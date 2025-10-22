@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { DollarSign, TrendingUp, Calendar, AlertTriangle } from "lucide-react";
+import { DollarSign, TrendingUp, Calendar, AlertTriangle, Wrench, Snowflake, Zap, Home } from "lucide-react";
 import { EmailCaptureModal } from "./EmailCaptureModal";
 
+type TradeType = "plumbing" | "hvac" | "electrical" | "roofing";
+
 export const EmergencyCalculator = () => {
-  const [trade, setTrade] = useState("plumbing");
+  const [trade, setTrade] = useState<TradeType>("plumbing");
   const [emergencyCalls, setEmergencyCalls] = useState([15]);
   const [missedPercent, setMissedPercent] = useState([40]);
   const [avgValue, setAvgValue] = useState([1200]);
@@ -24,11 +25,19 @@ export const EmergencyCalculator = () => {
   const roi = Math.round((netGain / aiCost) * 100);
   const paybackDays = Math.round((aiCost / recoveredRevenue) * 30);
 
-  const tradeDefaults: Record<string, { value: number; label: string }> = {
-    plumbing: { value: 1200, label: "Plumbing (Emergency Repairs)" },
-    hvac: { value: 1500, label: "HVAC (System Failures)" },
-    electrical: { value: 1100, label: "Electrical (Power Outages)" },
-    roofing: { value: 2000, label: "Roofing (Storm Damage)" },
+  const tradeDefaults: Record<TradeType, { value: number; calls: number; missedRate: number; label: string; icon: any }> = {
+    plumbing: { value: 1200, calls: 60, missedRate: 38, label: "Plumber", icon: Wrench },
+    hvac: { value: 1500, calls: 55, missedRate: 42, label: "HVAC", icon: Snowflake },
+    electrical: { value: 1100, calls: 50, missedRate: 35, label: "Electrician", icon: Zap },
+    roofing: { value: 2000, calls: 40, missedRate: 45, label: "Roofer", icon: Home },
+  };
+
+  const handleNicheSelect = (niche: TradeType) => {
+    setTrade(niche);
+    const defaults = tradeDefaults[niche];
+    setAvgValue([defaults.value]);
+    setEmergencyCalls([Math.round(defaults.calls / 4)]);
+    setMissedPercent([defaults.missedRate]);
   };
 
   return (
@@ -47,30 +56,37 @@ export const EmergencyCalculator = () => {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {/* Calculator Inputs */}
-            <Card>
+          <div className="max-w-5xl mx-auto">
+            <Card className="border-2 border-primary">
               <CardHeader>
-                <CardTitle>Calculate Your Lost Revenue</CardTitle>
-                <CardDescription>See exactly how much you're leaving on the table</CardDescription>
+                <CardTitle className="text-3xl text-center">You could recover ${recoveredRevenue.toLocaleString()}/month</CardTitle>
+                <CardDescription className="text-center text-base">Select your trade and adjust the numbers below</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Trade Selection */}
-                <div className="space-y-2">
-                  <Label>Your Trade</Label>
-                  <Select value={trade} onValueChange={(value) => {
-                    setTrade(value);
-                    setAvgValue([tradeDefaults[value].value]);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(tradeDefaults).map(([key, { label }]) => (
-                        <SelectItem key={key} value={key}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <CardContent className="space-y-8">
+                {/* Niche Selector Pills */}
+                <div className="space-y-3">
+                  <Label className="text-base">Your Trade</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {(Object.entries(tradeDefaults) as [TradeType, typeof tradeDefaults[TradeType]][]).map(([key, { label, icon: Icon }]) => (
+                      <Button
+                        key={key}
+                        variant={trade === key ? "default" : "outline"}
+                        className="h-auto py-4 flex flex-col items-center gap-2"
+                        onClick={() => handleNicheSelect(key)}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-sm font-semibold">{label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="w-full text-xs"
+                    onClick={() => handleNicheSelect(trade)}
+                  >
+                    Use {tradeDefaults[trade].label} defaults
+                  </Button>
                 </div>
 
                 {/* Emergency Calls Per Week */}
@@ -102,79 +118,30 @@ export const EmergencyCalculator = () => {
                   <Slider value={avgValue} onValueChange={setAvgValue} min={400} max={3000} step={100} />
                   <p className="text-xs text-muted-foreground">Emergency jobs typically worth 3-5x more</p>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Results */}
-            <Card className="border-2 border-primary">
-              <CardHeader>
-                <CardTitle className="text-2xl">Your Recovery Potential</CardTitle>
-                <CardDescription>With 95% AI capture rate</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Lost Revenue */}
-                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-destructive" />
-                      <span className="font-medium">Currently Losing</span>
+                {/* Results Section */}
+                <div className="space-y-6 pt-6 border-t-2">`
+                  <div className="text-center space-y-2">
+                    <p className="text-sm text-muted-foreground font-medium">💰 Recovered revenue per month</p>
+                    <p className="text-5xl font-bold text-primary">${recoveredRevenue.toLocaleString()}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-4 rounded-lg bg-muted">
+                      <p className="text-sm text-muted-foreground mb-1">📞 Calls to break even</p>
+                      <p className="text-2xl font-bold">{Math.ceil(aiCost / avgValue[0])} calls</p>
+                      <p className="text-xs text-muted-foreground mt-1">~{paybackDays} days</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-muted">
+                      <p className="text-sm text-muted-foreground mb-1">Net Monthly Gain</p>
+                      <p className="text-2xl font-bold text-primary">${netGain.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{roi}% ROI</p>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-destructive">
-                    ${lostRevenue.toLocaleString()}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {missedCalls} missed emergency calls/month
-                  </p>
+                  <Button className="w-full h-12 text-lg mt-4" onClick={() => setShowEmailModal(true)}>
+                    Get Your Personalized Recovery Plan
+                  </Button>
                 </div>
-
-                {/* Revenue Recovered */}
-                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-primary" />
-                      <span className="font-medium">Revenue Recovered</span>
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-primary">
-                    ${recoveredRevenue.toLocaleString()}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    95% of emergency calls captured
-                  </p>
-                </div>
-
-                {/* Net Monthly Gain */}
-                <div className="space-y-3">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-sm text-muted-foreground">AI Cost (recommended plan)</span>
-                    <span className="font-semibold">${aiCost}/month</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="font-medium">Net Monthly Gain</span>
-                    <span className="text-2xl font-bold text-primary">${netGain.toLocaleString()}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-primary" />
-                      <div>
-                        <div className="text-2xl font-bold">{roi}%</div>
-                        <div className="text-xs text-muted-foreground">ROI</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-primary" />
-                      <div>
-                        <div className="text-2xl font-bold">{paybackDays}</div>
-                        <div className="text-xs text-muted-foreground">Days to payback</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Button className="w-full h-12 text-lg" onClick={() => setShowEmailModal(true)}>
-                  Get Your Personalized Recovery Plan
-                </Button>
               </CardContent>
             </Card>
           </div>

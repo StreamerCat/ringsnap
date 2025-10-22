@@ -18,22 +18,21 @@ export const ContractorHero = () => {
             </div>
 
             <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
-              Stop Losing{" "}
-              <span className="text-primary">$4,200-$12,600/Month</span>{" "}
-              in Emergency Calls
+              The only AI receptionist built for{" "}
+              <span className="text-primary">home service pros</span>
             </h1>
 
             <p className="text-xl text-muted-foreground leading-relaxed">
-              Too busy under a sink to answer? AI receptionist books $800+ emergency jobs in <span className="font-semibold text-foreground">under 1 second</span> while you work. For plumbers, HVAC, electrical & roofing contractors.
+              Works 24/7. Books jobs. Sounds human. Flat rate. Never miss a call again, even at 2 AM.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Button size="lg" className="text-lg h-14 px-8">
                 <PhoneCall className="mr-2" />
-                Try Live Demo Now
+                Start free trial
               </Button>
               <Button size="lg" variant="outline" className="text-lg h-14 px-8" onClick={scrollToCalculator}>
-                Calculate Your Lost Revenue
+                Hear it live
               </Button>
             </div>
 

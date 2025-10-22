@@ -1,11 +1,15 @@
 import { Helmet } from "react-helmet";
+import { lazy, Suspense } from "react";
 import { ContractorHero } from "@/components/ContractorHero";
-import { EmergencyCalculator } from "@/components/EmergencyCalculator";
-import { SolutionDemo } from "@/components/SolutionDemo";
-import { ContractorTestimonials } from "@/components/ContractorTestimonials";
-import { ContractorPricing } from "@/components/ContractorPricing";
-import { FinalCTA } from "@/components/FinalCTA";
-import { ContractorFooter } from "@/components/ContractorFooter";
+
+const EmergencyCalculator = lazy(() => import("@/components/EmergencyCalculator").then(m => ({ default: m.EmergencyCalculator })));
+const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
+const CompetitorComparison = lazy(() => import("@/components/CompetitorComparison").then(m => ({ default: m.CompetitorComparison })));
+const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
+const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
+const FinalCTA = lazy(() => import("@/components/FinalCTA").then(m => ({ default: m.FinalCTA })));
+const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
+const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Index = () => {
   const structuredData = {
@@ -61,6 +65,32 @@ const Index = () => {
     ]
   };
 
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "AI Voice Agent",
+    "url": "https://aivoiceagent.com",
+    "logo": "https://aivoiceagent.com/logo.png",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+1-800-AI-CALLS",
+      "contactType": "customer support",
+      "availableLanguage": ["English", "Spanish"]
+    }
+  };
+
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "AI Voice Agent",
+    "url": "https://aivoiceagent.com",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://aivoiceagent.com/search?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  };
+
   const faqStructuredData = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -108,11 +138,8 @@ const Index = () => {
           name="description" 
           content="Stop losing $4,200-$12,600/month in missed emergency calls. AI receptionist answers in under 1 second, books plumbing & HVAC jobs 24/7. Try free for 14 days." 
         />
-        <meta 
-          name="keywords" 
-          content="AI answering service for plumbers, HVAC answering service, emergency call answering, 24/7 receptionist, plumber call service, contractor answering service" 
-        />
         <link rel="canonical" href="https://aivoiceagent.com/" />
+        <link rel="preload" as="image" href="https://aivoiceagent.com/hero-transcript.webp" />
         
         {/* Open Graph */}
         <meta property="og:title" content="24/7 AI Answering Service for Plumbers & HVAC" />
@@ -129,6 +156,12 @@ const Index = () => {
         
         {/* Structured Data */}
         <script type="application/ld+json">
+          {JSON.stringify(organizationSchema)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(websiteSchema)}
+        </script>
+        <script type="application/ld+json">
           {JSON.stringify(structuredData)}
         </script>
         <script type="application/ld+json">
@@ -136,16 +169,21 @@ const Index = () => {
         </script>
       </Helmet>
 
-      <main>
+      <main className="pb-20 md:pb-0">
         <h1 className="sr-only">24/7 AI Answering Service for Plumbers, HVAC, Electrical & Roofing Contractors</h1>
         
         <ContractorHero />
-        <EmergencyCalculator />
-        <SolutionDemo />
-        <ContractorTestimonials />
-        <ContractorPricing />
-        <FinalCTA />
-        <ContractorFooter />
+        
+        <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
+          <EmergencyCalculator />
+          <SolutionDemo />
+          <CompetitorComparison />
+          <ContractorTestimonials />
+          <ContractorPricing />
+          <FinalCTA />
+          <ContractorFooter />
+          <MobileFooterCTA />
+        </Suspense>
       </main>
     </>
   );

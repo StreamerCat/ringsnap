@@ -3,6 +3,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Star, TrendingUp } from "lucide-react";
 
 export const ContractorTestimonials = () => {
+  const metrics = [
+    { value: "4.9", label: "out of 5", sublabel: "from 247 contractors", icon: "star" },
+    { value: "<1 sec", label: "Answer time", sublabel: "Instant pickup", icon: "clock" },
+    { value: "95%", label: "Call capture", sublabel: "vs your 55-60%", icon: "phone" }
+  ];
+
   const testimonials = [
     {
       quote: "We went from missing 40% of after-hours calls to capturing 98%. That's an extra $23,400 in monthly revenue. The AI paid for itself in 3 days.",
@@ -39,6 +45,30 @@ export const ContractorTestimonials = () => {
   return (
     <section className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
+        {/* Ratings Strip */}
+        <div className="max-w-4xl mx-auto mb-12">
+          <Card className="border-2 border-primary">
+            <CardContent className="p-6">
+              <div className="grid md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x">
+                {metrics.map((metric, index) => (
+                  <div key={index} className="flex flex-col items-center justify-center text-center pt-6 md:pt-0 first:pt-0">
+                    {metric.icon === "star" && (
+                      <div className="flex items-center gap-1 mb-2">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="w-5 h-5 fill-primary text-primary" />
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-4xl font-bold text-primary">{metric.value}</div>
+                    <div className="text-sm font-medium mt-1">{metric.label}</div>
+                    <div className="text-xs text-muted-foreground">{metric.sublabel}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="max-w-4xl mx-auto text-center mb-12">
           <h2 className="text-4xl font-bold mb-4">Real Results from Real Contractors</h2>
           <p className="text-xl text-muted-foreground">

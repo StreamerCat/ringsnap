@@ -1,40 +1,85 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, Smartphone } from "lucide-react";
+import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign } from "lucide-react";
 
 export const SolutionDemo = () => {
   return (
     <section className="py-20 bg-background">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">
-            Your AI Receptionist Books <span className="text-primary">$800+ Emergency Jobs</span> While You Work
+          <h2 className="text-4xl font-bold mb-4 uppercase tracking-tight">
+            Meet Your New Receptionist <span className="text-primary">(Who Never Sleeps)</span>
           </h2>
           <p className="text-xl text-muted-foreground">
-            Natural conversations, not robotic. Knows emergencies from quotes. Transfers critical situations to you.
+            Try it now. Ask about pricing. Book an appointment. Report an emergency.
           </p>
         </div>
 
-        {/* Demo Widget Placeholder */}
-        <div className="max-w-2xl mx-auto mb-16">
-          <Card className="border-2 border-primary">
-            <CardContent className="p-8 text-center space-y-4">
-              <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                <Smartphone className="w-10 h-10 text-primary" />
-              </div>
-              <h3 className="text-2xl font-bold">Try the Live Demo</h3>
-              <p className="text-muted-foreground">
-                ☝️ Click below and say: <span className="font-semibold text-foreground">"My water heater is leaking and flooding my basement"</span>
-              </p>
-              <Button size="lg" className="text-lg h-14 px-8">
-                <MessageCircle className="mr-2" />
-                Start Demo Call
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Test emergency booking, appointment scheduling, or ask about pricing
-              </p>
+        {/* Interactive Demo */}
+        <div className="max-w-3xl mx-auto mb-16">
+          <iframe 
+            src="https://aivoiceagent.com/demo" 
+            title="Interactive Demo" 
+            className="w-full h-96 rounded-xl border-2 border-primary shadow-xl"
+            allow="microphone"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Proof Points Grid */}
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
+          <Card className="text-center p-6">
+            <CardContent className="space-y-3 p-0">
+              <Zap className="w-10 h-10 text-primary mx-auto" />
+              <h3 className="font-bold text-lg">Built for your industry</h3>
+              <p className="text-sm text-muted-foreground">Books jobs. Routes emergencies. Answers FAQs.</p>
             </CardContent>
           </Card>
+          <Card className="text-center p-6">
+            <CardContent className="space-y-3 p-0">
+              <Clock className="w-10 h-10 text-primary mx-auto" />
+              <h3 className="font-bold text-lg">24/7 coverage at a flat price</h3>
+              <p className="text-sm text-muted-foreground">No after hours fees. $297-$797/month.</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center p-6">
+            <CardContent className="space-y-3 p-0">
+              <Brain className="w-10 h-10 text-primary mx-auto" />
+              <h3 className="font-bold text-lg">Live in 10 minutes</h3>
+              <p className="text-sm text-muted-foreground">No training. No contracts. Keep your number.</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center p-6">
+            <CardContent className="space-y-3 p-0">
+              <DollarSign className="w-10 h-10 text-primary mx-auto" />
+              <h3 className="font-bold text-lg">Affordable for any size</h3>
+              <p className="text-sm text-muted-foreground">Plans from $297 to $1,497 per month.</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center p-6">
+            <CardContent className="space-y-3 p-0">
+              <MessageCircle className="w-10 h-10 text-primary mx-auto" />
+              <h3 className="font-bold text-lg">Sounds human</h3>
+              <p className="text-sm text-muted-foreground">89% of callers cannot tell it's AI.</p>
+            </CardContent>
+          </Card>
+          <Card className="text-center p-6">
+            <CardContent className="space-y-3 p-0">
+              <Shield className="w-10 h-10 text-primary mx-auto" />
+              <h3 className="font-bold text-lg">Zero risk</h3>
+              <p className="text-sm text-muted-foreground">14-day free trial. Cancel anytime.</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto mb-16">
+          <Button size="lg" className="text-lg h-14 px-8">
+            Start Free Trial
+          </Button>
+          <Button size="lg" variant="outline" className="text-lg h-14 px-8">
+            See How It Works
+          </Button>
         </div>
 
         {/* Outcome Cards */}
