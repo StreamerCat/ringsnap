@@ -52,17 +52,7 @@ const Index = () => {
       "worstRating": "1"
     },
     "description": "24/7 AI answering service for plumbers, HVAC, electrical, and roofing contractors. Never miss emergency calls worth $800-2000. Answers in under 1 second.",
-    "image": "https://aivoiceagent.com/og-image.jpg",
-    "featureList": [
-      "Answers calls in under 1 second",
-      "Books emergency appointments automatically",
-      "95% call capture rate",
-      "Multi-language support (English, Spanish)",
-      "Natural human-sounding voice",
-      "Integrates with existing phone number",
-      "24/7/365 availability",
-      "HIPAA compliant"
-    ]
+    "image": "https://aivoiceagent.com/og-image.jpg"
   };
 
   const organizationSchema = {

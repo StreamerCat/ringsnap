@@ -13,6 +13,13 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      lineHeight: {
+        relaxed: '1.75',
+        loose: '1.8',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

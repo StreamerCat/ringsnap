@@ -66,10 +66,11 @@ export const CompetitorComparison = () => {
 
   return (
     <section className="py-20 bg-background">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-7xl">
+        <hr className="section-divider mb-12" />
         <div className="max-w-6xl mx-auto text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">How We Stack Up</h2>
-          <p className="text-xl text-muted-foreground">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">How We Stack Up</h2>
+          <p className="text-xl text-muted-foreground leading-relaxed">
             Compare features, pricing, and ROI across all major platforms
           </p>
         </div>
@@ -83,7 +84,7 @@ export const CompetitorComparison = () => {
                 {competitors.map((comp, idx) => (
                   <TableHead
                     key={idx}
-                    className={`text-center ${comp.highlight ? "bg-primary/10 font-bold" : ""}`}
+                    className={`text-center ${comp.highlight ? "bg-emerald-50 border-2 border-emerald-500 font-bold" : ""}`}
                   >
                     {comp.name}
                   </TableHead>
@@ -97,7 +98,7 @@ export const CompetitorComparison = () => {
                   {criterion.values.map((value, colIdx) => (
                     <TableCell
                       key={colIdx}
-                      className={`text-center ${competitors[colIdx].highlight ? "bg-primary/5" : ""}`}
+                      className={`text-center ${competitors[colIdx].highlight ? "bg-emerald-50/50" : ""}`}
                     >
                       {getIcon(value)}
                     </TableCell>
@@ -111,7 +112,7 @@ export const CompetitorComparison = () => {
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-6">
           {competitors.map((comp, idx) => (
-            <Card key={idx} className={comp.highlight ? "border-2 border-primary" : ""}>
+            <Card key={idx} className={comp.highlight ? "border-2 border-emerald-500 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]" : "shadow-sm"}>
               <CardHeader>
                 <CardTitle className={comp.highlight ? "text-primary" : ""}>{comp.name}</CardTitle>
               </CardHeader>

@@ -44,41 +44,51 @@ export const ContractorTestimonials = () => {
 
   return (
     <section className="py-20 bg-muted/30">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-7xl">
+        <hr className="section-divider mb-12" />
+        
         {/* Ratings Strip */}
-        <div className="max-w-4xl mx-auto mb-12">
-          <Card className="border-2 border-primary">
-            <CardContent className="p-6">
-              <div className="grid md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x">
-                {metrics.map((metric, index) => (
-                  <div key={index} className="flex flex-col items-center justify-center text-center pt-6 md:pt-0 first:pt-0">
-                    {metric.icon === "star" && (
-                      <div className="flex items-center gap-1 mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="w-5 h-5 fill-primary text-primary" />
-                        ))}
-                      </div>
-                    )}
-                    <div className="text-4xl font-bold text-primary">{metric.value}</div>
-                    <div className="text-sm font-medium mt-1">{metric.label}</div>
-                    <div className="text-xs text-muted-foreground">{metric.sublabel}</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap items-center justify-center gap-8 mb-12 p-6 bg-white rounded-2xl border shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Star className="w-8 h-8 fill-emerald-500 text-emerald-500" />
+            <div>
+              <div className="text-3xl font-bold tabular-nums">4.9</div>
+              <div className="text-sm text-slate-600">out of 5</div>
+            </div>
+          </div>
+          
+          <div className="h-12 w-px bg-slate-200 hidden md:block" />
+          
+          <div className="text-center">
+            <div className="text-2xl font-bold tabular-nums">247</div>
+            <div className="text-sm text-slate-600">Contractors</div>
+          </div>
+          
+          <div className="h-12 w-px bg-slate-200 hidden md:block" />
+          
+          <div className="text-center">
+            <div className="text-2xl font-bold text-emerald-600 tabular-nums">&lt;1s</div>
+            <div className="text-sm text-slate-600">Answer time</div>
+          </div>
+          
+          <div className="h-12 w-px bg-slate-200 hidden md:block" />
+          
+          <div className="text-center">
+            <div className="text-2xl font-bold text-emerald-600 tabular-nums">95%</div>
+            <div className="text-sm text-slate-600">Capture rate</div>
+          </div>
         </div>
 
         <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">Real Results from Real Contractors</h2>
-          <p className="text-xl text-muted-foreground">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">Real Results from Real Contractors</h2>
+          <p className="text-xl text-muted-foreground leading-relaxed">
             847 plumbers, HVAC techs, electricians, and roofers capture 95% of emergency calls with AI
           </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="border-2 hover:border-primary transition-colors">
+            <Card key={index} className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
               <CardContent className="p-6 space-y-6">
                 {/* Star Rating */}
                 <div className="flex gap-1">

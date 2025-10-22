@@ -7,8 +7,8 @@ export const ContractorHero = () => {
   };
 
   return (
-    <section className="relative min-h-[90vh] flex items-center bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="container mx-auto px-4 py-16">
+    <section className="relative min-h-[90vh] flex items-center bg-gray-50">
+      <div className="container mx-auto px-4 py-24 max-w-7xl">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Column - Copy */}
           <div className="space-y-8">
@@ -17,21 +17,21 @@ export const ContractorHero = () => {
               <span className="text-sm font-medium">847 contractors answered 2,347 emergency calls this week</span>
             </div>
 
-            <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
+            <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
               The only AI receptionist built for{" "}
               <span className="text-primary">home service pros</span>
             </h1>
 
-            <p className="text-xl text-muted-foreground leading-relaxed">
+            <p className="text-xl text-muted-foreground leading-loose">
               Works 24/7. Books jobs. Sounds human. Flat rate. Never miss a call again, even at 2 AM.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="text-lg h-14 px-8">
+              <Button size="lg" className="text-lg h-14 px-8 shadow-lg hover:shadow-emerald-500/20 transition-all duration-200">
                 <PhoneCall className="mr-2" />
                 Start free trial
               </Button>
-              <Button size="lg" variant="outline" className="text-lg h-14 px-8" onClick={scrollToCalculator}>
+              <Button size="lg" variant="outline" className="text-lg h-14 px-8 hover:bg-gray-50 transition-all duration-200" onClick={scrollToCalculator}>
                 Hear it live
               </Button>
             </div>
@@ -53,63 +53,50 @@ export const ContractorHero = () => {
             </div>
           </div>
 
-          {/* Right Column - Visual */}
+          {/* Right Column - Transcript Card */}
           <div className="relative">
-            <div className="grid grid-cols-2 gap-4">
-              {/* Missed Call - Red Tint */}
-              <div className="relative p-6 rounded-2xl border-2 border-destructive/30 bg-destructive/5 backdrop-blur">
-                <div className="absolute -top-3 left-4 px-3 py-1 bg-destructive text-destructive-foreground text-xs font-bold rounded-full">
-                  WITHOUT AI
-                </div>
-                <div className="space-y-4 pt-2">
-                  <PhoneCall className="w-12 h-12 text-destructive animate-pulse" />
-                  <h3 className="font-bold text-lg">Missed Call</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Customer called at 8:47 PM about burst pipe emergency
-                  </p>
-                  <div className="pt-4 border-t space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Lost Revenue:</span>
-                      <span className="font-bold text-destructive">-$1,200</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Went to:</span>
-                      <span className="font-semibold">Competitor</span>
-                    </div>
-                  </div>
-                </div>
+            <div className="relative p-6 rounded-2xl border bg-white/80 backdrop-blur-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
+              <div className="absolute -top-3 -right-3 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-full shadow-lg">
+                &lt; 1s pickup
               </div>
-
-              {/* Booked Call - Green Tint */}
-              <div className="relative p-6 rounded-2xl border-2 border-primary/30 bg-primary/5 backdrop-blur">
-                <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
-                  WITH AI
+              
+              <div className="text-xs text-slate-500 uppercase tracking-wide mb-3">Live Call Transcript</div>
+              
+              <div className="space-y-3 text-sm leading-6">
+                <div>
+                  <span className="font-semibold text-emerald-600">AI:</span>
+                  <span className="text-slate-700"> Thanks for calling Summit Plumbing. How can I help?</span>
                 </div>
-                <div className="space-y-4 pt-2">
-                  <CheckCircle className="w-12 h-12 text-primary" />
-                  <h3 className="font-bold text-lg">Booked in 23 Sec</h3>
-                  <p className="text-sm text-muted-foreground">
-                    AI answered, qualified emergency, scheduled 9 AM arrival
-                  </p>
-                  <div className="pt-4 border-t space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Revenue:</span>
-                      <span className="font-bold text-primary">+$1,200</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="font-semibold text-primary">Confirmed</span>
-                    </div>
+                <div>
+                  <span className="font-semibold text-slate-800">Caller:</span>
+                  <span className="text-slate-700"> I have a burst pipe in the basement, water everywhere!</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-emerald-600">AI:</span>
+                  <span className="text-slate-700"> That's an emergency. Turn your main shutoff valve clockwise. I'm routing our on-call tech now. What's your address?</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-emerald-600">AI:</span>
+                  <span className="text-slate-700"> Got it. You're scheduled for arrival in 45 minutes. Text confirmation sent.</span>
+                </div>
+                
+                <div className="flex items-center gap-2 pt-3 border-t border-slate-200">
+                  <div className="flex items-center gap-1">
+                    <div className="w-1 h-4 bg-emerald-500 rounded animate-pulse" />
+                    <div className="w-1 h-6 bg-emerald-500 rounded animate-pulse" style={{animationDelay: '75ms'}} />
+                    <div className="w-1 h-4 bg-emerald-500 rounded animate-pulse" style={{animationDelay: '150ms'}} />
+                    <div className="w-1 h-5 bg-emerald-500 rounded animate-pulse" />
                   </div>
+                  <span className="text-xs text-slate-500">Call active • 0:47</span>
                 </div>
               </div>
             </div>
-
-            {/* Floating Stat Card */}
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-full max-w-sm p-4 bg-card border rounded-xl shadow-lg backdrop-blur">
+            
+            {/* Floating Stat Pill */}
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-white border-2 border-emerald-500 rounded-full shadow-lg whitespace-nowrap">
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary">95%</div>
-                <div className="text-sm text-muted-foreground">of emergency calls answered vs. your 55-60%</div>
+                <span className="text-2xl font-bold text-emerald-600">95%</span>
+                <span className="text-sm text-slate-600 ml-2">answered vs. your 55%</span>
               </div>
             </div>
           </div>

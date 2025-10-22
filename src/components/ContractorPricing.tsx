@@ -80,12 +80,13 @@ export const ContractorPricing = () => {
 
   return (
     <section className="py-20 bg-background">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-7xl">
+        <hr className="section-divider mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
             One Emergency Call <span className="text-primary">Pays for the Entire Month</span>
           </h2>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-xl text-muted-foreground leading-relaxed">
             Transparent pricing. No setup fees. Cancel anytime.
           </p>
         </div>
@@ -129,8 +130,8 @@ export const ContractorPricing = () => {
           {pricingTiers.map((tier, index) => (
             <Card 
               key={index} 
-              className={`relative ${
-                tier.badge ? 'border-2 border-primary shadow-xl scale-105' : 'border-2'
+              className={`relative shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200 ${
+                tier.badge ? 'border-2 border-primary hover:border-emerald-500 hover:shadow-xl scale-105' : 'border-2 hover:border-emerald-500'
               }`}
             >
               {tier.badge && (
@@ -184,7 +185,7 @@ export const ContractorPricing = () => {
 
                 {/* CTA */}
                 <Button 
-                  className="w-full h-12 text-lg" 
+                  className="w-full h-12 text-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-200" 
                   variant={tier.badge ? "default" : "outline"}
                   size="lg"
                 >
