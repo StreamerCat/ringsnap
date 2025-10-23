@@ -57,7 +57,7 @@ export const ContractorFooter = () => {
   };
 
   return (
-    <footer className="bg-muted/30 border-t">
+    <footer className="bg-gradient-to-br from-purple-50/30 to-white border-t border-purple-100/50">
       {/* FAQ Section */}
       <div className="container mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-center mb-8">Common Questions from Contractors</h2>
@@ -82,11 +82,13 @@ export const ContractorFooter = () => {
             {/* Brand Column */}
             <div className="md:col-span-1 space-y-4">
               <div className="flex items-center gap-2">
-                <Phone className="w-6 h-6 text-primary" />
-                <span className="font-bold text-lg">AI Receptionist</span>
+                <div className="w-6 h-6 gradient-core rounded-lg flex items-center justify-center">
+                  <Phone className="w-4 h-4 text-white" />
+                </div>
+                <span className="font-bold text-lg">Ringsnap</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Never miss another emergency call
+              <p className="text-sm text-foreground/60 font-secondary">
+                Made to sound human.
               </p>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
@@ -106,7 +108,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.product.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
                       {link.label}
                     </a>
                   </li>
@@ -120,7 +122,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.trades.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
                       {link.label}
                     </a>
                   </li>
@@ -134,7 +136,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.resources.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
                       {link.label}
                     </a>
                   </li>
@@ -148,7 +150,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.company.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
                       {link.label}
                     </a>
                   </li>

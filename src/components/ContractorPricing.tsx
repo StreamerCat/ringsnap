@@ -83,8 +83,8 @@ export const ContractorPricing = () => {
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 leading-tight">
-            One Emergency Call <span className="text-primary">Pays for the Entire Month</span>
+          <h2 className="text-headline mb-4">
+            Pricing as simple as <span className="text-gradient-core">a handshake</span>
           </h2>
           <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Transparent pricing. No setup fees. Cancel anytime.
@@ -130,22 +130,25 @@ export const ContractorPricing = () => {
           {pricingTiers.map((tier, index) => (
             <Card 
               key={index} 
-              className={`relative elevation-3 hover:-translate-y-0.5 transition-all duration-200 ${
-                tier.badge ? 'border-2 border-primary hover:border-emerald-500 hover:shadow-xl scale-105' : 'border-2 hover:border-emerald-500'
+              className={`relative rounded-3xl border-0 p-1 hover-glow ${
+                tier.badge 
+                  ? 'bg-gradient-to-br from-purple-200/50 via-pink-200/50 to-purple-200/50 scale-105' 
+                  : 'bg-gradient-to-br from-gray-100/50 to-white'
               }`}
             >
-              {tier.badge && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <Badge className="px-4 py-1 text-xs font-bold bg-primary text-primary-foreground">
-                    {tier.badge}
-                  </Badge>
-                </div>
-              )}
-              
-              <CardHeader className="text-center pb-4">
-                <div className="w-12 sm:w-14 h-12 sm:h-14 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                  <tier.icon className="w-6 sm:w-7 h-6 sm:h-7 text-primary" />
-                </div>
+              <div className="bg-white rounded-3xl">
+                {tier.badge && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <Badge variant="gradient" className="px-4 py-1 text-xs font-bold rounded-full">
+                      {tier.badge}
+                    </Badge>
+                  </div>
+                )}
+                
+                <CardHeader className="text-center pb-4">
+                  <div className="w-12 sm:w-14 h-12 sm:h-14 mx-auto mb-3 sm:mb-4 rounded-2xl gradient-secondary flex items-center justify-center">
+                    <tier.icon className="w-6 sm:w-7 h-6 sm:h-7 text-white" />
+                  </div>
                 <CardTitle className="text-xl sm:text-2xl">{tier.name}</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">{tier.description}</CardDescription>
                 <div className="pt-3 sm:pt-4">
@@ -177,16 +180,20 @@ export const ContractorPricing = () => {
                 </ul>
 
                 {/* Risk Reversal */}
-                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                  <div className="text-sm font-semibold text-center">
+                <div className="p-4 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100">
+                  <div className="text-sm font-semibold text-center text-foreground">
                     {tier.riskReversal}
                   </div>
                 </div>
 
                 {/* CTA */}
                 <Button 
-                  className="w-full h-12 text-lg shadow-lg hover:shadow-emerald-500/20 transition-all duration-200" 
-                  variant={tier.badge ? "default" : "outline"}
+                  className={`w-full h-12 text-lg rounded-full ${
+                    tier.badge 
+                      ? '' 
+                      : 'border-2 border-purple-100 hover:border-purple-200'
+                  }`}
+                  variant={tier.badge ? "gradient" : "outline"}
                   size="lg"
                 >
                   {tier.cta}
@@ -196,6 +203,7 @@ export const ContractorPricing = () => {
                   14-day free trial · No credit card required
                 </p>
               </CardContent>
+              </div>
             </Card>
           ))}
         </div>

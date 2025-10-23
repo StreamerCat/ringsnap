@@ -15,6 +15,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        secondary: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
       },
       lineHeight: {
         relaxed: '1.75',

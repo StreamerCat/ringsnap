@@ -16,7 +16,8 @@ const Index = () => {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "AI Answering Service for Contractors",
+    "name": "Ringsnap - AI Answering Service for Contractors",
+    "description": "Human-sounding AI receptionist that answers calls 24/7, books jobs automatically, and connects with customers warmly. Made for plumbers, HVAC, electrical, and roofing contractors.",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "offers": [
@@ -52,16 +53,29 @@ const Index = () => {
       "bestRating": "5",
       "worstRating": "1"
     },
-    "description": "24/7 AI answering service for plumbers, HVAC, electrical, and roofing contractors. Never miss emergency calls worth $800-2000. Answers in under 1 second.",
-    "image": "https://aivoiceagent.com/og-image.jpg"
+    "description": "Ringsnap: AI that answers like a human. 24/7 call answering for contractors. Never miss a call, book jobs automatically, sound warm not robotic. Customers won't know it's AI.",
+    "image": "https://aivoiceagent.com/og-image.jpg",
+    "featureList": [
+      "Answers in under 1 second",
+      "Books appointments automatically",
+      "Sounds completely human",
+      "24/7/365 availability",
+      "Multi-language support",
+      "Emergency call routing",
+      "HIPAA compliant",
+      "10-minute setup"
+    ]
   };
 
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "AI Voice Agent",
+    "name": "Ringsnap",
+    "alternateName": "AI Voice Agent",
+    "description": "AI answering service that sounds human. Made for contractors who never want to miss a call.",
     "url": "https://aivoiceagent.com",
     "logo": "https://aivoiceagent.com/logo.png",
+    "slogan": "Made to sound human",
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+1-800-AI-CALLS",
@@ -124,25 +138,29 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>24/7 AI Answering Service for Plumbers & HVAC | $297/mo</title>
+        <title>Ringsnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
         <meta 
           name="description" 
-          content="Stop losing $4,200-$12,600/month in missed emergency calls. AI receptionist answers in under 1 second, books plumbing & HVAC jobs 24/7. Try free for 14 days." 
+          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Ringsnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 14 days." 
+        />
+        <meta 
+          name="keywords" 
+          content="AI answering service, contractor receptionist, human-sounding AI, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, AI voice agent, warm AI assistant" 
         />
         <link rel="canonical" href="https://aivoiceagent.com/" />
         <link rel="preload" as="image" href="https://aivoiceagent.com/hero-transcript.webp" />
         
         {/* Open Graph */}
-        <meta property="og:title" content="24/7 AI Answering Service for Plumbers & HVAC" />
-        <meta property="og:description" content="Stop losing $4,200-$12,600/month in missed emergency calls. AI books jobs in under 1 second." />
+        <meta property="og:title" content="Ringsnap: AI that Answers Like a Human" />
+        <meta property="og:description" content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://aivoiceagent.com/" />
         <meta property="og:image" content="https://aivoiceagent.com/og-image.jpg" />
         
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="24/7 AI Answering Service for Plumbers & HVAC" />
-        <meta name="twitter:description" content="Never miss emergency calls worth $800-2000. AI answers in under 1 second." />
+        <meta name="twitter:title" content="Ringsnap: AI that Answers Like a Human" />
+        <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. AI that sounds warm and human." />
         <meta name="twitter:image" content="https://aivoiceagent.com/og-image.jpg" />
         
         {/* Structured Data */}
@@ -161,7 +179,7 @@ const Index = () => {
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
-        <h1 className="sr-only">24/7 AI Answering Service for Plumbers, HVAC, Electrical & Roofing Contractors</h1>
+        <h1 className="sr-only">Ringsnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
         
         <ContractorHero />
         

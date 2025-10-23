@@ -29,42 +29,42 @@ export const SolutionDemo = () => {
 
         {/* Proof Points Grid */}
         <div className="grid md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto mb-8 sm:mb-12">
-          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
             <CardContent className="space-y-3 p-0">
               <Zap className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Built for your industry</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">Books jobs. Routes emergencies. Answers FAQs.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
             <CardContent className="space-y-3 p-0">
               <Clock className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">24/7 coverage at a flat price</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">No after hours fees. $297-$797/month.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
             <CardContent className="space-y-3 p-0">
               <Brain className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Live in 10 minutes</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">No training. No contracts. Keep your number.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
             <CardContent className="space-y-3 p-0">
               <DollarSign className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Affordable for any size</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">Plans from $297 to $1,497 per month.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
             <CardContent className="space-y-3 p-0">
               <MessageCircle className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Sounds human</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">89% of callers cannot tell it's AI.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
             <CardContent className="space-y-3 p-0">
               <Shield className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Zero risk</h3>
@@ -75,10 +75,10 @@ export const SolutionDemo = () => {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto mb-16">
-          <Button size="lg" className="text-lg h-14 px-8 shadow-lg hover:shadow-emerald-500/20 transition-all duration-200">
+          <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full">
             Start Free Trial
           </Button>
-          <Button size="lg" variant="outline" className="text-lg h-14 px-8 hover:bg-gray-50 transition-all duration-200">
+          <Button size="lg" variant="outline" className="text-lg h-14 px-8 rounded-full border-2 border-foreground/10 hover:border-foreground/30 transition-all">
             See How It Works
           </Button>
         </div>

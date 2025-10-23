@@ -7,29 +7,30 @@ export const FinalCTA = () => {
   };
 
   return (
-    <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-background">
+    <section className="py-20 relative overflow-hidden">
+      {/* Gradient Aura Background */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/30 via-white to-pink-50/20" />
+        <div className="absolute top-20 right-20 w-96 h-96 gradient-core opacity-10 blur-3xl rounded-full" />
+      </div>
+      
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30">
-            <CheckCircle className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">847 contractors capturing 95% of calls vs. your 55-60%</span>
-          </div>
-
-          <h2 className="text-5xl font-bold leading-tight">
-            Stop Letting Your Competitors Book{" "}
-            <span className="text-primary">YOUR Emergency Calls</span>
+          <h2 className="text-headline leading-tight">
+            Stop letting your competitors book{" "}
+            <span className="text-gradient-core">your emergency calls</span>
           </h2>
 
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xl text-foreground/70 max-w-2xl mx-auto font-secondary">
             While you're under a sink or on a ladder, they're answering in under 1 second. Book $800+ emergency jobs 24/7 with AI that sounds human.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-            <Button size="lg" className="text-lg h-14 px-8">
+            <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full">
               <PhoneCall className="mr-2" />
               Try Live Demo Now
             </Button>
-            <Button size="lg" variant="outline" className="text-lg h-14 px-8" onClick={scrollToCalculator}>
+            <Button size="lg" variant="outline" className="text-lg h-14 px-8 rounded-full border-2 border-foreground/10 hover:border-foreground/30" onClick={scrollToCalculator}>
               <Calculator className="mr-2" />
               Calculate Your Lost Revenue
             </Button>
@@ -74,19 +75,19 @@ export const FinalCTA = () => {
           </div>
 
           {/* Urgency Without Fake Scarcity */}
-          <div className="max-w-md mx-auto p-6 rounded-xl bg-card border">
+          <div className="max-w-md mx-auto p-6 rounded-2xl bg-card border border-purple-100">
             <h3 className="font-bold mb-2">Every hour you wait:</h3>
-            <ul className="text-sm text-muted-foreground space-y-2 text-left">
+            <ul className="text-sm text-foreground/60 space-y-2 text-left">
               <li className="flex items-start gap-2">
-                <span className="text-destructive mt-1">•</span>
+                <span className="text-purple-500 mt-1">•</span>
                 <span>Your competitors answer emergency calls worth $500-2,000</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-destructive mt-1">•</span>
+                <span className="text-purple-500 mt-1">•</span>
                 <span>Customers find "someone who picks up" on Google</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-destructive mt-1">•</span>
+                <span className="text-purple-500 mt-1">•</span>
                 <span>You lose $140-350 in potential revenue (based on averages)</span>
               </li>
             </ul>
