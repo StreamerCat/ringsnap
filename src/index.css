@@ -38,20 +38,19 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
+    /* iOS Safe Areas */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -107,11 +106,95 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
+  /* Fluid Typography */
+  .text-fluid-h1 {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl;
+  }
+  
+  .text-fluid-h2 {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl;
+  }
+  
+  .text-fluid-body {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+  
+  /* Metric Typography */
+  .text-metric {
+    font-family: 'JetBrains Mono', monospace;
+    @apply tabular-nums font-semibold;
+  }
+  
+  /* Mobile Tap Targets - Minimum 44px */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Elevation System */
+  .elevation-1 {
+    @apply shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  .elevation-2 {
+    @apply shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.15)] transition-shadow duration-200;
+  }
+  
+  .elevation-3 {
+    @apply shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_40px_-12px_rgba(0,0,0,0.2)] transition-shadow duration-200;
+  }
+  
+  .elevation-4 {
+    @apply shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] hover:shadow-[0_25px_60px_-18px_rgba(0,0,0,0.3)] transition-shadow duration-200;
+  }
+  
   .card-premium {
-    @apply shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] rounded-2xl;
+    @apply elevation-3 rounded-2xl;
   }
   
   .section-divider {
     @apply h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent;
+  }
+  
+  /* Pulse Wave Button Animation */
+  .btn-pulse {
+    @apply relative overflow-hidden;
+  }
+  
+  .btn-pulse::before {
+    content: '';
+    @apply absolute inset-0 bg-white opacity-0;
+    animation: pulseWave 2s ease-out infinite;
+  }
+  
+  @keyframes pulseWave {
+    0% {
+      transform: scale(0.8);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1.2);
+      opacity: 0;
+    }
+  }
+  
+  /* Revenue Counter Animation */
+  @keyframes countUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-count-up {
+    animation: countUp 0.6s ease-out;
   }
 }

@@ -4,14 +4,14 @@ import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, Dol
 
 export const SolutionDemo = () => {
   return (
-    <section className="py-20 bg-background">
+    <section className="py-10 sm:py-14 lg:py-20 bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
-        <hr className="section-divider mb-12" />
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 uppercase tracking-tight leading-tight">
+        <hr className="section-divider mb-8 sm:mb-12" />
+        <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
+          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 uppercase tracking-tight leading-tight">
             Meet Your New Receptionist <span className="text-primary">(Who Never Sleeps)</span>
           </h2>
-          <p className="text-xl text-muted-foreground leading-relaxed">
+          <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Try it now. Ask about pricing. Book an appointment. Report an emergency.
           </p>
         </div>
@@ -28,47 +28,47 @@ export const SolutionDemo = () => {
         </div>
 
         {/* Proof Points Grid */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
-          <Card className="text-center p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto mb-8 sm:mb-12">
+          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
             <CardContent className="space-y-3 p-0">
-              <Zap className="w-10 h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-lg">Built for your industry</h3>
-              <p className="text-sm text-muted-foreground">Books jobs. Routes emergencies. Answers FAQs.</p>
+              <Zap className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
+              <h3 className="font-bold text-base sm:text-lg">Built for your industry</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">Books jobs. Routes emergencies. Answers FAQs.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
             <CardContent className="space-y-3 p-0">
-              <Clock className="w-10 h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-lg">24/7 coverage at a flat price</h3>
-              <p className="text-sm text-muted-foreground">No after hours fees. $297-$797/month.</p>
+              <Clock className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
+              <h3 className="font-bold text-base sm:text-lg">24/7 coverage at a flat price</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">No after hours fees. $297-$797/month.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
             <CardContent className="space-y-3 p-0">
-              <Brain className="w-10 h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-lg">Live in 10 minutes</h3>
-              <p className="text-sm text-muted-foreground">No training. No contracts. Keep your number.</p>
+              <Brain className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
+              <h3 className="font-bold text-base sm:text-lg">Live in 10 minutes</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">No training. No contracts. Keep your number.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
             <CardContent className="space-y-3 p-0">
-              <DollarSign className="w-10 h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-lg">Affordable for any size</h3>
-              <p className="text-sm text-muted-foreground">Plans from $297 to $1,497 per month.</p>
+              <DollarSign className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
+              <h3 className="font-bold text-base sm:text-lg">Affordable for any size</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">Plans from $297 to $1,497 per month.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
             <CardContent className="space-y-3 p-0">
-              <MessageCircle className="w-10 h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-lg">Sounds human</h3>
-              <p className="text-sm text-muted-foreground">89% of callers cannot tell it's AI.</p>
+              <MessageCircle className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
+              <h3 className="font-bold text-base sm:text-lg">Sounds human</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">89% of callers cannot tell it's AI.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200">
+          <Card className="text-center p-4 sm:p-6 elevation-2 hover:-translate-y-0.5 transition-all duration-200">
             <CardContent className="space-y-3 p-0">
-              <Shield className="w-10 h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-lg">Zero risk</h3>
-              <p className="text-sm text-muted-foreground">14-day free trial. Cancel anytime.</p>
+              <Shield className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
+              <h3 className="font-bold text-base sm:text-lg">Zero risk</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">14-day free trial. Cancel anytime.</p>
             </CardContent>
           </Card>
         </div>

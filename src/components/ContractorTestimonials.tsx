@@ -43,73 +43,73 @@ export const ContractorTestimonials = () => {
   ];
 
   return (
-    <section className="py-20 bg-muted/30">
+    <section className="py-10 sm:py-14 lg:py-20 bg-muted/30">
       <div className="container mx-auto px-4 max-w-7xl">
-        <hr className="section-divider mb-12" />
+        <hr className="section-divider mb-8 sm:mb-12" />
         
         {/* Ratings Strip */}
-        <div className="flex flex-wrap items-center justify-center gap-8 mb-12 p-6 bg-white rounded-2xl border shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Star className="w-8 h-8 fill-emerald-500 text-emerald-500" />
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mb-8 sm:mb-12 p-4 sm:p-6 bg-white rounded-2xl border elevation-3 max-w-4xl mx-auto">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Star className="w-6 sm:w-8 h-6 sm:h-8 fill-emerald-500 text-emerald-500" />
             <div>
-              <div className="text-3xl font-bold tabular-nums">4.9</div>
-              <div className="text-sm text-slate-600">out of 5</div>
+              <div className="text-2xl sm:text-3xl font-bold text-metric">4.9</div>
+              <div className="text-xs sm:text-sm text-slate-600">out of 5</div>
             </div>
           </div>
           
-          <div className="h-12 w-px bg-slate-200 hidden md:block" />
+          <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
           
           <div className="text-center">
-            <div className="text-2xl font-bold tabular-nums">247</div>
-            <div className="text-sm text-slate-600">Contractors</div>
+            <div className="text-xl sm:text-2xl font-bold text-metric">247</div>
+            <div className="text-xs sm:text-sm text-slate-600">Contractors</div>
           </div>
           
-          <div className="h-12 w-px bg-slate-200 hidden md:block" />
+          <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
           
           <div className="text-center">
-            <div className="text-2xl font-bold text-emerald-600 tabular-nums">&lt;1s</div>
-            <div className="text-sm text-slate-600">Answer time</div>
+            <div className="text-xl sm:text-2xl font-bold text-emerald-600 text-metric">&lt;1s</div>
+            <div className="text-xs sm:text-sm text-slate-600">Answer time</div>
           </div>
           
-          <div className="h-12 w-px bg-slate-200 hidden md:block" />
+          <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
           
           <div className="text-center">
-            <div className="text-2xl font-bold text-emerald-600 tabular-nums">95%</div>
-            <div className="text-sm text-slate-600">Capture rate</div>
+            <div className="text-xl sm:text-2xl font-bold text-emerald-600 text-metric">95%</div>
+            <div className="text-xs sm:text-sm text-slate-600">Capture rate</div>
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">Real Results from Real Contractors</h2>
-          <p className="text-xl text-muted-foreground leading-relaxed">
+        <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
+          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 leading-tight">Real Results from Real Contractors</h2>
+          <p className="text-fluid-body text-muted-foreground leading-relaxed">
             847 plumbers, HVAC techs, electricians, and roofers capture 95% of emergency calls with AI
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto">
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
-              <CardContent className="p-6 space-y-6">
+            <Card key={index} className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 elevation-3">
+              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Star Rating */}
                 <div className="flex gap-1">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-primary text-primary" />
+                    <Star key={i} className="w-4 sm:w-5 h-4 sm:h-5 fill-primary text-primary" />
                   ))}
                 </div>
 
                 {/* Quote */}
-                <blockquote className="text-sm leading-relaxed">
+                <blockquote className="text-xs sm:text-sm leading-relaxed">
                   "{testimonial.quote}"
                 </blockquote>
 
                 {/* Metric Badge */}
-                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="p-3 sm:p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-2xl font-bold text-primary">{testimonial.metric}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-primary text-metric">{testimonial.metric}</div>
                       <div className="text-xs text-muted-foreground">{testimonial.metricLabel}</div>
                     </div>
-                    <TrendingUp className="w-8 h-8 text-primary" />
+                    <TrendingUp className="w-6 sm:w-8 h-6 sm:h-8 text-primary" />
                   </div>
                 </div>
 

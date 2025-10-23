@@ -5,6 +5,7 @@ import { ContractorHero } from "@/components/ContractorHero";
 const EmergencyCalculator = lazy(() => import("@/components/EmergencyCalculator").then(m => ({ default: m.EmergencyCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
 const CompetitorComparison = lazy(() => import("@/components/CompetitorComparison").then(m => ({ default: m.CompetitorComparison })));
+const ObjectionHandling = lazy(() => import("@/components/ObjectionHandling").then(m => ({ default: m.ObjectionHandling })));
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
 const FinalCTA = lazy(() => import("@/components/FinalCTA").then(m => ({ default: m.FinalCTA })));
@@ -159,7 +160,7 @@ const Index = () => {
         </script>
       </Helmet>
 
-      <main className="pb-20 md:pb-0">
+      <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
         <h1 className="sr-only">24/7 AI Answering Service for Plumbers, HVAC, Electrical & Roofing Contractors</h1>
         
         <ContractorHero />
@@ -168,6 +169,7 @@ const Index = () => {
           <EmergencyCalculator />
           <SolutionDemo />
           <CompetitorComparison />
+          <ObjectionHandling />
           <ContractorTestimonials />
           <ContractorPricing />
           <FinalCTA />

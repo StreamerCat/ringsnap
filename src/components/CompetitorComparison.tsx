@@ -65,12 +65,12 @@ export const CompetitorComparison = () => {
   };
 
   return (
-    <section className="py-20 bg-background">
+    <section className="py-10 sm:py-14 lg:py-20 bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
-        <hr className="section-divider mb-12" />
-        <div className="max-w-6xl mx-auto text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">How We Stack Up</h2>
-          <p className="text-xl text-muted-foreground leading-relaxed">
+        <hr className="section-divider mb-8 sm:mb-12" />
+        <div className="max-w-6xl mx-auto text-center mb-8 sm:mb-12">
+          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 leading-tight">How We Stack Up</h2>
+          <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Compare features, pricing, and ROI across all major platforms
           </p>
         </div>
@@ -110,19 +110,38 @@ export const CompetitorComparison = () => {
         </div>
 
         {/* Mobile Cards */}
-        <div className="lg:hidden space-y-6">
+        <div className="lg:hidden space-y-4 sm:space-y-6">
           {competitors.map((comp, idx) => (
-            <Card key={idx} className={comp.highlight ? "border-2 border-emerald-500 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]" : "shadow-sm"}>
+            <Card key={idx} className={comp.highlight ? "border-2 border-emerald-500 elevation-3 relative" : "elevation-1"}>
+              {comp.highlight && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
+                  YOUR SOLUTION
+                </div>
+              )}
               <CardHeader>
                 <CardTitle className={comp.highlight ? "text-primary" : ""}>{comp.name}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {criteria.map((criterion, critIdx) => (
-                  <div key={critIdx} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <span className="text-sm font-medium">{criterion.name}</span>
-                    <div className="text-sm">{getIcon(criterion.values[idx])}</div>
-                  </div>
-                ))}
+              <CardContent className="space-y-2 sm:space-y-3">
+                {criteria.map((criterion, critIdx) => {
+                  const value = criterion.values[idx];
+                  const isGood = value === "check" || (value !== "x" && value !== "warning" && value !== "N/A");
+                  return (
+                    <div key={critIdx} className="flex justify-between items-center py-2 border-b last:border-0">
+                      <span className="text-xs sm:text-sm font-medium">{criterion.name}</span>
+                      <div className="flex items-center gap-2">
+                        {value === "check" || value === "x" || value === "warning" ? (
+                          getIcon(value)
+                        ) : (
+                          <span className={`text-xs sm:text-sm font-semibold px-2 py-1 rounded ${
+                            isGood ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {value}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           ))}

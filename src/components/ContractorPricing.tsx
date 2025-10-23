@@ -79,14 +79,14 @@ export const ContractorPricing = () => {
   ];
 
   return (
-    <section className="py-20 bg-background">
+    <section className="py-10 sm:py-14 lg:py-20 bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
-        <hr className="section-divider mb-12" />
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+        <hr className="section-divider mb-8 sm:mb-12" />
+        <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
+          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 leading-tight">
             One Emergency Call <span className="text-primary">Pays for the Entire Month</span>
           </h2>
-          <p className="text-xl text-muted-foreground leading-relaxed">
+          <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Transparent pricing. No setup fees. Cancel anytime.
           </p>
         </div>
@@ -126,11 +126,11 @@ export const ContractorPricing = () => {
         </div>
 
         {/* Pricing Tiers */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
           {pricingTiers.map((tier, index) => (
             <Card 
               key={index} 
-              className={`relative shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 transition-all duration-200 ${
+              className={`relative elevation-3 hover:-translate-y-0.5 transition-all duration-200 ${
                 tier.badge ? 'border-2 border-primary hover:border-emerald-500 hover:shadow-xl scale-105' : 'border-2 hover:border-emerald-500'
               }`}
             >
@@ -143,14 +143,14 @@ export const ContractorPricing = () => {
               )}
               
               <CardHeader className="text-center pb-4">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                  <tier.icon className="w-7 h-7 text-primary" />
+                <div className="w-12 sm:w-14 h-12 sm:h-14 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <tier.icon className="w-6 sm:w-7 h-6 sm:h-7 text-primary" />
                 </div>
-                <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                <CardDescription className="text-sm">{tier.description}</CardDescription>
-                <div className="pt-4">
-                  <div className="text-5xl font-bold">{tier.price}</div>
-                  <div className="text-sm text-muted-foreground">/month</div>
+                <CardTitle className="text-xl sm:text-2xl">{tier.name}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">{tier.description}</CardDescription>
+                <div className="pt-3 sm:pt-4">
+                  <div className="text-4xl sm:text-5xl font-bold text-metric">{tier.price}</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">/month</div>
                 </div>
               </CardHeader>
 
