@@ -37,29 +37,29 @@ export const ContractorFooter = () => {
       { label: "ROI Calculator", href: "#calculator" }
     ],
     trades: [
-      { label: "For Plumbers", href: "/plumbers" },
-      { label: "For HVAC", href: "/hvac" },
-      { label: "For Electricians", href: "/electrical" },
-      { label: "For Roofing", href: "/roofing" }
+      { label: "For Plumbers", href: "#calculator" },
+      { label: "For HVAC", href: "#calculator" },
+      { label: "For Electricians", href: "#calculator" },
+      { label: "For Roofing", href: "#calculator" }
     ],
     resources: [
-      { label: "Blog", href: "/blog" },
-      { label: "Case Studies", href: "/case-studies" },
-      { label: "Documentation", href: "/docs" },
-      { label: "Support", href: "/support" }
+      { label: "FAQ", href: "#faq" },
+      { label: "Get Started", href: "#pricing" },
+      { label: "Try Demo", href: "#demo" },
+      { label: "Support", href: "mailto:support@aivoiceagent.com" }
     ],
     company: [
-      { label: "About", href: "/about" },
-      { label: "Contact", href: "/contact" },
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Terms of Service", href: "/terms" }
+      { label: "Contact", href: "mailto:support@aivoiceagent.com" },
+      { label: "Privacy Policy", href: "#" },
+      { label: "Terms of Service", href: "#" },
+      { label: "Sitemap", href: "#" }
     ]
   };
 
   return (
     <footer className="bg-muted/30 border-t">
       {/* FAQ Section */}
-      <div className="container mx-auto px-4 py-16">
+      <div id="faq" className="container mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-center mb-8">Common Questions from Contractors</h2>
         <Accordion type="single" collapsible className="max-w-3xl mx-auto">
           {faqs.map((faq, index) => (

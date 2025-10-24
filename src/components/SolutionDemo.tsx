@@ -1,10 +1,109 @@
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign, Phone, PhoneOff, Volume2, VolumeX } from "lucide-react";
 
 export const SolutionDemo = () => {
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [volume, setVolume] = useState([80]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const vapiRef = useRef<any>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize Vapi on component mount
+  useEffect(() => {
+    // Dynamically load Vapi SDK
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@vapi-ai/web@latest/dist/index.js';
+    script.async = true;
+    script.onload = () => {
+      // Initialize Vapi with your assistant ID
+      // Replace 'YOUR_VAPI_ASSISTANT_ID' with actual ID
+      if (window.Vapi) {
+        vapiRef.current = new window.Vapi('YOUR_VAPI_PUBLIC_KEY');
+      }
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      if (vapiRef.current) {
+        vapiRef.current.stop();
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  // Handle call duration timer
+  useEffect(() => {
+    if (isCallActive) {
+      timerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      setCallDuration(0);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isCallActive]);
+
+  const handleStartCall = async () => {
+    if (vapiRef.current) {
+      try {
+        await vapiRef.current.start('YOUR_VAPI_ASSISTANT_ID');
+        setIsCallActive(true);
+      } catch (error) {
+        console.error('Failed to start call:', error);
+        alert('Please enable microphone permissions to use the demo');
+      }
+    } else {
+      alert('Demo is loading, please try again in a moment');
+    }
+  };
+
+  const handleEndCall = () => {
+    if (vapiRef.current) {
+      vapiRef.current.stop();
+      setIsCallActive(false);
+    }
+  };
+
+  const toggleMute = () => {
+    if (vapiRef.current) {
+      if (isMuted) {
+        vapiRef.current.setMuted(false);
+      } else {
+        vapiRef.current.setMuted(true);
+      }
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const handleVolumeChange = (value: number[]) => {
+    setVolume(value);
+    // Adjust volume if Vapi supports it
+    // vapiRef.current?.setVolume(value[0] / 100);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-background">
+    <section id="demo" className="py-10 sm:py-14 lg:py-20 bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
@@ -16,15 +115,99 @@ export const SolutionDemo = () => {
           </p>
         </div>
 
-        {/* Interactive Demo */}
+        {/* Interactive Voice Demo */}
         <div className="max-w-3xl mx-auto mb-16">
-          <iframe 
-            src="https://aivoiceagent.com/demo" 
-            title="Interactive Demo" 
-            className="w-full h-96 rounded-xl border-2 border-primary shadow-xl"
-            allow="microphone"
-            loading="lazy"
-          />
+          <Card className="border-2 border-primary shadow-xl">
+            <CardContent className="p-6 sm:p-8">
+              {/* Call Status */}
+              <div className="text-center mb-6">
+                {isCallActive ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-lg font-semibold">Call Active</span>
+                    </div>
+                    <div className="text-2xl font-mono font-bold text-primary">{formatTime(callDuration)}</div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Phone className="w-12 h-12 mx-auto text-primary" />
+                    <p className="text-sm text-muted-foreground">Click below to start a live conversation with our AI receptionist</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Instructions */}
+              {!isCallActive && (
+                <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+                  <h3 className="font-semibold mb-2 text-sm">Try asking:</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• "What are your hours?"</li>
+                    <li>• "I need emergency plumbing service"</li>
+                    <li>• "Can I schedule an appointment?"</li>
+                    <li>• "What's your pricing?"</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Call Controls */}
+              <div className="flex flex-col gap-4">
+                {/* Start/End Call Button */}
+                <Button
+                  size="lg"
+                  onClick={isCallActive ? handleEndCall : handleStartCall}
+                  className={`w-full h-14 text-lg shadow-lg transition-all duration-200 ${
+                    isCallActive
+                      ? 'bg-destructive hover:bg-destructive/90'
+                      : 'bg-primary hover:bg-primary/90'
+                  }`}
+                >
+                  {isCallActive ? (
+                    <>
+                      <PhoneOff className="mr-2 w-5 h-5" />
+                      End Call
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="mr-2 w-5 h-5" />
+                      Start Demo Call
+                    </>
+                  )}
+                </Button>
+
+                {/* Volume and Mute Controls */}
+                {isCallActive && (
+                  <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleMute}
+                      className="flex-shrink-0"
+                    >
+                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </Button>
+                    <div className="flex-1 flex items-center gap-3">
+                      <Volume2 className="w-4 h-4 text-muted-foreground" />
+                      <Slider
+                        value={volume}
+                        onValueChange={handleVolumeChange}
+                        min={0}
+                        max={100}
+                        step={10}
+                        className="flex-1"
+                      />
+                      <span className="text-sm font-medium text-muted-foreground w-10">{volume[0]}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Microphone Permission Note */}
+              <p className="text-xs text-center text-muted-foreground mt-4">
+                This demo requires microphone access. Your call is not recorded.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Proof Points Grid */}

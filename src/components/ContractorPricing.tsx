@@ -79,7 +79,7 @@ export const ContractorPricing = () => {
   ];
 
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-background">
+    <section id="pricing" className="py-10 sm:py-14 lg:py-20 bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
@@ -128,11 +128,12 @@ export const ContractorPricing = () => {
         {/* Pricing Tiers */}
         <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
           {pricingTiers.map((tier, index) => (
-            <Card 
-              key={index} 
-              className={`relative elevation-3 hover:-translate-y-0.5 transition-all duration-200 ${
-                tier.badge ? 'border-2 border-primary hover:border-emerald-500 hover:shadow-xl scale-105' : 'border-2 hover:border-emerald-500'
+            <Card
+              key={index}
+              className={`relative elevation-3 hover:-translate-y-1 transition-all duration-200 ${
+                tier.badge ? 'border-2 border-primary hover:border-emerald-500 hover:shadow-xl md:transform md:scale-[1.03]' : 'border-2 hover:border-emerald-500'
               }`}
+              style={tier.badge ? { transformOrigin: 'center' } : undefined}
             >
               {tier.badge && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">

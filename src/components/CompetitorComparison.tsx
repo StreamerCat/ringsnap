@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Check, X, AlertTriangle, Clock, DollarSign, ShieldCheck, Zap, Lock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, X, AlertTriangle } from "lucide-react";
 
 export const CompetitorComparison = () => {
+  const [selectedCompetitor, setSelectedCompetitor] = useState("CallRail");
+
   const competitors = [
     { name: "You", highlight: true },
     { name: "CallRail", highlight: false },
@@ -64,6 +68,13 @@ export const CompetitorComparison = () => {
     return <span className="text-sm text-center block">{value}</span>;
   };
 
+  const getIconSmall = (value: string) => {
+    if (value === "check") return <Check className="w-4 h-4 text-primary" />;
+    if (value === "x") return <X className="w-4 h-4 text-destructive" />;
+    if (value === "warning") return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+    return <span className="text-xs font-semibold">{value}</span>;
+  };
+
   return (
     <section className="py-10 sm:py-14 lg:py-20 bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -109,42 +120,84 @@ export const CompetitorComparison = () => {
           </Table>
         </div>
 
-        {/* Mobile Cards */}
-        <div className="lg:hidden space-y-4 sm:space-y-6">
-          {competitors.map((comp, idx) => (
-            <Card key={idx} className={comp.highlight ? "border-2 border-emerald-500 elevation-3 relative" : "elevation-1"}>
-              {comp.highlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
-                  YOUR SOLUTION
-                </div>
-              )}
-              <CardHeader>
-                <CardTitle className={comp.highlight ? "text-primary" : ""}>{comp.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 sm:space-y-3">
-                {criteria.map((criterion, critIdx) => {
-                  const value = criterion.values[idx];
-                  const isGood = value === "check" || (value !== "x" && value !== "warning" && value !== "N/A");
-                  return (
-                    <div key={critIdx} className="flex justify-between items-center py-2 border-b last:border-0">
-                      <span className="text-xs sm:text-sm font-medium">{criterion.name}</span>
-                      <div className="flex items-center gap-2">
-                        {value === "check" || value === "x" || value === "warning" ? (
-                          getIcon(value)
-                        ) : (
-                          <span className={`text-xs sm:text-sm font-semibold px-2 py-1 rounded ${
-                            isGood ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {value}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ))}
+        {/* Mobile Side-by-Side Comparison */}
+        <div className="lg:hidden space-y-6">
+          <Tabs defaultValue="CallRail" value={selectedCompetitor} onValueChange={setSelectedCompetitor} className="w-full">
+            <TabsList className="w-full grid grid-cols-4 sm:grid-cols-7 mb-6 h-auto">
+              {competitors.filter(c => !c.highlight).map((comp) => (
+                <TabsTrigger
+                  key={comp.name}
+                  value={comp.name}
+                  className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  {comp.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {competitors.filter(c => !c.highlight).map((comp, compIdx) => {
+              const actualIdx = competitors.findIndex(c => c.name === comp.name);
+              return (
+                <TabsContent key={comp.name} value={comp.name} className="mt-0">
+                  {/* Side-by-side comparison */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Your Solution Column */}
+                    <Card className="border-2 border-emerald-500 elevation-3">
+                      <CardHeader className="pb-3">
+                        <div className="text-center">
+                          <div className="inline-block px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded mb-2">
+                            YOUR SOLUTION
+                          </div>
+                          <CardTitle className="text-base sm:text-lg text-primary">You</CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3 px-3">
+                        {criteria.map((criterion, critIdx) => {
+                          const yourValue = criterion.values[0];
+                          return (
+                            <div key={critIdx} className="space-y-1">
+                              <div className="text-xs font-medium text-muted-foreground">{criterion.name}</div>
+                              <div className="flex items-center justify-center min-h-[28px] p-1 rounded bg-primary/5">
+                                {getIconSmall(yourValue)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+
+                    {/* Competitor Column */}
+                    <Card className="border elevation-1">
+                      <CardHeader className="pb-3">
+                        <div className="text-center">
+                          <div className="h-6 mb-2"></div>
+                          <CardTitle className="text-base sm:text-lg">{comp.name}</CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3 px-3">
+                        {criteria.map((criterion, critIdx) => {
+                          const competitorValue = criterion.values[actualIdx];
+                          const yourValue = criterion.values[0];
+                          const isBetter = (yourValue === "check" && competitorValue !== "check") ||
+                                          (yourValue !== "x" && competitorValue === "x");
+                          return (
+                            <div key={critIdx} className="space-y-1">
+                              <div className="text-xs font-medium text-muted-foreground">{criterion.name}</div>
+                              <div className={`flex items-center justify-center min-h-[28px] p-1 rounded ${
+                                isBetter ? 'bg-destructive/5' : 'bg-muted/50'
+                              }`}>
+                                {getIconSmall(competitorValue)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+              );
+            })}
+          </Tabs>
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-8 max-w-3xl mx-auto">

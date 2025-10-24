@@ -97,54 +97,104 @@ export const EmergencyCalculator = () => {
                 </div>
 
                 {/* Emergency Calls Per Week */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm">Emergency Calls Per Week</Label>
-                    <span className="text-sm font-bold text-metric">{emergencyCalls[0]} calls</span>
+                    <Label className="text-sm sm:text-base font-semibold">Emergency Calls Per Week</Label>
+                    <div className="px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                      <span className="text-base sm:text-lg font-bold text-primary text-metric">{emergencyCalls[0]}</span>
+                      <span className="text-sm text-primary/70 ml-1">calls</span>
+                    </div>
                   </div>
-                  <input 
-                    type="tel" 
+                  <input
+                    type="tel"
                     inputMode="numeric"
-                    value={emergencyCalls[0]} 
+                    value={emergencyCalls[0]}
                     onChange={(e) => setEmergencyCalls([Math.max(5, Math.min(50, Number(e.target.value) || 5))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold"
+                    className="sm:hidden w-full h-12 px-4 rounded-md border-2 border-primary/30 focus:border-primary text-center text-lg font-bold transition-colors"
                   />
-                  <Slider value={emergencyCalls} onValueChange={setEmergencyCalls} min={5} max={50} step={1} className="hidden sm:block" />
-                  <p className="text-xs text-muted-foreground">{monthlyEmergencyCalls} emergency calls/month</p>
+                  <div className="hidden sm:block p-4 rounded-lg bg-gradient-to-r from-emerald-50 to-white border-2 border-emerald-200">
+                    <Slider
+                      value={emergencyCalls}
+                      onValueChange={setEmergencyCalls}
+                      min={5}
+                      max={50}
+                      step={1}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                      <span>5 calls</span>
+                      <span className="font-medium text-primary">← Drag to adjust →</span>
+                      <span>50 calls</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground"><strong>{monthlyEmergencyCalls}</strong> emergency calls/month</p>
                 </div>
 
                 {/* Missed Percentage */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm">Currently Missed (%)</Label>
-                    <span className="text-sm font-bold text-metric">{missedPercent[0]}%</span>
+                    <Label className="text-sm sm:text-base font-semibold">Currently Missed (%)</Label>
+                    <div className="px-3 py-1.5 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <span className="text-base sm:text-lg font-bold text-destructive text-metric">{missedPercent[0]}</span>
+                      <span className="text-sm text-destructive/70 ml-1">%</span>
+                    </div>
                   </div>
-                  <input 
-                    type="tel" 
+                  <input
+                    type="tel"
                     inputMode="numeric"
-                    value={missedPercent[0]} 
+                    value={missedPercent[0]}
                     onChange={(e) => setMissedPercent([Math.max(20, Math.min(70, Number(e.target.value) || 40))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold"
+                    className="sm:hidden w-full h-12 px-4 rounded-md border-2 border-destructive/30 focus:border-destructive text-center text-lg font-bold transition-colors"
                   />
-                  <Slider value={missedPercent} onValueChange={setMissedPercent} min={20} max={70} step={5} className="hidden sm:block" />
-                  <p className="text-xs text-muted-foreground">Industry average: 35-40%</p>
+                  <div className="hidden sm:block p-4 rounded-lg bg-gradient-to-r from-red-50 to-white border-2 border-red-200">
+                    <Slider
+                      value={missedPercent}
+                      onValueChange={setMissedPercent}
+                      min={20}
+                      max={70}
+                      step={5}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                      <span>20%</span>
+                      <span className="font-medium text-destructive">← Drag to adjust →</span>
+                      <span>70%</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Industry average: <strong>35-40%</strong></p>
                 </div>
 
                 {/* Average Job Value */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm">Average Emergency Job Value</Label>
-                    <span className="text-sm font-bold text-metric">${avgValue[0].toLocaleString()}</span>
+                    <Label className="text-sm sm:text-base font-semibold">Average Emergency Job Value</Label>
+                    <div className="px-3 py-1.5 rounded-lg bg-emerald-600/10 border border-emerald-600/20">
+                      <span className="text-base sm:text-lg font-bold text-emerald-700 text-metric">${avgValue[0].toLocaleString()}</span>
+                    </div>
                   </div>
-                  <input 
-                    type="tel" 
+                  <input
+                    type="tel"
                     inputMode="numeric"
-                    value={avgValue[0]} 
+                    value={avgValue[0]}
                     onChange={(e) => setAvgValue([Math.max(400, Math.min(3000, Number(e.target.value) || 1200))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold"
+                    className="sm:hidden w-full h-12 px-4 rounded-md border-2 border-emerald-600/30 focus:border-emerald-600 text-center text-lg font-bold transition-colors"
                   />
-                  <Slider value={avgValue} onValueChange={setAvgValue} min={400} max={3000} step={100} className="hidden sm:block" />
-                  <p className="text-xs text-muted-foreground">Emergency jobs typically worth 3-5x more</p>
+                  <div className="hidden sm:block p-4 rounded-lg bg-gradient-to-r from-emerald-50 to-white border-2 border-emerald-200">
+                    <Slider
+                      value={avgValue}
+                      onValueChange={setAvgValue}
+                      min={400}
+                      max={3000}
+                      step={100}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                      <span>$400</span>
+                      <span className="font-medium text-emerald-600">← Drag to adjust →</span>
+                      <span>$3,000</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Emergency jobs typically worth <strong>3-5x more</strong></p>
                 </div>
 
                 {/* Results Section */}

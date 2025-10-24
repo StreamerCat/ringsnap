@@ -13,35 +13,42 @@ const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Index = () => {
+  const currentYear = new Date().getFullYear();
+  const nextYear = currentYear + 1;
+
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
+    "@id": "https://aivoiceagent.com/#software",
     "name": "AI Answering Service for Contractors",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "offers": [
       {
         "@type": "Offer",
+        "@id": "https://aivoiceagent.com/#offer-starter",
         "name": "Starter Plan",
         "price": "297",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": `${nextYear}-12-31`,
         "availability": "https://schema.org/InStock"
       },
       {
         "@type": "Offer",
+        "@id": "https://aivoiceagent.com/#offer-professional",
         "name": "Professional Plan",
         "price": "797",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": `${nextYear}-12-31`,
         "availability": "https://schema.org/InStock"
       },
       {
         "@type": "Offer",
+        "@id": "https://aivoiceagent.com/#offer-growth",
         "name": "Growth Plan",
         "price": "1497",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": `${nextYear}-12-31`,
         "availability": "https://schema.org/InStock"
       }
     ],
@@ -52,34 +59,29 @@ const Index = () => {
       "bestRating": "5",
       "worstRating": "1"
     },
-    "description": "24/7 AI answering service for plumbers, HVAC, electrical, and roofing contractors. Never miss emergency calls worth $800-2000. Answers in under 1 second.",
-    "image": "https://aivoiceagent.com/og-image.jpg"
+    "description": "24/7 AI answering service for plumbers, HVAC, electrical, and roofing contractors. Never miss emergency calls worth $800-2000. Answers in under 1 second."
   };
 
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": "https://aivoiceagent.com/#organization",
     "name": "AI Voice Agent",
     "url": "https://aivoiceagent.com",
-    "logo": "https://aivoiceagent.com/logo.png",
     "contactPoint": {
       "@type": "ContactPoint",
-      "telephone": "+1-800-AI-CALLS",
+      "telephone": "+18002422557",
       "contactType": "customer support",
-      "availableLanguage": ["English", "Spanish"]
+      "availableLanguage": ["en", "es"]
     }
   };
 
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": "https://aivoiceagent.com/#website",
     "name": "AI Voice Agent",
-    "url": "https://aivoiceagent.com",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://aivoiceagent.com/search?q={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
+    "url": "https://aivoiceagent.com"
   };
 
   const faqStructuredData = {
@@ -130,20 +132,18 @@ const Index = () => {
           content="Stop losing $4,200-$12,600/month in missed emergency calls. AI receptionist answers in under 1 second, books plumbing & HVAC jobs 24/7. Try free for 14 days." 
         />
         <link rel="canonical" href="https://aivoiceagent.com/" />
-        <link rel="preload" as="image" href="https://aivoiceagent.com/hero-transcript.webp" />
-        
+
         {/* Open Graph */}
         <meta property="og:title" content="24/7 AI Answering Service for Plumbers & HVAC" />
         <meta property="og:description" content="Stop losing $4,200-$12,600/month in missed emergency calls. AI books jobs in under 1 second." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://aivoiceagent.com/" />
-        <meta property="og:image" content="https://aivoiceagent.com/og-image.jpg" />
-        
+        <meta property="og:site_name" content="AI Voice Agent" />
+
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="24/7 AI Answering Service for Plumbers & HVAC" />
         <meta name="twitter:description" content="Never miss emergency calls worth $800-2000. AI answers in under 1 second." />
-        <meta name="twitter:image" content="https://aivoiceagent.com/og-image.jpg" />
         
         {/* Structured Data */}
         <script type="application/ld+json">
