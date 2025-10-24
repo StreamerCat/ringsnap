@@ -80,8 +80,9 @@ export const ContractorTestimonials = () => {
         </div>
 
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 leading-tight">Real Results from Real Contractors</h2>
-          <p className="text-fluid-body text-muted-foreground leading-relaxed">
+          <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
+          <h2 className="text-h2 mb-4">Real Results from Real Contractors</h2>
+          <p className="text-body-default">
             847 plumbers, HVAC techs, electricians, and roofers capture 95% of emergency calls with AI
           </p>
         </div>

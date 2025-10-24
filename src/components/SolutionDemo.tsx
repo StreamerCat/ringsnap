@@ -8,10 +8,11 @@ export const SolutionDemo = () => {
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 uppercase tracking-tight leading-tight">
-            Meet Your New Receptionist <span className="text-primary">(Who Never Sleeps)</span>
+          <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
+          <h2 className="text-h2 mb-4 uppercase tracking-tight">
+            Meet Your New Receptionist <span style={{color: 'hsl(var(--primary))'}}>Who Never Sleeps</span>
           </h2>
-          <p className="text-fluid-body text-muted-foreground leading-relaxed">
+          <p className="text-body-default">
             Try it now. Ask about pricing. Book an appointment. Report an emergency.
           </p>
         </div>

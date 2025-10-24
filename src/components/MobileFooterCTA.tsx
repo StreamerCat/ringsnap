@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { PhoneCall } from "lucide-react";
+import { PhoneCall, Calculator } from "lucide-react";
 
 export const MobileFooterCTA = () => {
   const [showCTA, setShowCTA] = useState(false);
@@ -20,14 +20,30 @@ export const MobileFooterCTA = () => {
   if (!showCTA) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur border-t shadow-lg animate-in slide-in-from-bottom pb-[calc(0.75rem+var(--safe-bottom))]">
-      <div className="container mx-auto px-4 pt-3 flex gap-2">
-        <Button size="sm" className="flex-1 min-h-[44px]" aria-label="Start free trial">
-          Start 14-day free trial
+    <div 
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden backdrop-blur-xl border-t animate-in slide-in-from-bottom"
+      style={{
+        background: 'linear-gradient(to top, white 0%, hsl(var(--cream) / 0.3) 100%)',
+        borderTopColor: 'hsl(var(--cream))',
+        boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.05)',
+        paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0))'
+      }}
+    >
+      <div className="container mx-auto px-4 pt-4 pb-4 flex gap-3">
+        <Button 
+          className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md" 
+          aria-label="Start free trial"
+        >
+          <PhoneCall className="w-5 h-5" />
+          <span className="ml-2">Start trial</span>
         </Button>
-        <Button size="sm" variant="outline" className="min-h-[44px] px-4" aria-label="Hear a real call">
-          <PhoneCall className="w-4 h-4" />
-          <span className="ml-2">Hear call</span>
+        <Button 
+          className="flex-1 h-12 rounded-full bg-white border-2 active:scale-95 transition-transform shadow-sm"
+          style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+          aria-label="Use calculator"
+        >
+          <Calculator className="w-5 h-5" />
+          <span className="ml-2">Calculate</span>
         </Button>
       </div>
     </div>

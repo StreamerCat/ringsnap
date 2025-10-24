@@ -83,8 +83,8 @@ export const ContractorPricing = () => {
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <h2 className="text-headline mb-4">
-            Pricing as simple as <span className="text-gradient-core">a handshake</span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style={{color: 'hsl(var(--charcoal))'}}>
+            Pricing as simple as <span style={{color: 'hsl(var(--primary))'}}>a handshake</span>
           </h2>
           <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Transparent pricing. No setup fees. Cancel anytime.
@@ -126,33 +126,35 @@ export const ContractorPricing = () => {
         </div>
 
         {/* Pricing Tiers */}
-        <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto items-stretch">
           {pricingTiers.map((tier, index) => (
             <Card 
               key={index} 
-              className={`relative ${
+              className={`relative flex flex-col h-full ${
                 tier.badge 
-                  ? 'card-tier-1 scale-105' 
-                  : 'card-tier-2'
+                  ? 'card-pricing-popular' 
+                  : 'card-tier-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-300'
               }`}
             >
                 {tier.badge && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <Badge variant="gradient" className="px-4 py-1 text-xs font-bold rounded-full">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+                    <Badge className="px-4 py-1.5 text-xs font-bold rounded-full bg-primary text-white animate-pulse-subtle">
                       {tier.badge}
                     </Badge>
                   </div>
                 )}
                 
                 <CardHeader className="text-center pb-4">
-                  <div className="w-12 sm:w-14 h-12 sm:h-14 mx-auto mb-3 sm:mb-4 rounded-2xl gradient-secondary flex items-center justify-center">
-                    <tier.icon className="w-6 sm:w-7 h-6 sm:h-7 text-white" />
+                  <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                    tier.badge ? 'bg-primary' : 'bg-cream'
+                  }`}>
+                    <tier.icon className="w-8 h-8" style={{color: tier.badge ? 'white' : 'hsl(var(--primary))'}} />
                   </div>
                 <CardTitle className="text-xl sm:text-2xl">{tier.name}</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">{tier.description}</CardDescription>
                 <div className="pt-3 sm:pt-4">
-                  <div className="text-4xl sm:text-5xl font-bold text-metric">{tier.price}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">/month</div>
+                  <div className="text-4xl sm:text-5xl font-bold" style={{color: 'hsl(var(--charcoal))'}}>{tier.price}</div>
+                  <div className="text-sm" style={{color: 'hsl(var(--charcoal) / 0.6)'}}>per month</div>
                 </div>
               </CardHeader>
 
@@ -168,7 +170,7 @@ export const ContractorPricing = () => {
                 <ul className="space-y-3">
                   {tier.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color: 'hsl(var(--primary))'}} />
                       <span className={`text-sm ${
                         feature.includes('PLUS') ? 'font-semibold text-primary' : ''
                       }`}>
@@ -187,12 +189,12 @@ export const ContractorPricing = () => {
 
                 {/* CTA */}
                 <Button 
-                  className={`w-full h-12 text-lg rounded-full ${
+                  className={`w-full h-12 text-lg rounded-full transition-all ${
                     tier.badge 
-                      ? '' 
-                      : 'border-2 border-charcoal/20 hover:border-charcoal/40'
+                      ? 'bg-primary text-white hover:opacity-90 shadow-md' 
+                      : 'bg-white border-2 hover:shadow-md'
                   }`}
-                  variant={tier.badge ? "gradient" : "outline"}
+                  style={tier.badge ? {} : {borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
                   size="lg"
                 >
                   {tier.cta}

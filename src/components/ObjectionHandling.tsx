@@ -32,10 +32,11 @@ export const ObjectionHandling = () => {
         <hr className="section-divider mb-8 sm:mb-12" />
         
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4 leading-tight">
-            Common Questions <span className="text-primary">Answered</span>
+          <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
+          <h2 className="text-h2 mb-4">
+            Common Questions <span style={{color: 'hsl(var(--primary))'}}>Answered</span>
           </h2>
-          <p className="text-fluid-body text-muted-foreground">
+          <p className="text-body-default">
             Real concerns from contractors like you
           </p>
         </div>

@@ -17,12 +17,13 @@ export const FinalCTA = () => {
       <div className="container mx-auto px-4">
         <hr className="section-divider mb-12" />
         <div className="max-w-4xl mx-auto text-center space-y-8">
-          <h2 className="text-headline leading-tight">
+          <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
+          <h2 className="text-h2">
             Stop letting your competitors book{" "}
-            <span className="text-gradient-core">your emergency calls</span>
+            <span style={{color: 'hsl(var(--primary))'}}>your emergency calls</span>
           </h2>
 
-          <p className="text-xl text-foreground/70 max-w-2xl mx-auto font-secondary">
+          <p className="text-xl leading-relaxed max-w-2xl mx-auto font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
             While you're under a sink or on a ladder, they're answering in under 1 second. Book $800+ emergency jobs 24/7 with AI that sounds human.
           </p>
 

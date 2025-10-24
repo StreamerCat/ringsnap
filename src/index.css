@@ -395,6 +395,110 @@ All colors MUST be HSL.
     @apply text-2xl sm:text-3xl font-bold;
     color: hsl(var(--charcoal));
   }
+
+  /* === PRICING SECTION ENHANCEMENTS === */
+  
+  /* Pricing card - Most Popular tier */
+  .card-pricing-popular {
+    @apply card-tier-1;
+    transform: scale(1.05);
+    border: 3px solid hsl(var(--primary));
+    animation: pricing-glow 2s ease-in-out infinite;
+    box-shadow: 0 20px 60px rgba(217, 119, 87, 0.3);
+    background: linear-gradient(to bottom, white 0%, hsl(var(--cream) / 0.3) 100%);
+  }
+
+  @keyframes pricing-glow {
+    0%, 100% {
+      box-shadow: 0 20px 60px rgba(217, 119, 87, 0.3);
+    }
+    50% {
+      box-shadow: 0 20px 70px rgba(217, 119, 87, 0.45);
+    }
+  }
+
+  /* Subtle pulse for badge */
+  .animate-pulse-subtle {
+    animation: pulse-badge 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-badge {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.85;
+    }
+  }
+
+  /* === TYPOGRAPHY SYSTEM === */
+  
+  /* Section headline with accent bar */
+  .section-headline {
+    @apply text-3xl sm:text-4xl lg:text-5xl font-bold text-center mb-4;
+    color: hsl(var(--charcoal));
+    letter-spacing: -0.02em;
+  }
+
+  .section-headline::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: hsl(var(--primary));
+    margin: 0 auto 1rem;
+    border-radius: 2px;
+  }
+
+  /* Typography hierarchy */
+  .text-h1 {
+    @apply text-5xl sm:text-6xl lg:text-7xl font-bold;
+    color: hsl(var(--charcoal));
+    letter-spacing: -0.03em;
+  }
+
+  .text-h2 {
+    @apply text-3xl sm:text-4xl lg:text-5xl font-bold;
+    color: hsl(var(--charcoal));
+    letter-spacing: -0.02em;
+  }
+
+  .text-h3 {
+    @apply text-2xl sm:text-3xl font-bold;
+    color: hsl(var(--charcoal));
+    letter-spacing: -0.01em;
+  }
+
+  .text-body-default {
+    @apply text-base leading-relaxed;
+    color: hsl(var(--charcoal) / 0.75);
+  }
+
+  .text-body-small {
+    @apply text-sm leading-relaxed;
+    color: hsl(var(--charcoal) / 0.6);
+  }
+
+  /* Image styling */
+  .image-enhanced {
+    @apply rounded-2xl shadow-md;
+    filter: sepia(0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Link styling */
+  .link-default {
+    color: hsl(var(--charcoal));
+    transition: all 0.2s ease;
+  }
+
+  .link-default:hover {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--primary));
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
   
   /* === SECTION SPACING & DIVIDERS === */
   

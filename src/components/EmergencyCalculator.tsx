@@ -51,8 +51,9 @@ export const EmergencyCalculator = () => {
               <AlertTriangle className="w-4 h-4 text-primary" />
               <span className="text-xs sm:text-sm font-medium">Every Missed Emergency Call = Lost Revenue</span>
             </div>
-            <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4" style={{ color: 'hsl(var(--charcoal))' }}>How Much Are You Losing Right Now?</h2>
-            <p className="text-fluid-body text-muted-foreground">
+            <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
+            <h2 className="text-h2 mb-4">How Much Are You Losing Right Now?</h2>
+            <p className="text-body-default">
               30-40% of calls go unanswered when you're under a sink, on a ladder, or your hands are dirty. Emergency calls are worth 3-5x more than regular jobs.
             </p>
           </div>
