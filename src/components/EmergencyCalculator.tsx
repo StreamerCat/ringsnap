@@ -42,8 +42,9 @@ export const EmergencyCalculator = () => {
 
   return (
     <>
-      <section id="calculator" className="py-10 sm:py-14 lg:py-20 bg-gradient-to-b from-white to-gray-50">
+      <section id="calculator" className="section-spacer bg-gradient-to-b from-white to-gray-50">
         <div className="container mx-auto px-4 max-w-7xl">
+          <hr className="section-divider mb-8 sm:mb-12" />
           {/* Problem Statement */}
           <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4 sm:mb-6">
@@ -57,7 +58,7 @@ export const EmergencyCalculator = () => {
           </div>
 
           <div className="max-w-5xl mx-auto">
-            <Card className="border-2 border-primary elevation-3">
+            <Card className="card-tier-1">
               <CardHeader>
                 <CardTitle className="text-3xl sm:text-4xl md:text-5xl text-center text-primary text-metric animate-count-up">
                   ${recoveredRevenue.toLocaleString()}
@@ -107,9 +108,9 @@ export const EmergencyCalculator = () => {
                     inputMode="numeric"
                     value={emergencyCalls[0]} 
                     onChange={(e) => setEmergencyCalls([Math.max(5, Math.min(50, Number(e.target.value) || 5))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold"
+                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
                   />
-                  <Slider value={emergencyCalls} onValueChange={setEmergencyCalls} min={5} max={50} step={1} className="hidden sm:block" />
+                  <Slider value={emergencyCalls} onValueChange={setEmergencyCalls} min={5} max={50} step={1} className="hidden sm:block input-focus" />
                   <p className="text-xs text-muted-foreground">{monthlyEmergencyCalls} emergency calls/month</p>
                 </div>
 
@@ -124,9 +125,9 @@ export const EmergencyCalculator = () => {
                     inputMode="numeric"
                     value={missedPercent[0]} 
                     onChange={(e) => setMissedPercent([Math.max(20, Math.min(70, Number(e.target.value) || 40))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold"
+                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
                   />
-                  <Slider value={missedPercent} onValueChange={setMissedPercent} min={20} max={70} step={5} className="hidden sm:block" />
+                  <Slider value={missedPercent} onValueChange={setMissedPercent} min={20} max={70} step={5} className="hidden sm:block input-focus" />
                   <p className="text-xs text-muted-foreground">Industry average: 35-40%</p>
                 </div>
 
@@ -141,9 +142,9 @@ export const EmergencyCalculator = () => {
                     inputMode="numeric"
                     value={avgValue[0]} 
                     onChange={(e) => setAvgValue([Math.max(400, Math.min(3000, Number(e.target.value) || 1200))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold"
+                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
                   />
-                  <Slider value={avgValue} onValueChange={setAvgValue} min={400} max={3000} step={100} className="hidden sm:block" />
+                  <Slider value={avgValue} onValueChange={setAvgValue} min={400} max={3000} step={100} className="hidden sm:block input-focus" />
                   <p className="text-xs text-muted-foreground">Emergency jobs typically worth 3-5x more</p>
                 </div>
 

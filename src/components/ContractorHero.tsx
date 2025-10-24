@@ -8,7 +8,7 @@ export const ContractorHero = () => {
   };
 
   return (
-    <section className="relative min-h-screen-safe flex items-center overflow-hidden">
+    <section className="relative min-h-screen-safe flex items-center overflow-hidden section-spacer">
       {/* Gradient Aura Background */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-br from-off-white to-cream/30" />

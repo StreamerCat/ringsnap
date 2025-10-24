@@ -27,7 +27,7 @@ export const ObjectionHandling = () => {
   ];
 
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-muted/30">
+    <section className="section-spacer-compact bg-muted/30">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         
@@ -42,7 +42,7 @@ export const ObjectionHandling = () => {
 
         <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {objections.map((objection, index) => (
-            <Card key={index} className="elevation-2 hover:-translate-y-1 transition-all duration-200">
+            <Card key={index} className="card-tier-3">
               <CardContent className="p-6 space-y-4">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                   <objection.icon className="w-6 h-6 text-primary" />

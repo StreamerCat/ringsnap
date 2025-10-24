@@ -43,7 +43,7 @@ export const ContractorTestimonials = () => {
   ];
 
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-muted/30">
+    <section className="section-spacer bg-muted/30">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         
@@ -88,7 +88,7 @@ export const ContractorTestimonials = () => {
 
         <div className="grid md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto">
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 elevation-3">
+            <Card key={index} className="card-tier-1">
               <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Star Rating */}
                 <div className="flex gap-1">

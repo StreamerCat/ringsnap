@@ -65,7 +65,7 @@ export const CompetitorComparison = () => {
   };
 
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-background">
+    <section className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-6xl mx-auto text-center mb-8 sm:mb-12">
@@ -112,7 +112,7 @@ export const CompetitorComparison = () => {
         {/* Mobile Cards */}
         <div className="lg:hidden space-y-4 sm:space-y-6">
           {competitors.map((comp, idx) => (
-            <Card key={idx} className={comp.highlight ? "border-2 border-emerald-500 elevation-3 relative" : "elevation-1"}>
+            <Card key={idx} className={comp.highlight ? "card-tier-1 relative" : "card-tier-2"}>
               {comp.highlight && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
                   YOUR SOLUTION

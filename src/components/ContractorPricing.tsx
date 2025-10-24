@@ -79,7 +79,7 @@ export const ContractorPricing = () => {
   ];
 
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-background">
+    <section className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
@@ -130,13 +130,12 @@ export const ContractorPricing = () => {
           {pricingTiers.map((tier, index) => (
             <Card 
               key={index} 
-              className={`relative rounded-3xl border-0 p-1 hover-glow ${
+              className={`relative ${
                 tier.badge 
-                  ? 'bg-gradient-to-br from-terracotta/20 to-cream/30 scale-105' 
-                  : 'bg-gradient-to-br from-gray-100/50 to-white'
+                  ? 'card-tier-1 scale-105' 
+                  : 'card-tier-2'
               }`}
             >
-              <div className="bg-white rounded-3xl">
                 {tier.badge && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <Badge variant="gradient" className="px-4 py-1 text-xs font-bold rounded-full">
@@ -203,7 +202,6 @@ export const ContractorPricing = () => {
                   14-day free trial · No credit card required
                 </p>
               </CardContent>
-              </div>
             </Card>
           ))}
         </div>

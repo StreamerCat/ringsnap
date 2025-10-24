@@ -7,7 +7,7 @@ export const FinalCTA = () => {
   };
 
   return (
-    <section className="py-20 relative overflow-hidden">
+    <section className="section-spacer relative overflow-hidden">
       {/* Gradient Aura Background */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-br from-cream/30 via-off-white to-white" />
@@ -15,6 +15,7 @@ export const FinalCTA = () => {
       </div>
       
       <div className="container mx-auto px-4">
+        <hr className="section-divider mb-12" />
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <h2 className="text-headline leading-tight">
             Stop letting your competitors book{" "}

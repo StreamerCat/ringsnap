@@ -4,7 +4,7 @@ import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, Dol
 
 export const SolutionDemo = () => {
   return (
-    <section className="py-10 sm:py-14 lg:py-20 bg-background">
+    <section className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
@@ -29,42 +29,42 @@ export const SolutionDemo = () => {
 
         {/* Proof Points Grid */}
         <div className="grid md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto mb-8 sm:mb-12">
-          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
+          <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <Zap className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Built for your industry</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">Books jobs. Routes emergencies. Answers FAQs.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
+          <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <Clock className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">24/7 coverage at a flat price</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">No after hours fees. $297-$797/month.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
+          <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <Brain className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Live in 10 minutes</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">No training. No contracts. Keep your number.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
+          <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <DollarSign className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Affordable for any size</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">Plans from $297 to $1,497 per month.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
+          <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <MessageCircle className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Sounds human</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">89% of callers cannot tell it's AI.</p>
             </CardContent>
           </Card>
-          <Card className="text-center p-4 sm:p-6 rounded-3xl elevation-2 hover-glow">
+          <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <Shield className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Zero risk</h3>
@@ -85,7 +85,7 @@ export const SolutionDemo = () => {
 
         {/* Outcome Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          <Card className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
+          <Card className="card-tier-2">
             <CardContent className="p-6 text-center space-y-4">
               <div className="w-14 h-14 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
                 <Zap className="w-7 h-7 text-primary" />
@@ -101,7 +101,7 @@ export const SolutionDemo = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
+          <Card className="card-tier-2">
             <CardContent className="p-6 text-center space-y-4">
               <div className="w-14 h-14 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
                 <Brain className="w-7 h-7 text-primary" />
@@ -117,7 +117,7 @@ export const SolutionDemo = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
+          <Card className="card-tier-2">
             <CardContent className="p-6 text-center space-y-4">
               <div className="w-14 h-14 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
                 <Calendar className="w-7 h-7 text-primary" />
@@ -133,7 +133,7 @@ export const SolutionDemo = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)]">
+          <Card className="card-tier-2">
             <CardContent className="p-6 text-center space-y-4">
               <div className="w-14 h-14 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
                 <PhoneForwarded className="w-7 h-7 text-primary" />
