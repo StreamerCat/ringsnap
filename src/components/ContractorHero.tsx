@@ -21,12 +21,11 @@ export const ContractorHero = () => {
           
           {/* Left Column */}
           <div className="space-y-8">
-            <h2 className="text-display leading-tight font-bold">
-              AI that answers{" "}
-              <span className="text-gradient-core">like a human</span>
-            </h2>
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
+              AI that answers like a human
+            </h1>
             
-            <p className="text-xl sm:text-2xl text-foreground/70 leading-relaxed font-secondary">
+            <p className="text-xl sm:text-2xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
               Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI.
             </p>
             
@@ -34,37 +33,34 @@ export const ContractorHero = () => {
             <div className="flex flex-col sm:flex-row gap-4">
               <Button 
                 size="lg" 
-                variant="gradient"
-                className="text-lg h-14 px-8 font-semibold rounded-full"
+                className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
               >
                 <PhoneCall className="mr-2" />
                 Try Ringsnap free
               </Button>
               <Button 
                 size="lg" 
-                variant="outline" 
-                className="text-lg h-14 px-8 font-semibold rounded-full border-2 border-foreground/10 hover:border-foreground/30 transition-all"
+                className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md"
+                style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
                 onClick={scrollToCalculator}
               >
                 Hear how it sounds
               </Button>
             </div>
             
-            {/* Soft Trust Badges */}
-            <div className="flex flex-wrap items-center gap-6 pt-6 border-t border-foreground/5">
-              <div className="flex items-center gap-2 text-sm text-foreground/60">
-                <div className="w-5 h-5 rounded-full gradient-core flex items-center justify-center">
-                  <CheckCircle className="w-3 h-3 text-white" />
-                </div>
-                <span>14-day free trial</span>
+            {/* Trust Badges */}
+            <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{borderColor: 'hsl(var(--charcoal) / 0.05)'}}>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                <Star className="w-4 h-4 text-primary fill-primary" />
+                <span className="font-medium">5-star rated</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-foreground/60">
-                <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                <span>4.9 from 247 reviews</span>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                <CheckCircle className="w-4 h-4 text-primary" />
+                <span className="font-medium">14-day free trial</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-foreground/60">
-                <Shield className="w-5 h-5 text-foreground/40" />
-                <span>HIPAA compliant</span>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                <PhoneCall className="w-4 h-4 text-primary" />
+                <span className="font-medium">24/7 Available</span>
               </div>
             </div>
           </div>
