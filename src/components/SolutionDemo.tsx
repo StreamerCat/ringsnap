@@ -13,7 +13,7 @@ export const SolutionDemo = () => {
             Meet Your New Receptionist <span style={{color: 'hsl(var(--primary))'}}>Who Never Sleeps</span>
           </h2>
           <p className="text-body-default">
-            Try it now. Ask about pricing. Book an appointment. Report an emergency.
+            Try it now. Ask about pricing. Book an appointment. Report an emergency. All calls handled.
           </p>
         </div>
 
@@ -107,9 +107,9 @@ export const SolutionDemo = () => {
               <div className="w-14 h-14 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
                 <Brain className="w-7 h-7 text-primary" />
               </div>
-              <h3 className="font-bold text-lg">Knows Emergency vs. Quote</h3>
+              <h3 className="font-bold text-lg">Smart Call Routing</h3>
               <p className="text-sm text-muted-foreground">
-                AI identifies $800+ urgent jobs from regular inquiries. Books same-day for emergencies, schedules quotes appropriately.
+                Life-threatening emergencies transferred instantly. Routine calls and quotes booked automatically with instant confirmation.
               </p>
               <div className="pt-2 border-t">
                 <div className="text-2xl font-bold text-primary">$1,200</div>

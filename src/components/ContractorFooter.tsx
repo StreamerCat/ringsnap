@@ -85,7 +85,7 @@ export const ContractorFooter = () => {
                 <div className="w-6 h-6 gradient-core rounded-lg flex items-center justify-center">
                   <Phone className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-bold text-lg">Ringsnap</span>
+                <span className="font-bold text-lg">RingSnap</span>
               </div>
               <p className="text-sm text-foreground/60 font-secondary">
                 Made to sound human.

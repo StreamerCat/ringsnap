@@ -70,7 +70,7 @@ export const CompetitorComparison = () => {
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-6xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-          <h2 className="text-h2 mb-4">Why Contractors Choose Ringsnap</h2>
+          <h2 className="text-h2 mb-4">Why Contractors Choose RingSnap</h2>
           <p className="text-body-default">
             Compare features, pricing, and ROI across all major platforms
           </p>

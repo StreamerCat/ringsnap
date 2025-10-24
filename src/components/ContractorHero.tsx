@@ -26,7 +26,7 @@ export const ContractorHero = () => {
             </h1>
             
             <p className="text-xl sm:text-2xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
-              Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI.
+              Never miss a call. Book every job—emergency or routine—24/7. Sound warm, not robotic. Your customers won't know it's AI.
             </p>
             
             {/* Gradient CTAs */}
@@ -36,7 +36,7 @@ export const ContractorHero = () => {
                 className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
               >
                 <PhoneCall className="mr-2" />
-                Try Ringsnap free
+                Try RingSnap free
               </Button>
               <Button 
                 size="lg" 
@@ -60,7 +60,7 @@ export const ContractorHero = () => {
               </div>
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
                 <PhoneCall className="w-4 h-4 text-primary" />
-                <span className="font-medium">24/7 Available</span>
+                <span className="font-medium">Handles emergencies, quotes & scheduling</span>
               </div>
             </div>
           </div>

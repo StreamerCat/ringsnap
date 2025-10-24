@@ -21,7 +21,7 @@ interface EmailCaptureModalProps {
   onOpenChange: (open: boolean) => void;
   calculatorData?: {
     trade: string;
-    emergencyCalls: number;
+    customerCalls: number;
     lostRevenue: number;
     recoveredRevenue: number;
     netGain: number;

@@ -11,7 +11,7 @@ export const ContractorTestimonials = () => {
 
   const testimonials = [
     {
-      quote: "We went from missing 40% of after-hours calls to capturing 98%. That's an extra $23,400 in monthly revenue. The AI paid for itself in 3 days.",
+      quote: "We went from missing 40% of calls to capturing 98%. Emergency AND routine calls—all handled. That's an extra $23,400 in monthly revenue. The AI paid for itself in 3 days.",
       name: "Tommy Chen",
       business: "Tommy's Plumbing",
       location: "Austin, TX",
@@ -21,7 +21,7 @@ export const ContractorTestimonials = () => {
       trade: "Plumbing"
     },
     {
-      quote: "Emergency HVAC calls come in when it's 95 degrees or 15 degrees—never during office hours. AI captured $31,000 worth of emergency repairs in the first month alone.",
+      quote: "HVAC emergencies AND quote requests come in around the clock. AI captured $31,000 worth of calls in the first month alone—both emergency repairs and scheduled maintenance.",
       name: "Sarah Martinez",
       business: "Arctic Heating & Cooling",
       location: "Denver, CO",
@@ -31,7 +31,7 @@ export const ContractorTestimonials = () => {
       trade: "HVAC"
     },
     {
-      quote: "I'm always on a ladder or in a panel box. AI books 127 emergency calls while I work. My competitor is still missing calls—I'm not.",
+      quote: "I'm always on a ladder or in a panel box. AI books 127 calls monthly while I work—emergencies get routed immediately, routine calls get scheduled. My competitors are still missing calls.",
       name: "Mike Johnson",
       business: "Bolt Electric",
       location: "Phoenix, AZ",
@@ -83,7 +83,7 @@ export const ContractorTestimonials = () => {
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
           <h2 className="text-h2 mb-4">Real Results from Real Contractors</h2>
           <p className="text-body-default">
-            847 plumbers, HVAC techs, electricians, and roofers capture 95% of emergency calls with AI
+            1,200+ contractors capturing 95% of all customer calls—emergencies, quotes, and appointments—with AI
           </p>
         </div>
 

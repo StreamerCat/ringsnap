@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Zap, Phone, Users, Crown } from "lucide-react";
+import { Check, Zap, Phone, Crown, Calculator, CheckCircle, Clock, Lock, Star, PhoneCall } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export const ContractorPricing = () => {
@@ -20,14 +20,14 @@ export const ContractorPricing = () => {
       overage: "$0.15/min overage",
       features: [
         "Answer 95% of calls automatically",
-        "Books appointments & emergency calls",
+        "Books all call types automatically",
         "Email & SMS notifications",
         "Call recordings & transcripts",
         "Google Calendar + Zapier integration",
         "Basic analytics dashboard",
         "Email support (24hr response)"
       ],
-      riskReversal: "Book 1 emergency call in 14 days or we refund + $50",
+      
       cta: "Start Free Trial",
       badge: null,
       icon: Phone
@@ -49,7 +49,7 @@ export const ContractorPricing = () => {
         "Advanced analytics + conversion tracking",
         "Custom scripts for your services"
       ],
-      riskReversal: "Book 10+ jobs in 30 days or full refund",
+      
       cta: "Start Free Trial",
       badge: "MOST POPULAR",
       icon: Zap
@@ -71,7 +71,7 @@ export const ContractorPricing = () => {
         "Custom integrations built for you",
         "Multi-location management dashboard"
       ],
-      riskReversal: "40% revenue increase in 60 days or refund + $500",
+      
       cta: "Start Free Trial",
       badge: null,
       icon: Crown
@@ -180,13 +180,6 @@ export const ContractorPricing = () => {
                   ))}
                 </ul>
 
-                {/* Risk Reversal */}
-                <div className="p-4 rounded-lg bg-gradient-to-br from-cream/30 to-white border border-charcoal/20">
-                  <div className="text-sm font-semibold text-center text-foreground">
-                    {tier.riskReversal}
-                  </div>
-                </div>
-
                 {/* CTA */}
                 <Button 
                   className={`w-full h-12 text-lg rounded-full transition-all ${
@@ -231,6 +224,70 @@ export const ContractorPricing = () => {
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-primary" />
               <span>Your number stays the same</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Final Strong CTA - Replaces removed FinalCTA component */}
+        <div className="max-w-4xl mx-auto mt-16 text-center space-y-8 p-8 rounded-2xl bg-gradient-to-br from-cream/30 to-white border-2 border-primary/20">
+          <div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style={{color: 'hsl(var(--charcoal))'}}>
+              Your Next Customer Is Calling Right Now. <span style={{color: 'hsl(var(--primary))'}}>Will You Answer?</span>
+            </h2>
+            <p className="text-lg leading-relaxed" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
+              Join 1,200+ contractors who never miss a call—emergency or routine—with RingSnap's human-sounding AI receptionist.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 shadow-lg">
+              <PhoneCall className="mr-2" />
+              Start Free 14-Day Trial
+            </Button>
+            <Button 
+              size="lg" 
+              className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 hover:shadow-md"
+              style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+              onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <Calculator className="mr-2" />
+              Calculate Your ROI
+            </Button>
+          </div>
+
+          {/* Trust badges */}
+          <div className="flex flex-wrap justify-center items-center gap-6 pt-4 text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-primary" />
+              <span>No credit card required</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" />
+              <span>Setup in 10 minutes</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-primary" />
+              <span>Cancel anytime</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 text-primary fill-primary" />
+              <span>4.9/5 from contractors</span>
+            </div>
+          </div>
+
+          {/* Stat callouts */}
+          <div className="grid grid-cols-3 gap-4 pt-6 border-t" style={{borderColor: 'hsl(var(--charcoal) / 0.1)'}}>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">&lt;1 sec</div>
+              <div className="text-xs text-muted-foreground">response time</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">1,247</div>
+              <div className="text-xs text-muted-foreground">jobs booked this week</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">24/7/365</div>
+              <div className="text-xs text-muted-foreground">always available</div>
             </div>
           </div>
         </div>

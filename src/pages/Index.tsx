@@ -2,13 +2,13 @@ import { Helmet } from "react-helmet";
 import { lazy, Suspense } from "react";
 import { ContractorHero } from "@/components/ContractorHero";
 
-const EmergencyCalculator = lazy(() => import("@/components/EmergencyCalculator").then(m => ({ default: m.EmergencyCalculator })));
+const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
 const CompetitorComparison = lazy(() => import("@/components/CompetitorComparison").then(m => ({ default: m.CompetitorComparison })));
 const ObjectionHandling = lazy(() => import("@/components/ObjectionHandling").then(m => ({ default: m.ObjectionHandling })));
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
-const FinalCTA = lazy(() => import("@/components/FinalCTA").then(m => ({ default: m.FinalCTA })));
+
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
@@ -16,7 +16,7 @@ const Index = () => {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Ringsnap - AI Answering Service for Contractors",
+    "name": "RingSnap - AI Answering Service for Contractors",
     "description": "Human-sounding AI receptionist that answers calls 24/7, books jobs automatically, and connects with customers warmly. Made for plumbers, HVAC, electrical, and roofing contractors.",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
@@ -70,7 +70,7 @@ const Index = () => {
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Ringsnap",
+    "name": "RingSnap",
     "alternateName": "AI Voice Agent",
     "description": "AI answering service that sounds human. Made for contractors who never want to miss a call.",
     "url": "https://aivoiceagent.com",
@@ -138,10 +138,10 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>Ringsnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
+        <title>RingSnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
         <meta 
           name="description" 
-          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Ringsnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 14 days." 
+          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. RingSnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 14 days." 
         />
         <meta 
           name="keywords" 
@@ -151,7 +151,7 @@ const Index = () => {
         <link rel="preload" as="image" href="https://aivoiceagent.com/hero-transcript.webp" />
         
         {/* Open Graph */}
-        <meta property="og:title" content="Ringsnap: AI that Answers Like a Human" />
+        <meta property="og:title" content="RingSnap: AI that Answers Like a Human" />
         <meta property="og:description" content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://aivoiceagent.com/" />
@@ -159,7 +159,7 @@ const Index = () => {
         
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Ringsnap: AI that Answers Like a Human" />
+        <meta name="twitter:title" content="RingSnap: AI that Answers Like a Human" />
         <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. AI that sounds warm and human." />
         <meta name="twitter:image" content="https://aivoiceagent.com/og-image.jpg" />
         
@@ -179,18 +179,17 @@ const Index = () => {
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
-        <h1 className="sr-only">Ringsnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
+        <h1 className="sr-only">RingSnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
         
         <ContractorHero />
         
         <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-          <EmergencyCalculator />
+          <CallValueCalculator />
           <SolutionDemo />
           <CompetitorComparison />
           <ObjectionHandling />
           <ContractorTestimonials />
           <ContractorPricing />
-          <FinalCTA />
           <ContractorFooter />
           <MobileFooterCTA />
         </Suspense>
