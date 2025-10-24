@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { DollarSign, TrendingUp, Calendar, AlertTriangle, Wrench, Snowflake, Zap, Home } from "lucide-react";
+import { DollarSign, TrendingUp, Calendar, AlertTriangle, Wrench, Snowflake, Zap, Home, ArrowRight } from "lucide-react";
 import { EmailCaptureModal } from "./EmailCaptureModal";
 
 type TradeType = "plumbing" | "hvac" | "electrical" | "roofing";
@@ -51,7 +51,7 @@ export const EmergencyCalculator = () => {
               <AlertTriangle className="w-4 h-4 text-primary" />
               <span className="text-xs sm:text-sm font-medium">Every Missed Emergency Call = Lost Revenue</span>
             </div>
-            <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4">How Much Are You Losing Right Now?</h2>
+            <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4" style={{ color: 'hsl(var(--charcoal))' }}>How Much Are You Losing Right Now?</h2>
             <p className="text-fluid-body text-muted-foreground">
               30-40% of calls go unanswered when you're under a sink, on a ladder, or your hands are dirty. Emergency calls are worth 3-5x more than regular jobs.
             </p>
@@ -60,7 +60,7 @@ export const EmergencyCalculator = () => {
           <div className="max-w-5xl mx-auto">
             <Card className="card-tier-1">
               <CardHeader>
-                <CardTitle className="text-3xl sm:text-4xl md:text-5xl text-center text-primary text-metric animate-count-up">
+                <CardTitle className="text-5xl text-center text-metric font-bold animate-count-up" style={{ color: 'hsl(var(--charcoal))' }}>
                   ${recoveredRevenue.toLocaleString()}
                 </CardTitle>
                 <CardDescription className="text-center text-base sm:text-lg">
@@ -76,15 +76,19 @@ export const EmergencyCalculator = () => {
                   <Label className="text-sm sm:text-base">Your Trade</Label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                     {(Object.entries(tradeDefaults) as [TradeType, typeof tradeDefaults[TradeType]][]).map(([key, { label, icon: Icon }]) => (
-                      <Button
+                      <button
                         key={key}
-                        variant={trade === key ? "default" : "outline"}
-                        className="h-auto min-h-[44px] py-3 sm:py-4 flex flex-col items-center gap-2 hover:-translate-y-0.5 transition-transform duration-200"
+                        className={`h-auto min-h-[48px] py-3 sm:py-4 flex flex-col items-center gap-2 transition-all duration-200 rounded-md font-medium ${
+                          trade === key 
+                            ? "bg-primary text-white border-0 hover:scale-105" 
+                            : "bg-cream border text-charcoal hover:bg-gradient-to-br hover:from-cream hover:to-white hover:-translate-y-1"
+                        }`}
+                        style={trade !== key ? { borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))' } : {}}
                         onClick={() => handleNicheSelect(key)}
                       >
-                        <Icon className="w-4 sm:w-5 h-4 sm:h-5 opacity-80 hover:opacity-100 transition-opacity" />
+                        <Icon className="w-4 sm:w-5 h-4 sm:h-5" />
                         <span className="text-xs sm:text-sm font-semibold">{label}</span>
-                      </Button>
+                      </button>
                     ))}
                   </div>
                   <Button 
@@ -151,35 +155,35 @@ export const EmergencyCalculator = () => {
                 {/* Results Section */}
                 <div className="space-y-4 sm:space-y-6 pt-6 border-t-2">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                    <div className="p-4 sm:p-5 rounded-2xl bg-white border elevation-2">
-                      <div className="flex items-center gap-2 text-slate-500 text-xs sm:text-sm mb-2">
+                    <div className="calculator-result-card">
+                      <div className="calculator-metric-label flex items-center gap-2 mb-2">
                         <DollarSign className="w-4 h-4 opacity-80" />
                         <span>Monthly gain</span>
                       </div>
-                      <div className="text-2xl sm:text-3xl font-bold text-metric">${netGain.toLocaleString()}</div>
-                      <div className="text-xs text-slate-500 mt-1 text-metric">{roi}% ROI</div>
+                      <div className="calculator-metric-number">${netGain.toLocaleString()}</div>
+                      <div className="text-xs mt-1" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>{roi}% ROI</div>
                     </div>
                     
-                    <div className="p-4 sm:p-5 rounded-2xl bg-white border elevation-2">
-                      <div className="flex items-center gap-2 text-slate-500 text-xs sm:text-sm mb-2">
+                    <div className="calculator-result-card">
+                      <div className="calculator-metric-label flex items-center gap-2 mb-2">
                         <Calendar className="w-4 h-4 opacity-80" />
                         <span>Break even</span>
                       </div>
-                      <div className="text-2xl sm:text-3xl font-bold text-metric">{Math.ceil(aiCost / avgValue[0])}</div>
-                      <div className="text-xs text-slate-500 mt-1">jobs (~{paybackDays} days)</div>
+                      <div className="calculator-metric-number">{Math.ceil(aiCost / avgValue[0])}</div>
+                      <div className="text-xs mt-1" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>jobs (~{paybackDays} days)</div>
                     </div>
                     
-                    <div className="p-4 sm:p-5 rounded-2xl bg-white border elevation-2">
-                      <div className="flex items-center gap-2 text-slate-500 text-xs sm:text-sm mb-2">
+                    <div className="calculator-result-card">
+                      <div className="calculator-metric-label flex items-center gap-2 mb-2">
                         <TrendingUp className="w-4 h-4 opacity-80" />
                         <span>Captured</span>
                       </div>
-                      <div className="text-2xl sm:text-3xl font-bold text-metric">{missedCalls}</div>
-                      <div className="text-xs text-slate-500 mt-1">missed → booked</div>
+                      <div className="calculator-metric-number">{missedCalls}</div>
+                      <div className="text-xs mt-1" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>missed → booked</div>
                     </div>
                   </div>
-                  <Button className="w-full h-12 text-lg mt-4 shadow-lg hover:shadow-emerald-500/20 transition-all duration-200" onClick={() => setShowEmailModal(true)}>
-                    Get Your Personalized Recovery Plan
+                  <Button className="w-full h-12 text-lg mt-4 rounded-full bg-primary text-white btn-pulse-cta shadow-lg hover:shadow-xl transition-all duration-200" onClick={() => setShowEmailModal(true)}>
+                    See How Ringsnap Helps You <ArrowRight className="w-5 h-5 ml-1 inline-block" />
                   </Button>
                 </div>
               </CardContent>

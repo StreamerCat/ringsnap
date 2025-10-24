@@ -375,6 +375,26 @@ All colors MUST be HSL.
     @apply rounded-2xl bg-gradient-to-r from-cream/30 to-cream/60;
     animation: skeleton-pulse 2s ease-in-out infinite;
   }
+
+  /* Calculator-specific styles */
+  .calculator-result-card {
+    @apply p-4 sm:p-5 rounded-2xl bg-white border-l-4 border-l-primary shadow-md transition-all duration-300;
+  }
+
+  .calculator-result-card:hover {
+    @apply shadow-lg;
+    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.12);
+  }
+
+  .calculator-metric-label {
+    @apply text-xs sm:text-sm;
+    color: hsl(var(--charcoal) / 0.6);
+  }
+
+  .calculator-metric-number {
+    @apply text-2xl sm:text-3xl font-bold;
+    color: hsl(var(--charcoal));
+  }
   
   /* === SECTION SPACING & DIVIDERS === */
   
