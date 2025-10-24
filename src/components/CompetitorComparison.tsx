@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Check, X, AlertTriangle, Clock, DollarSign, ShieldCheck, Zap, Lock } from "lucide-react";
 
 export const CompetitorComparison = () => {
+  // Updated comparison data - v2024
   const competitors = [
     { name: "You", highlight: true },
     { name: "CallRail", highlight: false },

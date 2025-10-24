@@ -60,7 +60,7 @@ export const ContractorHero = () => {
               </div>
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
                 <PhoneCall className="w-4 h-4 text-primary" />
-                <span className="font-medium">Handles emergencies, quotes & scheduling</span>
+                <span className="font-medium">All call types covered</span>
               </div>
             </div>
           </div>
