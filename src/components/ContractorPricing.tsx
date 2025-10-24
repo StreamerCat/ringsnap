@@ -132,7 +132,7 @@ export const ContractorPricing = () => {
               key={index} 
               className={`relative rounded-3xl border-0 p-1 hover-glow ${
                 tier.badge 
-                  ? 'bg-gradient-to-br from-purple-200/50 via-pink-200/50 to-purple-200/50 scale-105' 
+                  ? 'bg-gradient-to-br from-terracotta/20 to-cream/30 scale-105' 
                   : 'bg-gradient-to-br from-gray-100/50 to-white'
               }`}
             >
@@ -180,7 +180,7 @@ export const ContractorPricing = () => {
                 </ul>
 
                 {/* Risk Reversal */}
-                <div className="p-4 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100">
+                <div className="p-4 rounded-lg bg-gradient-to-br from-cream/30 to-white border border-charcoal/20">
                   <div className="text-sm font-semibold text-center text-foreground">
                     {tier.riskReversal}
                   </div>
@@ -191,7 +191,7 @@ export const ContractorPricing = () => {
                   className={`w-full h-12 text-lg rounded-full ${
                     tier.badge 
                       ? '' 
-                      : 'border-2 border-purple-100 hover:border-purple-200'
+                      : 'border-2 border-charcoal/20 hover:border-charcoal/40'
                   }`}
                   variant={tier.badge ? "gradient" : "outline"}
                   size="lg"

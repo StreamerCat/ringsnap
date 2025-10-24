@@ -46,8 +46,8 @@ export const EmergencyCalculator = () => {
         <div className="container mx-auto px-4 max-w-7xl">
           {/* Problem Statement */}
           <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-destructive/10 border border-destructive/20 mb-4 sm:mb-6">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4 sm:mb-6">
+              <AlertTriangle className="w-4 h-4 text-primary" />
               <span className="text-xs sm:text-sm font-medium">Every Missed Emergency Call = Lost Revenue</span>
             </div>
             <h2 className="text-fluid-h2 font-bold mb-3 sm:mb-4">How Much Are You Losing Right Now?</h2>
@@ -57,9 +57,9 @@ export const EmergencyCalculator = () => {
           </div>
 
           <div className="max-w-5xl mx-auto">
-            <Card className="border-2 border-emerald-500 elevation-3">
+            <Card className="border-2 border-primary elevation-3">
               <CardHeader>
-                <CardTitle className="text-3xl sm:text-4xl md:text-5xl text-center text-emerald-600 text-metric animate-count-up">
+                <CardTitle className="text-3xl sm:text-4xl md:text-5xl text-center text-primary text-metric animate-count-up">
                   ${recoveredRevenue.toLocaleString()}
                 </CardTitle>
                 <CardDescription className="text-center text-base sm:text-lg">

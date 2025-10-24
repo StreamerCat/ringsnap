@@ -50,7 +50,7 @@ export const ContractorTestimonials = () => {
         {/* Ratings Strip */}
         <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mb-8 sm:mb-12 p-4 sm:p-6 bg-white rounded-2xl border elevation-3 max-w-4xl mx-auto">
           <div className="flex items-center gap-2 sm:gap-3">
-            <Star className="w-6 sm:w-8 h-6 sm:h-8 fill-emerald-500 text-emerald-500" />
+            <Star className="w-6 sm:w-8 h-6 sm:h-8 fill-primary text-primary" />
             <div>
               <div className="text-2xl sm:text-3xl font-bold text-metric">4.9</div>
               <div className="text-xs sm:text-sm text-slate-600">out of 5</div>
@@ -67,14 +67,14 @@ export const ContractorTestimonials = () => {
           <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
           
           <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-emerald-600 text-metric">&lt;1s</div>
+            <div className="text-xl sm:text-2xl font-bold text-primary text-metric">&lt;1s</div>
             <div className="text-xs sm:text-sm text-slate-600">Answer time</div>
           </div>
           
           <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
           
           <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-emerald-600 text-metric">95%</div>
+            <div className="text-xl sm:text-2xl font-bold text-primary text-metric">95%</div>
             <div className="text-xs sm:text-sm text-slate-600">Capture rate</div>
           </div>
         </div>

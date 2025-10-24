@@ -8,40 +8,38 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Feeld-inspired gradient system */
-    --gradient-core-start: 282 68% 56%;     /* #8E2DE2 purple */
-    --gradient-core-end: 344 100% 70%;      /* #FF6A88 pink */
-    
-    --gradient-secondary-start: 282 57% 41%; /* #5C258D deep purple */
-    --gradient-secondary-end: 344 79% 64%;   /* #ED6EA0 rose */
-    
-    --gradient-accent-start: 210 36% 16%;    /* #141E30 navy */
-    --gradient-accent-end: 215 29% 29%;      /* #243B55 slate blue */
+    /* Terracotta Color System */
+    --terracotta: 13 61% 59%;        /* #D97757 Primary */
+    --terracotta-dark: 13 54% 51%;   /* #C4603E Hover state */
+    --charcoal: 200 11% 21%;         /* #2C3639 Secondary */
+    --cream: 36 33% 91%;             /* #F4E8D8 Accent */
+    --off-white: 60 14% 98%;         /* #FAF9F6 Light background */
+    --sage: 150 16% 57%;             /* #88A096 Success/positive */
     
     /* Neutrals - warm and soft */
-    --background: 0 0% 98%;                  /* #F9F9F9 off-white */
-    --foreground: 0 0% 11%;                  /* #1B1B1B graphite */
-    --soft-gray: 0 0% 93%;                   /* #EDEDED */
+    --background: 60 14% 98%;        /* Off-white */
+    --foreground: 200 11% 21%;       /* Charcoal */
+    --soft-gray: 0 0% 93%;           /* #EDEDED */
     
-    /* Primary = Gradient Core */
-    --primary: 282 68% 56%;
+    /* Primary = Terracotta */
+    --primary: 13 61% 59%;
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 0 0% 11%;
+    --secondary: 200 11% 21%;        /* Charcoal */
+    --secondary-foreground: 0 0% 100%;
     
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 46%;
+    --muted: 36 33% 91%;             /* Cream */
+    --muted-foreground: 200 11% 40%;
     
-    --accent: 282 57% 41%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 36 33% 91%;            /* Cream */
+    --accent-foreground: 200 11% 21%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 282 68% 56%;
+    --border: 200 11% 21%;           /* Charcoal borders */
+    --input: 36 33% 85%;
+    --ring: 13 61% 59%;              /* Terracotta */
 
     --radius: 0.5rem;
 
@@ -165,34 +163,24 @@ All colors MUST be HSL.
     @apply tabular-nums font-semibold;
   }
   
-  /* Core Gradients */
+  /* Core Gradients - Now Solid Terracotta */
   .gradient-core {
-    background: linear-gradient(135deg, 
-      hsl(var(--gradient-core-start)) 0%, 
-      hsl(var(--gradient-core-end)) 100%);
-    will-change: transform;
+    background: hsl(var(--terracotta));
   }
   
   .gradient-secondary {
-    background: linear-gradient(135deg, 
-      hsl(var(--gradient-secondary-start)) 0%, 
-      hsl(var(--gradient-secondary-end)) 100%);
+    background: hsl(var(--charcoal));
   }
   
   .gradient-accent {
     background: linear-gradient(135deg, 
-      hsl(var(--gradient-accent-start)) 0%, 
-      hsl(var(--gradient-accent-end)) 100%);
+      hsl(var(--terracotta)) 0%, 
+      hsl(var(--cream)) 100%);
   }
   
-  /* Gradient Text */
+  /* Gradient Text - Now Solid Terracotta */
   .text-gradient-core {
-    background: linear-gradient(135deg, 
-      hsl(var(--gradient-core-start)), 
-      hsl(var(--gradient-core-end)));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--terracotta));
   }
   
   /* Aura Effects (blurred gradient backgrounds) */
@@ -209,7 +197,7 @@ All colors MUST be HSL.
     width: 200%;
     height: 200%;
     background: radial-gradient(circle, 
-      hsl(var(--gradient-core-start) / 0.15) 0%, 
+      hsl(var(--terracotta) / 0.08) 0%, 
       transparent 70%);
     filter: blur(60px);
     z-index: -1;
@@ -222,14 +210,14 @@ All colors MUST be HSL.
     }
   }
   
-  /* Soft Hover Glow */
+  /* Soft Hover Glow - Terracotta */
   .hover-glow {
     transition: box-shadow 0.3s ease, transform 0.3s ease;
     will-change: transform;
   }
   
   .hover-glow:hover {
-    box-shadow: 0 20px 40px -15px hsl(var(--gradient-core-start) / 0.25);
+    box-shadow: 0 20px 40px -15px hsl(var(--terracotta) / 0.25);
     transform: translateY(-2px);
   }
   
@@ -261,7 +249,12 @@ All colors MUST be HSL.
   }
   
   .section-divider {
-    @apply h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent;
+    @apply h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent;
+  }
+  
+  /* Terracotta button hover state */
+  .hover\:bg-terracotta-dark:hover {
+    background: hsl(var(--terracotta-dark));
   }
   
   /* Pulse Wave Button Animation */

@@ -11,7 +11,7 @@ export const ContractorHero = () => {
     <section className="relative min-h-screen-safe flex items-center overflow-hidden">
       {/* Gradient Aura Background */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-white via-purple-50/30 to-pink-50/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-off-white to-cream/30" />
         <div className="absolute top-20 -right-40 w-96 h-96 gradient-core opacity-10 blur-3xl rounded-full" />
         <div className="absolute bottom-20 -left-40 w-96 h-96 gradient-secondary opacity-10 blur-3xl rounded-full" />
       </div>
@@ -71,7 +71,7 @@ export const ContractorHero = () => {
           
           {/* Right Column - Transcript */}
           <div className="relative">
-            <div className="relative p-1 rounded-3xl bg-gradient-to-br from-purple-400/20 via-pink-400/20 to-purple-400/10">
+            <div className="relative p-1 rounded-3xl bg-gradient-to-br from-terracotta/20 to-cream/20">
               <div className="relative p-6 sm:p-8 rounded-3xl bg-white/90 backdrop-blur-xl">
                 <Badge variant="gradient" className="absolute -top-3 -right-3 px-4 py-1.5 text-xs font-bold rounded-full shadow-xl">
                   &lt;1s pickup
@@ -112,7 +112,7 @@ export const ContractorHero = () => {
               </div>
             </div>
             
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-white rounded-full shadow-2xl border border-purple-100">
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-white rounded-full shadow-2xl border border-charcoal/20">
               <div className="text-center">
                 <span className="text-2xl font-bold text-gradient-core text-metric">95%</span>
                 <span className="text-sm text-foreground/60 ml-2">vs. your 55%</span>

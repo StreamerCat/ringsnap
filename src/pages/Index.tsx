@@ -53,7 +53,7 @@ const Index = () => {
       "bestRating": "5",
       "worstRating": "1"
     },
-    "description": "Ringsnap: AI that answers like a human. 24/7 call answering for contractors. Never miss a call, book jobs automatically, sound warm not robotic. Customers won't know it's AI.",
+    
     "image": "https://aivoiceagent.com/og-image.jpg",
     "featureList": [
       "Answers in under 1 second",

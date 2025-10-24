@@ -57,7 +57,7 @@ export const ContractorFooter = () => {
   };
 
   return (
-    <footer className="bg-gradient-to-br from-purple-50/30 to-white border-t border-purple-100/50">
+    <footer className="bg-gradient-to-br from-cream/30 to-off-white border-t border-charcoal/20">
       {/* FAQ Section */}
       <div className="container mx-auto px-4 py-16">
         <h2 className="text-3xl font-bold text-center mb-8">Common Questions from Contractors</h2>
@@ -108,7 +108,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.product.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
                       {link.label}
                     </a>
                   </li>
@@ -122,7 +122,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.trades.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
                       {link.label}
                     </a>
                   </li>
@@ -136,7 +136,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.resources.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
                       {link.label}
                     </a>
                   </li>
@@ -150,7 +150,7 @@ export const ContractorFooter = () => {
               <ul className="space-y-2">
                 {footerLinks.company.map((link, index) => (
                   <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-gradient-core transition-colors">
+                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
                       {link.label}
                     </a>
                   </li>

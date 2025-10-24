@@ -10,7 +10,7 @@ export const FinalCTA = () => {
     <section className="py-20 relative overflow-hidden">
       {/* Gradient Aura Background */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/30 via-white to-pink-50/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-cream/30 via-off-white to-white" />
         <div className="absolute top-20 right-20 w-96 h-96 gradient-core opacity-10 blur-3xl rounded-full" />
       </div>
       
@@ -75,19 +75,19 @@ export const FinalCTA = () => {
           </div>
 
           {/* Urgency Without Fake Scarcity */}
-          <div className="max-w-md mx-auto p-6 rounded-2xl bg-card border border-purple-100">
+          <div className="max-w-md mx-auto p-6 rounded-2xl bg-card border border-charcoal/20">
             <h3 className="font-bold mb-2">Every hour you wait:</h3>
             <ul className="text-sm text-foreground/60 space-y-2 text-left">
               <li className="flex items-start gap-2">
-                <span className="text-purple-500 mt-1">•</span>
+                <span className="text-primary mt-1">•</span>
                 <span>Your competitors answer emergency calls worth $500-2,000</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-purple-500 mt-1">•</span>
+                <span className="text-primary mt-1">•</span>
                 <span>Customers find "someone who picks up" on Google</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-purple-500 mt-1">•</span>
+                <span className="text-primary mt-1">•</span>
                 <span>You lose $140-350 in potential revenue (based on averages)</span>
               </li>
             </ul>
