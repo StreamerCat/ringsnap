@@ -5,7 +5,6 @@ import { ContractorHero } from "@/components/ContractorHero";
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
 const CompetitorComparison = lazy(() => import("@/components/CompetitorComparison").then(m => ({ default: m.CompetitorComparison })));
-const ObjectionHandling = lazy(() => import("@/components/ObjectionHandling").then(m => ({ default: m.ObjectionHandling })));
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
 
@@ -187,7 +186,6 @@ const Index = () => {
           <CallValueCalculator />
           <SolutionDemo />
           <CompetitorComparison />
-          <ObjectionHandling />
           <ContractorTestimonials />
           <ContractorPricing />
           <ContractorFooter />

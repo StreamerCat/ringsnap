@@ -1,67 +1,47 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Check, X, AlertTriangle, Clock, DollarSign, ShieldCheck, Zap, Lock } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 export const CompetitorComparison = () => {
-  // Updated comparison data - v2024
   const competitors = [
     { name: "RingSnap", highlight: true },
     { name: "CallRail", highlight: false },
     { name: "Hatch", highlight: false },
-    { name: "ServiceTitan Voice", highlight: false },
     { name: "Call Center", highlight: false },
-    { name: "Conversica", highlight: false },
-    { name: "AnswerConnect", highlight: false },
     { name: "Voicemail", highlight: false },
   ];
 
   const criteria = [
     {
       name: "Voice realism",
-      values: ["check", "warning", "warning", "check", "check", "warning", "check", "x"],
-    },
-    {
-      name: "24/7 coverage",
-      values: ["check", "check", "check", "check", "check", "check", "check", "x"],
-    },
-    {
-      name: "Appointment booking",
-      values: ["Automatic", "Manual", "Automatic", "Manual", "Manual", "Automatic", "Manual", "N/A"],
-    },
-    {
-      name: "Emergency routing",
-      values: ["Smart", "Basic", "Basic", "Smart", "Basic", "Basic", "Basic", "N/A"],
+      values: ["check", "warning", "warning", "check", "x"],
     },
     {
       name: "Setup time",
-      values: ["10 min", "1-2 days", "1 day", "2-4 weeks", "1-2 weeks", "1 day", "1-2 days", "Instant"],
-    },
-    {
-      name: "CRM flexibility",
-      values: ["Any CRM", "Limited", "Limited", "Locked", "Any CRM", "Limited", "Any CRM", "N/A"],
+      values: ["10 min", "1-2 days", "1 day", "1-2 weeks", "Instant"],
     },
     {
       name: "Monthly cost",
-      values: ["$297-1497", "$500-2000", "$600-1800", "$2000+", "$1500-3000", "$800-2500", "$800-2000", "Free"],
+      values: ["$297+", "$500+", "$600+", "$1500+", "Free"],
     },
     {
-      name: "ROI speed",
-      values: ["Days", "Weeks", "Weeks", "Months", "Months", "Weeks", "Weeks", "N/A"],
+      name: "24/7 coverage",
+      values: ["check", "check", "check", "check", "x"],
     },
     {
-      name: "Scalability",
-      values: ["Unlimited", "Per-user", "Per-user", "Caps", "Per-user", "Unlimited", "Per-user", "N/A"],
+      name: "Appointment booking",
+      values: ["Auto", "Manual", "Auto", "Manual", "x"],
     },
     {
-      name: "Reliability",
-      values: ["99.9%", "95%", "95%", "99%", "Variable", "98%", "96%", "100%"],
+      name: "Emergency routing",
+      values: ["Smart", "Basic", "Basic", "Basic", "x"],
     },
   ];
 
   const getIcon = (value: string) => {
     if (value === "check") return <Check className="w-5 h-5 text-primary mx-auto" />;
-    if (value === "x") return <X className="w-5 h-5 text-destructive mx-auto" />;
-    if (value === "warning") return <AlertTriangle className="w-5 h-5 text-yellow-500 mx-auto" />;
+    if (value === "x") return <X className="w-5 h-5 text-red-500 mx-auto" />;
+    if (value === "warning") return <span className="text-yellow-500 mx-auto block text-center">~</span>;
     return <span className="text-sm text-center block">{value}</span>;
   };
 
@@ -73,12 +53,12 @@ export const CompetitorComparison = () => {
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
           <h2 className="text-h2 mb-4">Why Contractors Choose RingSnap</h2>
           <p className="text-body-default">
-            Compare features, pricing, and ROI across all major platforms
+            Quick comparison of the top solutions
           </p>
         </div>
 
         {/* Desktop Table */}
-        <div className="hidden lg:block max-w-7xl mx-auto overflow-x-auto">
+        <div className="hidden md:block max-w-5xl mx-auto overflow-x-auto">
           <div className="card-tier-2 overflow-hidden">
             <Table>
               <TableHeader>
@@ -87,8 +67,10 @@ export const CompetitorComparison = () => {
                   {competitors.map((comp, idx) => (
                     <TableHead
                       key={idx}
-                      className={`text-center font-bold border-l bg-primary text-white`}
-                      style={comp.highlight ? {} : {borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
+                      className={`text-center font-bold border-l text-white ${
+                        comp.highlight ? 'bg-primary' : 'bg-primary/90'
+                      }`}
+                      style={{borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
                     >
                       {comp.name}
                     </TableHead>
@@ -116,7 +98,7 @@ export const CompetitorComparison = () => {
                         ) : value === "x" ? (
                           <X className="w-5 h-5 text-red-500 mx-auto" />
                         ) : value === "warning" ? (
-                          <AlertTriangle className="w-5 h-5 text-yellow-500 mx-auto" />
+                          <span className="text-yellow-500 mx-auto block text-center text-lg">~</span>
                         ) : (
                           <span className="text-sm text-center block" style={{color: 'hsl(var(--charcoal) / 0.75)'}}>
                             {value}
@@ -131,46 +113,65 @@ export const CompetitorComparison = () => {
           </div>
         </div>
 
-        {/* Mobile Cards */}
-        <div className="lg:hidden space-y-4 sm:space-y-6">
-          {competitors.map((comp, idx) => (
-            <Card key={idx} className={comp.highlight ? "card-tier-1 relative" : "card-tier-2"}>
-              {comp.highlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
-                  YOUR SOLUTION
-                </div>
-              )}
-              <CardHeader>
-                <CardTitle className={comp.highlight ? "text-primary" : ""}>{comp.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 sm:space-y-3">
-                {criteria.map((criterion, critIdx) => {
-                  const value = criterion.values[idx];
-                  const isGood = value === "check" || (value !== "x" && value !== "warning" && value !== "N/A");
-                  return (
-                    <div key={critIdx} className="flex justify-between items-center py-2 border-b last:border-0">
-                      <span className="text-xs sm:text-sm font-medium">{criterion.name}</span>
-                      <div className="flex items-center gap-2">
-                        {value === "check" || value === "x" || value === "warning" ? (
-                          getIcon(value)
+        {/* Mobile - Horizontal Scroll Table */}
+        <div className="md:hidden overflow-x-auto -mx-4 px-4">
+          <div className="card-tier-2 min-w-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-primary hover:bg-primary">
+                  <TableHead className="text-white font-bold text-xs sticky left-0 bg-primary z-10">Feature</TableHead>
+                  {competitors.map((comp, idx) => (
+                    <TableHead
+                      key={idx}
+                      className={`text-center font-bold text-xs border-l text-white ${
+                        comp.highlight ? 'bg-primary' : 'bg-primary/90'
+                      }`}
+                      style={{borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
+                    >
+                      {comp.name}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {criteria.map((criterion, rowIdx) => (
+                  <TableRow key={rowIdx}>
+                    <TableCell className="font-medium text-xs sticky left-0 bg-white z-10" style={{color: 'hsl(var(--charcoal))'}}>
+                      {criterion.name}
+                    </TableCell>
+                    {criterion.values.map((value, colIdx) => (
+                      <TableCell
+                        key={colIdx}
+                        className={`text-center border-l text-xs ${
+                          competitors[colIdx].highlight ? "bg-cream/30" : ""
+                        }`}
+                        style={{borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
+                      >
+                        {value === "check" ? (
+                          <Check className={`w-4 h-4 mx-auto ${
+                            competitors[colIdx].highlight ? 'text-primary' : 'text-muted-foreground'
+                          }`} />
+                        ) : value === "x" ? (
+                          <X className="w-4 h-4 text-red-500 mx-auto" />
+                        ) : value === "warning" ? (
+                          <span className="text-yellow-500 mx-auto block text-center">~</span>
                         ) : (
-                          <span className={`text-xs sm:text-sm font-semibold px-2 py-1 rounded ${
-                            isGood ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                          }`}>
+                          <span className="text-xs text-center block" style={{color: 'hsl(var(--charcoal) / 0.75)'}}>
                             {value}
                           </span>
                         )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          ))}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="text-xs text-center text-muted-foreground mt-2">← Swipe to compare →</p>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground mt-8 max-w-3xl mx-auto">
-          Comparison based on publicly available info and typical SMB plans. Features and pricing may vary.
+        <p className="text-center text-sm text-muted-foreground mt-6 max-w-3xl mx-auto">
+          Based on publicly available pricing and features
         </p>
       </div>
     </section>

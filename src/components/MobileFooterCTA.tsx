@@ -31,19 +31,20 @@ export const MobileFooterCTA = () => {
     >
       <div className="container mx-auto px-4 pt-4 pb-4 flex gap-3">
         <Button 
-          className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md" 
+          className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md text-sm font-semibold" 
           aria-label="Start free trial"
         >
-          <PhoneCall className="w-5 h-5" />
-          <span className="ml-2">Start trial</span>
+          <PhoneCall className="w-4 h-4" />
+          <span className="ml-1.5">Trial</span>
         </Button>
         <Button 
-          className="flex-1 h-12 rounded-full bg-white border-2 active:scale-95 transition-transform shadow-sm"
+          className="flex-1 h-12 rounded-full bg-white border-2 active:scale-95 transition-transform shadow-sm text-sm font-semibold"
           style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
           aria-label="Use calculator"
+          onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })}
         >
-          <Calculator className="w-5 h-5" />
-          <span className="ml-2">Calculate</span>
+          <Calculator className="w-4 h-4" />
+          <span className="ml-1.5">Calculate</span>
         </Button>
       </div>
     </div>
