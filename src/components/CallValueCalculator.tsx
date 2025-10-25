@@ -190,7 +190,7 @@ export const CallValueCalculator = () => {
                     This includes 24/7 emergencies, daytime quotes, appointment requests, and follow-up calls—everything your customers call about.
                   </p>
                   <Button className="w-full h-12 text-lg mt-4 rounded-full bg-primary text-white btn-pulse-cta shadow-lg hover:shadow-xl transition-all duration-200" onClick={() => setShowEmailModal(true)}>
-                    Stop Losing Calls (& Revenue) <ArrowRight className="w-5 h-5 ml-1 inline-block" />
+                    Get RingSnap Free <ArrowRight className="w-5 h-5 ml-1 inline-block" />
                   </Button>
                 </div>
               </CardContent>
