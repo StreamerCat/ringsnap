@@ -5,7 +5,7 @@ import { Check, X, AlertTriangle, Clock, DollarSign, ShieldCheck, Zap, Lock } fr
 export const CompetitorComparison = () => {
   // Updated comparison data - v2024
   const competitors = [
-    { name: "You", highlight: true },
+    { name: "RingSnap", highlight: true },
     { name: "CallRail", highlight: false },
     { name: "Hatch", highlight: false },
     { name: "ServiceTitan Voice", highlight: false },
