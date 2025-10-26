@@ -19,13 +19,27 @@ export const SolutionDemo = () => {
 
         {/* Interactive Demo */}
         <div className="max-w-3xl mx-auto mb-16">
-          <iframe 
-            src="https://aivoiceagent.com/demo" 
-            title="Interactive Demo" 
-            className="w-full h-96 rounded-xl border-2 border-primary shadow-xl"
-            allow="microphone"
-            loading="lazy"
-          />
+          <div className="rounded-xl overflow-hidden border-2 shadow-xl" style={{ borderColor: 'rgba(44, 54, 57, 0.2)' }}>
+            <vapi-widget
+              public-key="9159dfe3-b11f-457c-b41b-e296872027a0"
+              assistant-id="db066c6c-e2e3-424e-9fd1-1473f2ac3b01"
+              mode="chat"
+              theme="light"
+              base-bg-color="#FAF9F6"
+              accent-color="#D97757"
+              cta-button-color="#D97757"
+              cta-button-text-color="#ffffff"
+              border-radius="large"
+              size="large"
+              title="Chat with RingSnap AI"
+              start-button-text="Start Conversation"
+              end-button-text="End Conversation"
+              chat-first-message="Hey! I'm your AI receptionist. Ask me about pricing, book an appointment, or report an emergency."
+              chat-placeholder="Type your message..."
+              voice-show-transcript="true"
+              consent-required="false"
+            ></vapi-widget>
+          </div>
         </div>
 
         {/* Proof Points Grid */}
