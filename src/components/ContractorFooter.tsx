@@ -20,6 +20,9 @@ export const ContractorFooter = () => {
     question: "What about existing customers who want me personally?",
     answer: "You can configure VIP customers to transfer directly to you, or the AI can recognize returning customers by phone number and offer to transfer. You maintain complete control over who gets through and when."
   }, {
+    question: "How does the 3-day free trial work?",
+    answer: "Your 3-day trial includes 150 minutes (approximately 40+ test calls) to fully test RingSnap with real scenarios—emergency calls, appointments, after-hours coverage, everything. No credit card required to start.\n\nIf you use all 150 minutes during the trial, your AI simply pauses and you can upgrade instantly to continue. After 3 days, your selected plan begins automatically unless you cancel. You're in complete control and can cancel anytime with zero hassle."
+  }, {
     question: "What if I go over my included minutes?",
     answer: "No problem! We never cut off your service mid-month. If you exceed your included minutes, additional minutes are billed at:\n\n• Starter: $0.16/minute\n• Professional: $0.13/minute\n• Premium: $0.11/minute\n\nYou'll receive email notifications at 75% and 90% usage so you're never surprised. Most customers stay within their plan limits, but busy months happen—we've got you covered.\n\nIf you consistently exceed your limit, we'll proactively suggest upgrading to the next tier, which usually saves you money compared to paying for additional minutes each month."
   }];
