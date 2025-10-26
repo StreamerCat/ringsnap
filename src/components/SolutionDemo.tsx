@@ -1,6 +1,76 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign } from "lucide-react";
+import Vapi from "@vapi-ai/web";
+import { useEffect, useRef, useState } from "react";
+
+const VapiWidget = () => {
+  const [isCallActive, setIsCallActive] = useState(false);
+  const vapiRef = useRef<Vapi | null>(null);
+
+  useEffect(() => {
+    // Initialize Vapi instance
+    vapiRef.current = new Vapi("9159dfe3-b11f-457c-b41b-e296872027a0");
+    
+    // Event listeners
+    const handleCallStart = () => setIsCallActive(true);
+    const handleCallEnd = () => setIsCallActive(false);
+    
+    vapiRef.current.on("call-start", handleCallStart);
+    vapiRef.current.on("call-end", handleCallEnd);
+    
+    return () => {
+      vapiRef.current?.stop();
+    };
+  }, []);
+
+  const startCall = () => {
+    vapiRef.current?.start("db066c6c-e2e3-424e-9fd1-1473f2ac3b01");
+  };
+
+  const endCall = () => {
+    vapiRef.current?.stop();
+  };
+
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+      {!isCallActive ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-2xl font-bold mb-2 text-[#2C3639]">Chat with RingSnap AI</h3>
+            <p className="text-muted-foreground">
+              Ask about pricing, book an appointment, or report an emergency.
+            </p>
+          </div>
+          <button
+            onClick={startCall}
+            className="bg-[#D97757] text-white px-8 py-4 rounded-full text-lg font-semibold hover:opacity-90 transition-opacity shadow-lg"
+          >
+            Start Conversation
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-[#D97757] rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
+              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+              </svg>
+            </div>
+            <p className="text-xl font-semibold text-[#2C3639]">Call in Progress</p>
+            <p className="text-sm text-muted-foreground mt-2">AI receptionist is listening...</p>
+          </div>
+          <button
+            onClick={endCall}
+            className="bg-red-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-700 transition-colors shadow-lg"
+          >
+            End Conversation
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const SolutionDemo = () => {
   return (
@@ -19,26 +89,12 @@ export const SolutionDemo = () => {
 
         {/* Interactive Demo */}
         <div className="max-w-3xl mx-auto mb-16">
-          <div className="rounded-xl overflow-hidden border-2 shadow-xl" style={{ borderColor: 'rgba(44, 54, 57, 0.2)' }}>
-            <vapi-widget
-              public-key="9159dfe3-b11f-457c-b41b-e296872027a0"
-              assistant-id="db066c6c-e2e3-424e-9fd1-1473f2ac3b01"
-              mode="chat"
-              theme="light"
-              base-bg-color="#FAF9F6"
-              accent-color="#D97757"
-              cta-button-color="#D97757"
-              cta-button-text-color="#ffffff"
-              border-radius="large"
-              size="large"
-              title="Chat with RingSnap AI"
-              start-button-text="Start Conversation"
-              end-button-text="End Conversation"
-              chat-first-message="Hey! I'm your AI receptionist. Ask me about pricing, book an appointment, or report an emergency."
-              chat-placeholder="Type your message..."
-              voice-show-transcript="true"
-              consent-required="false"
-            ></vapi-widget>
+          <div 
+            id="vapi-chat-container"
+            className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative"
+            style={{ borderColor: 'rgba(44, 54, 57, 0.2)' }}
+          >
+            <VapiWidget />
           </div>
         </div>
 
