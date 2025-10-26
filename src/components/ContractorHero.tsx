@@ -21,19 +21,20 @@ export const ContractorHero = () => {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           
           {/* Left Column */}
-          <div className="space-y-8">
-            <img src={logo} alt="RingSnap Logo" className="h-12 sm:h-16 w-auto" />
+          <div>
+            <img src={logo} alt="RingSnap Logo" className="h-14 sm:h-20 w-auto mb-6" />
             
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
-              AI that answers like a human
-            </h1>
-            
-            <p className="text-xl sm:text-2xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
-              Never miss a call. Book every job—emergency or routine—24/7. Sound warm, not robotic. Your customers won't know it's AI.
-            </p>
-            
-            {/* Gradient CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="space-y-8">
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
+                AI that answers like a human
+              </h1>
+              
+              <p className="text-xl sm:text-2xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
+                Never miss a call. Book every job—emergency or routine—24/7. Sound warm, not robotic. Your customers won't know it's AI.
+              </p>
+              
+              {/* Gradient CTAs */}
+              <div className="flex flex-col sm:flex-row gap-4">
               <Button 
                 size="lg" 
                 className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
@@ -51,19 +52,20 @@ export const ContractorHero = () => {
               </Button>
             </div>
             
-            {/* Trust Badges */}
-            <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{borderColor: 'hsl(var(--charcoal) / 0.05)'}}>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
-                <Star className="w-4 h-4 text-primary fill-primary" />
-                <span className="font-medium">5-star rated</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
-                <CheckCircle className="w-4 h-4 text-primary" />
-                <span className="font-medium">14-day free trial</span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
-                <PhoneCall className="w-4 h-4 text-primary" />
-                <span className="font-medium">All call types covered</span>
+              {/* Trust Badges */}
+              <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{borderColor: 'hsl(var(--charcoal) / 0.05)'}}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                  <Star className="w-4 h-4 text-primary fill-primary" />
+                  <span className="font-medium">5-star rated</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span className="font-medium">14-day free trial</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                  <PhoneCall className="w-4 h-4 text-primary" />
+                  <span className="font-medium">All call types covered</span>
+                </div>
               </div>
             </div>
           </div>
