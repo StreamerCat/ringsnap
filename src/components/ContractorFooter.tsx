@@ -3,13 +3,13 @@ import { Phone, Mail, MapPin, Shield } from "lucide-react";
 export const ContractorFooter = () => {
   const faqs = [{
     question: "Will it sound like a robot?",
-    answer: "No. Our AI uses advanced voice technology that sounds completely natural. Customers typically can't tell they're speaking with AI. We offer premium voice cloning on Professional and Growth plans to match your team's voice exactly."
+    answer: "No. Our AI uses advanced voice technology that sounds completely natural. Customers typically can't tell they're speaking with AI. We offer premium voice cloning on Professional and Premium plans to match your team's voice exactly."
   }, {
     question: "What if it's a gas leak or electrical fire?",
     answer: "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The AI provides full context of the situation before transfer so you know exactly what you're walking into."
   }, {
     question: "Can it handle Spanish-speaking customers?",
-    answer: "Yes. Professional and Growth plans include multi-language support. The AI seamlessly switches between English and Spanish based on the customer's preference, ensuring you never lose a job due to language barriers."
+    answer: "Yes. Professional and Premium plans include multi-language support. The AI seamlessly switches between English and Spanish based on the customer's preference, ensuring you never lose a job due to language barriers."
   }, {
     question: "What if I'm already on a call?",
     answer: "The AI books the appointment automatically and sends you an SMS/email notification. You can configure it to transfer to voicemail, send to a crew member, or schedule for your next available slot. No calls get missed."
@@ -19,6 +19,9 @@ export const ContractorFooter = () => {
   }, {
     question: "What about existing customers who want me personally?",
     answer: "You can configure VIP customers to transfer directly to you, or the AI can recognize returning customers by phone number and offer to transfer. You maintain complete control over who gets through and when."
+  }, {
+    question: "What if I go over my included minutes?",
+    answer: "No problem! We never cut off your service mid-month. If you exceed your included minutes, additional minutes are billed at:\n\n• Starter: $0.16/minute\n• Professional: $0.13/minute\n• Premium: $0.11/minute\n\nYou'll receive email notifications at 75% and 90% usage so you're never surprised. Most customers stay within their plan limits, but busy months happen—we've got you covered.\n\nIf you consistently exceed your limit, we'll proactively suggest upgrading to the next tier, which usually saves you money compared to paying for additional minutes each month."
   }];
   const footerLinks = {
     product: [{

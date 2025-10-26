@@ -15,9 +15,10 @@ export const ContractorPricing = () => {
       name: "Starter",
       price: "$297",
       description: "Solo Contractors & Small Crews",
-      minutes: "2,000 minutes included",
+      minutes: "1,500 minutes included",
       receptionist: "1 AI receptionist",
-      overage: "$0.15/min overage",
+      overage: "$0.16/minute",
+      overageContext: "Most customers use 1,000-1,400 min/month",
       features: [
         "Answer 95% of calls automatically",
         "Books appointments automatically",
@@ -25,45 +26,46 @@ export const ContractorPricing = () => {
         "Google Calendar + Zapier",
         "Basic analytics"
       ],
-      
       cta: "Start Free Trial",
       badge: null,
       icon: Phone
     },
     {
       name: "Professional",
-      price: "$797",
+      price: "$547",
       description: "Growing Contractors with Multiple Crews",
-      minutes: "5,000 minutes included",
+      minutes: "3,500 minutes included",
       receptionist: "3 AI receptionists",
-      overage: "$0.12/min overage",
+      overage: "$0.13/minute",
+      overageContext: "Most customers stay within plan limits",
       features: [
         "Everything in Starter, PLUS:",
         "Premium voice cloning",
         "Smart call routing to crew",
         "Multi-language (EN + ES)",
-        "Advanced analytics"
+        "Advanced analytics",
+        "Priority support"
       ],
-      
       cta: "Start Free Trial",
       badge: "MOST POPULAR",
       icon: Zap
     },
     {
-      name: "Growth",
-      price: "$1,497",
+      name: "Premium",
+      price: "$947",
       description: "Multi-Location Contractors & Franchises",
-      minutes: "10,000 minutes included",
+      minutes: "7,000 minutes included",
       receptionist: "5 AI receptionists",
-      overage: "$0.10/min overage",
+      overage: "$0.11/minute",
+      overageContext: "Rarely needed at this tier",
       features: [
         "Everything in Professional, PLUS:",
         "Custom brand voice cloning",
         "Dedicated success manager",
         "API + custom webhooks",
-        "Multi-location dashboard"
+        "Multi-location dashboard",
+        "Priority phone support"
       ],
-      
       cta: "Start Free Trial",
       badge: null,
       icon: Crown
@@ -155,7 +157,6 @@ export const ContractorPricing = () => {
                 <div className="p-3 rounded-lg bg-muted/50 space-y-1 text-sm">
                   <div className="font-semibold">{tier.minutes}</div>
                   <div className="text-muted-foreground">{tier.receptionist}</div>
-                  <div className="text-xs text-muted-foreground">{tier.overage}</div>
                 </div>
 
                 {/* Features */}
@@ -185,9 +186,20 @@ export const ContractorPricing = () => {
                   {tier.cta}
                 </Button>
 
-                <p className="text-xs text-center text-muted-foreground">
-                  14-day free trial · No credit card required
+                {/* Trial Info - Secondary visibility */}
+                <p className="text-sm text-center text-charcoal/70 mt-3 mb-3">
+                  3-day trial · 150 minutes included · Cancel anytime
                 </p>
+
+                {/* Overage Info - De-emphasized */}
+                <div className="text-center space-y-1">
+                  <p className="text-sm text-muted-foreground font-normal">
+                    Additional minutes: {tier.overage} each
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 italic">
+                    ({tier.overageContext})
+                  </p>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -216,6 +228,83 @@ export const ContractorPricing = () => {
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-primary" />
               <span>Your number stays the same</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Usage Guide Section */}
+        <div className="max-w-4xl mx-auto mt-12 p-8 rounded-xl border-2 bg-background" style={{ borderColor: 'rgba(44, 54, 57, 0.2)' }}>
+          <h3 className="text-2xl font-bold text-center mb-8" style={{color: 'hsl(var(--charcoal))'}}>
+            How Many Minutes Do I Need?
+          </h3>
+          
+          <div className="text-center mb-8 text-muted-foreground">
+            <p className="text-lg">Average call length: <span className="font-semibold text-charcoal">3-4 minutes</span></p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Starter Guide */}
+            <div className="p-6 rounded-lg border-2 bg-muted/30" style={{ borderColor: 'rgba(44, 54, 57, 0.1)' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Phone className="w-5 h-5 text-primary" />
+                <h4 className="font-bold text-lg">STARTER</h4>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="font-semibold text-charcoal">1,500 min/month</div>
+                <div className="text-muted-foreground">~50 minutes per day</div>
+                <div className="text-muted-foreground">~12-15 calls per day</div>
+                <div className="mt-4 pt-4 border-t">
+                  <div className="font-semibold text-primary mb-1">Perfect for:</div>
+                  <div className="text-muted-foreground">Solo operators, part-time businesses</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Professional Guide */}
+            <div className="p-6 rounded-lg border-2 bg-primary/5" style={{ borderColor: 'hsl(var(--primary))' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-primary" />
+                <h4 className="font-bold text-lg">PROFESSIONAL</h4>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="font-semibold text-charcoal">3,500 min/month</div>
+                <div className="text-muted-foreground">~115 minutes per day</div>
+                <div className="text-muted-foreground">~30-35 calls per day</div>
+                <div className="mt-4 pt-4 border-t border-primary/20">
+                  <div className="font-semibold text-primary mb-1">Perfect for:</div>
+                  <div className="text-muted-foreground">1-3 truck operations</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Premium Guide */}
+            <div className="p-6 rounded-lg border-2 bg-muted/30" style={{ borderColor: 'rgba(44, 54, 57, 0.1)' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Crown className="w-5 h-5 text-primary" />
+                <h4 className="font-bold text-lg">PREMIUM</h4>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="font-semibold text-charcoal">7,000 min/month</div>
+                <div className="text-muted-foreground">~230 minutes per day</div>
+                <div className="text-muted-foreground">~60-70 calls per day</div>
+                <div className="mt-4 pt-4 border-t">
+                  <div className="font-semibold text-primary mb-1">Perfect for:</div>
+                  <div className="text-muted-foreground">Multi-location, high-volume operations</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Upgrade Tip */}
+          <div className="mt-8 p-4 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">💡</div>
+              <div className="text-sm">
+                <span className="font-semibold text-charcoal">Not sure which plan?</span>
+                <span className="text-muted-foreground ml-1">
+                  Start with Starter. You can upgrade anytime with zero service interruption.
+                </span>
+              </div>
             </div>
           </div>
         </div>
