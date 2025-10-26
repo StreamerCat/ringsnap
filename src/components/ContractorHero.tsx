@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
+import logo from "@/assets/ringsnap-logo.png";
 
 export const ContractorHero = () => {
   const scrollToCalculator = () => {
@@ -21,6 +22,8 @@ export const ContractorHero = () => {
           
           {/* Left Column */}
           <div className="space-y-8">
+            <img src={logo} alt="RingSnap Logo" className="h-12 sm:h-16 w-auto" />
+            
             <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
               AI that answers like a human
             </h1>
