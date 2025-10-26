@@ -22,7 +22,7 @@ export const ContractorHero = () => {
           
           {/* Left Column */}
           <div>
-            <img src={logo} alt="RingSnap Logo" className="h-14 sm:h-20 w-auto mb-6" />
+            <img src={logo} alt="RingSnap Logo" className="h-24 sm:h-32 lg:h-36 w-auto mb-8 sm:mb-12 mx-auto sm:mx-0" />
             
             <div className="space-y-8">
               <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
