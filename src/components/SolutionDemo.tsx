@@ -36,19 +36,72 @@ const VapiWidget = () => {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
       {!isCallActive ? (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-2xl font-bold mb-2 text-[#2C3639]">Click Start to Hear a Real Demo</h3>
-            <p className="text-muted-foreground">
-              This is a home services business. Ask about services, book an appointment, or report an emergency to see how RingSnap can work in your business and help you turn missed calls into more revenue.
+        <div className="space-y-6 max-w-2xl mx-auto">
+          {/* Headline - Benefit-Driven */}
+          <div className="text-center space-y-3">
+            <h3 className="text-3xl sm:text-4xl font-bold leading-tight text-[#2C3639]">
+              Stop Turning Away Calls.<br />Start Capturing Leads 24/7.
+            </h3>
+            <p className="text-base text-muted-foreground max-w-xl mx-auto">
+              Meet your 24/7 receptionist who never takes time off, never forgets a detail, and never lets a call go to voicemail. Watch how it handles a customer asking about your services, wanting to book, or reporting an emergency - naturally, professionally, and instantly.
             </p>
           </div>
-          <button
-            onClick={startCall}
-            className="bg-[#D97757] text-white px-8 py-4 rounded-full text-lg font-semibold hover:opacity-90 transition-opacity shadow-lg"
-          >
-            Start Conversation
-          </button>
+
+          {/* Enhanced Button with Visual Cue */}
+          <div className="space-y-4">
+            <button
+              onClick={startCall}
+              className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group"
+            >
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+              <span>Hear It in Action</span>
+            </button>
+            
+            {/* Friction Reducers */}
+            <div className="flex items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1.5 font-medium">
+                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                No signup
+              </span>
+              <span className="flex items-center gap-1.5 font-medium">
+                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                60 seconds
+              </span>
+              <span className="flex items-center gap-1.5 font-medium">
+                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Free demo
+              </span>
+            </div>
+
+            {/* Social Proof - Compact */}
+            <div className="bg-gradient-to-r from-[#D97757]/10 to-transparent rounded-xl p-3 sm:p-4 border border-[#D97757]/20">
+              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm flex-wrap">
+                <div className="flex -space-x-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#D97757] flex items-center justify-center text-white text-[10px] sm:text-xs font-bold border-2 border-white">JM</div>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#2C3639] flex items-center justify-center text-white text-[10px] sm:text-xs font-bold border-2 border-white">SK</div>
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#D97757] flex items-center justify-center text-white text-[10px] sm:text-xs font-bold border-2 border-white">RB</div>
+                </div>
+                <span className="text-[#2C3639] font-semibold">Join 5,000+ businesses</span>
+                <div className="flex gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
