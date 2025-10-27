@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, Calculator } from "lucide-react";
+import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
 
 export const MobileFooterCTA = () => {
   const [showCTA, setShowCTA] = useState(false);
+  const [showSignupForm, setShowSignupForm] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,6 +35,7 @@ export const MobileFooterCTA = () => {
         <Button 
           className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md text-sm font-semibold" 
           aria-label="Start free trial"
+          onClick={() => setShowSignupForm(true)}
         >
           <PhoneCall className="w-4 h-4" />
           <span className="ml-1.5">Trial</span>
@@ -47,6 +50,12 @@ export const MobileFooterCTA = () => {
           <span className="ml-1.5">Calculate</span>
         </Button>
       </div>
+
+      <FreeTrialSignupForm 
+        open={showSignupForm} 
+        onOpenChange={setShowSignupForm}
+        source="mobile-footer"
+      />
     </div>
   );
 };

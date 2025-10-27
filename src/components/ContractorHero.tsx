@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import logo from "@/assets/ringsnap-logo.png";
+import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
 
 export const ContractorHero = () => {
+  const [showSignupForm, setShowSignupForm] = useState(false);
   const scrollToCalculator = () => {
     document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -38,6 +41,7 @@ export const ContractorHero = () => {
               <Button 
                 size="lg" 
                 className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
+                onClick={() => setShowSignupForm(true)}
               >
                 <PhoneCall className="mr-2" />
                 Try RingSnap free
@@ -122,6 +126,12 @@ export const ContractorHero = () => {
           </div>
           
         </div>
+
+        <FreeTrialSignupForm 
+          open={showSignupForm} 
+          onOpenChange={setShowSignupForm}
+          source="hero"
+        />
       </div>
     </section>
   );

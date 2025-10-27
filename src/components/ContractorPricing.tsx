@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Check, Zap, Phone, Crown, Calculator, CheckCircle, Clock, Lock, Star, PhoneCall } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
 
 export const ContractorPricing = () => {
+  const [showSignupForm, setShowSignupForm] = useState(false);
   const comparisonData = [
     { option: "Full-time Receptionist", cost: "$3,000-4,000/month", issues: "Benefits, sick days, 9-5 only" },
     { option: "Answering Service", cost: "$500-1,200/month", issues: "Robotic, can't book appointments" },
@@ -182,6 +185,7 @@ export const ContractorPricing = () => {
                   }`}
                   style={tier.badge ? {} : {borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
                   size="lg"
+                  onClick={() => setShowSignupForm(true)}
                 >
                   {tier.cta}
                 </Button>
@@ -321,7 +325,11 @@ export const ContractorPricing = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button size="lg" className="text-base h-12 px-6 font-semibold rounded-full bg-primary text-white hover:opacity-90 shadow-lg">
+            <Button 
+              size="lg" 
+              className="text-base h-12 px-6 font-semibold rounded-full bg-primary text-white hover:opacity-90 shadow-lg"
+              onClick={() => setShowSignupForm(true)}
+            >
               <PhoneCall className="mr-2 w-4 h-4" />
               Start Free Trial
             </Button>
@@ -349,6 +357,12 @@ export const ContractorPricing = () => {
             </span>
           </div>
         </div>
+
+        <FreeTrialSignupForm 
+          open={showSignupForm} 
+          onOpenChange={setShowSignupForm}
+          source="pricing"
+        />
       </div>
     </section>
   );
