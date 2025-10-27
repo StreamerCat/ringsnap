@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, Mail, Clock, Sparkles, Shield, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +25,7 @@ const formSchema = z.object({
     .trim()
     .min(10, "Please enter a valid phone number")
     .max(20, "Phone number is too long"),
+  trade: z.string().optional(),
   wantsAdvancedVoice: z.boolean().default(false),
 });
 
@@ -45,6 +47,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
       name: "",
       email: "",
       phone: "",
+      trade: "",
       wantsAdvancedVoice: false,
     },
   });
@@ -60,6 +63,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
           name: data.name,
           email: data.email,
           phone: data.phone,
+          trade: data.trade || null,
           wants_advanced_voice: data.wantsAdvancedVoice,
           source: source || "unknown",
         }),
@@ -71,6 +75,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
             name: data.name,
             email: data.email,
             phone: data.phone,
+            trade: data.trade || null,
             wantsAdvancedVoice: data.wantsAdvancedVoice,
             source: source || "unknown",
           }),
@@ -167,6 +172,37 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
 
                 <FormField
                   control={form.control}
+                  name="trade"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trade (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your trade" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="hvac">HVAC</SelectItem>
+                          <SelectItem value="plumbing">Plumbing</SelectItem>
+                          <SelectItem value="electrician">Electrician</SelectItem>
+                          <SelectItem value="landscaping">Landscaping</SelectItem>
+                          <SelectItem value="general_contractor">General Contractor</SelectItem>
+                          <SelectItem value="roofing">Roofing</SelectItem>
+                          <SelectItem value="pest_control">Pest Control</SelectItem>
+                          <SelectItem value="garage_door">Garage Door Repair</SelectItem>
+                          <SelectItem value="carpentry">Carpentry</SelectItem>
+                          <SelectItem value="painting">Painting</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="wantsAdvancedVoice"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
@@ -178,10 +214,10 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                       </FormControl>
                       <div className="space-y-1 leading-none">
                         <FormLabel className="text-sm font-medium">
-                          I want to clone my own voice (Premium feature)
+                          Clone Your Own Voice (Premium Feature) - FREE When You Sign Up Today!
                         </FormLabel>
                         <p className="text-xs text-muted-foreground">
-                          We'll send you voice recording instructions after signup
+                          Normally $99/month. Lock in your free voice clone now.
                         </p>
                       </div>
                     </FormItem>

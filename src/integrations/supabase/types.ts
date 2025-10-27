@@ -67,6 +67,7 @@ export type Database = {
           name: string
           phone: string
           source: string | null
+          trade: string | null
           wants_advanced_voice: boolean | null
         }
         Insert: {
@@ -76,6 +77,7 @@ export type Database = {
           name: string
           phone: string
           source?: string | null
+          trade?: string | null
           wants_advanced_voice?: boolean | null
         }
         Update: {
@@ -85,6 +87,7 @@ export type Database = {
           name?: string
           phone?: string
           source?: string | null
+          trade?: string | null
           wants_advanced_voice?: boolean | null
         }
         Relationships: []
