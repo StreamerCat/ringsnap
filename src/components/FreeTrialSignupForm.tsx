@@ -175,7 +175,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                   name="trade"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Trade (Optional)</FormLabel>
+                      <FormLabel>Trade</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
