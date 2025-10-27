@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      revenue_report_leads: {
+        Row: {
+          business: string
+          created_at: string
+          customer_calls: number | null
+          email: string
+          id: string
+          lost_revenue: number | null
+          name: string
+          net_gain: number | null
+          payback_days: number | null
+          recovered_revenue: number | null
+          roi: number | null
+          trade: string | null
+        }
+        Insert: {
+          business: string
+          created_at?: string
+          customer_calls?: number | null
+          email: string
+          id?: string
+          lost_revenue?: number | null
+          name: string
+          net_gain?: number | null
+          payback_days?: number | null
+          recovered_revenue?: number | null
+          roi?: number | null
+          trade?: string | null
+        }
+        Update: {
+          business?: string
+          created_at?: string
+          customer_calls?: number | null
+          email?: string
+          id?: string
+          lost_revenue?: number | null
+          name?: string
+          net_gain?: number | null
+          payback_days?: number | null
+          recovered_revenue?: number | null
+          roi?: number | null
+          trade?: string | null
+        }
+        Relationships: []
+      }
       trial_signups: {
         Row: {
           created_at: string

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign } from "lucide-react";
 import Vapi from "@vapi-ai/web";
 import { useEffect, useRef, useState } from "react";
+import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
 
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
@@ -37,9 +38,9 @@ const VapiWidget = () => {
       {!isCallActive ? (
         <div className="space-y-6">
           <div>
-            <h3 className="text-2xl font-bold mb-2 text-[#2C3639]">Chat with RingSnap AI</h3>
+            <h3 className="text-2xl font-bold mb-2 text-[#2C3639]">Click Start to Hear a Real Demo</h3>
             <p className="text-muted-foreground">
-              Ask about pricing, book an appointment, or report an emergency.
+              This is a home services business. Ask about services, book an appointment, or report an emergency to see how RingSnap can work in your business and help you turn missed calls into more revenue.
             </p>
           </div>
           <button
@@ -73,6 +74,11 @@ const VapiWidget = () => {
 };
 
 export const SolutionDemo = () => {
+  const [showSignupForm, setShowSignupForm] = useState(false);
+  const scrollToVapiDemo = () => {
+    document.getElementById('vapi-chat-container')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <section className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -146,13 +152,29 @@ export const SolutionDemo = () => {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto mb-16">
-          <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full">
+          <Button 
+            size="lg" 
+            variant="gradient" 
+            className="text-lg h-14 px-8 rounded-full"
+            onClick={() => setShowSignupForm(true)}
+          >
             Start Free Trial
           </Button>
-          <Button size="lg" variant="outline" className="text-lg h-14 px-8 rounded-full border-2 border-foreground/10 hover:border-foreground/30 transition-all">
-            See How It Works
+          <Button 
+            size="lg" 
+            variant="outline" 
+            className="text-lg h-14 px-8 rounded-full border-2 border-foreground/10 hover:border-foreground/30 transition-all"
+            onClick={scrollToVapiDemo}
+          >
+            Hear How It Works
           </Button>
         </div>
+
+        <FreeTrialSignupForm 
+          open={showSignupForm} 
+          onOpenChange={setShowSignupForm}
+          source="solution-demo"
+        />
 
         {/* Outcome Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">

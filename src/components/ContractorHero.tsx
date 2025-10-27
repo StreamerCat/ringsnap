@@ -7,8 +7,8 @@ import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
 
 export const ContractorHero = () => {
   const [showSignupForm, setShowSignupForm] = useState(false);
-  const scrollToCalculator = () => {
-    document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToVapiDemo = () => {
+    document.getElementById('vapi-chat-container')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -50,7 +50,7 @@ export const ContractorHero = () => {
                 size="lg" 
                 className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md"
                 style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
-                onClick={scrollToCalculator}
+                onClick={scrollToVapiDemo}
               >
                 Hear how it sounds
               </Button>

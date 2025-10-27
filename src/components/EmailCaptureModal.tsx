@@ -7,6 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Building, User } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -32,21 +34,48 @@ interface EmailCaptureModalProps {
 
 export const EmailCaptureModal = ({ open, onOpenChange, calculatorData }: EmailCaptureModalProps) => {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
     resolver: zodResolver(formSchema)
   });
 
-  const onSubmit = (data: FormData) => {
-    // In production, this would send to your backend/email service
-    console.log("Form submitted:", { ...data, calculatorData });
-    
-    toast({
-      title: "Success!",
-      description: "Your personalized recovery plan is on the way. Check your email in 2 minutes.",
-    });
+  const onSubmit = async (data: FormData) => {
+    setIsSubmitting(true);
 
-    reset();
-    onOpenChange(false);
+    try {
+      // Save to database
+      const { error } = await supabase.from("revenue_report_leads").insert({
+        name: data.name,
+        email: data.email,
+        business: data.business,
+        trade: calculatorData?.trade || null,
+        customer_calls: calculatorData?.customerCalls || null,
+        lost_revenue: calculatorData?.lostRevenue || null,
+        recovered_revenue: calculatorData?.recoveredRevenue || null,
+        net_gain: calculatorData?.netGain || null,
+        roi: calculatorData?.roi || null,
+        payback_days: calculatorData?.paybackDays || null,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success!",
+        description: "Your personalized recovery plan is on the way. Check your email in 2 minutes.",
+      });
+
+      reset();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Form submission error:", error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -127,8 +156,8 @@ export const EmailCaptureModal = ({ open, onOpenChange, calculatorData }: EmailC
             </div>
           )}
 
-          <Button type="submit" className="w-full h-12">
-            Send Me My Recovery Plan
+          <Button type="submit" className="w-full h-12" disabled={isSubmitting}>
+            {isSubmitting ? "Sending..." : "Send Me My Recovery Plan"}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
