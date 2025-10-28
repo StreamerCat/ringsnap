@@ -29,12 +29,17 @@ export const ContractorHero = () => {
             
             <div className="space-y-8">
               <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
-                AI that answers like a human
+                Stop Losing $4K+/Month to Unanswered Calls
               </h1>
               
-              <p className="text-xl sm:text-2xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
-                Never miss a call. Book every job—emergency or routine—24/7. Sound warm, not robotic. Your customers won't know it's AI.
-              </p>
+              <div className="space-y-4">
+                <p className="text-2xl sm:text-3xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal) / 0.9)'}}>
+                  The AI Receptionist Built for Home Service Contractors
+                </p>
+                <p className="text-lg sm:text-xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
+                  Answers in under 2 rings. Sounds completely human. Has intelligent conversations. Your customers won't know it's AI—and you'll never miss another call.
+                </p>
+              </div>
               
               {/* Gradient CTAs */}
               <div className="flex flex-col sm:flex-row gap-4">
