@@ -321,9 +321,106 @@ export const CallValueCalculator = () => {
                 </form>
               </CardContent>
             </Card>
+
+            <Card className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Clock3 className="h-4 w-4 text-primary" />
+                  What you&apos;ll walk away with
+                </div>
+                <CardDescription>
+                  We email the same follow-up kits our top contractors use to recapture missed calls and prove ROI to leadership.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                {followUpHighlights.map((item, index) => (
+                  <div key={item.title} className={index === followUpHighlights.length - 1 ? "sm:col-span-2" : undefined}>
+                    <p className="text-sm font-semibold text-slate-700">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.copy}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
+
+          <Card className="relative overflow-hidden border-none bg-slate-900 text-white shadow-2xl lg:sticky lg:top-20">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary to-emerald-500 opacity-80" />
+            <div
+              className="absolute inset-0 mix-blend-soft-light"
+              style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25), transparent 55%)" }}
+            />
+            <CardHeader className="relative space-y-4">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                <AlertTriangle className="h-4 w-4" /> Hidden revenue leak
+              </div>
+              <CardTitle className="text-4xl font-bold">
+                ${numberFormatter.format(metrics.recoveredRevenue)} <span className="text-lg font-medium text-white/80">recaptured monthly</span>
+              </CardTitle>
+              <CardDescription className="text-white/80">
+                Based on {numberFormatter.format(metrics.missedCalls)} missed calls you can convert with RingSnap&apos;s AI receptionist.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="relative space-y-8">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Net new profit</div>
+                  <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.netGain)}</div>
+                  <div className="mt-1 text-xs text-white/60">ROI: {metrics.roi}%</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Break-even</div>
+                  <div className="mt-2 text-2xl font-semibold">{metrics.paybackDays} days</div>
+                  <div className="mt-1 text-xs text-white/60">≈ {breakEvenJobs} booked jobs</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">AI receptionist plan</div>
+                  <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.aiCost)}/mo</div>
+                  <div className="mt-1 text-xs text-white/60">Locks in 24/7 coverage</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Calls saved</div>
+                  <div className="mt-2 text-2xl font-semibold">{numberFormatter.format(metrics.recoveredCallCapture)}</div>
+                  <div className="mt-1 text-xs text-white/60">/{numberFormatter.format(metrics.monthlyCalls)} total calls</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+                <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">Bryan • Owner, Precision Plumbing</p>
+              </div>
+
+              <form className="space-y-4" onSubmit={handleFormSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="roi-email" className="text-xs uppercase tracking-[0.2em] text-white/70">
+                    Send the full ROI teardown to my inbox
+                  </Label>
+                  <Input
+                    id="roi-email"
+                    type="email"
+                    required
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="h-12 rounded-full border-white/40 bg-white/20 text-white placeholder:text-white/60 focus-visible:ring-white"
+                  />
+                </div>
+                <Button type="submit" size="lg" className="w-full rounded-full bg-white text-slate-900 hover:bg-white/90">
+                  Email me this ROI report <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                {formState === "submitted" ? (
+                  <p className="text-xs text-white/70">
+                    Thanks! We&apos;ll send the call scripts, follow-up cadences, and ROI math our top contractors use to close hot leads.
+                  </p>
+                ) : (
+                  <p className="text-xs text-white/60">
+                    No spam—just the proof you need to justify AI coverage to owners and ops leads.
+                  </p>
+                )}
+              </form>
+            </CardContent>
+          </Card>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 };
