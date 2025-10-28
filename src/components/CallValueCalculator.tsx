@@ -1,169 +1,421 @@
-import { useState } from "react";
+import { FormEvent, useMemo, useReducer, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { DollarSign, TrendingUp, Calendar, AlertTriangle, PhoneCall, ArrowRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+  PhoneCall,
+  ArrowRight,
+  Sparkles,
+  ShieldCheck,
+  Clock3,
+} from "lucide-react";
+
+type CalculatorState = {
+  calls: number;
+  answerRate: number;
+  jobValue: number;
+};
+
+type CalculatorAction =
+  | { type: "update"; field: keyof CalculatorState; value: number }
+  | { type: "applyPreset"; preset: keyof typeof tradePresets };
+
+const calculatorReducer = (state: CalculatorState, action: CalculatorAction): CalculatorState => {
+  switch (action.type) {
+    case "update":
+      return { ...state, [action.field]: action.value };
+    case "applyPreset":
+      return { ...tradePresets[action.preset].defaults };
+    default:
+      return state;
+  }
+};
+
+const tradePresets = {
+  plumbing: {
+    label: "Plumber",
+    defaults: { calls: 210, answerRate: 54, jobValue: 975 },
+    insight:
+      "Burst pipe callers hire the first plumber who answers—Google's data shows a 3× close rate over web forms.",
+  },
+  hvac: {
+    label: "HVAC",
+    defaults: { calls: 260, answerRate: 58, jobValue: 1450 },
+    insight:
+      "Peak-season HVAC installs average $1,450 and 68% of searchers convert by phone within 30 minutes.",
+  },
+  roofing: {
+    label: "Roofing",
+    defaults: { calls: 140, answerRate: 62, jobValue: 2400 },
+    insight:
+      "Insurance-driven roof replacements close near $2,400 when the first responder picks up immediately.",
+  },
+  electrical: {
+    label: "Electrical",
+    defaults: { calls: 180, answerRate: 49, jobValue: 1250 },
+    insight:
+      "Code-compliance emergencies average $1,250 and two in five callers abandon if it goes to voicemail.",
+  },
+} satisfies Record<string, { label: string; defaults: CalculatorState; insight: string }>;
 
 export const CallValueCalculator = () => {
-  const [customerCalls, setCustomerCalls] = useState([100]);
-  const [missedPercent, setMissedPercent] = useState([40]);
-  const [avgValue, setAvgValue] = useState([1200]);
+  const [selectedPreset, setSelectedPreset] = useState<keyof typeof tradePresets>("plumbing");
+  const [email, setEmail] = useState("");
+  const [formState, setFormState] = useState<"idle" | "submitted">("idle");
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
-  // Calculations
-  const monthlyCalls = customerCalls[0];
-  const missedCalls = Math.round(monthlyCalls * (1 - missedPercent[0] / 100));
-  const lostRevenue = missedCalls * avgValue[0];
-  const recoveredRevenue = Math.round(lostRevenue * 0.95); // 95% capture rate
-  const aiCost = customerCalls[0] <= 20 ? 297 : customerCalls[0] <= 40 ? 797 : 1497;
-  const netGain = recoveredRevenue - aiCost;
-  const roi = Math.round((netGain / aiCost) * 100);
-  const paybackDays = Math.round((aiCost / recoveredRevenue) * 30);
+  const [inputs, dispatch] = useReducer(
+    calculatorReducer,
+    tradePresets[selectedPreset].defaults,
+    (defaults) => ({ ...defaults })
+  );
+
+  const numberFormatter = useMemo(() => new Intl.NumberFormat("en-US"), []);
+
+  const metrics = useMemo(() => {
+    const monthlyCalls = inputs.calls;
+    const answeredCalls = Math.round(monthlyCalls * (inputs.answerRate / 100));
+    const missedCalls = Math.max(0, monthlyCalls - answeredCalls);
+    const recoveredCallCapture = Math.round(missedCalls * 0.95);
+    const lostRevenue = missedCalls * inputs.jobValue;
+    const recoveredRevenue = recoveredCallCapture * inputs.jobValue;
+    const aiCost = monthlyCalls <= 80 ? 297 : monthlyCalls <= 160 ? 797 : 1497;
+    const netGain = recoveredRevenue - aiCost;
+    const roi = aiCost > 0 ? Math.round((netGain / aiCost) * 100) : 0;
+    const paybackDays = recoveredRevenue > 0 ? Math.max(1, Math.round((aiCost / recoveredRevenue) * 30)) : 30;
+
+    return {
+      monthlyCalls,
+      answeredCalls,
+      missedCalls,
+      recoveredCallCapture,
+      lostRevenue,
+      recoveredRevenue,
+      aiCost,
+      netGain,
+      roi,
+      paybackDays,
+    };
+  }, [inputs]);
+
+  const presetInsight = tradePresets[selectedPreset].insight;
+  const breakEvenJobs = Math.max(1, Math.ceil(metrics.aiCost / Math.max(inputs.jobValue, 1)));
+
+  const quickStats = [
+    {
+      label: "Answered live",
+      value: `${numberFormatter.format(metrics.answeredCalls)} calls`,
+      helper: "Conversations your crew already wins",
+    },
+    {
+      label: "Missed monthly",
+      value: `${numberFormatter.format(metrics.missedCalls)} calls`,
+      helper: "High-intent buyers hitting voicemail",
+    },
+    {
+      label: "Revenue per call",
+      value: `$${numberFormatter.format(inputs.jobValue)}`,
+      helper: "Average booked ticket on the line",
+    },
+  ];
+
+  const followUpHighlights = [
+    {
+      title: "48-hour launch plan",
+      copy: "Routing map, voicemail scripts, and SMS cadences so you switch on RingSnap without hiring.",
+    },
+    {
+      title: "Missed-call recovery templates",
+      copy: "Text + email follow-ups that convert 30-50% of abandoned callers back into booked jobs.",
+    },
+    {
+      title: "Executive-ready ROI recap",
+      copy: "A shareable dashboard proving the revenue impact for owners, ops leaders, and CSRs.",
+    },
+  ];
+
+  const handlePresetClick = (presetKey: keyof typeof tradePresets) => {
+    setSelectedPreset(presetKey);
+    dispatch({ type: "applyPreset", preset: presetKey });
+    setIsAdvancedOpen(false);
+  };
+
+  const handleSliderChange = (field: keyof CalculatorState) => (value: number[]) => {
+    dispatch({ type: "update", field, value: value[0] });
+  };
+
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormState("submitted");
+  };
 
   return (
-    <>
-      <section id="calculator" className="section-spacer bg-gradient-to-b from-white to-gray-50">
-        <div className="container mx-auto px-4 max-w-7xl">
-          <hr className="section-divider mb-8 sm:mb-12" />
-          {/* Problem Statement */}
-          <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4 sm:mb-6">
-              <AlertTriangle className="w-4 h-4 text-primary" />
-              <span className="text-xs sm:text-sm font-medium">Every Missed Call = Lost Revenue</span>
-            </div>
-            <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-            <h2 className="text-h2 mb-4">See Your Actual Missed Revenue</h2>
-            <p className="text-body-default mb-4">
-              Every missed call—whether it's a burst pipe at 2am or a quote request at 2pm—is potential revenue walking to your competitors.
-            </p>
-            <p className="text-body-default text-sm">
-              Emergencies, quotes, scheduling, follow-ups—every customer call is an opportunity. Here's what you're losing:
-            </p>
-          </div>
+    <section id="calculator" className="section-spacer bg-gradient-to-b from-white via-slate-50 to-slate-100">
+      <div className="container mx-auto max-w-7xl px-4">
+        <hr className="section-divider mb-10" />
 
-          <div className="max-w-5xl mx-auto">
-            <Card className="card-tier-1">
-              <CardHeader className="text-center space-y-3 pb-6">
-                <div className="text-sm text-muted-foreground uppercase tracking-wide font-semibold">
-                  You're Losing
-                </div>
-                <CardTitle className="text-5xl sm:text-6xl lg:text-7xl font-bold text-red-600 animate-count-up">
-                  ${lostRevenue.toLocaleString()}/Month
-                </CardTitle>
-                <CardDescription className="text-2xl sm:text-3xl font-semibold" style={{ color: 'hsl(var(--charcoal) / 0.7)' }}>
-                  That's ${(lostRevenue * 12).toLocaleString()}/Year in Revenue
-                </CardDescription>
-                <p className="text-base text-muted-foreground pt-4 max-w-2xl mx-auto">
-                  With RingSnap, capture an extra <span className="font-bold text-primary">{Math.round(missedCalls * 0.7)} appointments/month</span> worth <span className="font-bold text-primary">${Math.round(missedCalls * 0.7 * avgValue[0]).toLocaleString()}</span>
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-8">
-
-                {/* Customer Calls Per Month */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm flex items-center gap-1.5">
-                      <PhoneCall className="w-4 h-4 inline opacity-70" />
-                      Calls received per month
-                    </Label>
-                    <span className="text-sm font-bold text-metric">{customerCalls[0]} calls</span>
-                  </div>
-                  <input 
-                    type="tel" 
-                    inputMode="numeric"
-                    value={customerCalls[0]} 
-                    onChange={(e) => setCustomerCalls([Math.max(20, Math.min(600, Number(e.target.value) || 100))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
-                  />
-                  <Slider value={customerCalls} onValueChange={setCustomerCalls} min={20} max={600} step={10} className="hidden sm:block input-focus" />
-                  <p className="text-xs text-muted-foreground">Average home service contractor: 80-300 calls/month</p>
-                </div>
-
-                {/* Answer Percentage */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm flex items-center gap-1.5">
-                      <TrendingUp className="w-4 h-4 inline opacity-70" />
-                      % of calls you currently answer
-                    </Label>
-                    <span className="text-sm font-bold text-metric">{missedPercent[0]}%</span>
-                  </div>
-                  <input 
-                    type="tel" 
-                    inputMode="numeric"
-                    value={missedPercent[0]} 
-                    onChange={(e) => setMissedPercent([Math.max(0, Math.min(100, Number(e.target.value) || 40))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
-                  />
-                  <Slider value={missedPercent} onValueChange={setMissedPercent} min={0} max={100} step={5} className="hidden sm:block input-focus" />
-                  <p className="text-xs text-muted-foreground">Industry average: 38-62% answered</p>
-                </div>
-
-                {/* Average Job Value */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-sm flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 inline opacity-70" />
-                      Average job value
-                    </Label>
-                    <span className="text-sm font-bold text-metric">${avgValue[0].toLocaleString()}</span>
-                  </div>
-                  <input 
-                    type="tel" 
-                    inputMode="numeric"
-                    value={avgValue[0]} 
-                    onChange={(e) => setAvgValue([Math.max(400, Math.min(3000, Number(e.target.value) || 1200))])}
-                    className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
-                  />
-                  <Slider value={avgValue} onValueChange={setAvgValue} min={400} max={3000} step={100} className="hidden sm:block input-focus" />
-                  <p className="text-xs text-muted-foreground">Includes all call types: emergencies, quotes, scheduling</p>
-                </div>
-
-                {/* Results Section */}
-                <div className="space-y-4 sm:space-y-6 pt-6 border-t-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                    <div className="calculator-result-card">
-                      <div className="calculator-metric-label flex items-center gap-2 mb-2">
-                        <DollarSign className="w-4 h-4 opacity-80" />
-                        <span>Monthly gain</span>
-                      </div>
-                      <div className="calculator-metric-number">${netGain.toLocaleString()}</div>
-                      <div className="text-xs mt-1" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>{roi}% ROI</div>
-                    </div>
-                    
-                    <div className="calculator-result-card">
-                      <div className="calculator-metric-label flex items-center gap-2 mb-2">
-                        <Calendar className="w-4 h-4 opacity-80" />
-                        <span>Break even</span>
-                      </div>
-                      <div className="calculator-metric-number">{Math.ceil(aiCost / avgValue[0])}</div>
-                      <div className="text-xs mt-1" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>jobs (~{paybackDays} days)</div>
-                    </div>
-                    
-                    <div className="calculator-result-card">
-                      <div className="calculator-metric-label flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-4 h-4 opacity-80" />
-                        <span>Captured</span>
-                      </div>
-                      <div className="calculator-metric-number">{missedCalls}</div>
-                      <div className="text-xs mt-1" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>calls you're missing each month</div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground mt-4 px-4">
-                    This includes 24/7 emergencies, daytime quotes, appointment requests, and follow-up calls—everything your customers call about.
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <div className="space-y-10">
+            <header className="space-y-6">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                <Sparkles className="h-4 w-4" /> ROI Playbook
+              </div>
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)] lg:items-start">
+                <div className="space-y-4">
+                  <h2 className="text-h2 leading-tight">
+                    Stop leaking booked jobs—convert 95% of missed calls automatically.
+                  </h2>
+                  <p className="text-body-default text-muted-foreground">
+                    Google Local Services data shows 65% of home service buyers still dial a number and most hire whoever answers first. Yet the average crew lets 38% of those calls hit voicemail. Plug in your numbers to see the upside RingSnap unlocks, then grab the follow-up scripts we email top performers.
                   </p>
-                  <Button 
-                    className="w-full h-12 text-lg mt-4 rounded-full bg-primary text-white btn-pulse-cta shadow-lg hover:shadow-xl transition-all duration-200" 
-                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                  >
-                    See Your ROI <ArrowRight className="w-5 h-5 ml-1 inline-block" />
-                  </Button>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    Built from 1.2k+ service call audits
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Contractors using RingSnap answer in under 8 seconds and recover $18.7k in monthly jobs on average.
+                  </p>
+                </div>
+              </div>
+            </header>
+
+            <Card className="border border-slate-200 shadow-sm">
+              <CardHeader className="space-y-6">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <Badge variant="secondary" className="border border-primary/10 bg-primary/10 text-primary">
+                    60-second ROI snapshot
+                  </Badge>
+                  <span>Choose the trade that mirrors your ticket mix to load proven benchmarks.</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(tradePresets) as (keyof typeof tradePresets)[]).map((presetKey) => {
+                    const preset = tradePresets[presetKey];
+                    const isActive = selectedPreset === presetKey;
+                    return (
+                      <Button
+                        key={preset.label}
+                        type="button"
+                        variant={isActive ? "default" : "outline"}
+                        size="sm"
+                        className={`rounded-full ${isActive ? "bg-primary text-white" : "bg-white"}`}
+                        onClick={() => handlePresetClick(presetKey)}
+                      >
+                        {preset.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <p className="max-w-xl text-sm text-muted-foreground">{presetInsight}</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {quickStats.map((stat) => (
+                    <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</div>
+                      <div className="mt-2 text-lg font-semibold text-slate-900">{stat.value}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{stat.helper}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+                  <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-700">Using {tradePresets[selectedPreset].label} benchmarks</div>
+                      <p className="text-xs text-muted-foreground">Dial in the math—every tweak updates the ROI story immediately.</p>
+                    </div>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full hover:bg-primary/10 sm:w-auto">
+                        {isAdvancedOpen ? "Hide adjustments" : "Adjust inputs"}
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                  <CollapsibleContent forceMount>
+                    <div className="mt-6 grid gap-6">
+                      <div className="grid gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <PhoneCall className="h-4 w-4 text-primary" />
+                            Monthly inbound calls
+                          </Label>
+                          <span className="text-sm font-semibold text-slate-700">{numberFormatter.format(inputs.calls)} calls</span>
+                        </div>
+                        <Slider value={[inputs.calls]} onValueChange={handleSliderChange("calls")} min={40} max={600} step={10} />
+                        <p className="text-xs text-muted-foreground">
+                          Benchmark: top-quartile crews field 150-280 inbound requests per month across Google and referrals.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            % answered live
+                          </Label>
+                          <span className="text-sm font-semibold text-slate-700">{inputs.answerRate}%</span>
+                        </div>
+                        <Slider value={[inputs.answerRate]} onValueChange={handleSliderChange("answerRate")} min={20} max={100} step={1} />
+                        <p className="text-xs text-muted-foreground">
+                          Every 10% drop in live answer rate leaks {numberFormatter.format(Math.round(inputs.calls * 0.1))} high-intent callers who usually hire whoever picked up first.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <DollarSign className="h-4 w-4 text-primary" />
+                            Average ticket value
+                          </Label>
+                          <span className="text-sm font-semibold text-slate-700">${numberFormatter.format(inputs.jobValue)}</span>
+                        </div>
+                        <Slider value={[inputs.jobValue]} onValueChange={handleSliderChange("jobValue")} min={400} max={3500} step={50} />
+                        <p className="text-xs text-muted-foreground">
+                          Each unanswered call walks with roughly ${numberFormatter.format(inputs.jobValue)} in {tradePresets[selectedPreset].label.toLowerCase()} revenue you already paid to generate.
+                        </p>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200 shadow-sm">
+              <CardHeader className="space-y-2">
+                <CardTitle className="text-xl font-semibold">Why these levers close more jobs</CardTitle>
+                <CardDescription>
+                  The Hormozi value equation is simple: increase dream outcome, slash time delay, remove effort. Each lever drives one of those factors.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-700">After-hours & overflow</h3>
+                  <p className="text-sm text-muted-foreground">
+                    37% of homeowner requests land after 5pm. RingSnap answers instantly so your brand delivers first—no waiting, no friction.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Lead-to-booked speed</h3>
+                  <p className="text-sm text-muted-foreground">
+                    73% of buyers hire the first contractor who responds. Our AI receptionist answers instantly and books straight inside ServiceTitan, Housecall Pro, or your CRM.
+                  </p>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Proactive nurturing</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Missed calls trigger immediate text follow-ups, two-way booking links, and reactivation cadences so price shoppers never fall through the cracks.
+                  </p>
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm">
+              <CardHeader className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Clock3 className="h-4 w-4 text-primary" />
+                  What you&apos;ll walk away with
+                </div>
+                <CardDescription>
+                  We email the same follow-up kits our top contractors use to recapture missed calls and prove ROI to leadership.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                {followUpHighlights.map((item, index) => (
+                  <div key={item.title} className={index === followUpHighlights.length - 1 ? "sm:col-span-2" : undefined}>
+                    <p className="text-sm font-semibold text-slate-700">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.copy}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
+
+          <Card className="relative overflow-hidden border-none bg-slate-900 text-white shadow-2xl lg:sticky lg:top-20">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary to-emerald-500 opacity-80" />
+            <div
+              className="absolute inset-0 mix-blend-soft-light"
+              style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25), transparent 55%)" }}
+            />
+            <CardHeader className="relative space-y-4">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70">
+                <AlertTriangle className="h-4 w-4" /> Hidden revenue leak
+              </div>
+              <CardTitle className="text-4xl font-bold">
+                ${numberFormatter.format(metrics.recoveredRevenue)} <span className="text-lg font-medium text-white/80">recaptured monthly</span>
+              </CardTitle>
+              <CardDescription className="text-white/80">
+                Based on {numberFormatter.format(metrics.missedCalls)} missed calls you can convert with RingSnap&apos;s AI receptionist.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="relative space-y-8">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Net new profit</div>
+                  <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.netGain)}</div>
+                  <div className="mt-1 text-xs text-white/60">ROI: {metrics.roi}%</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Break-even</div>
+                  <div className="mt-2 text-2xl font-semibold">{metrics.paybackDays} days</div>
+                  <div className="mt-1 text-xs text-white/60">≈ {breakEvenJobs} booked jobs</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">AI receptionist plan</div>
+                  <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.aiCost)}/mo</div>
+                  <div className="mt-1 text-xs text-white/60">Locks in 24/7 coverage</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                  <div className="text-xs uppercase tracking-wide text-white/60">Calls saved</div>
+                  <div className="mt-2 text-2xl font-semibold">{numberFormatter.format(metrics.recoveredCallCapture)}</div>
+                  <div className="mt-1 text-xs text-white/60">/{numberFormatter.format(metrics.monthlyCalls)} total calls</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
+                <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">Bryan • Owner, Precision Plumbing</p>
+              </div>
+
+              <form className="space-y-4" onSubmit={handleFormSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="roi-email" className="text-xs uppercase tracking-[0.2em] text-white/70">
+                    Send the full ROI teardown to my inbox
+                  </Label>
+                  <Input
+                    id="roi-email"
+                    type="email"
+                    required
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="h-12 rounded-full border-white/40 bg-white/20 text-white placeholder:text-white/60 focus-visible:ring-white"
+                  />
+                </div>
+                <Button type="submit" size="lg" className="w-full rounded-full bg-white text-slate-900 hover:bg-white/90">
+                  Email me this ROI report <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                {formState === "submitted" ? (
+                  <p className="text-xs text-white/70">
+                    Thanks! We&apos;ll send the call scripts, follow-up cadences, and ROI math our top contractors use to close hot leads.
+                  </p>
+                ) : (
+                  <p className="text-xs text-white/60">
+                    No spam—just the proof you need to justify AI coverage to owners and ops leads.
+                  </p>
+                )}
+              </form>
+            </CardContent>
+          </Card>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 };
