@@ -212,27 +212,6 @@ export const CallValueCalculator = () => {
                     </CollapsibleContent>
                   </Collapsible>
                 </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-3">
-                  {[{
-                    label: "Answered now",
-                    value: `${numberFormatter.format(metrics.answeredCalls)} calls`,
-                    helper: "Live conversations you already handle",
-                  }, {
-                    label: "Missed monthly",
-                    value: `${numberFormatter.format(metrics.missedCalls)} calls`,
-                    helper: "High-intent leads leaking today",
-                  }, {
-                    label: "Value per call",
-                    value: `$${numberFormatter.format(inputs.jobValue)}`,
-                    helper: "Average booked revenue on the line",
-                  }].map((stat) => (
-                    <div key={stat.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</div>
-                      <div className="mt-2 text-lg font-semibold text-slate-900">{stat.value}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{stat.helper}</div>
-                    </div>
-                  ))}
-                </CardContent>
               </Card>
 
               <Card className="border border-slate-200 shadow-sm">
