@@ -3,42 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { DollarSign, TrendingUp, Calendar, AlertTriangle, Wrench, Snowflake, Zap, Home, ArrowRight } from "lucide-react";
-import { EmailCaptureModal } from "./EmailCaptureModal";
-
-type TradeType = "plumbing" | "hvac" | "electrical" | "roofing";
+import { DollarSign, TrendingUp, Calendar, AlertTriangle, PhoneCall, ArrowRight } from "lucide-react";
 
 export const CallValueCalculator = () => {
-  const [trade, setTrade] = useState<TradeType>("plumbing");
-  const [customerCalls, setCustomerCalls] = useState([15]);
+  const [customerCalls, setCustomerCalls] = useState([100]);
   const [missedPercent, setMissedPercent] = useState([40]);
   const [avgValue, setAvgValue] = useState([1200]);
-  const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Calculations
-  const monthlyCalls = customerCalls[0] * 4;
-  const missedCalls = Math.round(monthlyCalls * (missedPercent[0] / 100));
+  const monthlyCalls = customerCalls[0];
+  const missedCalls = Math.round(monthlyCalls * (1 - missedPercent[0] / 100));
   const lostRevenue = missedCalls * avgValue[0];
   const recoveredRevenue = Math.round(lostRevenue * 0.95); // 95% capture rate
   const aiCost = customerCalls[0] <= 20 ? 297 : customerCalls[0] <= 40 ? 797 : 1497;
   const netGain = recoveredRevenue - aiCost;
   const roi = Math.round((netGain / aiCost) * 100);
   const paybackDays = Math.round((aiCost / recoveredRevenue) * 30);
-
-  const tradeDefaults: Record<TradeType, { value: number; calls: number; missedRate: number; label: string; icon: any }> = {
-    plumbing: { value: 1200, calls: 60, missedRate: 38, label: "Plumber", icon: Wrench },
-    hvac: { value: 1500, calls: 55, missedRate: 42, label: "HVAC", icon: Snowflake },
-    electrical: { value: 1100, calls: 50, missedRate: 35, label: "Electrician", icon: Zap },
-    roofing: { value: 2000, calls: 40, missedRate: 45, label: "Roofer", icon: Home },
-  };
-
-  const handleNicheSelect = (niche: TradeType) => {
-    setTrade(niche);
-    const defaults = tradeDefaults[niche];
-    setAvgValue([defaults.value]);
-    setCustomerCalls([Math.round(defaults.calls / 4)]);
-    setMissedPercent([defaults.missedRate]);
-  };
 
   return (
     <>
@@ -52,7 +32,7 @@ export const CallValueCalculator = () => {
               <span className="text-xs sm:text-sm font-medium">Every Missed Call = Lost Revenue</span>
             </div>
             <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-            <h2 className="text-h2 mb-4">How Much Revenue Are You Losing From Missed Calls?</h2>
+            <h2 className="text-h2 mb-4">See Your Actual Missed Revenue</h2>
             <p className="text-body-default mb-4">
               Every missed call—whether it's a burst pipe at 2am or a quote request at 2pm—is potential revenue walking to your competitors.
             </p>
@@ -63,86 +43,69 @@ export const CallValueCalculator = () => {
 
           <div className="max-w-5xl mx-auto">
             <Card className="card-tier-1">
-              <CardHeader>
-                <CardTitle className="text-5xl text-center text-metric font-bold animate-count-up" style={{ color: 'hsl(var(--charcoal))' }}>
-                  ${recoveredRevenue.toLocaleString()}
+              <CardHeader className="text-center space-y-3 pb-6">
+                <div className="text-sm text-muted-foreground uppercase tracking-wide font-semibold">
+                  You're Losing
+                </div>
+                <CardTitle className="text-5xl sm:text-6xl lg:text-7xl font-bold text-red-600 animate-count-up">
+                  ${lostRevenue.toLocaleString()}/Month
                 </CardTitle>
-                <CardDescription className="text-center text-base sm:text-lg">
-                  Recovered revenue per month
+                <CardDescription className="text-2xl sm:text-3xl font-semibold" style={{ color: 'hsl(var(--charcoal) / 0.7)' }}>
+                  That's ${(lostRevenue * 12).toLocaleString()}/Year in Revenue
                 </CardDescription>
-                <p className="text-center text-xs sm:text-sm text-slate-600 mt-2">
-                  Select your trade and adjust the numbers below
+                <p className="text-base text-muted-foreground pt-4 max-w-2xl mx-auto">
+                  With RingSnap, capture an extra <span className="font-bold text-primary">{Math.round(missedCalls * 0.7)} appointments/month</span> worth <span className="font-bold text-primary">${Math.round(missedCalls * 0.7 * avgValue[0]).toLocaleString()}</span>
                 </p>
               </CardHeader>
               <CardContent className="space-y-8">
-                {/* Niche Selector Pills */}
-                <div className="space-y-3">
-                  <Label className="text-sm sm:text-base">Your Trade</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-                    {(Object.entries(tradeDefaults) as [TradeType, typeof tradeDefaults[TradeType]][]).map(([key, { label, icon: Icon }]) => (
-                      <button
-                        key={key}
-                        className={`h-auto min-h-[48px] py-3 sm:py-4 flex flex-col items-center gap-2 transition-all duration-200 rounded-md font-medium ${
-                          trade === key 
-                            ? "bg-primary text-white border-0 hover:scale-105" 
-                            : "bg-cream border text-charcoal hover:bg-gradient-to-br hover:from-cream hover:to-white hover:-translate-y-1"
-                        }`}
-                        style={trade !== key ? { borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))' } : {}}
-                        onClick={() => handleNicheSelect(key)}
-                      >
-                        <Icon className="w-4 sm:w-5 h-4 sm:h-5" />
-                        <span className="text-xs sm:text-sm font-semibold">{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="w-full text-xs"
-                    onClick={() => handleNicheSelect(trade)}
-                  >
-                    Use {tradeDefaults[trade].label} defaults
-                  </Button>
-                </div>
 
-                {/* Customer Calls Per Week */}
+                {/* Customer Calls Per Month */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm">Customer Calls Per Week</Label>
+                    <Label className="text-sm flex items-center gap-1.5">
+                      <PhoneCall className="w-4 h-4 inline opacity-70" />
+                      Calls received per month
+                    </Label>
                     <span className="text-sm font-bold text-metric">{customerCalls[0]} calls</span>
                   </div>
                   <input 
                     type="tel" 
                     inputMode="numeric"
                     value={customerCalls[0]} 
-                    onChange={(e) => setCustomerCalls([Math.max(5, Math.min(50, Number(e.target.value) || 5))])}
+                    onChange={(e) => setCustomerCalls([Math.max(20, Math.min(600, Number(e.target.value) || 100))])}
                     className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
                   />
-                  <Slider value={customerCalls} onValueChange={setCustomerCalls} min={5} max={50} step={1} className="hidden sm:block input-focus" />
-                  <p className="text-xs text-muted-foreground">{monthlyCalls} customer calls/month</p>
+                  <Slider value={customerCalls} onValueChange={setCustomerCalls} min={20} max={600} step={10} className="hidden sm:block input-focus" />
+                  <p className="text-xs text-muted-foreground">Average home service contractor: 80-300 calls/month</p>
                 </div>
 
-                {/* Missed Percentage */}
+                {/* Answer Percentage */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm">% of calls you currently miss</Label>
+                    <Label className="text-sm flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 inline opacity-70" />
+                      % of calls you currently answer
+                    </Label>
                     <span className="text-sm font-bold text-metric">{missedPercent[0]}%</span>
                   </div>
                   <input 
                     type="tel" 
                     inputMode="numeric"
                     value={missedPercent[0]} 
-                    onChange={(e) => setMissedPercent([Math.max(20, Math.min(70, Number(e.target.value) || 40))])}
+                    onChange={(e) => setMissedPercent([Math.max(0, Math.min(100, Number(e.target.value) || 40))])}
                     className="sm:hidden w-full h-12 px-4 rounded-md border border-input text-center text-lg font-bold input-focus"
                   />
-                  <Slider value={missedPercent} onValueChange={setMissedPercent} min={20} max={70} step={5} className="hidden sm:block input-focus" />
-                  <p className="text-xs text-muted-foreground">Industry average: 35-40%</p>
+                  <Slider value={missedPercent} onValueChange={setMissedPercent} min={0} max={100} step={5} className="hidden sm:block input-focus" />
+                  <p className="text-xs text-muted-foreground">Industry average: 38-62% answered</p>
                 </div>
 
                 {/* Average Job Value */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-sm">Average Job Value</Label>
+                    <Label className="text-sm flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 inline opacity-70" />
+                      Average job value
+                    </Label>
                     <span className="text-sm font-bold text-metric">${avgValue[0].toLocaleString()}</span>
                   </div>
                   <input 
@@ -189,8 +152,11 @@ export const CallValueCalculator = () => {
                   <p className="text-xs text-center text-muted-foreground mt-4 px-4">
                     This includes 24/7 emergencies, daytime quotes, appointment requests, and follow-up calls—everything your customers call about.
                   </p>
-                  <Button className="w-full h-12 text-lg mt-4 rounded-full bg-primary text-white btn-pulse-cta shadow-lg hover:shadow-xl transition-all duration-200" onClick={() => setShowEmailModal(true)}>
-                    Full Revenue Report <ArrowRight className="w-5 h-5 ml-1 inline-block" />
+                  <Button 
+                    className="w-full h-12 text-lg mt-4 rounded-full bg-primary text-white btn-pulse-cta shadow-lg hover:shadow-xl transition-all duration-200" 
+                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    See Your ROI <ArrowRight className="w-5 h-5 ml-1 inline-block" />
                   </Button>
                 </div>
               </CardContent>
@@ -198,20 +164,6 @@ export const CallValueCalculator = () => {
           </div>
         </div>
       </section>
-
-      <EmailCaptureModal 
-        open={showEmailModal} 
-        onOpenChange={setShowEmailModal}
-        calculatorData={{
-          trade,
-          customerCalls: customerCalls[0],
-          lostRevenue,
-          recoveredRevenue,
-          netGain,
-          roi,
-          paybackDays
-        }}
-      />
     </>
   );
 };

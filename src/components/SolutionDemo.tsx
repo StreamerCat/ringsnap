@@ -139,11 +139,22 @@ export const SolutionDemo = () => {
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
           <h2 className="text-h2 mb-4 uppercase tracking-tight">
-            Meet Your New Receptionist <span style={{color: 'hsl(var(--primary))'}}>Who Never Sleeps</span>
+            Experience What Your Customers <span style={{color: 'hsl(var(--primary))'}}>Will Hear</span>
           </h2>
-          <p className="text-body-default">
-            Try it now. Ask about pricing. Book an appointment. Report an emergency. All calls handled.
+          <p className="text-body-default max-w-3xl mx-auto">
+            This isn't a scripted demo—it's a real AI agent handling actual service calls. 
+            Try asking about pricing, booking an appointment, or reporting an emergency. 
+            You'll see the natural conversation flow and understand why contractors are 
+            capturing 95%+ of their incoming calls.
           </p>
+        </div>
+
+        {/* Pre-Demo Tip */}
+        <div className="max-w-3xl mx-auto mb-6">
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+            <span className="font-bold">💡 Pro Tip:</span> Try asking "What's your pricing for an AC tune-up?" 
+            or "Can I schedule an emergency visit for tomorrow morning?"
+          </div>
         </div>
 
         {/* Interactive Demo */}
