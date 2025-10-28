@@ -33,26 +33,22 @@ const tradePresets = {
   plumbing: {
     label: "Plumber",
     defaults: { calls: 210, answerRate: 54, jobValue: 975 },
-    insight:
-      "Burst pipe callers hire the first plumber who answers—Google's data shows a 3× close rate over web forms.",
+    insight: "Emergency plumbing calls convert at 3× the rate of web forms—each is worth about $975.",
   },
   hvac: {
     label: "HVAC",
     defaults: { calls: 260, answerRate: 58, jobValue: 1450 },
-    insight:
-      "Peak-season HVAC installs average $1,450 and 68% of searchers convert by phone within 30 minutes.",
+    insight: "Peak-season HVAC installs average $1,450 and callers expect a live answer in under 30 seconds.",
   },
   roofing: {
     label: "Roofing",
     defaults: { calls: 140, answerRate: 62, jobValue: 2400 },
-    insight:
-      "Insurance-driven roof replacements close near $2,400 when the first responder picks up immediately.",
+    insight: "Insurance-driven roof replacements close near $2,400 when the first responder picks up immediately.",
   },
   electrical: {
     label: "Electrical",
     defaults: { calls: 180, answerRate: 49, jobValue: 1250 },
-    insight:
-      "Code-compliance emergencies average $1,250 and two in five callers abandon if it goes to voicemail.",
+    insight: "Code-compliance emergencies average $1,250 and 2 in 5 callers won’t leave a voicemail.",
   },
 } satisfies Record<string, { label: string; defaults: CalculatorState; insight: string }>;
 
@@ -120,11 +116,9 @@ export const CallValueCalculator = () => {
             <div className="flex items-center gap-2 text-primary font-semibold text-sm uppercase tracking-[0.18em]">
               <Sparkles className="h-4 w-4" /> ROI Playbook
             </div>
-            <h2 className="text-h2 mt-4 mb-3 leading-tight">
-              Stop leaking booked jobs—convert 95% of missed calls automatically.
-            </h2>
+            <h2 className="text-h2 mt-4 mb-3 leading-tight">Turn missed rings into booked revenue in under 60 seconds.</h2>
             <p className="text-body-default text-muted-foreground max-w-2xl">
-              Google Local Services data shows 65% of home service buyers still dial a number and most hire whoever answers first. Yet the average crew lets 38% of those calls hit voicemail. Plug in your numbers to see the upside RingSnap unlocks, then grab the follow-up scripts we email top performers.
+              Home service buyers still place 65% of jobs by phone, yet the average team misses 38% of those calls. Use the sliders below to see how RingSnap converts that leakage into profit, then claim the playbook we send top performers.
             </p>
           </div>
 
@@ -163,7 +157,7 @@ export const CallValueCalculator = () => {
                     <div className="flex items-center justify-between rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
                       <div className="text-sm">
                         <div className="font-semibold text-slate-700">Using {selectedPreset ? tradePresets[selectedPreset].label : "benchmarks"}</div>
-                        <p className="text-xs text-muted-foreground">Dial in the math—every tweak updates the ROI story immediately.</p>
+                        <p className="text-xs text-muted-foreground">Dial in the math—every tweak recalculates savings instantly.</p>
                       </div>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="hover:bg-primary/10">
@@ -183,7 +177,7 @@ export const CallValueCalculator = () => {
                           </div>
                           <Slider value={[inputs.calls]} onValueChange={handleSliderChange("calls")} min={40} max={600} step={10} />
                           <p className="text-xs text-muted-foreground">
-                            Benchmark: top-quartile crews field 150-280 inbound requests per month across Google and referrals.
+                            Benchmark: top-quartile shops log 150-280 inbound requests per month.
                           </p>
                         </div>
 
@@ -197,7 +191,7 @@ export const CallValueCalculator = () => {
                           </div>
                           <Slider value={[inputs.answerRate]} onValueChange={handleSliderChange("answerRate")} min={20} max={100} step={1} />
                           <p className="text-xs text-muted-foreground">
-                            Every 10% drop in live answer rate leaks {numberFormatter.format(Math.round(inputs.calls * 0.1))} high-intent callers who usually hire whoever picked up first.
+                            Every 10% drop in live answer rate leaks {numberFormatter.format(Math.round(inputs.calls * 0.1))} ready-to-book callers.
                           </p>
                         </div>
 
@@ -211,60 +205,40 @@ export const CallValueCalculator = () => {
                           </div>
                           <Slider value={[inputs.jobValue]} onValueChange={handleSliderChange("jobValue")} min={400} max={3500} step={50} />
                           <p className="text-xs text-muted-foreground">
-                            Each unanswered call walks with roughly ${numberFormatter.format(inputs.jobValue)} in {selectedPreset ? tradePresets[selectedPreset].label.toLowerCase() : "service"} revenue you already paid to generate.
+                            Each unanswered call walks away with roughly ${numberFormatter.format(inputs.jobValue)} in {selectedPreset ? tradePresets[selectedPreset].label.toLowerCase() : "service"} revenue.
                           </p>
                         </div>
                       </CardContent>
                     </CollapsibleContent>
                   </Collapsible>
                 </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-3">
-                  {[{
-                    label: "Answered now",
-                    value: `${numberFormatter.format(metrics.answeredCalls)} calls`,
-                    helper: "Live conversations you already handle",
-                  }, {
-                    label: "Missed monthly",
-                    value: `${numberFormatter.format(metrics.missedCalls)} calls`,
-                    helper: "High-intent leads leaking today",
-                  }, {
-                    label: "Value per call",
-                    value: `$${numberFormatter.format(inputs.jobValue)}`,
-                    helper: "Average booked revenue on the line",
-                  }].map((stat) => (
-                    <div key={stat.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</div>
-                      <div className="mt-2 text-lg font-semibold text-slate-900">{stat.value}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{stat.helper}</div>
-                    </div>
-                  ))}
-                </CardContent>
               </Card>
 
               <Card className="border border-slate-200 shadow-sm">
                 <CardHeader className="space-y-2">
                   <CardTitle className="text-xl font-semibold">Why these levers close more jobs</CardTitle>
                   <CardDescription>
-                    The Hormozi value equation is simple: increase dream outcome, slash time delay, remove effort. Each lever drives one of those factors.
+                    The ROI jumps when you remove the bottlenecks that keep buyers waiting. Here’s how the math compounds.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-6">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-700">After-hours & overflow</h3>
                     <p className="text-sm text-muted-foreground">
-                      37% of homeowner requests land after 5pm. RingSnap answers instantly so your brand delivers first—no waiting, no friction.
+                      37% of homeowner requests land after 5pm—RingSnap answers every one so competitors never grab the urgent job first.
                     </p>
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-slate-700">Lead-to-booked speed</h3>
                     <p className="text-sm text-muted-foreground">
-                      73% of buyers hire the first contractor who responds. Our AI receptionist answers instantly and books straight inside ServiceTitan, Housecall Pro, or your CRM.
+                      73% of buyers hire the first contractor who responds. Our AI receptionist answers instantly and books inside the
+                      tools you already trust.
                     </p>
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-slate-700">Proactive nurturing</h3>
                     <p className="text-sm text-muted-foreground">
-                      Missed calls trigger immediate text follow-ups, two-way booking links, and reactivation cadences so price shoppers never fall through the cracks.
+                      Missed calls trigger immediate text follow-ups and two-way booking links, keeping price shoppers in your pipeline.
                     </p>
                   </div>
                 </CardContent>
@@ -337,9 +311,8 @@ export const CallValueCalculator = () => {
                     Email me this ROI report <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                   {formState === "submitted" ? (
-                    <p className="text-xs text-white/70">
-                      Thanks! We&apos;ll send the call scripts, follow-up cadences, and ROI math our top contractors use to close hot leads.
-                    </p>
+                    <p className="text-xs text-white/70">Thanks! We&apos;ll send the call scripts, follow-up cadences, and ROI math our top
+                      contractors use.</p>
                   ) : (
                     <p className="text-xs text-white/60">
                       No spam—just the proof you need to justify AI coverage to owners and ops leads.
