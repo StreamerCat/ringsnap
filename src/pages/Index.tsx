@@ -1,6 +1,8 @@
 import { Helmet } from "react-helmet";
 import { lazy, Suspense } from "react";
 import { ContractorHero } from "@/components/ContractorHero";
+import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
+import { NextStepsStrip } from "@/components/NextStepsStrip";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -179,14 +181,16 @@ const Index = () => {
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
         <h1 className="sr-only">RingSnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
-        
+
         <ContractorHero />
-        
+        <TestimonialMetricsStrip />
+
         <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-          <CallValueCalculator />
-          <SolutionDemo />
-          <CompetitorComparison />
           <ContractorTestimonials />
+          <CompetitorComparison />
+          <SolutionDemo />
+          <NextStepsStrip />
+          <CallValueCalculator />
           <ContractorPricing />
           <ContractorFooter />
           <MobileFooterCTA />
