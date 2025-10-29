@@ -469,5 +469,6 @@ export const CallValueCalculator = () => {
           </div>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };
