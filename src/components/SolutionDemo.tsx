@@ -61,6 +61,14 @@ const VapiWidget = () => {
               <span>Hear It in Action</span>
             </button>
             
+            {/* Microphone Instruction */}
+            <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground/80 italic">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              <span>Enable your microphone to start talking to RingSnap</span>
+            </div>
+            
             {/* Friction Reducers */}
             <div className="flex items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1.5 font-medium">
