@@ -372,6 +372,24 @@ export const CallValueCalculator = () => {
                   </ul>
                 </div>
 
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5">
+                  <p className="text-sm font-semibold text-slate-700">You’ll tweak just three numbers:</p>
+                  <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                      Monthly inbound calls you already generate
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                      The % you currently answer live (or guess)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                      Average revenue per booked job in that trade
+                    </li>
+                  </ul>
+                </div>
+
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
                   <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
