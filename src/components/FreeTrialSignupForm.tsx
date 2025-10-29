@@ -127,7 +127,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
             </DialogHeader>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4" aria-live="polite">
                 <FormField
                   control={form.control}
                   name="name"
@@ -135,9 +135,14 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Smith" {...field} />
+                        <Input 
+                          placeholder="John Smith" 
+                          {...field}
+                          aria-required="true"
+                          className="px-3 sm:px-4"
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs flex items-start gap-1" />
                     </FormItem>
                   )}
                 />
@@ -149,9 +154,15 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john@smithplumbing.com" {...field} />
+                        <Input 
+                          type="email" 
+                          placeholder="john@smithplumbing.com" 
+                          {...field}
+                          aria-required="true"
+                          className="px-3 sm:px-4"
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs flex items-start gap-1" />
                     </FormItem>
                   )}
                 />
@@ -163,9 +174,15 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="(555) 123-4567" {...field} />
+                        <Input 
+                          type="tel" 
+                          placeholder="(555) 123-4567" 
+                          {...field}
+                          aria-required="true"
+                          className="px-3 sm:px-4"
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs flex items-start gap-1" />
                     </FormItem>
                   )}
                 />

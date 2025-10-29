@@ -113,61 +113,65 @@ export const CompetitorComparison = () => {
           </div>
         </div>
 
-        {/* Mobile - Horizontal Scroll Table */}
-        <div className="md:hidden overflow-x-auto -mx-4 px-4">
-          <div className="card-tier-2 min-w-[600px]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-primary hover:bg-primary">
-                  <TableHead className="text-white font-bold text-xs sticky left-0 bg-primary z-10">Feature</TableHead>
-                  {competitors.map((comp, idx) => (
-                    <TableHead
-                      key={idx}
-                      className={`text-center font-bold text-xs border-l text-white ${
-                        comp.highlight ? 'bg-primary' : 'bg-primary/90'
-                      }`}
-                      style={{borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
-                    >
-                      {comp.name}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {criteria.map((criterion, rowIdx) => (
-                  <TableRow key={rowIdx}>
-                    <TableCell className="font-medium text-xs sticky left-0 bg-white z-10" style={{color: 'hsl(var(--charcoal))'}}>
-                      {criterion.name}
-                    </TableCell>
-                    {criterion.values.map((value, colIdx) => (
-                      <TableCell
-                        key={colIdx}
-                        className={`text-center border-l text-xs ${
-                          competitors[colIdx].highlight ? "bg-cream/30" : ""
+        {/* Mobile - Horizontal Scroll Table with improved UX */}
+        <div className="md:hidden relative">
+          <div className="overflow-x-auto -mx-4 px-4 scrollbar-thin">
+            <div className="card-tier-2 min-w-[600px]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-primary hover:bg-primary">
+                    <TableHead className="text-white font-bold text-xs sticky left-0 bg-primary z-10 shadow-md">Feature</TableHead>
+                    {competitors.map((comp, idx) => (
+                      <TableHead
+                        key={idx}
+                        className={`text-center font-bold text-xs border-l text-white ${
+                          comp.highlight ? 'bg-primary' : 'bg-primary/90'
                         }`}
                         style={{borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
                       >
-                        {value === "check" ? (
-                          <Check className={`w-4 h-4 mx-auto ${
-                            competitors[colIdx].highlight ? 'text-primary' : 'text-muted-foreground'
-                          }`} />
-                        ) : value === "x" ? (
-                          <X className="w-4 h-4 text-red-500 mx-auto" />
-                        ) : value === "warning" ? (
-                          <span className="text-yellow-500 mx-auto block text-center">~</span>
-                        ) : (
-                          <span className="text-xs text-center block" style={{color: 'hsl(var(--charcoal) / 0.75)'}}>
-                            {value}
-                          </span>
-                        )}
-                      </TableCell>
+                        {comp.name}
+                      </TableHead>
                     ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {criteria.map((criterion, rowIdx) => (
+                    <TableRow key={rowIdx}>
+                      <TableCell className="font-medium text-xs sticky left-0 bg-white z-10 shadow-md p-2 sm:p-4" style={{color: 'hsl(var(--charcoal))'}}>
+                        {criterion.name}
+                      </TableCell>
+                      {criterion.values.map((value, colIdx) => (
+                        <TableCell
+                          key={colIdx}
+                          className={`text-center border-l text-xs p-2 sm:p-4 ${
+                            competitors[colIdx].highlight ? "bg-cream/30" : ""
+                          }`}
+                          style={{borderLeftColor: 'hsl(var(--charcoal) / 0.1)'}}
+                        >
+                          {value === "check" ? (
+                            <Check className={`w-4 h-4 mx-auto ${
+                              competitors[colIdx].highlight ? 'text-primary' : 'text-muted-foreground'
+                            }`} />
+                          ) : value === "x" ? (
+                            <X className="w-4 h-4 text-red-500 mx-auto" />
+                          ) : value === "warning" ? (
+                            <span className="text-yellow-500 mx-auto block text-center">~</span>
+                          ) : (
+                            <span className="text-xs text-center block" style={{color: 'hsl(var(--charcoal) / 0.75)'}}>
+                              {value}
+                            </span>
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-          <p className="text-xs text-center text-muted-foreground mt-2">← Swipe to compare →</p>
+          <p className="text-xs text-center text-muted-foreground mt-2 flex items-center justify-center gap-1">
+            <span aria-hidden="true">←</span> Swipe to compare <span aria-hidden="true">→</span>
+          </p>
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6 max-w-3xl mx-auto">

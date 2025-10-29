@@ -25,7 +25,7 @@ export const ContractorHero = () => {
           
           {/* Left Column */}
           <div>
-            <img src={logo} alt="RingSnap Logo" className="h-24 sm:h-32 lg:h-36 w-auto mb-8 sm:mb-12 mx-auto sm:mx-0" />
+            <img src={logo} alt="RingSnap AI Receptionist for Contractors" className="h-24 sm:h-32 lg:h-36 w-auto mb-8 sm:mb-12 mx-auto sm:mx-0" width="288" height="144" />
             
             <div className="space-y-8">
               <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
@@ -78,7 +78,7 @@ export const ContractorHero = () => {
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
                   <CheckCircle className="w-4 h-4 text-primary" />
-                  <span className="font-medium">14-day free trial</span>
+                  <span className="font-medium">Free trial</span>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
                   <PhoneCall className="w-4 h-4 text-primary" />

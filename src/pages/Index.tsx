@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { ContractorHero } from "@/components/ContractorHero";
 import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -142,7 +143,7 @@ const Index = () => {
         <title>RingSnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
         <meta 
           name="description" 
-          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. RingSnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 14 days." 
+          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. RingSnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 3 days." 
         />
         <meta 
           name="keywords" 
@@ -182,19 +183,29 @@ const Index = () => {
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
         <h1 className="sr-only">RingSnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
 
+        <a 
+          href="#main-content" 
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:shadow-lg"
+        >
+          Skip to main content
+        </a>
         <ContractorHero />
         <TestimonialMetricsStrip />
 
-        <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-          <ContractorTestimonials />
-          <CompetitorComparison />
-          <SolutionDemo />
-          <NextStepsStrip />
-          <CallValueCalculator />
-          <ContractorPricing />
-          <ContractorFooter />
-          <MobileFooterCTA />
-        </Suspense>
+        <div id="main-content">
+          <ErrorBoundary>
+            <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
+              <ContractorTestimonials />
+              <CompetitorComparison />
+              <SolutionDemo />
+              <NextStepsStrip />
+              <CallValueCalculator />
+              <ContractorPricing />
+              <ContractorFooter />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+        <MobileFooterCTA />
       </main>
     </>
   );
