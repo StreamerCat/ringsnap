@@ -43,23 +43,32 @@ export const ContractorHero = () => {
               
               {/* Gradient CTAs */}
               <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                size="lg" 
-                className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
-                onClick={() => setShowSignupForm(true)}
-              >
-                <PhoneCall className="mr-2" />
-                Try RingSnap free
-              </Button>
-              <Button 
-                size="lg" 
-                className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md"
-                style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
-                onClick={scrollToVapiDemo}
-              >
-                Hear how it sounds
-              </Button>
-            </div>
+                <Button
+                  size="lg"
+                  className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
+                  onClick={() => setShowSignupForm(true)}
+                >
+                  <PhoneCall className="mr-2" />
+                  Try RingSnap free
+                </Button>
+                <Button
+                  size="lg"
+                  className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md"
+                  style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+                  onClick={scrollToVapiDemo}
+                >
+                  Hear how it sounds
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md"
+                  style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+                  onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  See pricing
+                </Button>
+              </div>
             
               {/* Trust Badges */}
               <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{borderColor: 'hsl(var(--charcoal) / 0.05)'}}>

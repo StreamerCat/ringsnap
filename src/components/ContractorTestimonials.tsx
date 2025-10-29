@@ -3,12 +3,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Star, TrendingUp } from "lucide-react";
 
 export const ContractorTestimonials = () => {
-  const metrics = [
-    { value: "4.9", label: "out of 5", sublabel: "from 247 contractors", icon: "star" },
-    { value: "<1 sec", label: "Answer time", sublabel: "Instant pickup", icon: "clock" },
-    { value: "95%", label: "Call capture", sublabel: "vs your 55-60%", icon: "phone" }
-  ];
-
   const testimonials = [
     {
       quote: "We went from missing 40% of calls to capturing 98%. Emergency AND routine calls—all handled. That's an extra $23,400 in monthly revenue. The AI paid for itself in 3 days.",
@@ -46,44 +40,11 @@ export const ContractorTestimonials = () => {
     <section className="section-spacer bg-muted/30">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
-        
-        {/* Ratings Strip */}
-        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mb-8 sm:mb-12 p-4 sm:p-6 bg-white rounded-2xl border elevation-3 max-w-4xl mx-auto">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Star className="w-6 sm:w-8 h-6 sm:h-8 fill-primary text-primary" />
-            <div>
-              <div className="text-2xl sm:text-3xl font-bold text-metric">4.9</div>
-              <div className="text-xs sm:text-sm text-slate-600">out of 5</div>
-            </div>
-          </div>
-          
-          <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
-          
-          <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-metric">247</div>
-            <div className="text-xs sm:text-sm text-slate-600">Contractors</div>
-          </div>
-          
-          <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
-          
-          <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-primary text-metric">&lt;1s</div>
-            <div className="text-xs sm:text-sm text-slate-600">Answer time</div>
-          </div>
-          
-          <div className="h-8 sm:h-12 w-px bg-slate-200 hidden sm:block" />
-          
-          <div className="text-center">
-            <div className="text-xl sm:text-2xl font-bold text-primary text-metric">95%</div>
-            <div className="text-xs sm:text-sm text-slate-600">Capture rate</div>
-          </div>
-        </div>
-
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-          <h2 className="text-h2 mb-4">Real Results from Real Contractors</h2>
-          <p className="text-body-default">
-            1,200+ contractors capturing 95% of all customer calls—emergencies, quotes, and appointments—with AI
+          <h2 className="text-h2 mb-4">Real contractors see these results every day</h2>
+          <p className="text-body-default text-muted-foreground">
+            Proof before the pitch: crews in plumbing, HVAC, electrical, and roofing rely on RingSnap to sound human, stay on brand, and convert emergencies into booked jobs.
           </p>
         </div>
 
