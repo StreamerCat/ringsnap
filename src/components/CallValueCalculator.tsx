@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   DollarSign,
   TrendingUp,
@@ -15,6 +16,9 @@ import {
   Sparkles,
   ShieldCheck,
   Clock3,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 type CalculatorState = {
@@ -157,23 +161,23 @@ export const CallValueCalculator = () => {
   };
 
   return (
-    <section id="calculator" className="section-spacer bg-gradient-to-b from-white via-slate-50 to-slate-100">
+    <section id="calculator" className="section-spacer bg-slate-50">
       <div className="container mx-auto max-w-7xl px-4">
         <hr className="section-divider mb-10" />
 
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
           <div className="space-y-10">
             <header className="space-y-6">
-              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                <Sparkles className="h-4 w-4" /> ROI Playbook
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.28em] text-primary">
+                <Sparkles className="h-4 w-4" /> For home-service teams
               </div>
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)] lg:items-start">
                 <div className="space-y-4">
                   <h2 className="text-h2 leading-tight">
-                    Stop leaking booked jobs—convert 95% of missed calls automatically.
+                    Turn every missed call into booked revenue with RingSnap.
                   </h2>
                   <p className="text-body-default text-muted-foreground">
-                    Google Local Services data shows 65% of home service buyers still dial a number and most hire whoever answers first. Yet the average crew lets 38% of those calls hit voicemail. Plug in your numbers to see the upside RingSnap unlocks, then grab the follow-up scripts we email top performers.
+                    Homeowners still reach for the phone first—and 7 in 10 hire whoever responds immediately. Drop in your call volume to see how much revenue RingSnap recovers, then snag the launch kit we send top-performing crews.
                   </p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -182,7 +186,7 @@ export const CallValueCalculator = () => {
                     Built from 1.2k+ service call audits
                   </div>
                   <p className="mt-3 text-sm text-muted-foreground">
-                    Contractors using RingSnap answer in under 8 seconds and recover $18.7k in monthly jobs on average.
+                    Contractors using RingSnap answer in under 8 seconds and recover $18.7k in booked jobs every month on average.
                   </p>
                 </div>
               </div>
@@ -194,48 +198,54 @@ export const CallValueCalculator = () => {
                   <Badge variant="secondary" className="border border-primary/10 bg-primary/10 text-primary">
                     60-second ROI snapshot
                   </Badge>
-                  <span>Choose the trade that mirrors your ticket mix to load proven benchmarks.</span>
+                  <span>Pick the preset that mirrors your job mix to preload benchmarks.</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <ToggleGroup
+                  type="single"
+                  value={selectedPreset}
+                  onValueChange={(value) => value && handlePresetClick(value as keyof typeof tradePresets)}
+                  className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+                >
                   {(Object.keys(tradePresets) as (keyof typeof tradePresets)[]).map((presetKey) => {
                     const preset = tradePresets[presetKey];
-                    const isActive = selectedPreset === presetKey;
+                    const defaults = preset.defaults;
                     return (
-                      <Button
+                      <ToggleGroupItem
                         key={preset.label}
-                        type="button"
-                        variant={isActive ? "default" : "outline"}
-                        size="sm"
-                        className={`rounded-full ${isActive ? "bg-primary text-white" : "bg-white"}`}
-                        onClick={() => handlePresetClick(presetKey)}
+                        value={presetKey}
+                        className="group flex h-auto flex-col items-start gap-1 rounded-2xl border border-slate-200 bg-white p-3 text-left data-[state=on]:border-primary data-[state=on]:bg-primary/5"
                       >
-                        {preset.label}
-                      </Button>
+                        <span className="text-sm font-semibold text-slate-900">{preset.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {numberFormatter.format(defaults.calls)} calls · {defaults.answerRate}% live answer
+                        </span>
+                      </ToggleGroupItem>
                     );
                   })}
-                </div>
+                </ToggleGroup>
                 <p className="max-w-xl text-sm text-muted-foreground">{presetInsight}</p>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-3">
                   {quickStats.map((stat) => (
-                    <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{stat.label}</div>
-                      <div className="mt-2 text-lg font-semibold text-slate-900">{stat.value}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{stat.helper}</div>
+                    <div key={stat.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">{stat.label}</div>
+                      <div className="mt-3 text-2xl font-semibold text-slate-900">{stat.value}</div>
+                      <div className="mt-2 text-xs text-muted-foreground">{stat.helper}</div>
                     </div>
                   ))}
                 </div>
 
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-                  <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-700">Using {tradePresets[selectedPreset].label} benchmarks</div>
                       <p className="text-xs text-muted-foreground">Dial in the math—every tweak updates the ROI story immediately.</p>
                     </div>
                     <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full hover:bg-primary/10 sm:w-auto">
+                      <Button variant="ghost" size="sm" className="w-full justify-between gap-2 text-sm font-semibold text-slate-700 hover:bg-primary/10 sm:w-auto">
                         {isAdvancedOpen ? "Hide adjustments" : "Adjust inputs"}
+                        {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </Button>
                     </CollapsibleTrigger>
                   </div>
@@ -289,13 +299,7 @@ export const CallValueCalculator = () => {
             </Card>
 
             <Card className="border border-slate-200 shadow-sm">
-              <CardHeader className="space-y-2">
-                <CardTitle className="text-xl font-semibold">Why these levers close more jobs</CardTitle>
-                <CardDescription>
-                  The Hormozi value equation is simple: increase dream outcome, slash time delay, remove effort. Each lever drives one of those factors.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-6 sm:grid-cols-2">
+              <CardContent className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-slate-700">After-hours & overflow</h3>
                   <p className="text-sm text-muted-foreground">
@@ -316,109 +320,112 @@ export const CallValueCalculator = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            <Card className="border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm">
+          <div className="space-y-6 lg:sticky lg:top-20">
+            <Card className="border border-slate-800 bg-slate-950 text-white shadow-xl">
+              <CardHeader className="space-y-3">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/60">
+                  <AlertTriangle className="h-4 w-4" /> Recovered revenue snapshot
+                </div>
+                <CardTitle className="text-3xl font-bold">
+                  ${numberFormatter.format(metrics.recoveredRevenue)}
+                  <span className="block text-base font-medium text-white/70">Booked back every month</span>
+                </CardTitle>
+                <CardDescription className="text-white/75">
+                  {numberFormatter.format(metrics.missedCalls)} missed calls leak ${numberFormatter.format(metrics.lostRevenue)} in booked work today.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Recovered revenue</div>
+                    <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.recoveredRevenue)}</div>
+                    <div className="mt-1 text-[11px] text-white/60">Captured by RingSnap AI follow-up</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Net profit lift</div>
+                    <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.netGain)}</div>
+                    <div className="mt-1 text-[11px] text-white/60">ROI: {metrics.roi}% vs. subscription</div>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Break-even pace</div>
+                    <div className="mt-1 text-xl font-semibold text-white">{metrics.paybackDays} days</div>
+                    <div className="mt-1 text-[11px] text-white/60">≈ {breakEvenJobs} booked jobs</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Monthly plan</div>
+                    <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.aiCost)}/mo</div>
+                    <div className="mt-1 text-[11px] text-white/60">24/7 coverage included</div>
+                  </div>
+                </div>
+                <ul className="space-y-2 text-sm text-white/70">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                    <span>High-intent callers get quotes, scheduling links, and follow-ups automatically.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                    <span>Owners see a daily recap of booked jobs, missed opportunities, and talk tracks.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                    <span>CSRs reclaim time for VIP customers instead of chasing voicemails.</span>
+                  </li>
+                </ul>
+                <form className="space-y-4" onSubmit={handleFormSubmit}>
+                  <div className="space-y-2">
+                    <Label htmlFor="roi-email" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
+                      Email my ROI teardown
+                    </Label>
+                    <Input
+                      id="roi-email"
+                      type="email"
+                      required
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className="h-11 rounded-lg border-slate-700 bg-slate-900 text-white placeholder:text-white/50 focus-visible:ring-primary"
+                    />
+                  </div>
+                  <Button type="submit" size="lg" className="w-full rounded-lg bg-primary text-white hover:bg-primary/90">
+                    Send me the ROI report <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                  {formState === "submitted" ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary">
+                      <CheckCircle2 className="h-4 w-4" />
+                      We just sent the launch kit—check your inbox for scripts, cadences, and ROI math.
+                    </div>
+                  ) : (
+                    <p className="text-xs text-white/60">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>
+                  )}
+                </form>
+                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+                  <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
+                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-white/60">Bryan — Owner, Precision Plumbing</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200 bg-white shadow-sm">
               <CardHeader className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <Clock3 className="h-4 w-4 text-primary" />
                   What you&apos;ll walk away with
                 </div>
-                <CardDescription>
-                  We email the same follow-up kits our top contractors use to recapture missed calls and prove ROI to leadership.
-                </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2">
-                {followUpHighlights.map((item, index) => (
-                  <div key={item.title} className={index === followUpHighlights.length - 1 ? "sm:col-span-2" : undefined}>
-                    <p className="text-sm font-semibold text-slate-700">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">{item.copy}</p>
+              <CardContent className="grid gap-3">
+                {followUpHighlights.map((item) => (
+                  <div key={item.title} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.copy}</p>
                   </div>
                 ))}
               </CardContent>
             </Card>
           </div>
-
-          <Card className="relative overflow-hidden border-none bg-slate-900 text-white shadow-2xl lg:sticky lg:top-20">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary to-emerald-500 opacity-80" />
-            <div
-              className="absolute inset-0 mix-blend-soft-light"
-              style={{ backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25), transparent 55%)" }}
-            />
-              <CardHeader className="relative space-y-4">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70">
-                  <AlertTriangle className="h-4 w-4" /> Hidden revenue leak
-                </div>
-                <CardTitle className="text-4xl font-bold">
-                  ${numberFormatter.format(metrics.recoveredRevenue)} <span className="text-lg font-medium text-white/80">recaptured monthly</span>
-                </CardTitle>
-                <CardDescription className="text-white/80">
-                  You&apos;re leaving ${numberFormatter.format(metrics.lostRevenue)} in booked work when {numberFormatter.format(metrics.missedCalls)} calls roll to voicemail.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="relative space-y-8">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-                    <div className="text-xs uppercase tracking-wide text-white/60">Revenue leaking today</div>
-                    <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.lostRevenue)}</div>
-                    <div className="mt-1 text-xs text-white/60">High-intent jobs going to competitors</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-                    <div className="text-xs uppercase tracking-wide text-white/60">Net new profit</div>
-                    <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.netGain)}</div>
-                    <div className="mt-1 text-xs text-white/60">ROI: {metrics.roi}%</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-                    <div className="text-xs uppercase tracking-wide text-white/60">Break-even</div>
-                    <div className="mt-2 text-2xl font-semibold">{metrics.paybackDays} days</div>
-                    <div className="mt-1 text-xs text-white/60">≈ {breakEvenJobs} booked jobs</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-                    <div className="text-xs uppercase tracking-wide text-white/60">AI receptionist plan</div>
-                    <div className="mt-2 text-2xl font-semibold">${numberFormatter.format(metrics.aiCost)}/mo</div>
-                    <div className="mt-1 text-xs text-white/60">Locks in 24/7 coverage</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:col-span-2">
-                    <div className="text-xs uppercase tracking-wide text-white/60">Calls saved</div>
-                    <div className="mt-2 text-2xl font-semibold">{numberFormatter.format(metrics.recoveredCallCapture)}</div>
-                    <div className="mt-1 text-xs text-white/60">/{numberFormatter.format(metrics.monthlyCalls)} total calls</div>
-                  </div>
-                </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-                <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
-                <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/60">Bryan • Owner, Precision Plumbing</p>
-              </div>
-
-              <form className="space-y-4" onSubmit={handleFormSubmit}>
-                <div className="space-y-2">
-                  <Label htmlFor="roi-email" className="text-xs uppercase tracking-[0.2em] text-white/70">
-                    Send the full ROI teardown to my inbox
-                  </Label>
-                  <Input
-                    id="roi-email"
-                    type="email"
-                    required
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="h-12 rounded-full border-white/40 bg-white/20 text-white placeholder:text-white/60 focus-visible:ring-white"
-                  />
-                </div>
-                <Button type="submit" size="lg" className="w-full rounded-full bg-white text-slate-900 hover:bg-white/90">
-                  Email me this ROI report <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                {formState === "submitted" ? (
-                  <p className="text-xs text-white/70">
-                    Thanks! We&apos;ll send the call scripts, follow-up cadences, and ROI math our top contractors use to close hot leads.
-                  </p>
-                ) : (
-                  <p className="text-xs text-white/60">
-                    No spam—just the proof you need to justify AI coverage to owners and ops leads.
-                  </p>
-                )}
-              </form>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </section>
