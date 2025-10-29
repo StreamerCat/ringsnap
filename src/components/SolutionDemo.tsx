@@ -150,10 +150,7 @@ export const SolutionDemo = () => {
             Experience What Your Customers <span style={{color: 'hsl(var(--primary))'}}>Will Hear</span>
           </h2>
           <p className="text-body-default max-w-3xl mx-auto">
-            This isn't a scripted demo—it's a real AI agent handling actual service calls. 
-            Try asking about pricing, booking an appointment, or reporting an emergency. 
-            You'll see the natural conversation flow and understand why contractors are 
-            capturing 95%+ of their incoming calls.
+            Your 24/7 receptionist that never misses a call. Hear how it handles service questions, bookings, and emergencies—naturally and professionally.
           </p>
         </div>
 
