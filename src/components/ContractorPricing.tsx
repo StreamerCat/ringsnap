@@ -76,7 +76,7 @@ export const ContractorPricing = () => {
   ];
 
   return (
-    <section className="section-spacer bg-background">
+    <section id="pricing" className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
@@ -86,6 +86,19 @@ export const ContractorPricing = () => {
           <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Transparent pricing. No setup fees. Cancel anytime.
           </p>
+        </div>
+
+        <div className="max-w-4xl mx-auto mb-10 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left">
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Backed by proof</div>
+            <div className="mt-2 text-2xl font-bold text-charcoal">4.9/5 satisfaction</div>
+            <p className="text-xs text-muted-foreground mt-1">247 contractors rated onboarding + support experience.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left">
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">Stays on the job</div>
+            <div className="mt-2 text-2xl font-bold text-primary">95% call capture</div>
+            <p className="text-xs text-muted-foreground mt-1">Emergency, overflow, and after-hours calls booked automatically.</p>
+          </div>
         </div>
 
         {/* Value Comparison */}
