@@ -51,9 +51,9 @@ export const CompetitorComparison = () => {
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-6xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-          <h2 className="text-h2 mb-4">Why Contractors Choose RingSnap</h2>
-          <p className="text-body-default">
-            Quick comparison of the top solutions
+          <h2 className="text-h2 mb-4">Compare RingSnap vs. the old way</h2>
+          <p className="text-body-default text-muted-foreground">
+            You just saw the wins—here’s how we stack up against call centers, voicemail, and pieced-together tools.
           </p>
         </div>
 
