@@ -167,8 +167,7 @@ export const CallValueCalculator = () => {
           <span className="block text-base font-medium text-white/70">Booked back every month</span>
         </CardTitle>
         <CardDescription className="text-white/75">
-          {numberFormatter.format(metrics.missedCalls)} missed calls leak ${numberFormatter.format(metrics.lostRevenue)} in booked
-          work today.
+          {numberFormatter.format(metrics.missedCalls)} missed calls leak ${numberFormatter.format(metrics.lostRevenue)} in booked work today.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -355,6 +354,24 @@ export const CallValueCalculator = () => {
                   </ul>
                 </div>
 
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5">
+                  <p className="text-sm font-semibold text-slate-700">You’ll tweak just three numbers:</p>
+                  <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                      Monthly inbound calls you already generate
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                      The % you currently answer live (or guess)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                      Average revenue per booked job in that trade
+                    </li>
+                  </ul>
+                </div>
+
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
                   <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -423,7 +440,26 @@ export const CallValueCalculator = () => {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="border border-slate-200 shadow-sm">
-              
+              <CardContent className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-700">After-hours & overflow</h3>
+                  <p className="text-sm text-muted-foreground">
+                    37% of homeowner requests land after 5pm. RingSnap answers instantly so your brand delivers first—no waiting, no friction.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Lead-to-booked speed</h3>
+                  <p className="text-sm text-muted-foreground">
+                    73% of buyers hire the first contractor who responds. Our AI receptionist answers instantly and books straight inside ServiceTitan, Housecall Pro, or your CRM.
+                  </p>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Proactive nurturing</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Missed calls trigger immediate text follow-ups, two-way booking links, and reactivation cadences so price shoppers never fall through the cracks.
+                  </p>
+                </div>
+              </CardContent>
             </Card>
 
             <Card className="border border-slate-200 bg-white shadow-sm">
