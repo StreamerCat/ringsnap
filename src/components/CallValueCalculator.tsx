@@ -155,9 +155,7 @@ export const CallValueCalculator = () => {
     event.preventDefault();
     setFormState("submitted");
   };
-
-  const renderResultsCard = (className = "") => (
-    <Card className={`border border-slate-800 bg-slate-950 text-white shadow-xl ${className}`.trim()}>
+  const renderResultsCard = (className = "") => <Card className={`border border-slate-800 bg-slate-950 text-white shadow-xl ${className}`.trim()}>
       <CardHeader className="space-y-3">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/60">
           <AlertTriangle className="h-4 w-4" /> Recovered revenue snapshot
@@ -214,38 +212,23 @@ export const CallValueCalculator = () => {
             <Label htmlFor="roi-email" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
               Email my ROI teardown
             </Label>
-            <Input
-              id="roi-email"
-              type="email"
-              required
-              placeholder="you@company.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="h-11 rounded-lg border-slate-700 bg-slate-900 text-white placeholder:text-white/50 focus-visible:ring-primary"
-            />
+            <Input id="roi-email" type="email" required placeholder="you@company.com" value={email} onChange={event => setEmail(event.target.value)} className="h-11 rounded-lg border-slate-700 bg-slate-900 text-white placeholder:text-white/50 focus-visible:ring-primary" />
           </div>
           <Button type="submit" size="lg" className="w-full rounded-lg bg-primary text-white hover:bg-primary/90">
             Send me the ROI report <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
-          {formState === "submitted" ? (
-            <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary">
+          {formState === "submitted" ? <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary">
               <CheckCircle2 className="h-4 w-4" />
               We just sent the launch kit—check your inbox for scripts, cadences, and ROI math.
-            </div>
-          ) : (
-            <p className="text-xs text-white/60">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>
-          )}
+            </div> : <p className="text-xs text-white/60">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>}
         </form>
         <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
           <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
           <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-white/60">Bryan — Owner, Precision Plumbing</p>
         </div>
       </CardContent>
-    </Card>
-  );
-
-  return (
-    <section id="calculator" className="section-spacer bg-slate-50">
+    </Card>;
+  return <section id="calculator" className="section-spacer bg-slate-50">
       <div className="container mx-auto max-w-7xl px-4">
         <hr className="section-divider mb-10" />
 
@@ -259,9 +242,8 @@ export const CallValueCalculator = () => {
                 <h2 className="text-h2 leading-tight">
                   Turn every missed call into booked revenue with RingSnap.
                 </h2>
-                <p className="text-body-default text-muted-foreground">
-                  Homeowners still reach for the phone first—and 7 in 10 hire whoever responds immediately. Drop in your call volume to see how much revenue RingSnap recovers, then snag the launch kit we send top-performing crews.
-                </p>
+                <p className="text-body-default text-muted-foreground">Homeowners still reach for the phone first, and 7 in 10 hire whoever responds first.
+Drop in your call volume to see how much revenue RingSnap recovers.</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -283,28 +265,17 @@ export const CallValueCalculator = () => {
                 </Badge>
                 <span>Pick the preset that mirrors your job mix to preload benchmarks.</span>
               </div>
-              <ToggleGroup
-                type="single"
-                value={selectedPreset}
-                onValueChange={(value) => value && handlePresetClick(value as keyof typeof tradePresets)}
-                className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
-              >
-                {(Object.keys(tradePresets) as (keyof typeof tradePresets)[]).map((presetKey) => {
-                  const preset = tradePresets[presetKey];
-                  const defaults = preset.defaults;
-                  return (
-                    <ToggleGroupItem
-                      key={preset.label}
-                      value={presetKey}
-                      className="group flex h-auto flex-col items-start gap-1 rounded-2xl border border-slate-200 bg-white p-3 text-left data-[state=on]:border-primary data-[state=on]:bg-primary/5"
-                    >
+              <ToggleGroup type="single" value={selectedPreset} onValueChange={value => value && handlePresetClick(value as keyof typeof tradePresets)} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {(Object.keys(tradePresets) as (keyof typeof tradePresets)[]).map(presetKey => {
+                const preset = tradePresets[presetKey];
+                const defaults = preset.defaults;
+                return <ToggleGroupItem key={preset.label} value={presetKey} className="group flex h-auto flex-col items-start gap-1 rounded-2xl border border-slate-200 bg-white p-3 text-left data-[state=on]:border-primary data-[state=on]:bg-primary/5">
                       <span className="text-sm font-semibold text-slate-900">{preset.label}</span>
                       <span className="text-xs text-muted-foreground">
                         {numberFormatter.format(defaults.calls)} calls · {defaults.answerRate}% live answer
                       </span>
-                    </ToggleGroupItem>
-                  );
-                })}
+                    </ToggleGroupItem>;
+              })}
               </ToggleGroup>
               <p className="max-w-xl text-sm text-muted-foreground">{presetInsight}</p>
             </CardHeader>
@@ -336,71 +307,18 @@ export const CallValueCalculator = () => {
                   </ul>
                 </div>
 
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5">
-                  <p className="text-sm font-semibold text-slate-700">You’ll tweak just three numbers:</p>
-                  <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      Monthly inbound calls you already generate
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      The % you currently answer live (or guess)
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      Average revenue per booked job in that trade
-                    </li>
-                  </ul>
-                </div>
+                
 
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5">
-                  <p className="text-sm font-semibold text-slate-700">You’ll tweak just three numbers:</p>
-                  <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      Monthly inbound calls you already generate
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      The % you currently answer live (or guess)
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      Average revenue per booked job in that trade
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-5">
-                  <p className="text-sm font-semibold text-slate-700">You’ll tweak just three numbers:</p>
-                  <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      Monthly inbound calls you already generate
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      The % you currently answer live (or guess)
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
-                      Average revenue per booked job in that trade
-                    </li>
-                  </ul>
-                </div>
+                
 
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-                  <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex-col flex-auto gap-3.5 rounded-2xl border border-dashed border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:flex-1 ">
                     <div>
                       <div className="text-sm font-semibold text-slate-700">Using {tradePresets[selectedPreset].label} benchmarks</div>
                       <p className="text-xs text-muted-foreground">Dial in the math—every tweak updates the ROI story immediately.</p>
                     </div>
                     <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full justify-between gap-2 text-sm font-semibold text-slate-700 hover:bg-primary/10 sm:w-auto">
-                        {isAdvancedOpen ? "Hide adjustments" : "Adjust inputs"}
-                        {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
+                      
                     </CollapsibleTrigger>
                   </div>
                   <CollapsibleContent forceMount>
@@ -458,35 +376,12 @@ export const CallValueCalculator = () => {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="border border-slate-200 shadow-sm">
-              <CardContent className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-slate-700">After-hours & overflow</h3>
-                  <p className="text-sm text-muted-foreground">
-                    37% of homeowner requests land after 5pm. RingSnap answers instantly so your brand delivers first—no waiting, no friction.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-slate-700">Lead-to-booked speed</h3>
-                  <p className="text-sm text-muted-foreground">
-                    73% of buyers hire the first contractor who responds. Our AI receptionist answers instantly and books straight inside ServiceTitan, Housecall Pro, or your CRM.
-                  </p>
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <h3 className="text-sm font-semibold text-slate-700">Proactive nurturing</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Missed calls trigger immediate text follow-ups, two-way booking links, and reactivation cadences so price shoppers never fall through the cracks.
-                  </p>
-                </div>
-              </CardContent>
+              
             </Card>
 
-            <Card className="border border-slate-200 bg-white shadow-sm">
-              
-              
-            </Card>
+            
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
