@@ -4,39 +4,30 @@ import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, Dol
 import Vapi from "@vapi-ai/web";
 import { useEffect, useRef, useState } from "react";
 import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
-
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
   const vapiRef = useRef<Vapi | null>(null);
-
   useEffect(() => {
     // Initialize Vapi instance
     vapiRef.current = new Vapi("9159dfe3-b11f-457c-b41b-e296872027a0");
-    
+
     // Event listeners
     const handleCallStart = () => setIsCallActive(true);
     const handleCallEnd = () => setIsCallActive(false);
-    
     vapiRef.current.on("call-start", handleCallStart);
     vapiRef.current.on("call-end", handleCallEnd);
-    
     return () => {
       vapiRef.current?.stop();
     };
   }, []);
-
   const startCall = () => {
     vapiRef.current?.start("db066c6c-e2e3-424e-9fd1-1473f2ac3b01");
   };
-
   const endCall = () => {
     vapiRef.current?.stop();
   };
-
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-      {!isCallActive ? (
-        <div className="space-y-6 max-w-2xl mx-auto">
+  return <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+      {!isCallActive ? <div className="space-y-6 max-w-2xl mx-auto">
           {/* Headline - Benefit-Driven */}
           <div className="text-center space-y-3">
             <h3 className="text-3xl sm:text-4xl font-bold leading-tight text-[#2C3639]">
@@ -49,10 +40,7 @@ const VapiWidget = () => {
 
           {/* Enhanced Button with Visual Cue */}
           <div className="space-y-4">
-            <button
-              onClick={startCall}
-              className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group"
-            >
+            <button onClick={startCall} className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
@@ -101,18 +89,14 @@ const VapiWidget = () => {
                 </div>
                 <span className="text-[#2C3639] font-semibold">Join 5,000+ businesses</span>
                 <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                  {[...Array(5)].map((_, i) => <svg key={i} className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
+                    </svg>)}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
+        </div> : <div className="space-y-6">
           <div className="text-center">
             <div className="w-16 h-16 bg-[#D97757] rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
               <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -122,36 +106,32 @@ const VapiWidget = () => {
             <p className="text-xl font-semibold text-[#2C3639]">Call in Progress</p>
             <p className="text-sm text-muted-foreground mt-2">AI receptionist is listening...</p>
           </div>
-          <button
-            onClick={endCall}
-            className="bg-red-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-700 transition-colors shadow-lg"
-          >
+          <button onClick={endCall} className="bg-red-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-700 transition-colors shadow-lg">
             End Conversation
           </button>
-        </div>
-      )}
-    </div>
-  );
+        </div>}
+    </div>;
 };
-
 export const SolutionDemo = () => {
   const [showSignupForm, setShowSignupForm] = useState(false);
   const scrollToVapiDemo = () => {
-    document.getElementById('vapi-chat-container')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('vapi-chat-container')?.scrollIntoView({
+      behavior: 'smooth'
+    });
   };
-
-  return (
-    <section id="demo" className="section-spacer bg-background">
+  return <section id="demo" className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
           <h2 className="text-h2 mb-4 uppercase tracking-tight">
-            Hear How Your Customers <span style={{color: 'hsl(var(--primary))'}}>Will Be Greeted</span>
+            Hear How Your Customers <span style={{
+            color: 'hsl(var(--primary))'
+          }}>Will Be Greeted</span>
           </h2>
-          <p className="text-body-default max-w-3xl mx-auto">
-            Your 24/7 receptionist that never misses a call. Hear how it handles service questions, bookings, and emergencies—naturally and professionally.
-          </p>
+          <p className="text-body-default max-w-3xl mx-auto">Hear your new 24/7 receptionist in action. 
+Friendly, fast, and always on.
+It answers, qualifies, and books customers before your competitors ever pick up.</p>
         </div>
 
         {/* Pre-Demo Tip */}
@@ -164,11 +144,9 @@ export const SolutionDemo = () => {
 
         {/* Interactive Demo */}
         <div className="max-w-3xl mx-auto mb-16">
-          <div 
-            id="vapi-chat-container"
-            className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative"
-            style={{ borderColor: 'rgba(44, 54, 57, 0.2)' }}
-          >
+          <div id="vapi-chat-container" className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative" style={{
+          borderColor: 'rgba(44, 54, 57, 0.2)'
+        }}>
             <VapiWidget />
           </div>
         </div>
@@ -221,29 +199,15 @@ export const SolutionDemo = () => {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto mb-16">
-          <Button 
-            size="lg" 
-            variant="gradient" 
-            className="text-lg h-14 px-8 rounded-full"
-            onClick={() => setShowSignupForm(true)}
-          >
+          <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full" onClick={() => setShowSignupForm(true)}>
             Start Free Trial
           </Button>
-          <Button 
-            size="lg" 
-            variant="outline" 
-            className="text-lg h-14 px-8 rounded-full border-2 border-foreground/10 hover:border-foreground/30 transition-all"
-            onClick={scrollToVapiDemo}
-          >
+          <Button size="lg" variant="outline" className="text-lg h-14 px-8 rounded-full border-2 border-foreground/10 hover:border-foreground/30 transition-all" onClick={scrollToVapiDemo}>
             Hear How It Works
           </Button>
         </div>
 
-        <FreeTrialSignupForm 
-          open={showSignupForm} 
-          onOpenChange={setShowSignupForm}
-          source="solution-demo"
-        />
+        <FreeTrialSignupForm open={showSignupForm} onOpenChange={setShowSignupForm} source="solution-demo" />
 
         {/* Outcome Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -333,6 +297,5 @@ export const SolutionDemo = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
