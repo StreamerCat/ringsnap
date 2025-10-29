@@ -147,7 +147,7 @@ export const SolutionDemo = () => {
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
           <h2 className="text-h2 mb-4 uppercase tracking-tight">
-            Experience What Your Customers <span style={{color: 'hsl(var(--primary))'}}>Will Hear</span>
+            Hear How Your Customers <span style={{color: 'hsl(var(--primary))'}}>Will Be Greeted</span>
           </h2>
           <p className="text-body-default max-w-3xl mx-auto">
             Your 24/7 receptionist that never misses a call. Hear how it handles service questions, bookings, and emergencies—naturally and professionally.
