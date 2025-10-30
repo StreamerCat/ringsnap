@@ -1,7 +1,7 @@
-# API Proxy - must be first, before any other redirects
-/api/webhooks/stripe     https://TEMP.supabase.co/functions/v1/stripe-ingest     200
-/api/webhooks/vapi       https://TEMP.supabase.co/functions/v1/vapi-ingest       200
-/api/assistant/toggle    https://TEMP.supabase.co/functions/v1/assistant-toggle  200
-/api/billing/checkout    https://TEMP.supabase.co/functions/v1/billing-checkout  200
-/api/billing/portal      https://TEMP.supabase.co/functions/v1/billing-portal    200
-/api/provision           https://TEMP.supabase.co/functions/v1/provision         200
+# API Proxy
+/api/webhooks/stripe     https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/stripe-ingest     200
+/api/webhooks/vapi       https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/clever-api        200
+/api/assistant/toggle    https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/assistant-toggle  200
+/api/billing/checkout    https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/billing-checkout  200
+/api/billing/portal      https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/billing-portal    200
+/api/provision           https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/provision         200
