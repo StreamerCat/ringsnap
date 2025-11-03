@@ -4,4 +4,4 @@
 /api/assistant/toggle    https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/assistant-toggle  200
 /api/billing/checkout    https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/billing-checkout  200
 /api/billing/portal      https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/billing-portal    200
-/api/provision           https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/provision         200
+/api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu              200
