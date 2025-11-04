@@ -32,131 +32,77 @@ exports.handler = async (event) => {
     }
 
     const {
-      accountId,
       owner_name,
       owner_email,
       owner_phone,
       industry,
       company_name,
-      service_area,
-      business_hours,
-      emergency_policy
+      source,
+      wantsAdvancedVoice
     } = parsedBody;
 
-    const normalizedOwnerName = typeof owner_name === "string" ? owner_name.trim() : "";
-    const normalizedOwnerEmail = typeof owner_email === "string" ? owner_email.trim() : "";
-    const ownerPhoneValue =
+    const normalizedName = typeof owner_name === "string" ? owner_name.trim() : "";
+    const normalizedEmail = typeof owner_email === "string" ? owner_email.trim() : "";
+    const phoneValue =
       typeof owner_phone === "string" && owner_phone.trim() ? owner_phone.trim() : null;
-    const industryValue = typeof industry === "string" && industry.trim() ? industry.trim() : null;
-    const companyNameValue =
-      typeof company_name === "string" && company_name.trim() ? company_name.trim() : null;
-    const serviceAreaValue =
-      typeof service_area === "string" && service_area.trim() ? service_area.trim() : null;
-    const businessHoursValue =
-      typeof business_hours === "string" && business_hours.trim() ? business_hours.trim() : null;
-    const emergencyPolicyValue =
-      typeof emergency_policy === "string" && emergency_policy.trim() ? emergency_policy.trim() : null;
+    const tradeValue = typeof industry === "string" && industry.trim() ? industry.trim() : null;
+    const sourceValue = typeof source === "string" && source.trim() ? source.trim() : null;
+    const wantsAdvancedVoiceValue = typeof wantsAdvancedVoice === "boolean" ? wantsAdvancedVoice : false;
 
-    if (!normalizedOwnerName || !normalizedOwnerEmail || !isValidEmail(normalizedOwnerEmail)) {
+    if (!normalizedName || !normalizedEmail || !isValidEmail(normalizedEmail)) {
       return jsonResponse(400, { ok: false, error: "missing_fields" });
+    }
+
+    if (!phoneValue) {
+      console.error("Phone number is required but was not provided");
+      return jsonResponse(400, { ok: false, error: "missing_phone" });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const now = new Date();
-    const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    // Insert into trial_signups table
+    const insertPayload = {
+      name: normalizedName,
+      email: normalizedEmail,
+      phone: phoneValue,
+      trade: tradeValue,
+      source: sourceValue,
+      wants_advanced_voice: wantsAdvancedVoiceValue
+    };
 
-    let account_id = typeof accountId === "string" && accountId.trim() ? accountId.trim() : undefined;
+    console.log("Attempting to insert trial signup:", { ...insertPayload, email: normalizedEmail.substring(0, 3) + "***" });
 
-    if (!account_id) {
-      const { data, error } = await supabase
-        .from("accounts")
-        .insert([
-          {
-            owner_name: normalizedOwnerName,
-            owner_email: normalizedOwnerEmail,
-            owner_phone: ownerPhoneValue,
-            industry: industryValue,
-            company_name: companyNameValue,
-            service_area: serviceAreaValue,
-            business_hours: businessHoursValue,
-            emergency_policy: emergencyPolicyValue,
-            plan_status: "trial",
-            trial_minutes_used: 0,
-            trial_start_at: now.toISOString(),
-            trial_end_at: trialEnd.toISOString(),
-            onboarding_step: "created"
-          }
-        ])
-        .select("account_id")
-        .single();
+    const { data, error } = await supabase
+      .from("trial_signups")
+      .insert([insertPayload])
+      .select("id")
+      .single();
 
-      if (error || !data) {
-        console.error("Insert account error:", error);
-        return jsonResponse(500, { ok: false, error: "database_insert_failed" });
-      }
-
-      const resolvedAccountId = data.account_id || data.id;
-      account_id = typeof resolvedAccountId === "string" ? resolvedAccountId : String(resolvedAccountId);
-    } else {
-      const { error } = await supabase
-        .from("accounts")
-        .update({
-          owner_name: normalizedOwnerName,
-          owner_email: normalizedOwnerEmail,
-          owner_phone: ownerPhoneValue,
-          industry: industryValue,
-          company_name: companyNameValue,
-          service_area: serviceAreaValue,
-          business_hours: businessHoursValue,
-          emergency_policy: emergencyPolicyValue,
-          plan_status: "trial",
-          trial_minutes_used: 0,
-          trial_start_at: now.toISOString(),
-          trial_end_at: trialEnd.toISOString(),
-          onboarding_step: "created"
-        })
-        .eq("account_id", account_id);
-
-      if (error) {
-        console.error("Update account error:", error);
-        return jsonResponse(500, { ok: false, error: "database_update_failed" });
-      }
+    if (error || !data) {
+      console.error("Insert trial signup error:", JSON.stringify(error, null, 2));
+      return jsonResponse(500, {
+        ok: false,
+        error: "database_insert_failed",
+        details: error?.message || "Unknown error"
+      });
     }
 
-    const { error: userError } = await supabase
-      .from("users")
-      .upsert(
-        {
-          account_id: account_id,
-          name: normalizedOwnerName,
-          email: normalizedOwnerEmail,
-          phone: ownerPhoneValue,
-          role: "owner"
-        },
-        { onConflict: "email" }
-      );
+    const signupId = data.id;
 
-    if (userError) {
-      console.error("Upsert user error:", userError);
-      return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
-    }
-
+    // Send webhook if configured
     if (PROVISION_WEBHOOK_URL) {
       try {
         await fetch(PROVISION_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            accountId: account_id,
-            owner_name: normalizedOwnerName,
-            owner_email: normalizedOwnerEmail,
-            owner_phone: ownerPhoneValue,
-            industry: industryValue,
-            company_name: companyNameValue,
-            service_area: serviceAreaValue,
-            business_hours: businessHoursValue,
-            emergency_policy: emergencyPolicyValue
+            signupId: signupId,
+            name: normalizedName,
+            email: normalizedEmail,
+            phone: phoneValue,
+            trade: tradeValue,
+            company_name: company_name,
+            wants_advanced_voice: wantsAdvancedVoiceValue
           })
         });
       } catch (webhookError) {
@@ -164,7 +110,7 @@ exports.handler = async (event) => {
       }
     }
 
-    return jsonResponse(200, { ok: true, accountId: account_id });
+    return jsonResponse(200, { ok: true, signupId: signupId });
   } catch (e) {
     console.error("Unhandled error:", e);
     return jsonResponse(500, { ok: false, error: "internal_error" });

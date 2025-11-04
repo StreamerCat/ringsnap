@@ -109,9 +109,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
       owner_phone: trimmedPhone,
       industry: data.trade?.trim() ?? "",
       company_name: data.companyName?.trim() || companyDomain,
-      service_area: "",
-      business_hours: "",
-      emergency_policy: ""
+      wantsAdvancedVoice: data.wantsAdvancedVoice,
+      source: _source || "website"
     };
 
     try {
