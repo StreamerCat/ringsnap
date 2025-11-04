@@ -1,4 +1,4 @@
-const { createClient } = require("@supabase/supabase-js");
+import { createClient } from "@supabase/supabase-js";
 
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
@@ -8,7 +8,7 @@ const jsonResponse = (statusCode, payload) => ({
 
 const isValidEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") {
       return jsonResponse(405, { ok: false, error: "method_not_allowed" });

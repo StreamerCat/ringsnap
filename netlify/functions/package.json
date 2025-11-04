@@ -1,6 +1,7 @@
 {
   "name": "netlify-functions",
   "version": "1.0.0",
+  "type": "module",
   "description": "Netlify serverless functions",
   "main": "signup.js",
   "dependencies": {

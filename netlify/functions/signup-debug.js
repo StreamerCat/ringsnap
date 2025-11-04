@@ -1,4 +1,4 @@
-const { createClient } = require("@supabase/supabase-js");
+import { createClient } from "@supabase/supabase-js";
 
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
@@ -10,7 +10,7 @@ const jsonResponse = (statusCode, payload) => ({
   body: JSON.stringify(payload)
 });
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   console.log("=== SIGNUP FUNCTION STARTED ===");
   console.log("HTTP Method:", event.httpMethod);
   console.log("Headers:", JSON.stringify(event.headers, null, 2));
