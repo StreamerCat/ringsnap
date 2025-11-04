@@ -1,19 +1,58 @@
-const { createClient } = require("@supabase/supabase-js");
+import { createClient } from "@supabase/supabase-js";
 
-exports.handler = async (event) => {
+const jsonResponse = (statusCode, payload) => ({
+  statusCode,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload)
+});
+
+const isValidEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const isSchemaMismatchError = (error) => {
+  if (!error) return false;
+  const code = error.code || "";
+  const message = (error.message || "").toLowerCase();
+  return code === "42703" || code === "42P01" || message.includes("does not exist");
+};
+
+const isConflictError = (error) => {
+  if (!error) return false;
+  const code = error.code || "";
+  const message = (error.message || "").toLowerCase();
+  return code === "23505" || message.includes("duplicate key value") || message.includes("conflict");
+};
+
+const insertAccountRecord = async (supabase, payload, selectColumn) =>
+  supabase.from("accounts").insert([payload]).select(selectColumn).single();
+
+const updateAccountRecord = async (supabase, payload, column, accountId) =>
+  supabase.from("accounts").update(payload).eq(column, accountId);
+
+export const handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
+      return jsonResponse(405, { ok: false, error: "method_not_allowed" });
     }
 
-    // Parse form or JSON
+    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PROVISION_WEBHOOK_URL } = process.env;
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Missing Supabase environment configuration");
+      return jsonResponse(500, { ok: false, error: "config_error" });
+    }
+
     const isJson = (event.headers["content-type"] || "").includes("application/json");
-    const body = isJson
-      ? JSON.parse(event.body || "{}")
-      : Object.fromEntries(new URLSearchParams(event.body || ""));
+    let parsedBody = {};
+    try {
+      parsedBody = isJson
+        ? JSON.parse(event.body || "{}")
+        : Object.fromEntries(new URLSearchParams(event.body || ""));
+    } catch (parseError) {
+      console.error("Body parse error", parseError);
+      return jsonResponse(400, { ok: false, error: "invalid_body" });
+    }
 
     const {
-      accountId,                 // optional; if not sent, we will create one
+      accountId,
       owner_name,
       owner_email,
       owner_phone,
@@ -22,111 +61,223 @@ exports.handler = async (event) => {
       service_area,
       business_hours,
       emergency_policy
-    } = body;
+    } = parsedBody;
 
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const normalizedOwnerName = typeof owner_name === "string" ? owner_name.trim() : "";
+    const normalizedOwnerEmail = typeof owner_email === "string" ? owner_email.trim() : "";
+    const ownerPhoneValue =
+      typeof owner_phone === "string" && owner_phone.trim() ? owner_phone.trim() : null;
+    const industryValue = typeof industry === "string" && industry.trim() ? industry.trim() : null;
+    const companyNameValue =
+      typeof company_name === "string" && company_name.trim() ? company_name.trim() : null;
+    const serviceAreaValue =
+      typeof service_area === "string" && service_area.trim() ? service_area.trim() : null;
+    const businessHoursValue =
+      typeof business_hours === "string" && business_hours.trim() ? business_hours.trim() : null;
+    const emergencyPolicyValue =
+      typeof emergency_policy === "string" && emergency_policy.trim() ? emergency_policy.trim() : null;
 
-    // Create or update the account row
-    let account_id = accountId;
+    if (!normalizedOwnerName || !normalizedOwnerEmail || !isValidEmail(normalizedOwnerEmail)) {
+      return jsonResponse(400, { ok: false, error: "missing_fields" });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+    const trimmedAccountId =
+      typeof accountId === "string" && accountId.trim() ? accountId.trim() : undefined;
+
+    const normalizedCompanyName =
+      companyNameValue ||
+      (normalizedOwnerEmail.includes("@")
+        ? normalizedOwnerEmail.split("@")[1] || normalizedOwnerName
+        : normalizedOwnerName);
+    const companyDomain =
+      normalizedOwnerEmail.includes("@")
+        ? normalizedOwnerEmail.split("@")[1]?.toLowerCase() || null
+        : null;
+
+    let account_id = trimmedAccountId;
+
     if (!account_id) {
-      const { data, error } = await supabase
-        .from("accounts")
-        .insert([{
-          owner_name,
-          owner_email,
-          owner_phone,
-          industry,
-          company_name,
-          service_area,
-          business_hours,
-          emergency_policy,
-          plan_status: "trial",
-          trial_minutes_used: 0,
-          trial_start_at: new Date().toISOString(),
-          trial_end_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          onboarding_step: "created"
-        }])
-        .select("account_id")
-        .single();
+      const specInsertPayload = {
+        owner_name: normalizedOwnerName,
+        owner_email: normalizedOwnerEmail,
+        owner_phone: ownerPhoneValue,
+        industry: industryValue,
+        company_name: normalizedCompanyName,
+        service_area: serviceAreaValue,
+        business_hours: businessHoursValue,
+        emergency_policy: emergencyPolicyValue,
+        plan_status: "trial",
+        trial_minutes_used: 0,
+        trial_start_at: now.toISOString(),
+        trial_end_at: trialEnd.toISOString(),
+        onboarding_step: "created"
+      };
 
-      if (error) {
-        console.error("Insert account error:", error);
-        return { statusCode: 500, body: "Database insert failed" };
+      let insertResult = await insertAccountRecord(supabase, specInsertPayload, "account_id");
+
+      if (insertResult.error && isSchemaMismatchError(insertResult.error)) {
+        const fallbackPayload = {
+          company_name: normalizedCompanyName,
+          company_domain: companyDomain,
+          trade: industryValue,
+          wants_advanced_voice: null,
+          subscription_status: "trial",
+          trial_start_date: now.toISOString(),
+          trial_end_date: trialEnd.toISOString()
+        };
+
+        insertResult = await insertAccountRecord(supabase, fallbackPayload, "id");
       }
-      account_id = data.account_id;
-    } else {
-      const { error } = await supabase
-        .from("accounts")
-        .update({
-          owner_name,
-          owner_email,
-          owner_phone,
-          industry,
-          company_name,
-          service_area,
-          business_hours,
-          emergency_policy,
-          plan_status: "trial",
-          trial_minutes_used: 0,
-          trial_start_at: new Date().toISOString(),
-          trial_end_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          onboarding_step: "created"
-        })
-        .eq("account_id", account_id);
 
-      if (error) {
-        console.error("Update account error:", error);
-        return { statusCode: 500, body: "Database update failed" };
+      if (insertResult.error || !insertResult.data) {
+        console.error("Insert account error:", insertResult.error);
+        return jsonResponse(500, { ok: false, error: "database_insert_failed" });
+      }
+
+      const resolvedAccountId = insertResult.data.account_id || insertResult.data.id;
+      account_id = typeof resolvedAccountId === "string" ? resolvedAccountId : String(resolvedAccountId);
+    } else {
+      const specUpdatePayload = {
+        owner_name: normalizedOwnerName,
+        owner_email: normalizedOwnerEmail,
+        owner_phone: ownerPhoneValue,
+        industry: industryValue,
+        company_name: normalizedCompanyName,
+        service_area: serviceAreaValue,
+        business_hours: businessHoursValue,
+        emergency_policy: emergencyPolicyValue,
+        plan_status: "trial",
+        trial_minutes_used: 0,
+        trial_start_at: now.toISOString(),
+        trial_end_at: trialEnd.toISOString(),
+        onboarding_step: "created"
+      };
+
+      let updateResult = await updateAccountRecord(
+        supabase,
+        specUpdatePayload,
+        "account_id",
+        account_id
+      );
+
+      if (updateResult.error && isSchemaMismatchError(updateResult.error)) {
+        const fallbackPayload = {
+          company_name: normalizedCompanyName,
+          company_domain: companyDomain,
+          trade: industryValue,
+          subscription_status: "trial",
+          trial_start_date: now.toISOString(),
+          trial_end_date: trialEnd.toISOString(),
+          wants_advanced_voice: null
+        };
+
+        updateResult = await updateAccountRecord(supabase, fallbackPayload, "id", account_id);
+      }
+
+      if (updateResult.error) {
+        console.error("Update account error:", updateResult.error);
+        return jsonResponse(500, { ok: false, error: "database_update_failed" });
       }
     }
 
-    // Ensure an owner user exists (safe to attempt every time)
-    await supabase
-      .from("users")
-      .insert([{
-        account_id,
-        name: owner_name,
-        email: owner_email,
-        phone: owner_phone,
-        role: "owner"
-      }])
-      .select()
-      .single()
-      .catch(() => ({}));
+    account_id = typeof account_id === "string" ? account_id : String(account_id);
 
-    // Optional: kick off provisioning (Stripe customer + Vapi assistant)
-    if (process.env.PROVISION_WEBHOOK_URL) {
+    const ownerUserPayload = {
+      account_id: account_id,
+      name: normalizedOwnerName,
+      email: normalizedOwnerEmail,
+      phone: ownerPhoneValue,
+      role: "owner"
+    };
+
+    const ensureTrialSignup = async () => {
+      const trialSignupPayload = {
+        name: normalizedOwnerName,
+        email: normalizedOwnerEmail,
+        phone: ownerPhoneValue || "",
+        trade: industryValue,
+        wants_advanced_voice: null,
+        source: "website"
+      };
+
+      const { error: trialSignupError } = await supabase
+        .from("trial_signups")
+        .upsert(trialSignupPayload, { onConflict: "email" });
+
+      if (trialSignupError) {
+        if (isSchemaMismatchError(trialSignupError)) {
+          console.warn("Trial signup fallback table unavailable:", trialSignupError);
+          return;
+        }
+
+        console.error("Trial signup upsert error:", trialSignupError);
+        throw new Error("trial_signup_failed");
+      }
+    };
+
+    const insertUserResult = await supabase.from("users").insert([ownerUserPayload]);
+
+    if (insertUserResult.error) {
+      if (isSchemaMismatchError(insertUserResult.error)) {
+        try {
+          await ensureTrialSignup();
+        } catch (fallbackError) {
+          return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
+        }
+      } else if (isConflictError(insertUserResult.error)) {
+        const { error: updateUserError } = await supabase
+          .from("users")
+          .update(ownerUserPayload)
+          .eq("email", normalizedOwnerEmail);
+
+        if (updateUserError) {
+          if (isSchemaMismatchError(updateUserError)) {
+            try {
+              await ensureTrialSignup();
+            } catch (fallbackError) {
+              return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
+            }
+          } else {
+            console.error("Update user error:", updateUserError);
+            return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
+          }
+        }
+      } else {
+        console.error("Insert user error:", insertUserResult.error);
+        return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
+      }
+    }
+
+    if (PROVISION_WEBHOOK_URL) {
       try {
-        await fetch(process.env.PROVISION_WEBHOOK_URL, {
+        await fetch(PROVISION_WEBHOOK_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             accountId: account_id,
-            owner_name,
-            owner_email,
-            owner_phone,
-            industry,
-            company_name,
-            service_area,
-            business_hours,
-            emergency_policy
+            owner_name: normalizedOwnerName,
+            owner_email: normalizedOwnerEmail,
+            owner_phone: ownerPhoneValue,
+            industry: industryValue,
+            company_name: normalizedCompanyName,
+            service_area: serviceAreaValue,
+            business_hours: businessHoursValue,
+            emergency_policy: emergencyPolicyValue
           })
         });
-      } catch (e) {
-        console.warn("Provision webhook failed (continuing):", e);
+      } catch (webhookError) {
+        console.warn("Provision webhook failed (continuing):", webhookError);
       }
     }
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ok: true, accountId: account_id })
-    };
+    return jsonResponse(200, { ok: true, accountId: account_id });
   } catch (e) {
     console.error("Unhandled error:", e);
-    return { statusCode: 500, body: "Internal error" };
+    return jsonResponse(500, { ok: false, error: "internal_error" });
   }
 };
