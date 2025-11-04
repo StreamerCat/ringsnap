@@ -1,7 +1,11 @@
 const { createClient } = require("@supabase/supabase-js");
 
-exports.handler = async (event) => {
   try {
+    // Handle CORS preflight
+    if (event.httpMethod === "OPTIONS") {
+      return jsonResponse(200, { ok: true });
+    }
+
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Method Not Allowed" };
     }
