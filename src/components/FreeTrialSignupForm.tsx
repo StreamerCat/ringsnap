@@ -114,18 +114,29 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
     };
 
     try {
+      console.log("Submitting signup with payload:", { ...payload, owner_email: payload.owner_email.substring(0, 3) + "***" });
+
       const response = await fetch("/.netlify/functions/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
+      console.log("Response status:", response.status, response.statusText);
+
       const result = await response
         .json()
-        .catch(() => null);
+        .catch((e) => {
+          console.error("Failed to parse JSON response:", e);
+          return null;
+        });
+
+      console.log("Response data:", result);
 
       if (!response.ok || !result?.ok) {
-        throw new Error("request_failed");
+        const errorDetails = result?.details || result?.error || "Unknown error";
+        console.error("Signup failed:", errorDetails);
+        throw new Error(errorDetails);
       }
 
       form.reset();
@@ -133,10 +144,11 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
       onOpenChange(false);
       navigate("/app");
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Signup submission failed", error);
-      }
-      setErrorMessage("Could not start your trial. Please try again.");
+      console.error("Signup submission failed:", error);
+      const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";
+      setErrorMessage(errorMsg.includes("database_insert_failed")
+        ? "There was a database error. Please contact support."
+        : "Could not start your trial. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -172,8 +184,6 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
 
         <Form {...form}>
           <form
-            action="/.netlify/functions/signup"
-            method="POST"
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-4 mt-4"
             aria-live="polite"
