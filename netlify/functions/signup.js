@@ -44,36 +44,47 @@ exports.handler = async (event) => {
     const normalizedName = typeof owner_name === "string" ? owner_name.trim() : "";
     const normalizedEmail = typeof owner_email === "string" ? owner_email.trim() : "";
     const phoneValue =
-      typeof owner_phone === "string" && owner_phone.trim() ? owner_phone.trim() : "";
+      typeof owner_phone === "string" && owner_phone.trim() ? owner_phone.trim() : null;
     const tradeValue = typeof industry === "string" && industry.trim() ? industry.trim() : null;
     const sourceValue = typeof source === "string" && source.trim() ? source.trim() : null;
     const wantsAdvancedVoiceValue = typeof wantsAdvancedVoice === "boolean" ? wantsAdvancedVoice : false;
 
-    if (!normalizedName || !normalizedEmail || !isValidEmail(normalizedEmail) || !phoneValue) {
+    if (!normalizedName || !normalizedEmail || !isValidEmail(normalizedEmail)) {
       return jsonResponse(400, { ok: false, error: "missing_fields" });
+    }
+
+    if (!phoneValue) {
+      console.error("Phone number is required but was not provided");
+      return jsonResponse(400, { ok: false, error: "missing_phone" });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Insert into trial_signups table
+    const insertPayload = {
+      name: normalizedName,
+      email: normalizedEmail,
+      phone: phoneValue,
+      trade: tradeValue,
+      source: sourceValue,
+      wants_advanced_voice: wantsAdvancedVoiceValue
+    };
+
+    console.log("Attempting to insert trial signup:", { ...insertPayload, email: normalizedEmail.substring(0, 3) + "***" });
+
     const { data, error } = await supabase
       .from("trial_signups")
-      .insert([
-        {
-          name: normalizedName,
-          email: normalizedEmail,
-          phone: phoneValue,
-          trade: tradeValue,
-          source: sourceValue,
-          wants_advanced_voice: wantsAdvancedVoiceValue
-        }
-      ])
+      .insert([insertPayload])
       .select("id")
       .single();
 
     if (error || !data) {
-      console.error("Insert trial signup error:", error);
-      return jsonResponse(500, { ok: false, error: "database_insert_failed" });
+      console.error("Insert trial signup error:", JSON.stringify(error, null, 2));
+      return jsonResponse(500, {
+        ok: false,
+        error: "database_insert_failed",
+        details: error?.message || "Unknown error"
+      });
     }
 
     const signupId = data.id;
