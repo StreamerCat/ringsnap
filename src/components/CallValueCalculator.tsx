@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { DollarSign, TrendingUp, AlertTriangle, PhoneCall, ArrowRight, Sparkles, ShieldCheck, Clock3, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, PhoneCall, ArrowRight, Sparkles, ShieldCheck, Clock3, CheckCircle2, ChevronDown, ChevronUp, Download } from "lucide-react";
 type CalculatorState = {
   calls: number;
   answerRate: number;
@@ -78,7 +78,18 @@ const tradePresets = {
   defaults: CalculatorState;
   insight: string;
 }>;
-export const CallValueCalculator = () => {
+
+interface CallValueCalculatorProps {
+  showPdfDownload?: boolean;
+  companyName?: string;
+  onPdfDownload?: (metrics: any) => void;
+}
+
+export const CallValueCalculator = ({
+  showPdfDownload = false,
+  companyName = "",
+  onPdfDownload
+}: CallValueCalculatorProps = {}) => {
   const [selectedPreset, setSelectedPreset] = useState<keyof typeof tradePresets>("plumbing");
   const [email, setEmail] = useState("");
   const [formState, setFormState] = useState<"idle" | "submitted">("idle");
@@ -207,6 +218,16 @@ export const CallValueCalculator = () => {
             <span>CSRs reclaim time for VIP customers instead of chasing voicemails.</span>
           </li>
         </ul>
+        {showPdfDownload && companyName && (
+          <Button
+            onClick={() => onPdfDownload?.(metrics)}
+            size="lg"
+            className="w-full rounded-lg bg-white text-slate-900 hover:bg-slate-100 border-2 border-slate-700 mb-4"
+          >
+            <Download className="mr-2 h-5 w-5" />
+            Download ROI Report PDF
+          </Button>
+        )}
         <form className="space-y-4" onSubmit={handleFormSubmit}>
           <div className="space-y-2">
             <Label htmlFor="roi-email" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
