@@ -152,7 +152,10 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
       setExistingCompany(existingAccount?.company_name || null);
       setShowConfirmation(true);
     } catch (error: any) {
-      console.error("Signup error:", error);
+      // Only log in development to prevent information leakage
+      if (import.meta.env.DEV) {
+        console.error("Signup error:", error);
+      }
       toast.error(error.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);

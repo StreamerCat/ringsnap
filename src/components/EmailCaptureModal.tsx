@@ -67,7 +67,10 @@ export const EmailCaptureModal = ({ open, onOpenChange, calculatorData }: EmailC
       reset();
       onOpenChange(false);
     } catch (error) {
-      console.error("Form submission error:", error);
+      // Only log in development to prevent information leakage
+      if (import.meta.env.DEV) {
+        console.error("Form submission error:", error);
+      }
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
