@@ -67,18 +67,35 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     };
 
     try {
-      const response = await fetch("/.netlify/functions/signup", {
+      console.log("Submitting signup with payload:", { ...payload, owner_email: payload.owner_email.substring(0, 3) + "***" });
+
+      // Using debug endpoint for better error messages
+      const response = await fetch("/.netlify/functions/signup-debug", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
+      console.log("Response status:", response.status, response.statusText);
+
       const result = await response
         .json()
-        .catch(() => null);
+        .catch((e) => {
+          console.error("Failed to parse JSON response:", e);
+          return null;
+        });
+
+      console.log("Response data:", result);
 
       if (!response.ok || !result?.ok) {
-        throw new Error("request_failed");
+        const errorDetails = result?.details || result?.error || "Unknown error";
+        const errorCode = result?.code || "";
+        const errorHint = result?.hint || "";
+        console.error("Signup failed:", { error: errorDetails, code: errorCode, hint: errorHint });
+
+        // Show detailed error to user
+        setErrorMessage(`Error: ${errorDetails}${errorCode ? ` (${errorCode})` : ''}${errorHint ? ` - ${errorHint}` : ''}`);
+        return;
       }
 
       form.reset();
@@ -86,10 +103,9 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       onOpenChange(false);
       navigate("/app");
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Signup submission failed", error);
-      }
-      setErrorMessage("Could not start your trial. Please try again.");
+      console.error("Signup submission failed:", error);
+      const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -125,8 +141,6 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
 
         <Form {...form}>
           <form
-            action="/.netlify/functions/signup"
-            method="POST"
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-4 mt-4"
             aria-live="polite"
