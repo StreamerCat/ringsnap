@@ -1,48 +1,64 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Loader2, Phone, Settings, TestTube } from "lucide-react";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
+
+type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
+type UserWithAccount = UserRow & { accounts?: AccountRow | null };
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
-  const [account, setAccount] = useState<any>(null);
+  const [userRecord, setUserRecord] = useState<UserWithAccount | null>(null);
+  const [account, setAccount] = useState<AccountRow | null>(null);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         navigate("/");
         return;
       }
 
-      // Fetch user profile and account data
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*, accounts(*)")
-        .eq("id", user.id)
-        .single();
+      if (!user.email) {
+        navigate("/");
+        return;
+      }
 
-      if (profileData) {
-        setProfile(profileData);
-        setAccount(profileData.accounts);
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("*, accounts:account_id(*)")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (userError) {
+        console.error("Error fetching user record:", userError);
+        toast.error("Failed to load account information");
+        return;
+      }
+
+      if (userData) {
+        const typedData = userData as UserWithAccount;
+        setUserRecord(typedData);
+        setAccount(typedData.accounts ?? null);
       }
     } catch (error) {
-      console.error("Error loading profile:", error);
+      console.error("Error loading account:", error);
       toast.error("Failed to load account information");
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -57,8 +73,8 @@ export default function Onboarding() {
     );
   }
 
-  const trialDaysRemaining = account?.trial_end_date 
-    ? Math.ceil((new Date(account.trial_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const trialDaysRemaining = account?.trial_end_at
+    ? Math.ceil((new Date(account.trial_end_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 3;
 
   return (
@@ -69,11 +85,13 @@ export default function Onboarding() {
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
             <Check className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-4xl font-bold">Welcome to RingSnap{profile?.is_primary ? "" : `, ${profile?.name}!`}</h1>
+          <h1 className="text-4xl font-bold">
+            Welcome to RingSnap{userRecord?.name ? `, ${userRecord.name}!` : ""}
+          </h1>
           <p className="text-xl text-muted-foreground">
-            {profile?.is_primary 
-              ? `Your account is being set up for ${account?.company_name}`
-              : `You've joined ${account?.company_name}'s account`
+            {account?.owner_name
+              ? `Your account is being set up for ${account.owner_name}`
+              : "Your account is being prepared."
             }
           </p>
           <div className="inline-block bg-primary/10 text-primary px-4 py-2 rounded-full font-semibold">
@@ -93,7 +111,7 @@ export default function Onboarding() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Your dedicated number will be sent to {profile?.email} within the next few minutes.
+                Your dedicated number will be sent to {userRecord?.email || account?.owner_email} within the next few minutes.
               </p>
             </CardContent>
           </Card>
@@ -137,28 +155,40 @@ export default function Onboarding() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="font-semibold text-muted-foreground">Company</p>
-                <p className="text-lg">{account?.company_name}</p>
+                <p className="font-semibold text-muted-foreground">Account Owner</p>
+                <p className="text-lg">{account?.owner_name || "Not specified"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Trade</p>
-                <p className="text-lg">{account?.trade || "Not specified"}</p>
+                <p className="text-lg">{account?.industry || "Not specified"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Name</p>
-                <p className="text-lg">{profile?.name}</p>
+                <p className="text-lg">{userRecord?.name || account?.owner_name}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Phone</p>
-                <p className="text-lg">{profile?.phone}</p>
+                <p className="text-lg">{userRecord?.phone || account?.owner_phone || "Not provided"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Email</p>
-                <p className="text-lg">{profile?.id}</p>
+                <p className="text-lg">{userRecord?.email || account?.owner_email || "Not provided"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Role</p>
-                <p className="text-lg capitalize">{profile?.is_primary ? "Owner" : "User"}</p>
+                <p className="text-lg capitalize">{userRecord?.role || "owner"}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground">Trial Status</p>
+                <p className="text-lg capitalize">{account?.plan_status || "trial"}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground">Trial Ends</p>
+                <p className="text-lg">
+                  {account?.trial_end_at
+                    ? new Date(account.trial_end_at).toLocaleString()
+                    : "Pending"}
+                </p>
               </div>
             </div>
           </CardContent>
