@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  useEffect(() => {
-    checkIfAlreadyLoggedIn();
-  }, []);
-
-  const checkIfAlreadyLoggedIn = async () => {
+  const checkIfAlreadyLoggedIn = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -29,7 +25,11 @@ export default function Login() {
     } finally {
       setIsCheckingAuth(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    checkIfAlreadyLoggedIn();
+  }, [checkIfAlreadyLoggedIn]);
 
   const handlePasswordlessLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,9 +47,10 @@ export default function Login() {
 
       toast.success("Check your email for the login link!");
       setEmail("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login error:", error);
-      toast.error(error.message || "Failed to send login link");
+      const message = error instanceof Error ? error.message : "Failed to send login link";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
