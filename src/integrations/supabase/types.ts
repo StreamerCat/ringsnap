@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          company_domain: string | null
+          company_name: string
+          created_at: string | null
+          id: string
+          subscription_status:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          trade: string | null
+          trial_end_date: string | null
+          trial_start_date: string | null
+          updated_at: string | null
+          wants_advanced_voice: boolean | null
+        }
+        Insert: {
+          company_domain?: string | null
+          company_name: string
+          created_at?: string | null
+          id?: string
+          subscription_status?:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          trade?: string | null
+          trial_end_date?: string | null
+          trial_start_date?: string | null
+          updated_at?: string | null
+          wants_advanced_voice?: boolean | null
+        }
+        Update: {
+          company_domain?: string | null
+          company_name?: string
+          created_at?: string | null
+          id?: string
+          subscription_status?:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          trade?: string | null
+          trial_end_date?: string | null
+          trial_start_date?: string | null
+          updated_at?: string | null
+          wants_advanced_voice?: boolean | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          account_id: string
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          name: string
+          phone: string
+          source: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string | null
+          id: string
+          is_primary?: boolean | null
+          name: string
+          phone: string
+          source?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          name?: string
+          phone?: string
+          source?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       revenue_report_leads: {
         Row: {
           business: string
@@ -92,15 +178,43 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      extract_email_domain: { Args: { email: string }; Returns: string }
+      get_user_account_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_generic_email_domain: { Args: { domain: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "owner" | "admin" | "user"
+      subscription_status: "trial" | "active" | "cancelled" | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -227,6 +341,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["owner", "admin", "user"],
+      subscription_status: ["trial", "active", "cancelled", "expired"],
+    },
   },
 } as const
