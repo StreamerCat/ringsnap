@@ -5,6 +5,23 @@ const { createClient } = require("@supabase/supabase-js");
     if (event.httpMethod === "OPTIONS") {
       return jsonResponse(200, { ok: true });
     }
+  }
+
+  if (!response.ok) {
+    const error = new Error(`Supabase request failed with status ${response.status}`);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
+
+  return data;
+};
+
+const resolveCompanyName = (email, providedCompany) => {
+  const normalizedCompany = normalizeString(providedCompany);
+  if (normalizedCompany) {
+    return normalizedCompany;
+  }
 
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Method Not Allowed" };

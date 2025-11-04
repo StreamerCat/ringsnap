@@ -150,7 +150,6 @@ const Index = () => {
           content="AI answering service, contractor receptionist, human-sounding AI, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, AI voice agent, warm AI assistant" 
         />
         <link rel="canonical" href="https://aivoiceagent.com/" />
-        <link rel="preload" as="image" href="https://aivoiceagent.com/hero-transcript.webp" />
         
         {/* Open Graph */}
         <meta property="og:title" content="RingSnap: AI that Answers Like a Human" />
