@@ -8,27 +8,7 @@ const jsonResponse = (statusCode, payload) => ({
 
 const isValidEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-const isSchemaMismatchError = (error) => {
-  if (!error) return false;
-  const code = error.code || "";
-  const message = (error.message || "").toLowerCase();
-  return code === "42703" || code === "42P01" || message.includes("does not exist");
-};
-
-const isConflictError = (error) => {
-  if (!error) return false;
-  const code = error.code || "";
-  const message = (error.message || "").toLowerCase();
-  return code === "23505" || message.includes("duplicate key value") || message.includes("conflict");
-};
-
-const insertAccountRecord = async (supabase, payload, selectColumn) =>
-  supabase.from("accounts").insert([payload]).select(selectColumn).single();
-
-const updateAccountRecord = async (supabase, payload, column, accountId) =>
-  supabase.from("accounts").update(payload).eq(column, accountId);
-
-export const handler = async (event) => {
+exports.handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") {
       return jsonResponse(405, { ok: false, error: "method_not_allowed" });
@@ -86,52 +66,34 @@ export const handler = async (event) => {
     const now = new Date();
     const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-    const trimmedAccountId =
-      typeof accountId === "string" && accountId.trim() ? accountId.trim() : undefined;
-
-    const normalizedCompanyName =
-      companyNameValue ||
-      (normalizedOwnerEmail.includes("@")
-        ? normalizedOwnerEmail.split("@")[1] || normalizedOwnerName
-        : normalizedOwnerName);
-    const companyDomain =
-      normalizedOwnerEmail.includes("@")
-        ? normalizedOwnerEmail.split("@")[1]?.toLowerCase() || null
-        : null;
-
-    let account_id = trimmedAccountId;
+    let account_id = typeof accountId === "string" && accountId.trim() ? accountId.trim() : undefined;
 
     if (!account_id) {
-      const specInsertPayload = {
-        owner_name: normalizedOwnerName,
-        owner_email: normalizedOwnerEmail,
-        owner_phone: ownerPhoneValue,
-        industry: industryValue,
-        company_name: normalizedCompanyName,
-        service_area: serviceAreaValue,
-        business_hours: businessHoursValue,
-        emergency_policy: emergencyPolicyValue,
-        plan_status: "trial",
-        trial_minutes_used: 0,
-        trial_start_at: now.toISOString(),
-        trial_end_at: trialEnd.toISOString(),
-        onboarding_step: "created"
-      };
+      const { data, error } = await supabase
+        .from("accounts")
+        .insert([
+          {
+            owner_name: normalizedOwnerName,
+            owner_email: normalizedOwnerEmail,
+            owner_phone: ownerPhoneValue,
+            industry: industryValue,
+            company_name: companyNameValue,
+            service_area: serviceAreaValue,
+            business_hours: businessHoursValue,
+            emergency_policy: emergencyPolicyValue,
+            plan_status: "trial",
+            trial_minutes_used: 0,
+            trial_start_at: now.toISOString(),
+            trial_end_at: trialEnd.toISOString(),
+            onboarding_step: "created"
+          }
+        ])
+        .select("account_id")
+        .single();
 
-      let insertResult = await insertAccountRecord(supabase, specInsertPayload, "account_id");
-
-      if (insertResult.error && isSchemaMismatchError(insertResult.error)) {
-        const fallbackPayload = {
-          company_name: normalizedCompanyName,
-          company_domain: companyDomain,
-          trade: industryValue,
-          wants_advanced_voice: null,
-          subscription_status: "trial",
-          trial_start_date: now.toISOString(),
-          trial_end_date: trialEnd.toISOString()
-        };
-
-        insertResult = await insertAccountRecord(supabase, fallbackPayload, "id");
+      if (error) {
+        console.error("Insert account error:", error);
+        return jsonResponse(500, { ok: false, error: "database_insert_failed" });
       }
 
       if (insertResult.error || !insertResult.data) {
@@ -142,115 +104,47 @@ export const handler = async (event) => {
       const resolvedAccountId = insertResult.data.account_id || insertResult.data.id;
       account_id = typeof resolvedAccountId === "string" ? resolvedAccountId : String(resolvedAccountId);
     } else {
-      const specUpdatePayload = {
-        owner_name: normalizedOwnerName,
-        owner_email: normalizedOwnerEmail,
-        owner_phone: ownerPhoneValue,
-        industry: industryValue,
-        company_name: normalizedCompanyName,
-        service_area: serviceAreaValue,
-        business_hours: businessHoursValue,
-        emergency_policy: emergencyPolicyValue,
-        plan_status: "trial",
-        trial_minutes_used: 0,
-        trial_start_at: now.toISOString(),
-        trial_end_at: trialEnd.toISOString(),
-        onboarding_step: "created"
-      };
+      const { error } = await supabase
+        .from("accounts")
+        .update({
+          owner_name: normalizedOwnerName,
+          owner_email: normalizedOwnerEmail,
+          owner_phone: ownerPhoneValue,
+          industry: industryValue,
+          company_name: companyNameValue,
+          service_area: serviceAreaValue,
+          business_hours: businessHoursValue,
+          emergency_policy: emergencyPolicyValue,
+          plan_status: "trial",
+          trial_minutes_used: 0,
+          trial_start_at: now.toISOString(),
+          trial_end_at: trialEnd.toISOString(),
+          onboarding_step: "created"
+        })
+        .eq("account_id", account_id);
 
-      let updateResult = await updateAccountRecord(
-        supabase,
-        specUpdatePayload,
-        "account_id",
-        account_id
-      );
-
-      if (updateResult.error && isSchemaMismatchError(updateResult.error)) {
-        const fallbackPayload = {
-          company_name: normalizedCompanyName,
-          company_domain: companyDomain,
-          trade: industryValue,
-          subscription_status: "trial",
-          trial_start_date: now.toISOString(),
-          trial_end_date: trialEnd.toISOString(),
-          wants_advanced_voice: null
-        };
-
-        updateResult = await updateAccountRecord(supabase, fallbackPayload, "id", account_id);
-      }
-
-      if (updateResult.error) {
-        console.error("Update account error:", updateResult.error);
+      if (error) {
+        console.error("Update account error:", error);
         return jsonResponse(500, { ok: false, error: "database_update_failed" });
       }
     }
 
-    account_id = typeof account_id === "string" ? account_id : String(account_id);
+    const { error: userError } = await supabase
+      .from("users")
+      .upsert(
+        {
+          account_id: account_id,
+          name: normalizedOwnerName,
+          email: normalizedOwnerEmail,
+          phone: ownerPhoneValue,
+          role: "owner"
+        },
+        { onConflict: "email" }
+      );
 
-    const ownerUserPayload = {
-      account_id: account_id,
-      name: normalizedOwnerName,
-      email: normalizedOwnerEmail,
-      phone: ownerPhoneValue,
-      role: "owner"
-    };
-
-    const ensureTrialSignup = async () => {
-      const trialSignupPayload = {
-        name: normalizedOwnerName,
-        email: normalizedOwnerEmail,
-        phone: ownerPhoneValue || "",
-        trade: industryValue,
-        wants_advanced_voice: null,
-        source: "website"
-      };
-
-      const { error: trialSignupError } = await supabase
-        .from("trial_signups")
-        .upsert(trialSignupPayload, { onConflict: "email" });
-
-      if (trialSignupError) {
-        if (isSchemaMismatchError(trialSignupError)) {
-          console.warn("Trial signup fallback table unavailable:", trialSignupError);
-          return;
-        }
-
-        console.error("Trial signup upsert error:", trialSignupError);
-        throw new Error("trial_signup_failed");
-      }
-    };
-
-    const insertUserResult = await supabase.from("users").insert([ownerUserPayload]);
-
-    if (insertUserResult.error) {
-      if (isSchemaMismatchError(insertUserResult.error)) {
-        try {
-          await ensureTrialSignup();
-        } catch (fallbackError) {
-          return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
-        }
-      } else if (isConflictError(insertUserResult.error)) {
-        const { error: updateUserError } = await supabase
-          .from("users")
-          .update(ownerUserPayload)
-          .eq("email", normalizedOwnerEmail);
-
-        if (updateUserError) {
-          if (isSchemaMismatchError(updateUserError)) {
-            try {
-              await ensureTrialSignup();
-            } catch (fallbackError) {
-              return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
-            }
-          } else {
-            console.error("Update user error:", updateUserError);
-            return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
-          }
-        }
-      } else {
-        console.error("Insert user error:", insertUserResult.error);
-        return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
-      }
+    if (userError) {
+      console.error("Upsert user error:", userError);
+      return jsonResponse(500, { ok: false, error: "user_upsert_failed" });
     }
 
     if (PROVISION_WEBHOOK_URL) {
@@ -264,7 +158,7 @@ export const handler = async (event) => {
             owner_email: normalizedOwnerEmail,
             owner_phone: ownerPhoneValue,
             industry: industryValue,
-            company_name: normalizedCompanyName,
+            company_name: companyNameValue,
             service_area: serviceAreaValue,
             business_hours: businessHoursValue,
             emergency_policy: emergencyPolicyValue
