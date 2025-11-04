@@ -71,3 +71,11 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Testing checklist
+
+1. Fill the signup form with test data.
+2. Expect a 200 response containing `{ ok: true, accountId }` from `/.netlify/functions/signup`.
+3. Confirm the browser redirects to `/app` after submission.
+4. Verify in Supabase that the `accounts` and `users` tables include the new trial records with the expected fields.
+5. Ensure Lovable's native database does not contain a duplicate record for the submission.
