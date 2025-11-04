@@ -26,7 +26,20 @@ const formSchema = z.object({
     .min(10, "Please enter a valid phone number")
     .max(20, "Phone number is too long"),
   trade: z.string().optional(),
+  companyName: z.string().optional(),
   wantsAdvancedVoice: z.boolean().default(false),
+}).refine((data) => {
+  const email = data.email;
+  if (!email) return true;
+  const domain = email.split('@')[1]?.toLowerCase();
+  const genericDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com'];
+  if (genericDomains.includes(domain) && !data.companyName) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Company name is required for personal email addresses",
+  path: ["companyName"],
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -40,6 +53,13 @@ interface FreeTrialSignupFormProps {
 export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSignupFormProps) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingCompany, setExistingCompany] = useState<string | null>(null);
+
+  const isGenericEmail = (email: string) => {
+    const domain = email.split('@')[1]?.toLowerCase();
+    const genericDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com'];
+    return genericDomains.includes(domain);
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -48,6 +68,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
       email: "",
       phone: "",
       trade: "",
+      companyName: "",
       wantsAdvancedVoice: false,
     },
   });
@@ -56,49 +77,83 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
     setIsSubmitting(true);
 
     try {
-      // Parallel submissions to Lovable Cloud and Formspree
-      const [supabaseResult, formspreeResult] = await Promise.allSettled([
-        // Lovable Cloud submission
+      // Generate secure random password
+      const generateSecurePassword = () => {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(36)).join('').slice(0, 32);
+      };
+
+      const domain = data.email.split('@')[1]?.toLowerCase();
+      const isGeneric = isGenericEmail(data.email);
+
+      // Check if account exists for this domain/company
+      let existingAccount = null;
+      if (isGeneric && data.companyName) {
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('id, company_name')
+          .eq('company_name', data.companyName)
+          .is('company_domain', null)
+          .maybeSingle();
+        existingAccount = account;
+      } else if (!isGeneric) {
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('id, company_name')
+          .eq('company_domain', domain)
+          .maybeSingle();
+        existingAccount = account;
+      }
+
+      // Create authenticated user with Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: generateSecurePassword(),
+        options: {
+          data: {
+            name: data.name,
+            phone: data.phone,
+            trade: data.trade || null,
+            company_name: data.companyName || domain,
+            wants_advanced_voice: data.wantsAdvancedVoice,
+            source: source || 'website',
+          },
+          emailRedirectTo: `${window.location.origin}/onboarding`,
+        }
+      });
+
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          throw new Error('This email is already registered. Try logging in instead.');
+        }
+        throw signUpError;
+      }
+
+      // Parallel backup submissions
+      await Promise.allSettled([
+        // Submit to Formspree as backup
+        fetch("https://formspree.io/f/xanyepky", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        }),
+        // Also log to trial_signups as audit trail
         supabase.from("trial_signups").insert({
           name: data.name,
           email: data.email,
           phone: data.phone,
           trade: data.trade || null,
           wants_advanced_voice: data.wantsAdvancedVoice,
-          source: source || "unknown",
-        }),
-        // Formspree submission
-        fetch("https://formspree.io/f/xanyepky", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            trade: data.trade || null,
-            wantsAdvancedVoice: data.wantsAdvancedVoice,
-            source: source || "unknown",
-          }),
+          source: source || "website",
         }),
       ]);
 
-      // Check for errors
-      if (supabaseResult.status === "rejected") {
-        console.error("Lovable Cloud error:", supabaseResult.reason);
-      }
-      if (formspreeResult.status === "rejected") {
-        console.error("Formspree error:", formspreeResult.reason);
-      }
-
-      // Show success if at least one succeeded
-      if (supabaseResult.status === "fulfilled" || formspreeResult.status === "fulfilled") {
-        setShowConfirmation(true);
-      } else {
-        throw new Error("Both submissions failed");
-      }
-    } catch (error) {
-      console.error("Form submission error:", error);
-      toast.error("Something went wrong. Please try again or email us directly.");
+      setExistingCompany(existingAccount?.company_name || null);
+      setShowConfirmation(true);
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      toast.error(error.message || "Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -108,6 +163,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
     if (!isSubmitting) {
       form.reset();
       setShowConfirmation(false);
+      setExistingCompany(null);
       onOpenChange(false);
     }
   };
@@ -214,11 +270,40 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
+              <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => {
+                  const email = form.watch("email");
+                  const showCompanyField = email && isGenericEmail(email);
+                  
+                  return (
+                    <FormItem className={showCompanyField ? "" : "hidden"}>
+                      <FormLabel>
+                        Company Name {showCompanyField && <span className="text-destructive">*</span>}
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder={showCompanyField ? "e.g., Smith Plumbing LLC" : ""}
+                          {...field} 
+                        />
+                      </FormControl>
+                      {showCompanyField && (
+                        <p className="text-sm text-muted-foreground">
+                          Required for personal email addresses
+                        </p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              <FormField
                   control={form.control}
                   name="wantsAdvancedVoice"
                   render={({ field }) => (
@@ -262,10 +347,13 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
                 <CheckCircle className="w-8 h-8 text-primary" />
               </div>
               <h3 className="text-2xl font-bold" style={{color: 'hsl(var(--charcoal))'}}>
-                Check Your Inbox!
+                {existingCompany ? `Welcome to ${existingCompany}!` : 'Check Your Inbox!'}
               </h3>
               <p className="text-muted-foreground">
-                We've sent setup instructions to <span className="font-semibold text-charcoal">{form.getValues("email")}</span>
+                {existingCompany 
+                  ? `We've sent you an email to join ${existingCompany}'s existing account. Click the link to activate your access.`
+                  : <>We've sent setup instructions to <span className="font-semibold text-charcoal">{form.getValues("email")}</span>. Click the link to activate your account and start your 3-day trial.</>
+                }
               </p>
             </div>
 
