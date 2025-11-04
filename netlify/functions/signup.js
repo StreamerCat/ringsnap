@@ -1,118 +1,211 @@
-import { createClient } from "@supabase/supabase-js";
-
 const jsonResponse = (statusCode, payload) => ({
   statusCode,
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(payload)
 });
 
-const isValidEmail = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const parseBody = (event) => {
+  const contentType = (event.headers?.["content-type"] || event.headers?.["Content-Type"] || "")
+    .toLowerCase();
 
-exports.handler = async (event) => {
+  if (contentType.includes("application/json")) {
+    return JSON.parse(event.body || "{}");
+  }
+
+  return Object.fromEntries(new URLSearchParams(event.body || ""));
+};
+
+const normalizeString = (value) => (typeof value === "string" ? value.trim() : "");
+
+const buildSupabaseUrl = (baseUrl, path) => {
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  return `${normalizedBase}rest/v1/${path}`;
+};
+
+const createSupabaseRequest = (supabaseUrl, supabaseServiceRoleKey) => async (path, init = {}) => {
+  if (typeof fetch !== "function") {
+    throw new Error("Fetch API is unavailable in this environment");
+  }
+
+  const url = buildSupabaseUrl(supabaseUrl, path);
+  const headers = {
+    apikey: supabaseServiceRoleKey,
+    Authorization: `Bearer ${supabaseServiceRoleKey}`,
+    ...init.headers,
+    "Content-Type": init.headers?.["Content-Type"] || init.headers?.["content-type"] || "application/json"
+  };
+
+  const response = await fetch(url, { ...init, headers });
+  const text = await response.text();
+  let data = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      data = text;
+    }
+  }
+
+  if (!response.ok) {
+    const error = new Error(`Supabase request failed with status ${response.status}`);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
+
+  return data;
+};
+
+const resolveCompanyName = (email, providedCompany) => {
+  const normalizedCompany = normalizeString(providedCompany);
+  if (normalizedCompany) {
+    return normalizedCompany;
+  }
+
+  const domain = normalizeString(email).split("@")[1];
+  if (!domain) {
+    return "";
+  }
+
+  const label = domain.split(".")[0];
+  return label ? label.replace(/[-_]/g, " ").replace(/\s+/g, " ") : "";
+};
+
+export const handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") {
-      return jsonResponse(405, { ok: false, error: "method_not_allowed" });
+      return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PROVISION_WEBHOOK_URL } = process.env;
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("Missing Supabase environment configuration");
-      return jsonResponse(500, { ok: false, error: "config_error" });
-    }
-
-    const isJson = (event.headers["content-type"] || "").includes("application/json");
-    let parsedBody = {};
+    let body;
     try {
-      parsedBody = isJson
-        ? JSON.parse(event.body || "{}")
-        : Object.fromEntries(new URLSearchParams(event.body || ""));
+      body = parseBody(event);
     } catch (parseError) {
-      console.error("Body parse error", parseError);
-      return jsonResponse(400, { ok: false, error: "invalid_body" });
+      console.error("Failed to parse signup payload", parseError);
+      return jsonResponse(400, { ok: false, error: "invalid_payload" });
     }
 
-    const {
-      owner_name,
-      owner_email,
-      owner_phone,
-      industry,
-      company_name,
-      source,
-      wantsAdvancedVoice
-    } = parsedBody;
+    const name = normalizeString(body?.name);
+    const email = normalizeString(body?.email);
+    const phone = normalizeString(body?.phone);
+    const trade = normalizeString(body?.trade);
+    const companyName = resolveCompanyName(email, body?.companyName);
+    const wantsAdvancedVoice = Boolean(body?.wantsAdvancedVoice);
 
-    const normalizedName = typeof owner_name === "string" ? owner_name.trim() : "";
-    const normalizedEmail = typeof owner_email === "string" ? owner_email.trim() : "";
-    const phoneValue =
-      typeof owner_phone === "string" && owner_phone.trim() ? owner_phone.trim() : null;
-    const tradeValue = typeof industry === "string" && industry.trim() ? industry.trim() : null;
-    const sourceValue = typeof source === "string" && source.trim() ? source.trim() : null;
-    const wantsAdvancedVoiceValue = typeof wantsAdvancedVoice === "boolean" ? wantsAdvancedVoice : false;
-
-    if (!normalizedName || !normalizedEmail || !isValidEmail(normalizedEmail)) {
+    if (!name || !email) {
       return jsonResponse(400, { ok: false, error: "missing_fields" });
     }
 
-    if (!phoneValue) {
-      console.error("Phone number is required but was not provided");
-      return jsonResponse(400, { ok: false, error: "missing_phone" });
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      console.error("Missing Supabase service credentials");
+      return jsonResponse(500, { ok: false, error: "configuration_error" });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabaseRequest = createSupabaseRequest(supabaseUrl, supabaseServiceRoleKey);
 
-    // Insert into trial_signups table
-    const insertPayload = {
-      name: normalizedName,
-      email: normalizedEmail,
-      phone: phoneValue,
-      trade: tradeValue,
-      source: sourceValue,
-      wants_advanced_voice: wantsAdvancedVoiceValue
-    };
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-    console.log("Attempting to insert trial signup:", { ...insertPayload, email: normalizedEmail.substring(0, 3) + "***" });
+    let accountId;
 
-    const { data, error } = await supabase
-      .from("trial_signups")
-      .insert([insertPayload])
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      console.error("Insert trial signup error:", JSON.stringify(error, null, 2));
-      return jsonResponse(500, {
-        ok: false,
-        error: "database_insert_failed",
-        details: error?.message || "Unknown error"
+    try {
+      const accountInsertResult = await supabaseRequest("accounts", {
+        method: "POST",
+        body: JSON.stringify([
+          {
+            owner_name: name,
+            owner_email: email,
+            owner_phone: phone || null,
+            industry: trade || null,
+            plan_status: "trial",
+            trial_minutes_used: 0,
+            trial_start_at: now.toISOString(),
+            trial_end_at: trialEnd.toISOString(),
+            onboarding_step: "created"
+          }
+        ]),
+        headers: {
+          Prefer: "return=representation"
+        }
       });
+
+      accountId = accountInsertResult?.[0]?.account_id || accountInsertResult?.[0]?.id;
+    } catch (accountError) {
+      console.error("Insert account error", accountError);
+      return jsonResponse(500, { ok: false, error: "database_insert_failed" });
     }
 
-    const signupId = data.id;
+    if (!accountId) {
+      console.error("Account insert did not return an account_id");
+      return jsonResponse(500, { ok: false, error: "database_insert_failed" });
+    }
 
-    // Send webhook if configured
-    if (PROVISION_WEBHOOK_URL) {
-      try {
-        await fetch(PROVISION_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            signupId: signupId,
-            name: normalizedName,
-            email: normalizedEmail,
-            phone: phoneValue,
-            trade: tradeValue,
-            company_name: company_name,
-            wants_advanced_voice: wantsAdvancedVoiceValue
-          })
-        });
-      } catch (webhookError) {
-        console.warn("Provision webhook failed (continuing):", webhookError);
+    try {
+      await supabaseRequest("users", {
+        method: "POST",
+        body: JSON.stringify([
+          {
+            account_id: accountId,
+            name,
+            email,
+            phone: phone || null,
+            role: "owner"
+          }
+        ]),
+        headers: {
+          Prefer: "resolution=ignore-duplicates"
+        }
+      });
+    } catch (userError) {
+      console.warn("Unable to insert owner user", userError);
+    }
+
+    if (process.env.PROVISION_WEBHOOK_URL && typeof fetch === "function") {
+      let controller = null;
+      let timeout = null;
+
+      if (typeof AbortController === "function") {
+        controller = new AbortController();
+        timeout = setTimeout(() => {
+          try {
+            controller.abort();
+          } catch (abortError) {
+            console.warn("Failed to abort provisioning webhook", abortError);
+          }
+        }, 5000);
       }
+
+      fetch(process.env.PROVISION_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId,
+          owner_name: name,
+          owner_email: email,
+          owner_phone: phone || null,
+          industry: trade || null,
+          company_name: companyName || null,
+          wantsAdvancedVoice
+        }),
+        signal: controller?.signal
+      })
+        .catch((webhookError) => {
+          console.warn("Provisioning webhook failed", webhookError);
+        })
+        .finally(() => {
+          if (timeout) {
+            clearTimeout(timeout);
+          }
+        });
     }
 
-    return jsonResponse(200, { ok: true, signupId: signupId });
-  } catch (e) {
-    console.error("Unhandled error:", e);
+    return jsonResponse(200, { ok: true, accountId });
+  } catch (error) {
+    console.error("Unhandled error in signup function", error);
     return jsonResponse(500, { ok: false, error: "internal_error" });
   }
 };

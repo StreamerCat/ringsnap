@@ -30,28 +30,6 @@ const formSchema = z
     trade: z.string().optional(),
     companyName: z.string().optional(),
     wantsAdvancedVoice: z.boolean().default(false)
-  })
-  .refine((data) => {
-    const email = data.email;
-    if (!email) return true;
-    const domain = email.split("@")[1]?.toLowerCase();
-    const genericDomains = [
-      "gmail.com",
-      "yahoo.com",
-      "hotmail.com",
-      "outlook.com",
-      "icloud.com",
-      "aol.com",
-      "protonmail.com",
-      "mail.com"
-    ];
-    if (genericDomains.includes(domain) && !data.companyName) {
-      return false;
-    }
-    return true;
-  }, {
-    message: "Company name is required for personal email addresses",
-    path: ["companyName"]
   });
 
 type FormData = z.infer<typeof formSchema>;
@@ -59,10 +37,9 @@ type FormData = z.infer<typeof formSchema>;
 interface FreeTrialSignupFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  source?: string;
 }
 
-export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: FreeTrialSignupFormProps) => {
+export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormProps) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -79,7 +56,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
       "protonmail.com",
       "mail.com"
     ];
-    return genericDomains.includes(domain);
+    return !!domain && genericDomains.includes(domain);
   };
 
   const form = useForm<FormData>({
@@ -104,13 +81,12 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
     const companyDomain = trimmedEmail.split("@")[1]?.toLowerCase() ?? "";
 
     const payload = {
-      owner_name: trimmedName,
-      owner_email: trimmedEmail,
-      owner_phone: trimmedPhone,
-      industry: data.trade?.trim() ?? "",
-      company_name: data.companyName?.trim() || companyDomain,
-      wantsAdvancedVoice: data.wantsAdvancedVoice,
-      source: _source || "website"
+      name: trimmedName,
+      email: trimmedEmail,
+      phone: trimmedPhone,
+      trade: data.trade?.trim() ?? "",
+      companyName: data.companyName?.trim() || companyDomain,
+      wantsAdvancedVoice: data.wantsAdvancedVoice ?? false
     };
 
     try {

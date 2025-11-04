@@ -177,7 +177,7 @@ export const SolutionDemo = () => {
             </span>
           </h2>
           <p className="text-body-default max-w-3xl mx-auto">
-            Hear your new 24/7 receptionist in action.  Friendly, fast, and always on. It answers, qualifies, and books
+            Hear your new 24/7 receptionist in action. Friendly, fast, and always on. It answers, qualifies, and books
             customers before your competitors ever pick up.
           </p>
         </div>
