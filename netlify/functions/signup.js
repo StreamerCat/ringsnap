@@ -91,3 +91,5 @@ const { createClient } = require("@supabase/supabase-js");
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: "internal_error" }) };
   }
 };
+
+export default handler;
