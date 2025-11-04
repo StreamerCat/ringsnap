@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,39 +9,50 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, Mail, Clock, Sparkles, Shield, Zap } from "lucide-react";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
-const formSchema = z.object({
-  name: z.string()
-    .trim()
-    .min(1, "Name is required")
-    .max(100, "Name must be less than 100 characters"),
-  email: z.string()
-    .trim()
-    .email("Please enter a valid email")
-    .max(255, "Email must be less than 255 characters"),
-  phone: z.string()
-    .trim()
-    .min(10, "Please enter a valid phone number")
-    .max(20, "Phone number is too long"),
-  trade: z.string().optional(),
-  companyName: z.string().optional(),
-  wantsAdvancedVoice: z.boolean().default(false),
-}).refine((data) => {
-  const email = data.email;
-  if (!email) return true;
-  const domain = email.split('@')[1]?.toLowerCase();
-  const genericDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com'];
-  if (genericDomains.includes(domain) && !data.companyName) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Company name is required for personal email addresses",
-  path: ["companyName"],
-});
+const formSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Name is required")
+      .max(100, "Name must be less than 100 characters"),
+    email: z
+      .string()
+      .trim()
+      .email("Please enter a valid email")
+      .max(255, "Email must be less than 255 characters"),
+    phone: z
+      .string()
+      .trim()
+      .min(10, "Please enter a valid phone number")
+      .max(20, "Phone number is too long"),
+    trade: z.string().optional(),
+    companyName: z.string().optional(),
+    wantsAdvancedVoice: z.boolean().default(false)
+  })
+  .refine((data) => {
+    const email = data.email;
+    if (!email) return true;
+    const domain = email.split("@")[1]?.toLowerCase();
+    const genericDomains = [
+      "gmail.com",
+      "yahoo.com",
+      "hotmail.com",
+      "outlook.com",
+      "icloud.com",
+      "aol.com",
+      "protonmail.com",
+      "mail.com"
+    ];
+    if (genericDomains.includes(domain) && !data.companyName) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Company name is required for personal email addresses",
+    path: ["companyName"]
+  });
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -50,14 +62,23 @@ interface FreeTrialSignupFormProps {
   source?: string;
 }
 
-export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSignupFormProps) => {
-  const [showConfirmation, setShowConfirmation] = useState(false);
+export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: FreeTrialSignupFormProps) => {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [existingCompany, setExistingCompany] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isGenericEmail = (email: string) => {
-    const domain = email.split('@')[1]?.toLowerCase();
-    const genericDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com'];
+    const domain = email.split("@")[1]?.toLowerCase();
+    const genericDomains = [
+      "gmail.com",
+      "yahoo.com",
+      "hotmail.com",
+      "outlook.com",
+      "icloud.com",
+      "aol.com",
+      "protonmail.com",
+      "mail.com"
+    ];
     return genericDomains.includes(domain);
   };
 
@@ -69,382 +90,249 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source }: FreeTrialSig
       phone: "",
       trade: "",
       companyName: "",
-      wantsAdvancedVoice: false,
-    },
+      wantsAdvancedVoice: false
+    }
   });
 
   const onSubmit = async (data: FormData) => {
+    setErrorMessage(null);
     setIsSubmitting(true);
 
+    const trimmedName = data.name.trim();
+    const trimmedEmail = data.email.trim();
+    const trimmedPhone = data.phone.trim();
+    const companyDomain = trimmedEmail.split("@")[1]?.toLowerCase() ?? "";
+
+    const payload = {
+      owner_name: trimmedName,
+      owner_email: trimmedEmail,
+      owner_phone: trimmedPhone,
+      industry: data.trade?.trim() ?? "",
+      company_name: data.companyName?.trim() || companyDomain,
+      service_area: "",
+      business_hours: "",
+      emergency_policy: ""
+    };
+
     try {
-      // Generate secure random password
-      const generateSecurePassword = () => {
-        const array = new Uint8Array(32);
-        crypto.getRandomValues(array);
-        return Array.from(array, byte => byte.toString(36)).join('').slice(0, 32);
-      };
-
-      const domain = data.email.split('@')[1]?.toLowerCase();
-      const isGeneric = isGenericEmail(data.email);
-
-      // Check if account exists for this domain/company
-      let existingAccount = null;
-      if (isGeneric && data.companyName) {
-        const { data: account } = await supabase
-          .from('accounts')
-          .select('id, company_name')
-          .eq('company_name', data.companyName)
-          .is('company_domain', null)
-          .maybeSingle();
-        existingAccount = account;
-      } else if (!isGeneric) {
-        const { data: account } = await supabase
-          .from('accounts')
-          .select('id, company_name')
-          .eq('company_domain', domain)
-          .maybeSingle();
-        existingAccount = account;
-      }
-
-      // Create authenticated user with Supabase Auth
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email: data.email,
-        password: generateSecurePassword(),
-        options: {
-          data: {
-            name: data.name,
-            phone: data.phone,
-            trade: data.trade || null,
-            company_name: data.companyName || domain,
-            wants_advanced_voice: data.wantsAdvancedVoice,
-            source: source || 'website',
-          },
-          emailRedirectTo: `${window.location.origin}/onboarding`,
-        }
+      const response = await fetch("/.netlify/functions/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
 
-      if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
-          throw new Error('This email is already registered. Try logging in instead.');
-        }
-        throw signUpError;
+      const result = await response
+        .json()
+        .catch(() => null);
+
+      if (!response.ok || !result?.ok) {
+        throw new Error("request_failed");
       }
 
-      // Parallel backup submissions
-      await Promise.allSettled([
-        // Submit to Formspree as backup
-        fetch("https://formspree.io/f/xanyepky", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        }),
-        // Also log to trial_signups as audit trail
-        supabase.from("trial_signups").insert({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          trade: data.trade || null,
-          wants_advanced_voice: data.wantsAdvancedVoice,
-          source: source || "website",
-        }),
-      ]);
-
-      setExistingCompany(existingAccount?.company_name || null);
-      setShowConfirmation(true);
-    } catch (error: any) {
-      // Only log in development to prevent information leakage
+      form.reset();
+      setErrorMessage(null);
+      onOpenChange(false);
+      navigate("/app");
+    } catch (error) {
       if (import.meta.env.DEV) {
-        console.error("Signup error:", error);
+        console.error("Signup submission failed", error);
       }
-      toast.error(error.message || "Something went wrong. Please try again.");
+      setErrorMessage("Could not start your trial. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    if (!isSubmitting) {
-      form.reset();
-      setShowConfirmation(false);
-      setExistingCompany(null);
-      onOpenChange(false);
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isSubmitting) {
+      return;
     }
+
+    if (!nextOpen) {
+      form.reset();
+      setErrorMessage(null);
+    }
+
+    onOpenChange(nextOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        {!showConfirmation ? (
-          <>
-            <DialogHeader>
-              <DialogTitle className="text-2xl sm:text-3xl font-bold text-center" style={{color: 'hsl(var(--charcoal))'}}>
-                Start Taking Every Call in 10 Minutes
-              </DialogTitle>
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                150 minutes free • Cancel anytime
-              </p>
-            </DialogHeader>
+        <DialogHeader>
+          <DialogTitle
+            className="text-2xl sm:text-3xl font-bold text-center"
+            style={{ color: "hsl(var(--charcoal))" }}
+          >
+            Start Taking Every Call in 10 Minutes
+          </DialogTitle>
+          <p className="text-center text-sm text-muted-foreground pt-2">
+            150 minutes free • Cancel anytime
+          </p>
+        </DialogHeader>
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4" aria-live="polite">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="John Smith" 
-                          {...field}
-                          aria-required="true"
-                          className="px-3 sm:px-4"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-xs flex items-start gap-1" />
-                    </FormItem>
-                  )}
-                />
+        <Form {...form}>
+          <form
+            action="/.netlify/functions/signup"
+            method="POST"
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-4 mt-4"
+            aria-live="polite"
+          >
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="John Smith"
+                      {...field}
+                      aria-required="true"
+                      className="px-3 sm:px-4"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
 
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="email" 
-                          placeholder="john@smithplumbing.com" 
-                          {...field}
-                          aria-required="true"
-                          className="px-3 sm:px-4"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-xs flex items-start gap-1" />
-                    </FormItem>
-                  )}
-                />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="john@smithplumbing.com"
+                      {...field}
+                      aria-required="true"
+                      className="px-3 sm:px-4"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
 
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="tel" 
-                          placeholder="(555) 123-4567" 
-                          {...field}
-                          aria-required="true"
-                          className="px-3 sm:px-4"
-                        />
-                      </FormControl>
-                      <FormMessage className="text-xs flex items-start gap-1" />
-                    </FormItem>
-                  )}
-                />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      {...field}
+                      aria-required="true"
+                      className="px-3 sm:px-4"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
 
-                <FormField
-                  control={form.control}
-                  name="trade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Trade</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your trade" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="hvac">HVAC</SelectItem>
-                          <SelectItem value="plumbing">Plumbing</SelectItem>
-                          <SelectItem value="electrician">Electrician</SelectItem>
-                          <SelectItem value="landscaping">Landscaping</SelectItem>
-                          <SelectItem value="general_contractor">General Contractor</SelectItem>
-                          <SelectItem value="roofing">Roofing</SelectItem>
-                          <SelectItem value="pest_control">Pest Control</SelectItem>
-                          <SelectItem value="garage_door">Garage Door Repair</SelectItem>
-                          <SelectItem value="carpentry">Carpentry</SelectItem>
-                          <SelectItem value="painting">Painting</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
+            <FormField
+              control={form.control}
+              name="trade"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Trade</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your trade" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="hvac">HVAC</SelectItem>
+                      <SelectItem value="plumbing">Plumbing</SelectItem>
+                      <SelectItem value="electrician">Electrician</SelectItem>
+                      <SelectItem value="landscaping">Landscaping</SelectItem>
+                      <SelectItem value="general_contractor">General Contractor</SelectItem>
+                      <SelectItem value="roofing">Roofing</SelectItem>
+                      <SelectItem value="pest_control">Pest Control</SelectItem>
+                      <SelectItem value="garage_door">Garage Door Repair</SelectItem>
+                      <SelectItem value="carpentry">Carpentry</SelectItem>
+                      <SelectItem value="painting">Painting</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="companyName"
+              render={({ field }) => {
+                const email = form.watch("email");
+                const showCompanyField = email && isGenericEmail(email);
+
+                return (
+                  <FormItem className={showCompanyField ? "" : "hidden"}>
+                    <FormLabel>
+                      Company Name {showCompanyField && <span className="text-destructive">*</span>}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={showCompanyField ? "e.g., Smith Plumbing LLC" : ""}
+                        {...field}
+                      />
+                    </FormControl>
+                    {showCompanyField && (
+                      <p className="text-sm text-muted-foreground">Required for personal email addresses</p>
+                    )}
+                    <FormMessage />
                   </FormItem>
-                )}
-              />
+                );
+              }}
+            />
 
-              <FormField
-                control={form.control}
-                name="companyName"
-                render={({ field }) => {
-                  const email = form.watch("email");
-                  const showCompanyField = email && isGenericEmail(email);
-                  
-                  return (
-                    <FormItem className={showCompanyField ? "" : "hidden"}>
-                      <FormLabel>
-                        Company Name {showCompanyField && <span className="text-destructive">*</span>}
-                      </FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder={showCompanyField ? "e.g., Smith Plumbing LLC" : ""}
-                          {...field} 
-                        />
-                      </FormControl>
-                      {showCompanyField && (
-                        <p className="text-sm text-muted-foreground">
-                          Required for personal email addresses
-                        </p>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-
-              <FormField
-                  control={form.control}
-                  name="wantsAdvancedVoice"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel className="text-sm font-medium">
-                          Clone Your Own Voice (Premium Feature) - FREE When You Sign Up Today!
-                        </FormLabel>
-                        <p className="text-xs text-muted-foreground">
-                          Normally $99/month. Lock in your free voice clone now.
-                        </p>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 text-base font-semibold rounded-full bg-primary text-white hover:opacity-90"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Starting Your Trial..." : "Start Free Trial"}
-                </Button>
-
-                <p className="text-xs text-center text-muted-foreground">
-                  By continuing, you agree to our Terms of Service and Privacy Policy
-                </p>
-              </form>
-            </Form>
-          </>
-        ) : (
-          <div className="space-y-6 py-4">
-            <div className="text-center space-y-3">
-              <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-2xl font-bold" style={{color: 'hsl(var(--charcoal))'}}>
-                {existingCompany ? `Welcome to ${existingCompany}!` : 'Check Your Inbox!'}
-              </h3>
-              <p className="text-muted-foreground">
-                {existingCompany 
-                  ? `We've sent you an email to join ${existingCompany}'s existing account. Click the link to activate your access.`
-                  : <>We've sent setup instructions to <span className="font-semibold text-charcoal">{form.getValues("email")}</span>. Click the link to activate your account and start your 3-day trial.</>
-                }
-              </p>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-primary/10 border border-primary/20">
-              <Mail className="w-5 h-5 text-primary flex-shrink-0" />
-              <p className="text-sm font-medium" style={{color: 'hsl(var(--charcoal))'}}>
-                <span className="font-bold">Check your inbox now</span> — Setup link expires in 24 hours
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-semibold text-center" style={{color: 'hsl(var(--charcoal))'}}>
-                What happens next?
-              </h4>
-
-              <div className="space-y-3">
-                <div className="flex gap-3 items-start p-3 rounded-lg bg-muted/50">
-                  <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    1
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-sm mb-1" style={{color: 'hsl(var(--charcoal))'}}>
-                      Check Your Email (2 minutes)
-                    </h5>
+            <FormField
+              control={form.control}
+              name="wantsAdvancedVoice"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-sm font-medium">
+                      Clone Your Own Voice (Premium Feature) - FREE When You Sign Up Today!
+                    </FormLabel>
                     <p className="text-xs text-muted-foreground">
-                      Look for "Your RingSnap Account is Ready"<br />
-                      Contains: Login credentials + automatic setup link
+                      Normally $99/month. Lock in your free voice clone now.
                     </p>
                   </div>
-                  <Clock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                </div>
+                </FormItem>
+              )}
+            />
 
-                <div className="flex gap-3 items-start p-3 rounded-lg bg-muted/50">
-                  <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    2
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-sm mb-1" style={{color: 'hsl(var(--charcoal))'}}>
-                      One-Click Account Setup (30 seconds)
-                    </h5>
-                    <p className="text-xs text-muted-foreground">
-                      Click the link in email to automatically configure your account
-                    </p>
-                  </div>
-                  <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
-                </div>
-
-                <div className="flex gap-3 items-start p-3 rounded-lg bg-muted/50">
-                  <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    3
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-sm mb-1" style={{color: 'hsl(var(--charcoal))'}}>
-                      Start Taking Calls (Today)
-                    </h5>
-                    <p className="text-xs text-muted-foreground">
-                      Test with your first call using 150 free trial minutes
-                    </p>
-                  </div>
-                  <Zap className="w-5 h-5 text-primary flex-shrink-0" />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground pt-2 border-t">
-              <div className="flex items-center gap-1">
-                <CheckCircle className="w-3 h-3 text-primary" />
-                <span>3-day trial</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <CheckCircle className="w-3 h-3 text-primary" />
-                <span>150 minutes included</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <CheckCircle className="w-3 h-3 text-primary" />
-                <span>Cancel anytime</span>
-              </div>
-            </div>
+            {errorMessage && (
+              <p className="text-sm text-destructive text-center">{errorMessage}</p>
+            )}
 
             <Button
-              onClick={handleClose}
-              className="w-full h-12 rounded-full"
-              variant="outline"
+              type="submit"
+              className="w-full h-12 text-base font-semibold rounded-full bg-primary text-white hover:opacity-90"
+              disabled={isSubmitting}
             >
-              Close
+              {isSubmitting ? "Starting Your Trial..." : "Start Free Trial"}
             </Button>
-          </div>
-        )}
+
+            <p className="text-xs text-center text-muted-foreground">
+              By continuing, you agree to our Terms of Service and Privacy Policy
+            </p>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
