@@ -116,7 +116,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
     try {
       console.log("Submitting signup with payload:", { ...payload, owner_email: payload.owner_email.substring(0, 3) + "***" });
 
-      const response = await fetch("/.netlify/functions/signup", {
+      // Using debug endpoint for better error messages
+      const response = await fetch("/.netlify/functions/signup-debug", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -135,8 +136,13 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
 
       if (!response.ok || !result?.ok) {
         const errorDetails = result?.details || result?.error || "Unknown error";
-        console.error("Signup failed:", errorDetails);
-        throw new Error(errorDetails);
+        const errorCode = result?.code || "";
+        const errorHint = result?.hint || "";
+        console.error("Signup failed:", { error: errorDetails, code: errorCode, hint: errorHint });
+
+        // Show detailed error to user
+        setErrorMessage(`Error: ${errorDetails}${errorCode ? ` (${errorCode})` : ''}${errorHint ? ` - ${errorHint}` : ''}`);
+        return;
       }
 
       form.reset();
@@ -146,9 +152,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange, source: _source }: Fre
     } catch (error) {
       console.error("Signup submission failed:", error);
       const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";
-      setErrorMessage(errorMsg.includes("database_insert_failed")
-        ? "There was a database error. Please contact support."
-        : "Could not start your trial. Please try again.");
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
