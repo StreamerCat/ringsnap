@@ -95,7 +95,14 @@ exports.handler = async (event) => {
         console.error("Insert account error:", error);
         return jsonResponse(500, { ok: false, error: "database_insert_failed" });
       }
-      account_id = data.account_id;
+
+      if (insertResult.error || !insertResult.data) {
+        console.error("Insert account error:", insertResult.error);
+        return jsonResponse(500, { ok: false, error: "database_insert_failed" });
+      }
+
+      const resolvedAccountId = insertResult.data.account_id || insertResult.data.id;
+      account_id = typeof resolvedAccountId === "string" ? resolvedAccountId : String(resolvedAccountId);
     } else {
       const { error } = await supabase
         .from("accounts")
