@@ -17,7 +17,7 @@ CREATE TABLE public.revenue_report_leads (
 -- Enable Row Level Security
 ALTER TABLE public.revenue_report_leads ENABLE ROW LEVEL SECURITY;
 
--- Create policy to allow anonymous inserts (same pattern as trial_signups)
+-- Create policy to allow anonymous inserts for revenue report leads
 CREATE POLICY "Anyone can create revenue report leads"
 ON public.revenue_report_leads
 FOR INSERT
