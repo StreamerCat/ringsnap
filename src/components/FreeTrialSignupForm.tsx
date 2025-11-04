@@ -6,7 +6,6 @@ import * as z from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -27,9 +26,7 @@ const formSchema = z
       .trim()
       .min(10, "Please enter a valid phone number")
       .max(20, "Phone number is too long"),
-    trade: z.string().optional(),
-    companyName: z.string().optional(),
-    wantsAdvancedVoice: z.boolean().default(false)
+    trade: z.string().optional()
   });
 
 type FormData = z.infer<typeof formSchema>;
@@ -44,30 +41,13 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const isGenericEmail = (email: string) => {
-    const domain = email.split("@")[1]?.toLowerCase();
-    const genericDomains = [
-      "gmail.com",
-      "yahoo.com",
-      "hotmail.com",
-      "outlook.com",
-      "icloud.com",
-      "aol.com",
-      "protonmail.com",
-      "mail.com"
-    ];
-    return !!domain && genericDomains.includes(domain);
-  };
-
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       email: "",
       phone: "",
-      trade: "",
-      companyName: "",
-      wantsAdvancedVoice: false
+      trade: ""
     }
   });
 
@@ -78,30 +58,44 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     const trimmedName = data.name.trim();
     const trimmedEmail = data.email.trim();
     const trimmedPhone = data.phone.trim();
-    const companyDomain = trimmedEmail.split("@")[1]?.toLowerCase() ?? "";
 
     const payload = {
       name: trimmedName,
       email: trimmedEmail,
       phone: trimmedPhone,
-      trade: data.trade?.trim() ?? "",
-      companyName: data.companyName?.trim() || companyDomain,
-      wantsAdvancedVoice: data.wantsAdvancedVoice ?? false
+      trade: data.trade?.trim() ?? ""
     };
 
     try {
-      const response = await fetch("/.netlify/functions/signup", {
+      console.log("Submitting signup with payload:", { ...payload, owner_email: payload.owner_email.substring(0, 3) + "***" });
+
+      // Using debug endpoint for better error messages
+      const response = await fetch("/.netlify/functions/signup-debug", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
+      console.log("Response status:", response.status, response.statusText);
+
       const result = await response
         .json()
-        .catch(() => null);
+        .catch((e) => {
+          console.error("Failed to parse JSON response:", e);
+          return null;
+        });
+
+      console.log("Response data:", result);
 
       if (!response.ok || !result?.ok) {
-        throw new Error("request_failed");
+        const errorDetails = result?.details || result?.error || "Unknown error";
+        const errorCode = result?.code || "";
+        const errorHint = result?.hint || "";
+        console.error("Signup failed:", { error: errorDetails, code: errorCode, hint: errorHint });
+
+        // Show detailed error to user
+        setErrorMessage(`Error: ${errorDetails}${errorCode ? ` (${errorCode})` : ''}${errorHint ? ` - ${errorHint}` : ''}`);
+        return;
       }
 
       form.reset();
@@ -109,10 +103,9 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       onOpenChange(false);
       navigate("/app");
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("Signup submission failed", error);
-      }
-      setErrorMessage("Could not start your trial. Please try again.");
+      console.error("Signup submission failed:", error);
+      const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -148,8 +141,6 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
 
         <Form {...form}>
           <form
-            action="/.netlify/functions/signup"
-            method="POST"
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-4 mt-4"
             aria-live="polite"
@@ -240,53 +231,6 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
                     </SelectContent>
                   </Select>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="companyName"
-              render={({ field }) => {
-                const email = form.watch("email");
-                const showCompanyField = email && isGenericEmail(email);
-
-                return (
-                  <FormItem className={showCompanyField ? "" : "hidden"}>
-                    <FormLabel>
-                      Company Name {showCompanyField && <span className="text-destructive">*</span>}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={showCompanyField ? "e.g., Smith Plumbing LLC" : ""}
-                        {...field}
-                      />
-                    </FormControl>
-                    {showCompanyField && (
-                      <p className="text-sm text-muted-foreground">Required for personal email addresses</p>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
-
-            <FormField
-              control={form.control}
-              name="wantsAdvancedVoice"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="text-sm font-medium">
-                      Clone Your Own Voice (Premium Feature) - FREE When You Sign Up Today!
-                    </FormLabel>
-                    <p className="text-xs text-muted-foreground">
-                      Normally $99/month. Lock in your free voice clone now.
-                    </p>
-                  </div>
                 </FormItem>
               )}
             />
