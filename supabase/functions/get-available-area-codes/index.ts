@@ -1,4 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
+
+const FUNCTION_NAME = 'get-available-area-codes';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +9,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -16,7 +21,9 @@ serve(async (req) => {
       throw new Error('VAPI_API_KEY not configured');
     }
 
-    console.log('Fetching available area codes from VAPI...');
+    logInfo('Fetching available area codes from VAPI', {
+      ...baseLogOptions
+    });
 
     // Query VAPI for available phone numbers without area code restriction
     const response = await fetch('https://api.vapi.ai/phone-number', {
@@ -37,7 +44,10 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('VAPI error response:', errorText);
+      logError('VAPI error response', {
+        ...baseLogOptions,
+        error: new Error(errorText)
+      });
       
       // Try to extract area codes from error message
       const match = errorText.match(/available area codes: ([\d,\s]+)/i);
@@ -47,7 +57,10 @@ serve(async (req) => {
           .map(code => code.trim())
           .filter(code => code.length === 3);
         
-        console.log('Extracted area codes from error:', areaCodes);
+        logInfo('Extracted area codes from error response', {
+          ...baseLogOptions,
+          context: { areaCodes }
+        });
         
         return new Response(
           JSON.stringify({ 
@@ -68,7 +81,10 @@ serve(async (req) => {
     
     // If we got a phone number, delete it and extract the area code
     if (data.id) {
-      console.log('Created test number, deleting:', data.id);
+      logInfo('Created temporary test number', {
+        ...baseLogOptions,
+        context: { phoneId: data.id }
+      });
       
       // Delete the test number
       await fetch(`https://api.vapi.ai/phone-number/${data.id}`, {
@@ -95,7 +111,9 @@ serve(async (req) => {
     }
 
     // Fallback: return common area codes
-    console.log('Using fallback area codes');
+    logWarn('Using fallback area codes', {
+      ...baseLogOptions
+    });
     return new Response(
       JSON.stringify({ 
         areaCodes: ['212', '310', '415', '720', '303', '512', '617'],
@@ -108,7 +126,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in get-available-area-codes:', error);
+    logError('Error in get-available-area-codes', {
+      ...baseLogOptions,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ 

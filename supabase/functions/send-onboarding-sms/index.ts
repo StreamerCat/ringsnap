@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "send-onboarding-sms";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,16 +10,27 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let currentAccountId: string | null = null;
+
   try {
     const { phone, ringSnapNumber, name, accountId, vapiPhoneId } = await req.json();
 
+    currentAccountId = accountId ?? null;
+    const accountContext = { ...baseLogOptions, accountId: currentAccountId ?? undefined };
+
     if (!phone || !ringSnapNumber || !name || !vapiPhoneId) {
-      console.error('Missing required fields for SMS');
+      logError('Missing required fields for onboarding SMS', {
+        ...accountContext,
+        error: new Error('Missing required fields'),
+        context: { phoneProvided: Boolean(phone), ringSnapNumberProvided: Boolean(ringSnapNumber), nameProvided: Boolean(name), vapiPhoneIdProvided: Boolean(vapiPhoneId) }
+      });
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -45,8 +59,14 @@ Start catching every call 🔥
 
 Reply STOP to opt out`;
 
-    console.log('Sending SMS to:', phone);
-    console.log('Message length:', smsMessage.length, 'characters');
+    logInfo('Sending onboarding SMS', {
+      ...accountContext,
+      context: {
+        recipientPhone: phone,
+        messageLength: smsMessage.length,
+        vapiPhoneId
+      }
+    });
 
     // Send SMS via VAPI API
     const vapiApiKey = Deno.env.get('VAPI_API_KEY');
@@ -64,12 +84,19 @@ Reply STOP to opt out`;
 
     if (!vapiResponse.ok) {
       const errorText = await vapiResponse.text();
-      console.error('VAPI SMS API error:', vapiResponse.status, errorText);
+      logError('VAPI SMS API error', {
+        ...accountContext,
+        error: new Error(errorText),
+        context: { status: vapiResponse.status }
+      });
       throw new Error(`VAPI SMS failed: ${errorText}`);
     }
 
     const vapiData = await vapiResponse.json();
-    console.log('SMS sent successfully via VAPI:', vapiData);
+    logInfo('SMS sent successfully via VAPI', {
+      ...accountContext,
+      context: { vapiMessageId: vapiData.id }
+    });
 
     // Log to database
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -94,7 +121,10 @@ Reply STOP to opt out`;
         status: 'sent',
         vapi_message_id: vapiData.id || null,
       });
-      console.log('SMS logged to database');
+      logInfo('SMS logged to database', {
+        ...accountContext,
+        context: { phoneNumberId: phoneRecord.id }
+      });
     }
 
     return new Response(
@@ -103,7 +133,11 @@ Reply STOP to opt out`;
     );
 
   } catch (error) {
-    console.error('SMS send error:', error);
+    logError('SMS send error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     // Return success to not block provisioning, but log the failure

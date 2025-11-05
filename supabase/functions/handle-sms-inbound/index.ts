@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "handle-sms-inbound";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +12,9 @@ const corsHeaders = {
 const VAPI_API_KEY = Deno.env.get('VAPI_API_KEY');
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+  let currentAccountId: string | null = null;
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -26,7 +32,10 @@ serve(async (req) => {
     const to = params.get('To') || '';
     const messageBody = params.get('Body') || '';
 
-    console.log(`Inbound SMS from ${from} to ${to}: ${messageBody}`);
+    logInfo('Inbound SMS received', {
+      ...baseLogOptions,
+      context: { from, to, messageLength: messageBody.length }
+    });
 
     // Find account by phone number
     const { data: phoneNumber } = await supabase
@@ -37,9 +46,14 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!phoneNumber) {
-      console.error(`Phone number not found: ${to}`);
+      logWarn('Inbound SMS phone number not found', {
+        ...baseLogOptions,
+        context: { to }
+      });
       return new Response('OK', { status: 200 });
     }
+
+    currentAccountId = phoneNumber.account_id;
 
     // Check if SMS is enabled
     const { data: account } = await supabase
@@ -49,7 +63,10 @@ serve(async (req) => {
       .single();
 
     if (!account?.sms_enabled) {
-      console.log('SMS not enabled for this account');
+      logInfo('SMS inbound received for disabled account', {
+        ...baseLogOptions,
+        accountId: currentAccountId
+      });
       return new Response('OK', { status: 200 });
     }
 
@@ -65,21 +82,35 @@ serve(async (req) => {
     });
 
     // Generate AI response via VAPI (placeholder)
-    let responseText = 'Thank you for your message. We will get back to you shortly.';
+    const responseText = 'Thank you for your message. We will get back to you shortly.';
     
     if (VAPI_API_KEY) {
       // TODO: Integrate with VAPI for AI-generated responses
-      console.log('AI response generation would happen here');
+      logInfo('AI response generation placeholder', {
+        ...baseLogOptions,
+        accountId: currentAccountId
+      });
     }
 
     // Check daily quota
     if (account.daily_sms_sent >= account.daily_sms_quota) {
-      console.log('Daily SMS quota exceeded');
+      logWarn('Daily SMS quota exceeded for inbound response', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: {
+          dailySmsSent: account.daily_sms_sent,
+          dailySmsQuota: account.daily_sms_quota
+        }
+      });
       return new Response('OK', { status: 200 });
     }
 
     // Send response (placeholder - actual implementation depends on SMS provider)
-    console.log(`Sending response to ${from}: ${responseText}`);
+    logInfo('Sending inbound SMS response', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: { to: from, messageLength: responseText.length }
+    });
     
     // Store outbound message
     await supabase.from('sms_messages').insert({
@@ -101,7 +132,11 @@ serve(async (req) => {
     return new Response('OK', { status: 200 });
 
   } catch (error) {
-    console.error('SMS inbound error:', error);
+    logError('SMS inbound error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     return new Response('OK', { status: 200 }); // Always return 200 to Twilio
   }
 });

@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "stripe-webhook";
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET');
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+  let currentAccountId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -17,7 +24,10 @@ serve(async (req) => {
     // For now, parse the event directly
     const event = JSON.parse(body);
 
-    console.log(`Stripe webhook received: ${event.type}`);
+    logInfo('Stripe webhook received', {
+      ...baseLogOptions,
+      context: { eventType: event.type }
+    });
 
     switch (event.type) {
       case 'invoice.payment_succeeded': {
@@ -32,6 +42,8 @@ serve(async (req) => {
           .maybeSingle();
 
         if (!account) break;
+
+        currentAccountId = account.id;
 
         // Apply account credits to invoice
         const invoiceAmountCents = invoice.amount_due;
@@ -61,7 +73,14 @@ serve(async (req) => {
           remainingAmount -= appliedAmount;
         }
 
-        console.log(`Applied credits to invoice ${invoice.id}, remaining: $${remainingAmount / 100}`);
+        logInfo('Applied credits to invoice', {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          context: {
+            invoiceId: invoice.id,
+            remainingAmountCents: remainingAmount
+          }
+        });
 
         // Check if this is first payment for referral conversion
         const { data: referrals } = await supabase
@@ -104,7 +123,11 @@ serve(async (req) => {
             },
           ]);
 
-          console.log(`Referral converted: ${referral.id}`);
+          logInfo('Referral converted from payment', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            context: { referralId: referral.id, referrerAccountId: referral.referrer_account_id }
+          });
 
           // Send notification emails
           if (RESEND_API_KEY) {
@@ -127,7 +150,10 @@ serve(async (req) => {
           })
           .eq('stripe_customer_id', customerId);
 
-        console.log(`Payment failed for customer: ${customerId}`);
+        logInfo('Payment failed for customer', {
+          ...baseLogOptions,
+          context: { customerId }
+        });
         break;
       }
 
@@ -148,7 +174,10 @@ serve(async (req) => {
           })
           .eq('stripe_customer_id', customerId);
 
-        console.log(`Subscription cancelled for customer: ${customerId}`);
+        logInfo('Subscription cancelled for customer', {
+          ...baseLogOptions,
+          context: { customerId }
+        });
         break;
       }
 
@@ -176,7 +205,11 @@ serve(async (req) => {
               })
               .eq('id', account.id);
 
-            console.log(`Account restored within hold period: ${account.id}`);
+            logInfo('Account restored within hold period', {
+              ...baseLogOptions,
+              accountId: account.id,
+              context: { customerId }
+            });
           }
         }
 
@@ -184,7 +217,10 @@ serve(async (req) => {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logInfo('Unhandled Stripe webhook event', {
+          ...baseLogOptions,
+          context: { eventType: event.type }
+        });
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -193,7 +229,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Webhook error:', error);
+    logError('Stripe webhook error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Webhook error' }),
       { status: 400, headers: { 'Content-Type': 'application/json' } }

@@ -1,6 +1,9 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
+
+const FUNCTION_NAME = 'manage-phone-lifecycle';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +11,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,7 +23,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log('Running phone lifecycle management cron...');
+    logInfo('Running phone lifecycle management cron', {
+      ...baseLogOptions
+    });
 
     // Find phone numbers that should be released (held for 7 days)
     const now = new Date().toISOString();
@@ -29,21 +36,32 @@ serve(async (req) => {
       .lte('held_until', now);
 
     if (error) {
-      console.error('Error fetching phone numbers:', error);
+      logError('Error fetching phone numbers for lifecycle management', {
+        ...baseLogOptions,
+        error
+      });
       return new Response(
         JSON.stringify({ error: error.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
-    console.log(`Found ${numbersToRelease?.length || 0} numbers to release`);
+    logInfo('Phone numbers identified for release', {
+      ...baseLogOptions,
+      context: { count: numbersToRelease?.length || 0 }
+    });
 
     let releasedCount = 0;
     let savedCostCents = 0;
 
     for (const phoneNumber of numbersToRelease || []) {
+      const phoneAccountId = phoneNumber.account_id ?? null;
       try {
-        console.log(`Releasing phone number ${phoneNumber.phone_number}`);
+        logInfo('Releasing phone number', {
+          ...baseLogOptions,
+          accountId: phoneAccountId,
+          context: { phoneNumber: phoneNumber.phone_number }
+        });
 
         // Call VAPI API to release the phone number
         if (phoneNumber.vapi_phone_id) {
@@ -58,9 +76,20 @@ serve(async (req) => {
           );
 
           if (!vapiResponse.ok) {
-            console.error(`VAPI release failed for ${phoneNumber.phone_number}:`, await vapiResponse.text());
+            logWarn('VAPI release failed for phone number', {
+              ...baseLogOptions,
+              accountId: phoneAccountId,
+              context: {
+                phoneNumber: phoneNumber.phone_number,
+                response: await vapiResponse.text()
+              }
+            });
           } else {
-            console.log(`VAPI phone number ${phoneNumber.vapi_phone_id} released successfully`);
+            logInfo('VAPI phone number released successfully', {
+              ...baseLogOptions,
+              accountId: phoneAccountId,
+              context: { vapiPhoneId: phoneNumber.vapi_phone_id }
+            });
           }
         }
 
@@ -76,15 +105,30 @@ serve(async (req) => {
         releasedCount++;
         savedCostCents += 500; // Estimate $5/month per number
 
-        console.log(`Phone number ${phoneNumber.phone_number} released successfully`);
+        logInfo('Phone number released successfully', {
+          ...baseLogOptions,
+          accountId: phoneAccountId,
+          context: { phoneNumber: phoneNumber.phone_number }
+        });
 
       } catch (phoneError) {
-        console.error(`Error releasing phone ${phoneNumber.phone_number}:`, phoneError);
+        logError('Error releasing phone number', {
+          ...baseLogOptions,
+          accountId: phoneAccountId,
+          error: phoneError,
+          context: { phoneNumber: phoneNumber.phone_number }
+        });
       }
     }
 
     const savedCostDollars = (savedCostCents / 100).toFixed(2);
-    console.log(`Released ${releasedCount} phone numbers, saving ~$${savedCostDollars}/month`);
+    logInfo('Phone lifecycle run summary', {
+      ...baseLogOptions,
+      context: {
+        releasedCount,
+        savedCostMonthlyDollars: savedCostDollars
+      }
+    });
 
     return new Response(
       JSON.stringify({ 
@@ -96,7 +140,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Phone lifecycle cron error:', error);
+    logError('Phone lifecycle cron error', {
+      ...baseLogOptions,
+      error
+    });
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

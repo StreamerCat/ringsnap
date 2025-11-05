@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { formatPhoneE164 } from "../_shared/validators.ts";
+import { extractCorrelationId, logError } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "verify-code";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +11,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -95,7 +100,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Verify code error:', error);
+    logError('Verify code error', {
+      ...baseLogOptions,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

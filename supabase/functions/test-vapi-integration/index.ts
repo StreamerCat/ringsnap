@@ -1,4 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "test-vapi-integration";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +9,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -40,7 +45,7 @@ serve(async (req) => {
   let assistantId: string | null = null;
 
   // Test 1: API Key Validation (always runs - free)
-  console.log('Test 1: Validating API Key...');
+  logInfo('Test 1: Validating API Key', { ...baseLogOptions });
   try {
     const accountResponse = await fetch('https://api.vapi.ai/assistant?limit=1', {
       headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` }
@@ -50,20 +55,29 @@ serve(async (req) => {
       const accountData = await accountResponse.json();
       tests.apiKey.success = true;
       tests.apiKey.details = `Valid API key (${Array.isArray(accountData) ? accountData.length : 0} assistants found)`;
-      console.log('✓ API Key valid');
+      logInfo('API key validated', {
+        ...baseLogOptions,
+        context: { assistantsFound: Array.isArray(accountData) ? accountData.length : 0 }
+      });
     } else {
       const errorText = await accountResponse.text();
       tests.apiKey.error = `Status ${accountResponse.status}: ${errorText}`;
-      console.error('✗ API Key invalid:', tests.apiKey.error);
+      logError('API key invalid', {
+        ...baseLogOptions,
+        error: new Error(tests.apiKey.error)
+      });
     }
   } catch (error) {
     tests.apiKey.error = error instanceof Error ? error.message : 'Unknown error';
-    console.error('✗ API Key test failed:', tests.apiKey.error);
+    logError('API key test failed', {
+      ...baseLogOptions,
+      error: new Error(tests.apiKey.error)
+    });
   }
 
   // Test 2: Phone Number Creation (only if testLevel allows)
   if (tests.apiKey.success && ['phone', 'full'].includes(testLevel)) {
-    console.log('Test 2: Creating test phone number...');
+    logInfo('Test 2: Creating test phone number', { ...baseLogOptions });
     try {
       const phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
         method: 'POST',
@@ -89,20 +103,32 @@ serve(async (req) => {
         tests.phoneNumber.phoneId = phoneData.id;
         tests.phoneNumber.phoneNumber = phoneData.number;
         tests.phoneNumber.details = `Created phone: ${phoneData.number}`;
-        console.log('✓ Phone created:', phoneData.number);
+        logInfo('Phone created during test', {
+          ...baseLogOptions,
+          context: { phoneId: phoneData.id, phoneNumber: phoneData.number }
+        });
       } else {
         const errorText = await phoneResponse.text();
         tests.phoneNumber.error = `Status ${phoneResponse.status}: ${errorText}`;
-        console.error('✗ Phone creation failed:', tests.phoneNumber.error);
+        logError('Phone creation failed during test', {
+          ...baseLogOptions,
+          error: new Error(tests.phoneNumber.error)
+        });
       }
     } catch (error) {
       tests.phoneNumber.error = error instanceof Error ? error.message : 'Unknown error';
-      console.error('✗ Phone creation error:', tests.phoneNumber.error);
+      logError('Phone creation error during test', {
+        ...baseLogOptions,
+        error: new Error(tests.phoneNumber.error)
+      });
     }
   } else if (tests.apiKey.success) {
     tests.phoneNumber.skipped = true;
     tests.phoneNumber.details = `Skipped (testLevel: ${testLevel})`;
-    console.log('⊘ Phone number test skipped');
+    logInfo('Phone number test skipped', {
+      ...baseLogOptions,
+      context: { testLevel }
+    });
   } else {
     tests.phoneNumber.skipped = true;
     tests.phoneNumber.error = 'Skipped due to API key failure';
@@ -110,7 +136,7 @@ serve(async (req) => {
 
   // Test 3: Assistant Creation (only if testLevel allows)
   if (tests.apiKey.success && ['assistant', 'full'].includes(testLevel)) {
-    console.log('Test 3: Creating test assistant...');
+    logInfo('Test 3: Creating test assistant', { ...baseLogOptions });
     try {
       const assistantResponse = await fetch('https://api.vapi.ai/assistant', {
         method: 'POST',
@@ -143,20 +169,32 @@ serve(async (req) => {
         tests.assistant.success = true;
         tests.assistant.assistantId = assistantData.id;
         tests.assistant.details = `Created assistant: ${assistantData.name}`;
-        console.log('✓ Assistant created:', assistantData.id);
+        logInfo('Assistant created during test', {
+          ...baseLogOptions,
+          context: { assistantId: assistantData.id }
+        });
       } else {
         const errorText = await assistantResponse.text();
         tests.assistant.error = `Status ${assistantResponse.status}: ${errorText}`;
-        console.error('✗ Assistant creation failed:', tests.assistant.error);
+        logError('Assistant creation failed during test', {
+          ...baseLogOptions,
+          error: new Error(tests.assistant.error)
+        });
       }
     } catch (error) {
       tests.assistant.error = error instanceof Error ? error.message : 'Unknown error';
-      console.error('✗ Assistant creation error:', tests.assistant.error);
+      logError('Assistant creation error during test', {
+        ...baseLogOptions,
+        error: new Error(tests.assistant.error)
+      });
     }
   } else if (tests.apiKey.success) {
     tests.assistant.skipped = true;
     tests.assistant.details = `Skipped (testLevel: ${testLevel})`;
-    console.log('⊘ Assistant test skipped');
+    logInfo('Assistant test skipped', {
+      ...baseLogOptions,
+      context: { testLevel }
+    });
   } else {
     tests.assistant.skipped = true;
     tests.assistant.error = 'Skipped due to API key failure';
@@ -164,7 +202,7 @@ serve(async (req) => {
 
   // Test 4: Linking Assistant to Phone (only for full test)
   if (testLevel === 'full' && tests.phoneNumber.success && tests.assistant.success && phoneId && assistantId) {
-    console.log('Test 4: Linking assistant to phone...');
+    logInfo('Test 4: Linking assistant to phone', { ...baseLogOptions });
     try {
       const linkResponse = await fetch(`https://api.vapi.ai/phone-number/${phoneId}`, {
         method: 'PATCH',
@@ -180,20 +218,32 @@ serve(async (req) => {
       if (linkResponse.ok) {
         tests.linking.success = true;
         tests.linking.details = `Successfully linked assistant ${assistantId} to phone ${phoneId}`;
-        console.log('✓ Linking successful');
+        logInfo('Assistant linked to phone during test', {
+          ...baseLogOptions,
+          context: { assistantId, phoneId }
+        });
       } else {
         const errorText = await linkResponse.text();
         tests.linking.error = `Status ${linkResponse.status}: ${errorText}`;
-        console.error('✗ Linking failed:', tests.linking.error);
+        logError('Assistant to phone linking failed during test', {
+          ...baseLogOptions,
+          error: new Error(tests.linking.error)
+        });
       }
     } catch (error) {
       tests.linking.error = error instanceof Error ? error.message : 'Unknown error';
-      console.error('✗ Linking error:', tests.linking.error);
+      logError('Assistant to phone linking error during test', {
+        ...baseLogOptions,
+        error: new Error(tests.linking.error)
+      });
     }
   } else if (testLevel !== 'full') {
     tests.linking.skipped = true;
     tests.linking.details = `Skipped (testLevel: ${testLevel})`;
-    console.log('⊘ Linking test skipped');
+    logInfo('Linking test skipped', {
+      ...baseLogOptions,
+      context: { testLevel }
+    });
   } else {
     tests.linking.skipped = true;
     tests.linking.error = 'Skipped due to phone or assistant creation failure';
@@ -201,7 +251,7 @@ serve(async (req) => {
 
   // Test 5: Cleanup
   if (!skipCleanup) {
-    console.log('Test 5: Cleaning up test resources...');
+    logInfo('Test 5: Cleaning up test resources', { ...baseLogOptions });
     const cleanupResults = [];
 
     if (phoneId) {
@@ -213,7 +263,10 @@ serve(async (req) => {
         
         if (deletePhoneResponse.ok) {
           cleanupResults.push(`Deleted phone ${phoneId}`);
-          console.log('✓ Phone deleted');
+          logInfo('Test phone resource deleted', {
+            ...baseLogOptions,
+            context: { phoneId }
+          });
         } else {
           cleanupResults.push(`Failed to delete phone: ${deletePhoneResponse.status}`);
         }
@@ -231,7 +284,10 @@ serve(async (req) => {
         
         if (deleteAssistantResponse.ok) {
           cleanupResults.push(`Deleted assistant ${assistantId}`);
-          console.log('✓ Assistant deleted');
+          logInfo('Test assistant resource deleted', {
+            ...baseLogOptions,
+            context: { assistantId }
+          });
         } else {
           cleanupResults.push(`Failed to delete assistant: ${deleteAssistantResponse.status}`);
         }
@@ -297,11 +353,16 @@ serve(async (req) => {
     }
   }
 
-  console.log('\n=== Test Summary ===');
-  console.log(summary);
-  console.log(`Test Level: ${testLevel}, Credits Used: ${creditsUsed}`);
-  console.log('Recommendations:', recommendations);
-  console.log('Next Steps:', nextSteps);
+  logInfo('Test summary generated', {
+    ...baseLogOptions,
+    context: {
+      summary,
+      testLevel,
+      creditsUsed,
+      recommendations,
+      nextSteps
+    }
+  });
 
   return new Response(
     JSON.stringify({
