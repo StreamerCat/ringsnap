@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { SalesPasswordGate } from "@/components/SalesPasswordGate";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -122,8 +123,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4">
-      <div className="container max-w-7xl mx-auto">
+    <SalesPasswordGate>
+      <div className="min-h-screen bg-slate-50 p-4">
+        <div className="container max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-3xl font-bold text-slate-900">Sales Dashboard</h1>
           <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -317,5 +319,6 @@ export default function Dashboard() {
         </Tabs>
       </div>
     </div>
+    </SalesPasswordGate>
   );
 }

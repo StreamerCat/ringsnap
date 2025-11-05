@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
@@ -234,18 +236,36 @@ function SalesSignupFormInner() {
             )}
           </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="trade">Trade *</Label>
-            <Input
-              id="trade"
-              {...form.register("trade")}
-              placeholder="Plumbing, HVAC, Electrical, etc."
-              className="text-base"
-            />
-            {form.formState.errors.trade && (
-              <p className="text-sm text-red-500">{form.formState.errors.trade.message}</p>
+          <FormField
+            control={form.control}
+            name="trade"
+            render={({ field }) => (
+              <FormItem className="sm:col-span-2">
+                <FormLabel>Trade *</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="text-base">
+                      <SelectValue placeholder="Select your trade" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="hvac">HVAC</SelectItem>
+                    <SelectItem value="plumbing">Plumbing</SelectItem>
+                    <SelectItem value="electrician">Electrician</SelectItem>
+                    <SelectItem value="landscaping">Landscaping</SelectItem>
+                    <SelectItem value="general_contractor">General Contractor</SelectItem>
+                    <SelectItem value="roofing">Roofing</SelectItem>
+                    <SelectItem value="pest_control">Pest Control</SelectItem>
+                    <SelectItem value="garage_door">Garage Door Repair</SelectItem>
+                    <SelectItem value="carpentry">Carpentry</SelectItem>
+                    <SelectItem value="painting">Painting</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
             )}
-          </div>
+          />
         </CardContent>
       </Card>
 
