@@ -19,11 +19,6 @@ const setupSchema = z.object({
     .regex(/^\d{5}$/, "Please enter a valid 5-digit ZIP code"),
   trade: z.string().min(1, "Please select your trade"),
   assistantGender: z.enum(['male', 'female']),
-  customInstructions: z
-    .string()
-    .max(500, "Custom instructions must be less than 500 characters")
-    .optional()
-    .or(z.literal('')),
   referralCode: z
     .string()
     .trim()
@@ -50,7 +45,6 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
       zipCode: "",
       trade: "",
       assistantGender: "female",
-      customInstructions: "",
       referralCode: ""
     }
   });
@@ -65,7 +59,6 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
           zipCode: data.zipCode.trim(),
           trade: data.trade,
           assistantGender: data.assistantGender,
-          customInstructions: data.customInstructions?.trim() || null,
           referralCode: data.referralCode?.trim() || null
         }
       });
@@ -189,29 +182,6 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
                     </RadioGroup>
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="customInstructions"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Custom Instructions (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="e.g., Always mention our 24/7 emergency service and family-owned status"
-                      {...field}
-                      rows={3}
-                      maxLength={500}
-                      className="resize-none"
-                    />
-                  </FormControl>
-                  <FormDescription className="text-xs">
-                    {field.value?.length || 0}/500 characters
-                  </FormDescription>
-                  <FormMessage className="text-xs" />
                 </FormItem>
               )}
             />

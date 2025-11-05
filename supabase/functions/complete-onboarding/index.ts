@@ -41,7 +41,7 @@ serve(async (req) => {
       );
     }
 
-    const { zipCode, trade, assistantGender, customInstructions, referralCode } = await req.json();
+    const { zipCode, trade, assistantGender, referralCode } = await req.json();
 
     // Validate required fields
     if (!zipCode || !trade || !assistantGender) {
@@ -87,7 +87,6 @@ serve(async (req) => {
         zip_code: zipCode,
         trade: trade,
         assistant_gender: assistantGender,
-        custom_instructions: customInstructions || null,
         phone_number_area_code: areaCode,
         provisioning_status: 'provisioning',
         updated_at: new Date().toISOString()

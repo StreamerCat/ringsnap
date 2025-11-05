@@ -21,7 +21,7 @@ import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDia
 import { ReferralShareInterface } from "@/components/ReferralShareInterface";
 import { 
   Phone, Users, Settings, CreditCard, Gift, TrendingUp, 
-  Clock, AlertCircle, CheckCircle, Loader2 
+  Clock, AlertCircle, CheckCircle, Loader2, Sparkles, Check
 } from "lucide-react";
 
 export default function CustomerDashboard() {
@@ -41,6 +41,8 @@ export default function CustomerDashboard() {
   const [referralCode, setReferralCode] = useState("");
   const [recordingState, setRecordingState] = useState<any>(null);
   const [showRecordingConsent, setShowRecordingConsent] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [savingInstructions, setSavingInstructions] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -128,6 +130,11 @@ export default function CustomerDashboard() {
         .eq("account_id", accountId)
         .single();
       if (codeData) setReferralCode(codeData.code);
+
+      // Load custom instructions
+      if (profileData.accounts.custom_instructions) {
+        setCustomInstructions(profileData.accounts.custom_instructions);
+      }
 
       // Load state recording laws if billing_state exists
       if (profileData.accounts.billing_state) {
@@ -461,6 +468,68 @@ export default function CustomerDashboard() {
 
           {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  AI Assistant Customization
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="customInstructions">Custom Instructions</Label>
+                  <Textarea
+                    id="customInstructions"
+                    placeholder="e.g., Always mention our 24/7 emergency service and family-owned status. Offer 10% discount for first-time customers."
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    rows={6}
+                    maxLength={500}
+                    className="resize-none"
+                  />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className={customInstructions.length > 450 ? 'text-red-500 font-semibold' : 'text-muted-foreground'}>
+                      {customInstructions.length}/500 characters
+                    </span>
+                    <span className="text-muted-foreground text-xs">Updates take effect on next call</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={async () => {
+                    setSavingInstructions(true);
+                    try {
+                      const { error } = await supabase
+                        .from('accounts')
+                        .update({ custom_instructions: customInstructions })
+                        .eq('id', account.id);
+                      if (error) throw error;
+                      setAccount({ ...account, custom_instructions: customInstructions });
+                      toast({ title: "Success", description: "Custom instructions updated" });
+                    } catch (error: any) {
+                      toast({ title: "Error", description: error.message, variant: "destructive" });
+                    } finally {
+                      setSavingInstructions(false);
+                    }
+                  }}
+                  disabled={savingInstructions}
+                  size="lg"
+                  className="w-full sm:w-auto"
+                >
+                  {savingInstructions ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Save Instructions
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Call Recording</CardTitle>

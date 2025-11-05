@@ -250,8 +250,16 @@ serve(async (req) => {
       })
       .eq('id', accountId);
 
-    // 8. Send welcome email
+    // 8. Send welcome email with carrier instructions
     if (RESEND_API_KEY && email) {
+      const formatPhone = (phone: string) => {
+        const cleaned = phone.replace(/\D/g, "");
+        if (cleaned.length === 11 && cleaned.startsWith("1")) {
+          return cleaned.substring(1).replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3");
+        }
+        return phone;
+      };
+
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -261,19 +269,138 @@ serve(async (req) => {
         body: JSON.stringify({
           from: 'RingSnap <welcome@ringsnap.com>',
           to: email,
-          subject: 'Welcome to RingSnap! Your AI Assistant is Ready',
+          subject: `🎉 ${name}, Your RingSnap Number is Ready: ${formatPhone(phoneNumber)}`,
           html: `
-            <h1>Welcome to RingSnap, ${name}!</h1>
-            <p>Your AI phone assistant is ready to start taking calls.</p>
-            ${phoneNumber ? `<p><strong>Your phone number:</strong> ${phoneNumber}</p>` : ''}
-            <p><strong>Referral code:</strong> ${referralCode}</p>
-            <p>Share your code and earn $50 for each referral!</p>
-            <p>Next steps:</p>
-            <ol>
-              <li>Forward your business line to your new RingSnap number</li>
-              <li>Make a test call to hear your assistant in action</li>
-              <li>Customize your assistant in the dashboard</li>
-            </ol>
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #D95F3C 0%, #B4483C 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                .phone-hero { background: #f9f5f2; border: 3px solid #D95F3C; padding: 30px; text-align: center; border-radius: 8px; margin: 20px 0; }
+                .phone-number { font-size: 42px; font-weight: bold; color: #D95F3C; margin: 15px 0; letter-spacing: 1px; }
+                .carrier-section { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0; }
+                .carrier-title { font-size: 20px; font-weight: bold; color: #D95F3C; margin-bottom: 15px; }
+                .code-block { background: #2d3748; color: #48bb78; padding: 12px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 14px; margin: 10px 0; }
+                .step { margin: 15px 0; padding-left: 10px; border-left: 3px solid #D95F3C; }
+                .cta-button { display: inline-block; background: #48bb78; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+                @media only screen and (max-width: 600px) {
+                  .phone-number { font-size: 32px; }
+                  .container { padding: 10px; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to RingSnap!</h1>
+                  <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">Your AI Phone Assistant is Ready</p>
+                </div>
+
+                <div class="phone-hero">
+                  <p style="margin: 0; font-size: 14px; color: #666;">Your RingSnap Number</p>
+                  <div class="phone-number">${formatPhone(phoneNumber)}</div>
+                  <p style="margin: 0; font-size: 14px; color: #666;">Forward your business line to start receiving calls</p>
+                </div>
+
+                <p style="font-size: 16px; margin: 20px 0;">Hi ${name},</p>
+                <p style="margin: 10px 0;">Your AI assistant is live and ready to answer calls for ${account.company_name}! Here's how to forward your business phone:</p>
+
+                <div class="carrier-section">
+                  <div class="carrier-title">📱 AT&T Instructions</div>
+                  <div class="step">
+                    <strong>1. Dial this code:</strong>
+                    <div class="code-block">*72${phoneNumber}</div>
+                    <p style="margin: 5px 0; font-size: 14px; color: #666;">Press Call and listen for the confirmation tone</p>
+                  </div>
+                  <div class="step">
+                    <strong>2. Turn off forwarding:</strong>
+                    <div class="code-block">*73</div>
+                  </div>
+                </div>
+
+                <div class="carrier-section">
+                  <div class="carrier-title">📱 Verizon Instructions</div>
+                  <div class="step">
+                    <strong>1. Dial this code:</strong>
+                    <div class="code-block">*72${phoneNumber}</div>
+                    <p style="margin: 5px 0; font-size: 14px; color: #666;">Wait for the confirmation tone before hanging up</p>
+                  </div>
+                  <div class="step">
+                    <strong>2. Turn off forwarding:</strong>
+                    <div class="code-block">*73</div>
+                  </div>
+                </div>
+
+                <div class="carrier-section">
+                  <div class="carrier-title">📱 T-Mobile Instructions</div>
+                  <div class="step">
+                    <strong>1. Dial this code:</strong>
+                    <div class="code-block">**21*${phoneNumber}#</div>
+                    <p style="margin: 5px 0; font-size: 14px; color: #666;">Example: **21*${phoneNumber}#</p>
+                  </div>
+                  <div class="step">
+                    <strong>2. Turn off forwarding:</strong>
+                    <div class="code-block">##21#</div>
+                  </div>
+                </div>
+
+                <div class="carrier-section">
+                  <div class="carrier-title">📱 U.S. Cellular Instructions</div>
+                  <div class="step">
+                    <strong>1. Dial this code:</strong>
+                    <div class="code-block">*72${phoneNumber}</div>
+                  </div>
+                  <div class="step">
+                    <strong>2. Turn off forwarding:</strong>
+                    <div class="code-block">*73 or *720</div>
+                  </div>
+                </div>
+
+                <div style="background: #f9f5f2; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <h3 style="margin: 0 0 10px 0; color: #D95F3C;">🚀 Quick Reference</h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="background: white;">
+                      <td style="padding: 10px; border: 1px solid #ddd;"><strong>AT&T / Verizon</strong></td>
+                      <td style="padding: 10px; border: 1px solid #ddd;">*72 + number</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px; border: 1px solid #ddd;"><strong>T-Mobile</strong></td>
+                      <td style="padding: 10px; border: 1px solid #ddd;">**21*number#</td>
+                    </tr>
+                    <tr style="background: white;">
+                      <td style="padding: 10px; border: 1px solid #ddd;"><strong>Turn Off</strong></td>
+                      <td style="padding: 10px; border: 1px solid #ddd;">*73 or ##21#</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="tel:${phoneNumber}" class="cta-button" style="color: white;">📞 Test Call Your Assistant Now</a>
+                  <br><br>
+                  <a href="https://ringsnap.com/onboarding" style="color: #D95F3C; text-decoration: none; font-weight: bold;">View Full Setup Guide →</a>
+                </div>
+
+                <div style="background: #e6f7ff; border-left: 4px solid #1890ff; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                  <strong>💡 Pro Tip:</strong> Make a test call to ${formatPhone(phoneNumber)} right now to hear your assistant in action!
+                </div>
+
+                <div style="background: #fff7e6; border-left: 4px solid #faad14; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                  <strong>🎁 Share & Earn $50!</strong><br>
+                  <p style="margin: 10px 0 5px 0;">Your referral code: <strong style="color: #D95F3C; font-size: 18px;">${referralCode}</strong></p>
+                  <p style="margin: 5px 0;">Share with other contractors and earn $50 credit when they sign up!</p>
+                </div>
+
+                <div class="footer">
+                  <p>Need help? Reply to this email or contact us at <a href="mailto:support@ringsnap.com" style="color: #D95F3C;">support@ringsnap.com</a></p>
+                  <p style="margin: 10px 0 0 0; color: #999;">© 2025 RingSnap. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>
           `,
         }),
       });

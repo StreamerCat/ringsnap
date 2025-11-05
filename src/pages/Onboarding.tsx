@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import { OnboardingSetupForm } from "@/components/OnboardingSetupForm";
+import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -124,7 +125,7 @@ export default function Onboarding() {
     setShowSetupForm(false);
     toast.success("Setup complete! Provisioning your resources...");
     
-    // Poll for provisioning completion
+    // Poll for provisioning completion (faster 3s polling)
     const pollInterval = setInterval(async () => {
       const { data: updatedAccount } = await supabase
         .from('accounts')
@@ -140,7 +141,7 @@ export default function Onboarding() {
         clearInterval(pollInterval);
         toast.error("Provisioning failed. Please contact support.");
       }
-    }, 5000); // Poll every 5 seconds
+    }, 3000); // Poll every 3 seconds (faster)
 
     // Stop polling after 2 minutes
     setTimeout(() => clearInterval(pollInterval), 120000);
@@ -184,89 +185,101 @@ export default function Onboarding() {
     );
   }
 
-  // Show loading state if provisioning
-  if (account?.provisioning_status === 'provisioning') {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
-        <div className="max-w-2xl mx-auto text-center space-y-8">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-          <h1 className="text-4xl font-bold">Setting Up Your Account</h1>
-          <p className="text-xl text-muted-foreground">
-            We're provisioning your phone number and AI assistant. This usually takes 1-2 minutes.
-          </p>
-          <Card className="bg-muted">
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">
-                You'll be automatically redirected when setup is complete.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   const trialDaysRemaining = account?.trial_end_date
     ? Math.ceil((new Date(account.trial_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 3;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-            <Check className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-4xl font-bold">
-            Welcome to RingSnap{profile?.name ? `, ${profile.name}!` : ""}
-          </h1>
-          <p className="text-xl text-muted-foreground">
-            {account?.company_name
-              ? `Your account is being set up for ${account.company_name}`
-              : "Your account is being prepared."
-            }
-          </p>
-          <div className="inline-block bg-primary/10 text-primary px-4 py-2 rounded-full font-semibold">
-            {trialDaysRemaining} days remaining in your trial
-          </div>
-        </div>
-
-        {/* Phone Number Card */}
-        {phoneNumber && (
-          <Card className="border-primary/20">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted py-8 px-4 sm:py-12">
+      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+        {/* Progress Banner - Shows during provisioning */}
+        {account?.provisioning_status === 'provisioning' && (
+          <Card className="border-2 border-blue-500 bg-blue-50 shadow-lg sticky top-4 z-10">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Phone className="h-5 w-5 text-primary" />
-                Your RingSnap Number
-              </CardTitle>
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <CardTitle className="text-lg sm:text-xl">Setting Up Your Account</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold tracking-tight">
-                  {phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3")}
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center">
+                    <Check className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-medium">Creating your phone number</span>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(phoneNumber);
-                    toast.success("Phone number copied to clipboard!");
-                  }}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-3">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${phoneNumber ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    {phoneNumber ? <Check className="h-5 w-5" /> : <Loader2 className="h-4 w-4 animate-spin" />}
+                  </div>
+                  <span className="text-sm font-medium">Configuring AI assistant</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${assistant ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    {assistant ? <Check className="h-5 w-5" /> : <span className="text-xs">3</span>}
+                  </div>
+                  <span className="text-sm font-medium">Finalizing account</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={account?.provisioning_status === 'completed' ? 'default' : 'secondary'}>
-                  {account?.provisioning_status || 'pending'}
-                </Badge>
-                {account?.phone_number_area_code && (
-                  <Badge variant="outline">Area: {account.phone_number_area_code}</Badge>
-                )}
+              <p className="text-sm text-muted-foreground mt-4">
+                This usually takes 60-90 seconds. Feel free to explore below!
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Welcome Header */}
+        <Card className="bg-gradient-to-br from-primary/5 to-cream/20">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl sm:text-4xl font-bold mb-2">
+              Welcome to RingSnap! 🎉
+            </CardTitle>
+            <CardDescription className="text-base sm:text-lg">
+              Your AI phone assistant is {phoneNumber ? 'ready' : 'being set up'}
+            </CardDescription>
+            {account?.subscription_status === 'trial' && (
+              <div className="inline-block bg-primary/10 text-primary px-4 py-2 rounded-full font-semibold mt-4">
+                {trialDaysRemaining} days remaining in your trial
               </div>
+            )}
+          </CardHeader>
+        </Card>
+
+        {/* Carrier Forwarding Instructions - Hero when provisioned */}
+        {phoneNumber && (
+          <CarrierForwardingInstructions 
+            phoneNumber={phoneNumber}
+            companyName={account?.company_name}
+          />
+        )}
+
+        {/* Test Assistant Card */}
+        {phoneNumber && (
+          <Card className="border-2 border-green-500 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Phone className="h-6 w-6 text-green-600" />
+                Test Your AI Assistant
+              </CardTitle>
+              <CardDescription className="text-base">
+                Call your RingSnap number to hear your {assistant?.voice_gender || 'AI'} assistant in action
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                size="lg"
+                asChild
+                className="w-full h-16 text-xl font-bold bg-green-600 hover:bg-green-700"
+              >
+                <a href={`tel:${phoneNumber}`}>
+                  <Phone className="mr-3 h-6 w-6" />
+                  Call {phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3")} Now
+                </a>
+              </Button>
+              <p className="text-xs text-center text-muted-foreground mt-3">
+                The call will be answered by your AI assistant just like a real customer call
+              </p>
             </CardContent>
           </Card>
         )}
