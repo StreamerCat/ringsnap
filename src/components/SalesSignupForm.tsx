@@ -19,8 +19,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
+// Initialize Stripe - Replace with your live publishable key from https://dashboard.stripe.com/apikeys
+const stripePromise = loadStripe('pk_live_YOUR_PUBLISHABLE_KEY_HERE');
 
 // Form schema
 const salesFormSchema = z.object({
