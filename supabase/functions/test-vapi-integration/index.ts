@@ -26,30 +26,30 @@ serve(async (req) => {
     );
   }
 
-  const { skipCleanup = false } = await req.json().catch(() => ({}));
+  const { testLevel = 'minimal', skipCleanup = false } = await req.json().catch(() => ({}));
   
   const tests = {
-    apiKey: { success: false, details: '', error: '' },
-    phoneNumber: { success: false, phoneId: '', phoneNumber: '', details: '', error: '' },
-    assistant: { success: false, assistantId: '', details: '', error: '' },
-    linking: { success: false, details: '', error: '' },
-    cleanup: { success: false, details: '' }
+    apiKey: { success: false, details: '', error: '', skipped: false },
+    phoneNumber: { success: false, phoneId: '', phoneNumber: '', details: '', error: '', skipped: false },
+    assistant: { success: false, assistantId: '', details: '', error: '', skipped: false },
+    linking: { success: false, details: '', error: '', skipped: false },
+    cleanup: { success: false, details: '', skipped: false }
   };
 
   let phoneId: string | null = null;
   let assistantId: string | null = null;
 
-  // Test 1: API Key Validation
+  // Test 1: API Key Validation (always runs - free)
   console.log('Test 1: Validating API Key...');
   try {
-    const accountResponse = await fetch('https://api.vapi.ai/account', {
+    const accountResponse = await fetch('https://api.vapi.ai/assistant?limit=1', {
       headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` }
     });
 
     if (accountResponse.ok) {
       const accountData = await accountResponse.json();
       tests.apiKey.success = true;
-      tests.apiKey.details = `Valid API key. Account: ${accountData.name || 'N/A'}`;
+      tests.apiKey.details = `Valid API key (${Array.isArray(accountData) ? accountData.length : 0} assistants found)`;
       console.log('✓ API Key valid');
     } else {
       const errorText = await accountResponse.text();
@@ -61,8 +61,8 @@ serve(async (req) => {
     console.error('✗ API Key test failed:', tests.apiKey.error);
   }
 
-  // Test 2: Phone Number Creation
-  if (tests.apiKey.success) {
+  // Test 2: Phone Number Creation (only if testLevel allows)
+  if (tests.apiKey.success && ['phone', 'full'].includes(testLevel)) {
     console.log('Test 2: Creating test phone number...');
     try {
       const phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
@@ -99,12 +99,17 @@ serve(async (req) => {
       tests.phoneNumber.error = error instanceof Error ? error.message : 'Unknown error';
       console.error('✗ Phone creation error:', tests.phoneNumber.error);
     }
+  } else if (tests.apiKey.success) {
+    tests.phoneNumber.skipped = true;
+    tests.phoneNumber.details = `Skipped (testLevel: ${testLevel})`;
+    console.log('⊘ Phone number test skipped');
   } else {
+    tests.phoneNumber.skipped = true;
     tests.phoneNumber.error = 'Skipped due to API key failure';
   }
 
-  // Test 3: Assistant Creation
-  if (tests.apiKey.success) {
+  // Test 3: Assistant Creation (only if testLevel allows)
+  if (tests.apiKey.success && ['assistant', 'full'].includes(testLevel)) {
     console.log('Test 3: Creating test assistant...');
     try {
       const assistantResponse = await fetch('https://api.vapi.ai/assistant', {
@@ -148,12 +153,17 @@ serve(async (req) => {
       tests.assistant.error = error instanceof Error ? error.message : 'Unknown error';
       console.error('✗ Assistant creation error:', tests.assistant.error);
     }
+  } else if (tests.apiKey.success) {
+    tests.assistant.skipped = true;
+    tests.assistant.details = `Skipped (testLevel: ${testLevel})`;
+    console.log('⊘ Assistant test skipped');
   } else {
+    tests.assistant.skipped = true;
     tests.assistant.error = 'Skipped due to API key failure';
   }
 
-  // Test 4: Linking Assistant to Phone
-  if (tests.phoneNumber.success && tests.assistant.success && phoneId && assistantId) {
+  // Test 4: Linking Assistant to Phone (only for full test)
+  if (testLevel === 'full' && tests.phoneNumber.success && tests.assistant.success && phoneId && assistantId) {
     console.log('Test 4: Linking assistant to phone...');
     try {
       const linkResponse = await fetch(`https://api.vapi.ai/phone-number/${phoneId}`, {
@@ -180,7 +190,12 @@ serve(async (req) => {
       tests.linking.error = error instanceof Error ? error.message : 'Unknown error';
       console.error('✗ Linking error:', tests.linking.error);
     }
+  } else if (testLevel !== 'full') {
+    tests.linking.skipped = true;
+    tests.linking.details = `Skipped (testLevel: ${testLevel})`;
+    console.log('⊘ Linking test skipped');
   } else {
+    tests.linking.skipped = true;
     tests.linking.error = 'Skipped due to phone or assistant creation failure';
   }
 
@@ -239,37 +254,76 @@ serve(async (req) => {
     ? `✓ All ${totalTests} tests passed!` 
     : `✗ ${totalTests - passedTests} of ${totalTests} tests failed`;
 
+  // Determine credit usage
+  let creditsUsed = 'none';
+  if (testLevel === 'full') creditsUsed = 'high';
+  else if (testLevel === 'phone' || testLevel === 'assistant') creditsUsed = 'low';
+
   const recommendations = [];
+  const nextSteps = [];
+
   if (!tests.apiKey.success) {
     recommendations.push('CRITICAL: Verify VAPI_API_KEY is correct and has proper permissions');
-  }
-  if (!tests.phoneNumber.success && tests.apiKey.success) {
-    recommendations.push('Check VAPI account limits, billing status, and area code availability');
-  }
-  if (!tests.assistant.success && tests.apiKey.success) {
-    recommendations.push('Verify VAPI account has assistant creation permissions and OpenAI integration');
-  }
-  if (!tests.linking.success && tests.phoneNumber.success && tests.assistant.success) {
-    recommendations.push('Check VAPI API documentation for phone-assistant linking requirements');
-  }
-  if (passedTests === totalTests) {
-    recommendations.push('VAPI integration is working correctly! Issue may be in provisioning logic or timing.');
+    nextSteps.push('Fix API key before running any other tests (saves credits)');
+  } else {
+    // API key is valid
+    if (testLevel === 'minimal') {
+      nextSteps.push('✓ API key validated successfully (0 credits used)');
+      nextSteps.push('Run with {"testLevel": "phone"} to test phone number creation');
+      nextSteps.push('Run with {"testLevel": "assistant"} to test assistant creation');
+      nextSteps.push('Run with {"testLevel": "full"} to test complete integration');
+    }
+    
+    if (testLevel === 'phone' && tests.phoneNumber.success) {
+      nextSteps.push('✓ Phone number creation successful');
+      nextSteps.push('Run with {"testLevel": "full"} to test linking');
+    } else if (testLevel === 'phone' && !tests.phoneNumber.success && !tests.phoneNumber.skipped) {
+      recommendations.push('Phone number creation failed - check VAPI account limits and billing');
+    }
+    
+    if (testLevel === 'assistant' && tests.assistant.success) {
+      nextSteps.push('✓ Assistant creation successful');
+      nextSteps.push('Run with {"testLevel": "full"} to test linking');
+    } else if (testLevel === 'assistant' && !tests.assistant.success && !tests.assistant.skipped) {
+      recommendations.push('Assistant creation failed - verify API permissions');
+    }
+    
+    if (testLevel === 'full') {
+      if (tests.phoneNumber.success && tests.assistant.success && tests.linking.success) {
+        nextSteps.push('✓ Full integration test passed - VAPI is configured correctly');
+      } else if (tests.phoneNumber.success && tests.assistant.success && !tests.linking.success) {
+        recommendations.push('Linking failed - check VAPI phone-assistant configuration');
+      }
+    }
   }
 
   console.log('\n=== Test Summary ===');
   console.log(summary);
+  console.log(`Test Level: ${testLevel}, Credits Used: ${creditsUsed}`);
   console.log('Recommendations:', recommendations);
+  console.log('Next Steps:', nextSteps);
 
   return new Response(
     JSON.stringify({
-      success: passedTests === totalTests,
+      success: tests.apiKey.success && 
+               (testLevel === 'minimal' || 
+                (testLevel === 'phone' && tests.phoneNumber.success) ||
+                (testLevel === 'assistant' && tests.assistant.success) ||
+                (testLevel === 'full' && tests.phoneNumber.success && tests.assistant.success && tests.linking.success)),
+      testLevel,
+      creditsUsed,
       tests,
       summary,
       recommendations,
+      nextSteps,
       metadata: {
         skipCleanup,
         timestamp: new Date().toISOString(),
-        apiKeyConfigured: !!VAPI_API_KEY
+        apiKeyConfigured: !!VAPI_API_KEY,
+        createdResources: {
+          phoneId,
+          assistantId
+        }
       }
     }, null, 2),
     {
