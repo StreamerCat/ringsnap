@@ -176,9 +176,10 @@ function SalesSignupFormInner() {
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-      {/* Customer Info Section */}
-      <Card>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        {/* Customer Info Section */}
+        <Card>
         <CardHeader>
           <CardTitle>Customer Information</CardTitle>
         </CardHeader>
@@ -434,7 +435,8 @@ function SalesSignupFormInner() {
       >
         {isSubmitting ? "Creating Account..." : "Create Account & Start"}
       </Button>
-    </form>
+      </form>
+    </Form>
   );
 }
 
