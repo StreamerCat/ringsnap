@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { supabase } from "@/integrations/supabase/client";
 const formSchema = z.object({
   name: z
     .string()
@@ -86,6 +87,18 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       if (!response.ok || !result?.ok) {
         const errorDetails = result?.details || result?.error || "Unknown error";
         throw new Error(errorDetails);
+      }
+
+      // Sign in with returned credentials for instant login
+      if (result.email && result.password) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: result.email,
+          password: result.password,
+        });
+
+        if (signInError) {
+          throw new Error('Account created but failed to sign in. Please use the login page.');
+        }
       }
 
       form.reset();

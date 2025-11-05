@@ -164,7 +164,9 @@ serve(async (req) => {
       JSON.stringify({ 
         ok: true,
         user_id: authData.user.id,
-        message: 'Trial signup successful. Account provisioning in progress.'
+        email: email,
+        password: password, // Return password for instant login
+        message: 'Trial signup successful. Redirecting to onboarding...'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
