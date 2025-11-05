@@ -79,3 +79,16 @@ Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/c
 3. Confirm the browser redirects to `/app` after submission.
 4. Verify in Supabase that the `accounts` and `users` tables include the new trial records with the expected fields.
 5. Ensure Lovable's native database does not contain a duplicate record for the submission.
+
+## Admin monitoring dashboard
+
+Operations leads and admins can access a consolidated health dashboard at `/admin/monitoring` (link available from the Sales dashboard header once authenticated as an owner or admin). The page surfaces provisioning health, usage trends, and risk signals pulled from Supabase views optimised for this workflow.
+
+### Daily health check routine
+
+1. **Provisioning status cards** – Confirm new accounts are progressing to a `provisioned` state and review any recent failures surfaced in the "Recent provisioning failures" table.
+2. **Call volume & minutes** – Use the time range filter (7/30/90 days or all-time) to ensure total calls and minutes align with expectations. Investigate spikes in cost or average call duration.
+3. **Edge function error feed** – Scan the most recent errors for repeated failures. Escalate critical or high severity issues and capture request IDs for debugging.
+4. **Flagged accounts** – Review accounts with active alerts, provisioning issues, or manual flags. Coordinate follow-up actions with support or sales depending on the flagged reason.
+
+All datasets are powered by the new `admin_*` Supabase views, so downstream teams can also build reports directly against those views if deeper analysis is required.

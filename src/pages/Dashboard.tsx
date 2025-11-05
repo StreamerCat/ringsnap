@@ -126,8 +126,13 @@ export default function Dashboard() {
     <SalesPasswordGate>
       <div className="min-h-screen bg-slate-50 p-4">
         <div className="container max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-slate-900">Sales Dashboard</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <h1 className="text-3xl font-bold text-slate-900">Sales Dashboard</h1>
+            <Button variant="outline" onClick={() => navigate("/admin/monitoring")}>
+              Monitoring Dashboard
+            </Button>
+          </div>
           <Select value={dateFilter} onValueChange={setDateFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue />
