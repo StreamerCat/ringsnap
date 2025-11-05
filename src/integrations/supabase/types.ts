@@ -90,6 +90,7 @@ export type Database = {
           overage_cap_percentage: number | null
           overage_minutes_used: number | null
           phone_number_area_code: string | null
+          phone_number_e164: string | null
           phone_number_held_until: string | null
           phone_number_status: string | null
           phone_verified: boolean | null
@@ -113,6 +114,7 @@ export type Database = {
           trial_start_date: string | null
           updated_at: string | null
           vapi_assistant_id: string | null
+          vapi_number_id: string | null
           vapi_phone_number: string | null
           wants_advanced_voice: boolean | null
           zip_code: string | null
@@ -148,6 +150,7 @@ export type Database = {
           overage_cap_percentage?: number | null
           overage_minutes_used?: number | null
           phone_number_area_code?: string | null
+          phone_number_e164?: string | null
           phone_number_held_until?: string | null
           phone_number_status?: string | null
           phone_verified?: boolean | null
@@ -171,6 +174,7 @@ export type Database = {
           trial_start_date?: string | null
           updated_at?: string | null
           vapi_assistant_id?: string | null
+          vapi_number_id?: string | null
           vapi_phone_number?: string | null
           wants_advanced_voice?: boolean | null
           zip_code?: string | null
@@ -206,6 +210,7 @@ export type Database = {
           overage_cap_percentage?: number | null
           overage_minutes_used?: number | null
           phone_number_area_code?: string | null
+          phone_number_e164?: string | null
           phone_number_held_until?: string | null
           phone_number_status?: string | null
           phone_verified?: boolean | null
@@ -229,6 +234,7 @@ export type Database = {
           trial_start_date?: string | null
           updated_at?: string | null
           vapi_assistant_id?: string | null
+          vapi_number_id?: string | null
           vapi_phone_number?: string | null
           wants_advanced_voice?: boolean | null
           zip_code?: string | null
@@ -877,6 +883,117 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      provisioning_jobs: {
+        Row: {
+          account_id: string
+          attempts: number
+          created_at: string | null
+          error: string | null
+          id: string
+          status: string
+          step: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          attempts?: number
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          status?: string
+          step?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          attempts?: number
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          status?: string
+          step?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provisioning_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vapi_assistants: {
+        Row: {
+          account_id: string
+          config: Json
+          created_at: string | null
+          id: string
+          vapi_assistant_id: string
+        }
+        Insert: {
+          account_id: string
+          config?: Json
+          created_at?: string | null
+          id?: string
+          vapi_assistant_id: string
+        }
+        Update: {
+          account_id?: string
+          config?: Json
+          created_at?: string | null
+          id?: string
+          vapi_assistant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vapi_assistants_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vapi_numbers: {
+        Row: {
+          account_id: string
+          country: string | null
+          created_at: string | null
+          id: string
+          phone_e164: string
+          vapi_number_id: string
+        }
+        Insert: {
+          account_id: string
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          phone_e164: string
+          vapi_number_id: string
+        }
+        Update: {
+          account_id?: string
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          phone_e164?: string
+          vapi_number_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vapi_numbers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       voice_library: {
         Row: {

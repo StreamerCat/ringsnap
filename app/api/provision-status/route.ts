@@ -1,40 +1,74 @@
-// app/api/signup/route.ts
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export async function POST(req: NextRequest) {
-  const { name, email, phone, trade, companyName, areaCode = "303" } = await req.json();
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables for provision status route");
+}
 
-  // create or fetch user and account as you already do
-  const { data: user } = await supabase.from("users").insert({ name, email, phone }).select("*").single();
-  const { data: account } = await supabase.from("accounts").insert({ owner_user_id: user.id, name: companyName ?? name }).select("*").single();
-
-  // call the secure Edge Function to provision
-  const res = await fetch(`${process.env.SUPABASE_URL}/functions/v1/provision`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
-    },
-    body: JSON.stringify({
-      accountId: account.id,
-      userId: user.id,
-      companyName: companyName ?? "RingSnap",
-      areaCode
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
     })
-  });
+  : null;
 
-  const body = await res.json();
-  if (!res.ok || !body.ok) {
-    return Response.json({ ok: false, error: body.error || "provision_failed" }, { status: 400 });
+export async function GET(req: NextRequest) {
+  if (!supabase) {
+    return Response.json({ ok: false, error: "server_not_configured" }, { status: 500 });
   }
 
-  return Response.json({
-    ok: true,
-    accountId: account.id,
-    assistantId: body.assistantId,
-    phone: body.number
-  });
+  const url = new URL(req.url);
+  const jobId = url.searchParams.get("job_id");
+
+  if (!jobId) {
+    return Response.json({ ok: false, error: "missing_job_id" }, { status: 400 });
+  }
+
+  try {
+    const { data: job, error: jobError } = await supabase
+      .from("provisioning_jobs")
+      .select("*")
+      .eq("id", jobId)
+      .maybeSingle();
+
+    if (jobError) {
+      throw jobError;
+    }
+
+    if (!job) {
+      return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+    }
+
+    if (job.status === "succeeded") {
+      const { data: account, error: accountError } = await supabase
+        .from("accounts")
+        .select("phone_number_e164")
+        .eq("id", job.account_id)
+        .maybeSingle();
+
+      if (accountError) {
+        throw accountError;
+      }
+
+      return Response.json({
+        ok: true,
+        status: job.status,
+        step: job.step,
+        phone: account?.phone_number_e164 ?? null,
+      });
+    }
+
+    return Response.json({
+      ok: true,
+      status: job.status,
+      step: job.step,
+      error: job.error ?? null,
+    });
+  } catch (error) {
+    console.error("Provision status error", error);
+    const message = error instanceof Error ? error.message : "unknown_error";
+    return Response.json({ ok: false, error: message }, { status: 500 });
+  }
 }
