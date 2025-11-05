@@ -12,6 +12,8 @@ const corsHeaders = {
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+  let accountId: string | undefined;
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,7 +23,9 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { accountId, phoneNumberId, customerPhone, appointmentDetails } = await req.json();
+    const body = await req.json();
+    accountId = body.accountId;
+    const { phoneNumberId, customerPhone, appointmentDetails } = body;
 
     if (!accountId || !customerPhone || !appointmentDetails) {
       return new Response(

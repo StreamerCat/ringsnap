@@ -116,7 +116,8 @@ const AdminMonitoring = () => {
           throw error;
         }
 
-        const hasAccess = roles?.some((role: { role: string }) => role.role === "owner" || role.role === "admin");
+        const hasAccess = roles && Array.isArray(roles) && roles.length > 0 && 
+          roles.some((role: any) => role.role === "owner" || role.role === "admin");
 
         if (!hasAccess) {
           setIsAuthorized(false);
@@ -139,7 +140,7 @@ const AdminMonitoring = () => {
     verifyAccess();
   }, [navigate, toast]);
 
-  const { data: provisioningSummary = [], isLoading: provisioningLoading } = useQuery({
+  const { data: provisioningSummary = [], isLoading: provisioningLoading, error: provisioningError } = useQuery({
     queryKey: ["admin-monitoring", "provisioning-summary"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -148,24 +149,28 @@ const AdminMonitoring = () => {
 
       if (error) throw error;
       return (data || []).map((row: any) => ({
-        ...row,
-        account_count: Number(row.account_count) || 0,
-        accounts_with_errors: Number(row.accounts_with_errors) || 0,
+        provisioning_status: row.provisioning_status,
+        account_count: row.account_count,
+        accounts_with_errors: row.accounts_with_errors,
+        last_failure_at: row.last_failure_at,
       })) as ProvisioningStatusRow[];
     },
     enabled: isAuthorized,
     staleTime: 60_000,
-    onError: (error: any) => {
-      console.error("Failed to load provisioning summary", error);
-      toast({
-        title: "Failed to load provisioning summary",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    },
   });
 
-  const { data: callStats = [], isLoading: callStatsLoading } = useQuery({
+  useEffect(() => {
+    if (provisioningError) {
+      console.error("Failed to load provisioning summary", provisioningError);
+      toast({
+        title: "Failed to load provisioning summary",
+        description: provisioningError.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  }, [provisioningError, toast]);
+
+  const { data: callStats = [], isLoading: callStatsLoading, error: callStatsError } = useQuery({
     queryKey: ["admin-monitoring", "call-stats"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -183,17 +188,20 @@ const AdminMonitoring = () => {
     },
     enabled: isAuthorized,
     staleTime: 60_000,
-    onError: (error: any) => {
-      console.error("Failed to load call stats", error);
-      toast({
-        title: "Failed to load call stats",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    },
   });
 
-  const { data: edgeFunctionErrors = [], isLoading: edgeErrorsLoading } = useQuery({
+  useEffect(() => {
+    if (callStatsError) {
+      console.error("Failed to load call stats", callStatsError);
+      toast({
+        title: "Failed to load call stats",
+        description: callStatsError.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  }, [callStatsError, toast]);
+
+  const { data: edgeFunctionErrors = [] as EdgeFunctionErrorRow[], isLoading: edgeErrorsLoading, error: edgeErrorsError } = useQuery({
     queryKey: ["admin-monitoring", "edge-function-errors"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -203,21 +211,25 @@ const AdminMonitoring = () => {
         .limit(25);
 
       if (error) throw error;
-      return (data || []) as EdgeFunctionErrorRow[];
+      if (!data) return [];
+      return data as unknown as EdgeFunctionErrorRow[];
     },
     enabled: isAuthorized,
     staleTime: 30_000,
-    onError: (error: any) => {
-      console.error("Failed to load edge function errors", error);
-      toast({
-        title: "Failed to load edge function errors",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    },
   });
 
-  const { data: flaggedAccounts = [], isLoading: flaggedAccountsLoading } = useQuery({
+  useEffect(() => {
+    if (edgeErrorsError) {
+      console.error("Failed to load edge function errors", edgeErrorsError);
+      toast({
+        title: "Failed to load edge function errors",
+        description: edgeErrorsError.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  }, [edgeErrorsError, toast]);
+
+  const { data: flaggedAccounts = [] as FlaggedAccountRow[], isLoading: flaggedAccountsLoading, error: flaggedAccountsError } = useQuery({
     queryKey: ["admin-monitoring", "flagged-accounts"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -233,17 +245,20 @@ const AdminMonitoring = () => {
     },
     enabled: isAuthorized,
     staleTime: 60_000,
-    onError: (error: any) => {
-      console.error("Failed to load flagged accounts", error);
-      toast({
-        title: "Failed to load flagged accounts",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    },
   });
 
-  const { data: provisioningFailures = [], isLoading: provisioningFailuresLoading } = useQuery({
+  useEffect(() => {
+    if (flaggedAccountsError) {
+      console.error("Failed to load flagged accounts", flaggedAccountsError);
+      toast({
+        title: "Failed to load flagged accounts",
+        description: flaggedAccountsError.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  }, [flaggedAccountsError, toast]);
+
+  const { data: provisioningFailures = [] as ProvisioningFailureRow[], isLoading: provisioningFailuresLoading, error: provisioningFailuresError } = useQuery({
     queryKey: ["admin-monitoring", "provisioning-failures"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -253,19 +268,23 @@ const AdminMonitoring = () => {
         .limit(25);
 
       if (error) throw error;
-      return (data || []) as ProvisioningFailureRow[];
+      if (!data) return [];
+      return data as unknown as ProvisioningFailureRow[];
     },
     enabled: isAuthorized,
     staleTime: 30_000,
-    onError: (error: any) => {
-      console.error("Failed to load provisioning failures", error);
+  });
+
+  useEffect(() => {
+    if (provisioningFailuresError) {
+      console.error("Failed to load provisioning failures", provisioningFailuresError);
       toast({
         title: "Failed to load provisioning failures",
-        description: error.message || "An unexpected error occurred.",
+        description: provisioningFailuresError.message || "An unexpected error occurred.",
         variant: "destructive",
       });
-    },
-  });
+    }
+  }, [provisioningFailuresError, toast]);
 
   const filteredCallStats = useMemo(() => {
     if (!callStats || callStats.length === 0) return [] as DailyCallStat[];
