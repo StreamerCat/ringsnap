@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { jsPDF } from 'jspdf';
+import { Helmet } from 'react-helmet';
 import { Card, CardContent } from "@/components/ui/card";
 import { CallValueCalculator } from "@/components/CallValueCalculator";
 import { SalesSignupForm } from "@/components/SalesSignupForm";
+import { SalesPasswordGate } from "@/components/SalesPasswordGate";
 import Vapi from "@vapi-ai/web";
 import { useEffect, useRef } from "react";
 
@@ -148,7 +150,11 @@ export default function Sales() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <SalesPasswordGate>
+      <Helmet>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      <div className="min-h-screen bg-slate-50">
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-slate-100 to-slate-50 py-12 sm:py-16 px-4">
         <div className="container mx-auto max-w-7xl text-center">
@@ -236,6 +242,7 @@ export default function Sales() {
 
       {/* Bottom Padding for Mobile */}
       <div className="pb-20"></div>
-    </div>
+      </div>
+    </SalesPasswordGate>
   );
 }
