@@ -1,5 +1,8 @@
 project_id = "lytnlrkdccqmxgdmdxef"
 
+[functions.test-vapi-integration]
+verify_jwt = false
+
 [functions.free-trial-signup]
 verify_jwt = false
 
