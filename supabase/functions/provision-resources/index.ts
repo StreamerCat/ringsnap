@@ -74,15 +74,24 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          provider: 'twilio',
-          numberType: 'local',
-          areaCode: areaCode,
+          provider: 'vapi',
+          name: `${account.company_name} - Primary`,
+          fallbackDestination: {
+            type: 'number',
+            number: phone || '+14155551234',
+          },
+          ...(areaCode && { areaCode: areaCode })
         }),
       });
 
       if (!phoneResponse.ok) {
         const errorText = await phoneResponse.text();
         console.error('VAPI phone creation failed:', errorText);
+        console.error('Request payload:', JSON.stringify({
+          provider: 'vapi',
+          areaCode: areaCode,
+          companyName: account.company_name
+        }));
         throw new Error(`Failed to create phone number: ${errorText}`);
       }
 
