@@ -74,7 +74,7 @@ serve(async (req) => {
         body: JSON.stringify({
           provider: 'vapi',
           name: 'RingSnap Test Number',
-          areaCode: '720',
+          numberDesiredAreaCode: '720',
           fallbackDestination: {
             type: 'number',
             number: '+14155551234'
@@ -130,7 +130,7 @@ serve(async (req) => {
             }]
           },
           voice: {
-            provider: 'elevenlabs',
+            provider: '11labs',
             voiceId: 'sarah'
           },
           firstMessage: 'This is a test assistant.'

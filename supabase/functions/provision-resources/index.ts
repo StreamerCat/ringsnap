@@ -83,7 +83,7 @@ serve(async (req) => {
             type: 'number',
             number: phone || '+14155551234',
           },
-          ...(areaCode && { areaCode: areaCode })
+          ...(areaCode && { numberDesiredAreaCode: areaCode })
         }),
       });
 
@@ -140,7 +140,7 @@ serve(async (req) => {
             systemPrompt: prompt,
           },
           voice: {
-            provider: 'elevenlabs',
+            provider: '11labs',
             voiceId: voiceId,
           },
           firstMessage: `Thank you for calling ${account.company_name}. How can I help you today?`,
