@@ -26,7 +26,8 @@ const formSchema = z
       .trim()
       .min(10, "Please enter a valid phone number")
       .max(20, "Phone number is too long"),
-    trade: z.string().optional()
+    trade: z.string().optional(),
+    companyName: z.string().optional()
   });
 
 type FormData = z.infer<typeof formSchema>;
@@ -48,7 +49,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       name: "",
       email: "",
       phone: "",
-      trade: ""
+      trade: "",
+      companyName: ""
     }
   });
 
@@ -64,16 +66,22 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       name: trimmedName,
       email: trimmedEmail,
       phone: trimmedPhone,
-      trade: data.trade?.trim() ?? ""
+      trade: data.trade?.trim() ?? "",
+      companyName: data.companyName?.trim() ?? ""
     };
 
     try {
       console.log("Submitting signup with payload:", { ...payload, email: payload.email.substring(0, 3) + "***" });
 
-      // Using debug endpoint for better error messages
-      const response = await fetch("/.netlify/functions/signup-debug", {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/free-trial-signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(payload)
       });
 
@@ -177,6 +185,24 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
                       placeholder="john@smithplumbing.com"
                       {...field}
                       aria-required="true"
+                      className="px-3 sm:px-4"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="companyName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company Name (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Smith Plumbing"
+                      {...field}
                       className="px-3 sm:px-4"
                     />
                   </FormControl>

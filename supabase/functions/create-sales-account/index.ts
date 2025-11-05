@@ -163,10 +163,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Sales account creation error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorDetails = error instanceof Error ? error.stack : 'Unknown error';
     return new Response(
       JSON.stringify({
-        error: error.message,
-        details: error instanceof Error ? error.stack : 'Unknown error'
+        error: errorMessage,
+        details: errorDetails
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -178,7 +180,7 @@ serve(async (req) => {
 
 // Helper: Map plan type to Stripe price ID
 function getPriceIdForPlan(planType: string): string {
-  const priceMap = {
+  const priceMap: Record<string, string> = {
     'starter': Deno.env.get('STRIPE_PRICE_STARTER') || 'price_starter_placeholder',
     'professional': Deno.env.get('STRIPE_PRICE_PROFESSIONAL') || 'price_professional_placeholder',
     'premium': Deno.env.get('STRIPE_PRICE_PREMIUM') || 'price_premium_placeholder'
