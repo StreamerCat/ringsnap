@@ -19,7 +19,7 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { name, email, phone, trade, companyName, zipCode, assistantGender, referralCode, deviceFingerprint } = await req.json();
+    const { name, email, phone, companyName, deviceFingerprint } = await req.json();
 
     // Validate required fields
     if (!name || !email || !phone) {
@@ -33,14 +33,6 @@ serve(async (req) => {
     if (!isValidPhoneNumber(phone)) {
       return new Response(
         JSON.stringify({ error: 'Invalid phone number format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate ZIP code if provided
-    if (zipCode && !isValidZipCode(zipCode)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid ZIP code format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -137,10 +129,6 @@ serve(async (req) => {
         company_name: finalCompanyName,
         name,
         phone,
-        trade: trade || null,
-        zip_code: zipCode || null,
-        assistant_gender: assistantGender || 'female',
-        referral_code: referralCode || null,
         source: 'website'
       }
     });
@@ -171,38 +159,6 @@ serve(async (req) => {
       device_fingerprint: deviceFingerprint,
       success: true,
     });
-
-    // Handle referral if provided
-    if (referralCode) {
-      const { data: referralCodeData } = await supabase
-        .from('referral_codes')
-        .select('account_id')
-        .eq('code', referralCode)
-        .maybeSingle();
-
-      if (referralCodeData) {
-        // Get referee account ID (will be created by trigger)
-        setTimeout(async () => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('account_id')
-            .eq('id', authData.user.id)
-            .single();
-
-          if (profile) {
-            await supabase.from('referrals').insert({
-              referrer_account_id: referralCodeData.account_id,
-              referee_account_id: profile.account_id,
-              referral_code: referralCode,
-              referee_email: email,
-              referee_phone: phone,
-              referee_signup_ip: clientIP,
-              status: 'pending',
-            });
-          }
-        }, 2000);
-      }
-    }
 
     return new Response(
       JSON.stringify({ 

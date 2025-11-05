@@ -7,6 +7,7 @@ import { Check, Loader2, Phone, Settings, TestTube, Copy, User, UserCircle2, Clo
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
+import { OnboardingSetupForm } from "@/components/OnboardingSetupForm";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -22,6 +23,7 @@ export default function Onboarding() {
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [assistant, setAssistant] = useState<any | null>(null);
   const [usageStats, setUsageStats] = useState({ minutesUsed: 0, minutesLimit: 150 });
+  const [showSetupForm, setShowSetupForm] = useState(false);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -109,6 +111,41 @@ export default function Onboarding() {
     checkAuth();
   }, [checkAuth]);
 
+  // Show setup form if provisioning status is pending
+  useEffect(() => {
+    if (account?.provisioning_status === 'pending') {
+      setShowSetupForm(true);
+    } else {
+      setShowSetupForm(false);
+    }
+  }, [account?.provisioning_status]);
+
+  const handleSetupComplete = async () => {
+    setShowSetupForm(false);
+    toast.success("Setup complete! Provisioning your resources...");
+    
+    // Poll for provisioning completion
+    const pollInterval = setInterval(async () => {
+      const { data: updatedAccount } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', account?.id)
+        .single();
+      
+      if (updatedAccount?.provisioning_status === 'completed') {
+        clearInterval(pollInterval);
+        toast.success("Your account is ready!");
+        await checkAuth(); // Refresh all data
+      } else if (updatedAccount?.provisioning_status === 'failed') {
+        clearInterval(pollInterval);
+        toast.error("Provisioning failed. Please contact support.");
+      }
+    }, 5000); // Poll every 5 seconds
+
+    // Stop polling after 2 minutes
+    setTimeout(() => clearInterval(pollInterval), 120000);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
@@ -118,6 +155,55 @@ export default function Onboarding() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show setup form modal if provisioning is pending
+  if (account?.provisioning_status === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
+        <div className="max-w-2xl mx-auto text-center space-y-8">
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+            <Check className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-4xl font-bold">
+            Welcome{profile?.name ? `, ${profile.name}!` : ""}
+          </h1>
+          <p className="text-xl text-muted-foreground">
+            Let's complete your account setup
+          </p>
+        </div>
+
+        <OnboardingSetupForm
+          open={showSetupForm}
+          onOpenChange={setShowSetupForm}
+          onSuccess={handleSetupComplete}
+        />
+      </div>
+    );
+  }
+
+  // Show loading state if provisioning
+  if (account?.provisioning_status === 'provisioning') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
+        <div className="max-w-2xl mx-auto text-center space-y-8">
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+          <h1 className="text-4xl font-bold">Setting Up Your Account</h1>
+          <p className="text-xl text-muted-foreground">
+            We're provisioning your phone number and AI assistant. This usually takes 1-2 minutes.
+          </p>
+          <Card className="bg-muted">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                You'll be automatically redirected when setup is complete.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
