@@ -20,6 +20,7 @@ const VapiWidget = () => {
       .then(data => {
         setVapiConfig(data);
         // Initialize Vapi instance with fetched public key
+        // TODO: Legacy client-side Vapi demo usage. Provisioning now happens server-side; migrate this demo when backend tokens are available.
         vapiRef.current = new Vapi(data.publicKey);
         
         // Event listeners

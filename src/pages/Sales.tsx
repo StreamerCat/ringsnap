@@ -15,6 +15,7 @@ const VapiWidget = () => {
 
   useEffect(() => {
     // Initialize Vapi instance
+    // TODO: Legacy client-side Vapi demo usage. Provisioning now happens server-side; migrate this sales demo when backend tokens are available.
     vapiRef.current = new Vapi("9159dfe3-b11f-457c-b41b-e296872027a0");
 
     // Event listeners

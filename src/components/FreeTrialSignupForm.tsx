@@ -41,6 +41,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [provisionedNumber, setProvisionedNumber] = useState<string | null>(null);
+  const [provisionJobId, setProvisionJobId] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -60,6 +62,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
 
   const onSubmit = async (data: FormData) => {
     setErrorMessage(null);
+    setProvisionedNumber(null);
+    setProvisionJobId(null);
     setIsSubmitting(true);
 
     const payload = {
@@ -70,13 +74,9 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     };
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/free-trial-signup`, {
+      const response = await fetch(`/api/signup`, {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
@@ -85,11 +85,19 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       const result = await response.json();
 
       if (!response.ok || !result?.ok) {
-        const errorDetails = result?.details || result?.error || "Unknown error";
+        const errorDetails = result?.error || "Unknown error";
         throw new Error(errorDetails);
       }
 
-      // Sign in with returned credentials for instant login
+      if (result.phone) {
+        setProvisionedNumber(result.phone);
+      }
+
+      if (result.jobId) {
+        setProvisionJobId(result.jobId);
+      }
+
+      // Sign in with returned credentials for instant login when available
       if (result.email && result.password) {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: result.email,
@@ -122,6 +130,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     if (!nextOpen) {
       form.reset();
       setErrorMessage(null);
+      setProvisionedNumber(null);
+      setProvisionJobId(null);
     }
 
     onOpenChange(nextOpen);
@@ -148,6 +158,15 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
             className="space-y-4 mt-4"
             aria-live="polite"
           >
+            {provisionedNumber && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                <p className="font-medium">You're all set!</p>
+                <p className="mt-1">Your RingSnap assistant is reachable at <span className="font-semibold">{provisionedNumber}</span>.</p>
+                {provisionJobId && (
+                  <p className="mt-1 text-xs text-emerald-800">Provisioning job ID: {provisionJobId}</p>
+                )}
+              </div>
+            )}
             <FormField
               control={form.control}
               name="name"
