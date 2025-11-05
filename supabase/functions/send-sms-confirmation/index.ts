@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "send-sms-confirmation";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +10,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -40,7 +45,14 @@ serve(async (req) => {
     }
 
     if (account.daily_sms_sent >= account.daily_sms_quota) {
-      console.log('Daily SMS quota exceeded');
+      logWarn('Daily SMS quota exceeded', {
+        ...baseLogOptions,
+        accountId,
+        context: {
+          dailySmsSent: account.daily_sms_sent,
+          dailySmsQuota: account.daily_sms_quota
+        }
+      });
       return new Response(
         JSON.stringify({ error: 'Daily SMS quota exceeded' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -64,7 +76,16 @@ serve(async (req) => {
     // Format confirmation message
     const message = `Appointment confirmed! ${appointmentDetails.date} at ${appointmentDetails.time}. ${appointmentDetails.serviceType}. Reply CANCEL to cancel.`;
 
-    console.log(`Sending SMS confirmation to ${customerPhone}: ${message}`);
+    logInfo('Sending SMS confirmation', {
+      ...baseLogOptions,
+      accountId,
+      context: {
+        customerPhone,
+        phoneNumberId,
+        appointmentDate: appointmentDetails.date,
+        appointmentTime: appointmentDetails.time
+      }
+    });
 
     // TODO: Send actual SMS via Twilio/VAPI
     // For now, just log it
@@ -95,7 +116,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('SMS confirmation error:', error);
+    logError('SMS confirmation error', {
+      ...baseLogOptions,
+      accountId,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

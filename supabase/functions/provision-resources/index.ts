@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getAreaCodeFromZip } from "../_shared/area-code-lookup.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "provision-resources";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +17,8 @@ const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -35,7 +40,13 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting provisioning for account: ${accountId}`);
+    logInfo('Starting provisioning workflow', {
+      ...baseLogOptions,
+      accountId,
+      context: {
+        requestOrigin: req.headers.get('origin') || undefined
+      }
+    });
 
     await supabase
       .from('accounts')
@@ -57,7 +68,11 @@ serve(async (req) => {
     if (!areaCode) {
       throw new Error('No area code selected for account');
     }
-    console.log('Using selected area code:', areaCode);
+    logInfo('Using selected area code', {
+      ...baseLogOptions,
+      accountId,
+      context: { areaCode }
+    });
 
     // Get plan limits
     const { data: planDef } = await supabase
@@ -73,7 +88,11 @@ serve(async (req) => {
     let phoneNumber = null;
     
     if (VAPI_API_KEY && areaCode) {
-      console.log(`Requesting phone number with area code: ${areaCode}`);
+      logInfo('Requesting VAPI phone number', {
+        ...baseLogOptions,
+        accountId,
+        context: { areaCode }
+      });
 
       const phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
         method: 'POST',
@@ -94,19 +113,30 @@ serve(async (req) => {
 
       if (!phoneResponse.ok) {
         const errorText = await phoneResponse.text();
-        console.error('VAPI phone creation failed:', errorText);
-        console.error('Request payload:', JSON.stringify({
-          provider: 'vapi',
-          areaCode: areaCode,
-          companyName: account.company_name
-        }));
+        logError('VAPI phone creation failed', {
+          ...baseLogOptions,
+          accountId,
+          error: new Error(errorText),
+          context: {
+            provider: 'vapi',
+            areaCode,
+            companyName: account.company_name
+          }
+        });
         throw new Error(`Failed to create phone number: ${errorText}`);
       }
 
       const phoneData = await phoneResponse.json();
       vapiPhoneId = phoneData.id;
       phoneNumber = phoneData.number;
-      console.log(`Phone created: ${phoneNumber} (${vapiPhoneId})`);
+      logInfo('VAPI phone number created', {
+        ...baseLogOptions,
+        accountId,
+        context: {
+          vapiPhoneId,
+          phoneDigits: phoneNumber
+        }
+      });
     }
 
     // 2. Create VAPI Assistant
@@ -154,13 +184,21 @@ serve(async (req) => {
 
       if (!assistantResponse.ok) {
         const errorText = await assistantResponse.text();
-        console.error('VAPI assistant creation failed:', errorText);
+        logError('VAPI assistant creation failed', {
+          ...baseLogOptions,
+          accountId,
+          error: new Error(errorText)
+        });
         throw new Error(`Failed to create assistant: ${errorText}`);
       }
 
       const assistantData = await assistantResponse.json();
       vapiAssistantId = assistantData.id;
-      console.log(`Assistant created: ${vapiAssistantId}`);
+      logInfo('Assistant created', {
+        ...baseLogOptions,
+        accountId,
+        context: { vapiAssistantId }
+      });
 
       // Link assistant to phone number
       if (vapiPhoneId) {
@@ -199,7 +237,11 @@ serve(async (req) => {
       if (stripeResponse.ok) {
         const stripeData = await stripeResponse.json();
         stripeCustomerId = stripeData.id;
-        console.log(`Stripe customer created: ${stripeCustomerId}`);
+        logInfo('Stripe customer created', {
+          ...baseLogOptions,
+          accountId,
+          context: { stripeCustomerId }
+        });
       }
     }
 
@@ -258,7 +300,10 @@ serve(async (req) => {
       })
       .eq('id', accountId);
 
-    console.log('Account updated successfully:', accountId);
+    logInfo('Account updated successfully', {
+      ...baseLogOptions,
+      accountId
+    });
 
     // 8. Send onboarding SMS if phone is provided (non-blocking)
     if (phone && phoneNumber && vapiPhoneId) {
@@ -270,8 +315,17 @@ serve(async (req) => {
           accountId: accountId,
           vapiPhoneId: vapiPhoneId
         }
-      }).catch(err => console.error('SMS send failed (non-critical):', err));
-      console.log('SMS notification triggered');
+      }).catch(err =>
+        logWarn('SMS notification failed (non-critical)', {
+          ...baseLogOptions,
+          accountId,
+          context: { error: err instanceof Error ? err.message : String(err) }
+        })
+      );
+      logInfo('SMS notification triggered', {
+        ...baseLogOptions,
+        accountId
+      });
     }
 
     // 9. Send welcome email with setup instructions
@@ -367,10 +421,17 @@ serve(async (req) => {
         }),
       });
       
-      console.log('Welcome email sent to:', email);
+      logInfo('Welcome email sent', {
+        ...baseLogOptions,
+        accountId,
+        context: { email }
+      });
     }
 
-    console.log(`Provisioning completed for account: ${accountId}`);
+    logInfo('Provisioning completed', {
+      ...baseLogOptions,
+      accountId
+    });
 
     return new Response(
       JSON.stringify({
@@ -383,7 +444,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Provisioning error:', error);
+    logError('Provisioning error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     
     if (currentAccountId) {

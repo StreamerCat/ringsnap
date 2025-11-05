@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "handle-referral-signup";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,9 +10,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let currentAccountId: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -17,6 +24,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { referralCode, refereeAccountId, refereeEmail, refereePhone, refereeIP } = await req.json();
+    currentAccountId = refereeAccountId ?? null;
 
     if (!referralCode || !refereeAccountId) {
       return new Response(
@@ -33,7 +41,11 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!referralCodeData) {
-      console.log(`Invalid referral code: ${referralCode}`);
+      logWarn('Invalid referral code', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: { referralCode }
+      });
       return new Response(
         JSON.stringify({ error: 'Invalid referral code' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -94,14 +106,28 @@ serve(async (req) => {
       });
 
     if (insertError) {
-      console.error('Error creating referral:', insertError);
+      logError('Error creating referral', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        error: insertError,
+        context: { referralCode }
+      });
       return new Response(
         JSON.stringify({ error: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Referral created: ${referrerAccountId} -> ${refereeAccountId}${isFlagged ? ' (FLAGGED)' : ''}`);
+    logInfo('Referral created', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        referrerAccountId,
+        isFlagged,
+        referralCode,
+        flagReason
+      }
+    });
 
     return new Response(
       JSON.stringify({ 
@@ -113,7 +139,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Handle referral error:', error);
+    logError('Handle referral error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

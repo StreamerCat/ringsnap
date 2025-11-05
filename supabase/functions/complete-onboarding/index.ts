@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isValidZipCode } from "../_shared/validators.ts";
 import { getAreaCodeFromZip } from "../_shared/area-code-lookup.ts";
+import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "complete-onboarding";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,10 +12,14 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let currentAccountId: string | null = null;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -34,7 +41,10 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
-      console.error('Auth error:', userError);
+      logError('Auth error during onboarding completion', {
+        ...baseLogOptions,
+        error: userError
+      });
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -59,7 +69,10 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Using selected area code: ${areaCode}`);
+    logInfo('Using selected area code', {
+      ...baseLogOptions,
+      context: { areaCode }
+    });
 
     // Get user's profile to find account_id
     const { data: profile, error: profileError } = await supabase
@@ -69,7 +82,10 @@ serve(async (req) => {
       .single();
 
     if (profileError || !profile) {
-      console.error('Profile fetch error:', profileError);
+      logError('Profile fetch error during onboarding completion', {
+        ...baseLogOptions,
+        error: profileError
+      });
       return new Response(
         JSON.stringify({ error: 'User profile not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -77,6 +93,7 @@ serve(async (req) => {
     }
 
     const accountId = profile.account_id;
+    currentAccountId = accountId;
 
     // Update account with setup data
     const { error: updateError } = await supabase
@@ -91,14 +108,21 @@ serve(async (req) => {
       .eq('id', accountId);
 
     if (updateError) {
-      console.error('Account update error:', updateError);
+      logError('Account update error during onboarding completion', {
+        ...baseLogOptions,
+        accountId,
+        error: updateError
+      });
       return new Response(
         JSON.stringify({ error: 'Failed to update account' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Account updated successfully:', accountId);
+    logInfo('Account updated successfully', {
+      ...baseLogOptions,
+      accountId
+    });
 
     // Handle referral code if provided
     if (referralCode) {
@@ -130,7 +154,14 @@ serve(async (req) => {
             referee_signup_ip: clientIP,
             status: 'pending',
           });
-          console.log('Referral created for code:', referralCode);
+          logInfo('Referral created for onboarding account', {
+            ...baseLogOptions,
+            accountId,
+            context: {
+              referralCode,
+              referrerAccountId: referralCodeData.account_id
+            }
+          });
         }
       }
     }
@@ -147,7 +178,11 @@ serve(async (req) => {
       });
 
       if (provisionError) {
-        console.error('Provisioning invocation error:', provisionError);
+        logError('Provisioning invocation error', {
+          ...baseLogOptions,
+          accountId,
+          error: provisionError
+        });
         // Update provisioning status to failed
         await supabase
           .from('accounts')
@@ -163,12 +198,19 @@ serve(async (req) => {
         );
       }
 
-      console.log('Provisioning triggered successfully for account:', accountId);
+      logInfo('Provisioning triggered successfully', {
+        ...baseLogOptions,
+        accountId
+      });
     } catch (provisionError) {
-      console.error('Provisioning error:', provisionError);
+      logError('Provisioning error while invoking function', {
+        ...baseLogOptions,
+        accountId,
+        error: provisionError
+      });
       await supabase
         .from('accounts')
-        .update({ 
+        .update({
           provisioning_status: 'failed',
           provisioning_error: provisionError instanceof Error ? provisionError.message : 'Unknown error'
         })
@@ -189,7 +231,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Complete onboarding error:', error);
+    logError('Complete onboarding error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

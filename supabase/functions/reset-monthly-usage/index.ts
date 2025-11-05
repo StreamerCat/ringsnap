@@ -2,6 +2,10 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { extractCorrelationId, logError, logInfo } from '../_shared/logging.ts';
+import type { LogOptions } from '../_shared/logging.ts';
+
+const FUNCTION_NAME = 'reset-monthly-usage';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +13,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -23,7 +29,9 @@ serve(async (req) => {
       apiVersion: '2023-10-16',
     });
 
-    console.log('Running monthly usage reset cron...');
+    logInfo('Running monthly usage reset cron', {
+      ...baseLogOptions
+    });
 
     // Find accounts where billing cycle is today
     const today = new Date().toISOString().split('T')[0];
@@ -34,18 +42,27 @@ serve(async (req) => {
       .eq('subscription_status', 'active');
 
     if (error) {
-      console.error('Error fetching accounts:', error);
+      logError('Error fetching accounts', {
+        ...baseLogOptions,
+        error
+      });
       return new Response(
         JSON.stringify({ error: error.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
-    console.log(`Processing ${accounts?.length || 0} accounts`);
+    logInfo('Processing accounts for reset', {
+      ...baseLogOptions,
+      context: { accountCount: accounts?.length || 0 }
+    });
 
     for (const account of accounts || []) {
       try {
-        console.log(`Processing account ${account.id}`);
+        logInfo('Processing account for monthly reset', {
+          ...baseLogOptions,
+          accountId: account.id
+        });
 
         const overageMinutes = account.overage_minutes_used || 0;
         let totalOverageChargeCents = 0;
@@ -55,7 +72,15 @@ serve(async (req) => {
           const overageRateCents = account.plan_definitions?.overage_rate_cents || 0;
           totalOverageChargeCents = Math.round(overageMinutes * (overageRateCents / 100));
 
-          console.log(`Overage: ${overageMinutes} minutes @ $${(overageRateCents / 100).toFixed(2)}/min = $${(totalOverageChargeCents / 100).toFixed(2)}`);
+          logInfo('Calculated overage charges', {
+            ...baseLogOptions,
+            accountId: account.id,
+            context: {
+              overageMinutes,
+              overageRateCents,
+              totalOverageChargeCents
+            }
+          });
 
           // Create Stripe invoice line item
           if (account.stripe_customer_id && totalOverageChargeCents > 0) {
@@ -92,7 +117,11 @@ serve(async (req) => {
                   })
                   .eq('id', credit.id);
 
-                console.log(`Applied $${(creditAmount / 100).toFixed(2)} credit`);
+                logInfo('Applied credit to overage charge', {
+                  ...baseLogOptions,
+                  accountId: account.id,
+                  context: { creditAmount }
+                });
               }
             }
           }
@@ -116,13 +145,21 @@ serve(async (req) => {
           account,
           account.monthly_minutes_used || 0,
           overageMinutes,
-          totalOverageChargeCents
+          totalOverageChargeCents,
+          baseLogOptions
         );
 
-        console.log(`Account ${account.id} reset successfully`);
+        logInfo('Account reset successfully', {
+          ...baseLogOptions,
+          accountId: account.id
+        });
 
       } catch (accountError) {
-        console.error(`Error processing account ${account.id}:`, accountError);
+        logError('Error processing account during reset', {
+          ...baseLogOptions,
+          accountId: account.id,
+          error: accountError
+        });
       }
     }
 
@@ -135,7 +172,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Reset cron error:', error);
+    logError('Reset cron error', {
+      ...baseLogOptions,
+      error
+    });
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -150,12 +190,20 @@ function getNextBillingDate(currentDate: string): string {
 }
 
 async function sendUsageSummary(
-  account: any,
+  account: Record<string, unknown>,
   monthlyMinutes: number,
   overageMinutes: number,
-  overageChargeCents: number
+  overageChargeCents: number,
+  logOptions: Pick<LogOptions, 'functionName' | 'correlationId'>
 ) {
-  console.log(`Would send usage summary email to account ${account.id}`);
-  console.log(`Monthly: ${monthlyMinutes}, Overage: ${overageMinutes}, Charge: $${(overageChargeCents / 100).toFixed(2)}`);
+  logInfo('Usage summary email pending send', {
+    ...logOptions,
+    accountId: typeof account.id === 'string' ? account.id : null,
+    context: {
+      monthlyMinutes,
+      overageMinutes,
+      overageChargeCents
+    }
+  });
   // TODO: Integrate with Resend
 }

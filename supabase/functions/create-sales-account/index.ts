@@ -2,6 +2,9 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "create-sales-account";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,10 +12,14 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  let currentAccountId: string | null = null;
 
   try {
     // Initialize Stripe with secret key
@@ -29,10 +36,13 @@ serve(async (req) => {
     // Parse request body
     const { customerInfo, paymentMethodId, skipPayment } = await req.json();
 
-    console.log('Creating sales account:', {
-      email: customerInfo.email,
-      skipPayment,
-      hasPlanType: !!customerInfo.planType
+    logInfo('Creating sales account', {
+      ...baseLogOptions,
+      context: {
+        email: customerInfo.email,
+        skipPayment,
+        hasPlanType: !!customerInfo.planType
+      }
     });
 
     let stripeCustomerId = null;
@@ -52,7 +62,10 @@ serve(async (req) => {
         }
       });
       stripeCustomerId = customer.id;
-      console.log('Stripe customer created:', stripeCustomerId);
+      logInfo('Stripe customer created', {
+        ...baseLogOptions,
+        context: { stripeCustomerId, email: customerInfo.email }
+      });
 
       // Attach payment method
       await stripe.paymentMethods.attach(paymentMethodId, {
@@ -77,7 +90,10 @@ serve(async (req) => {
         }
       });
       subscriptionId = subscription.id;
-      console.log('Subscription created:', subscriptionId);
+      logInfo('Subscription created', {
+        ...baseLogOptions,
+        context: { subscriptionId, planType: customerInfo.planType }
+      });
     }
 
     // Step 2: Generate secure temporary password
@@ -105,11 +121,18 @@ serve(async (req) => {
     });
 
     if (authError) {
-      console.error('Auth user creation failed:', authError);
+      logError('Auth user creation failed', {
+        ...baseLogOptions,
+        error: authError,
+        context: { email: customerInfo.email }
+      });
       throw authError;
     }
 
-    console.log('Auth user created:', authData.user.id);
+    logInfo('Auth user created', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, email: customerInfo.email }
+    });
 
     // Step 4: Database trigger will automatically create:
     // - accounts table entry
@@ -127,6 +150,7 @@ serve(async (req) => {
       .single();
 
     if (profile?.account_id) {
+      currentAccountId = profile.account_id;
       await supabaseAdmin
         .from('accounts')
         .update({
@@ -141,7 +165,15 @@ serve(async (req) => {
         })
         .eq('id', profile.account_id);
 
-      console.log('Account updated with sales data');
+      logInfo('Account updated with sales data', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: {
+          salesRepName: customerInfo.salesRepName,
+          planType: customerInfo.planType,
+          subscriptionStatus: skipPayment ? 'trial' : 'active'
+        }
+      });
     }
 
     // Return success response
@@ -162,7 +194,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Sales account creation error:', error);
+    logError('Sales account creation error', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorDetails = error instanceof Error ? error.stack : 'Unknown error';
     return new Response(

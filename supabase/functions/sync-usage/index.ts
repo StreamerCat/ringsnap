@@ -1,6 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
+import type { LogOptions } from '../_shared/logging.ts';
+
+const FUNCTION_NAME = 'sync-usage';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +12,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -23,10 +29,14 @@ serve(async (req) => {
     const { call, customData } = payload;
     const accountId = customData?.accountId;
 
-    console.log('Sync usage:', {
+    logInfo('Sync usage webhook received', {
+      ...baseLogOptions,
       accountId,
-      duration: call.duration,
-      cost: call.cost
+      context: {
+        duration: call?.duration,
+        cost: call?.cost,
+        callId: call?.id
+      }
     });
 
     if (!accountId) {
@@ -44,7 +54,11 @@ serve(async (req) => {
       .single();
 
     if (accountError || !account) {
-      console.error('Account not found:', accountError);
+      logError('Account not found during sync usage', {
+        ...baseLogOptions,
+        accountId,
+        error: accountError
+      });
       return new Response(
         JSON.stringify({ error: 'Account not found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
@@ -93,12 +107,20 @@ serve(async (req) => {
     const totalUsed = isOverage ? monthlyLimit : currentMonthlyUsed + durationMinutes;
     const usagePercentage = (totalUsed / monthlyLimit) * 100;
 
-    console.log('Usage percentage:', usagePercentage);
+    logInfo('Usage percentage calculated', {
+      ...baseLogOptions,
+      accountId,
+      context: { usagePercentage }
+    });
 
     // 80% warning
     if (usagePercentage >= 80 && usagePercentage < 95 && account.last_usage_warning_level !== '80') {
-      console.log('Sending 80% warning');
-      await sendUsageWarning(supabase, account, '80', usagePercentage, totalUsed, monthlyLimit);
+      logInfo('Sending 80% usage warning', {
+        ...baseLogOptions,
+        accountId,
+        context: { usagePercentage }
+      });
+      await sendUsageWarning(account, '80', usagePercentage, totalUsed, monthlyLimit, baseLogOptions);
       await supabase
         .from('accounts')
         .update({
@@ -110,8 +132,12 @@ serve(async (req) => {
 
     // 95% warning
     if (usagePercentage >= 95 && usagePercentage < 100 && account.last_usage_warning_level !== '95') {
-      console.log('Sending 95% warning');
-      await sendUsageWarning(supabase, account, '95', usagePercentage, totalUsed, monthlyLimit);
+      logInfo('Sending 95% usage warning', {
+        ...baseLogOptions,
+        accountId,
+        context: { usagePercentage }
+      });
+      await sendUsageWarning(account, '95', usagePercentage, totalUsed, monthlyLimit, baseLogOptions);
       await supabase
         .from('accounts')
         .update({
@@ -123,9 +149,13 @@ serve(async (req) => {
 
     // 100% overage notification
     if (usagePercentage >= 100 && account.last_usage_warning_level !== '100') {
-      console.log('Sending 100% overage notification');
+      logInfo('Sending 100% overage notification', {
+        ...baseLogOptions,
+        accountId,
+        context: { usagePercentage }
+      });
       const overageRate = account.plan_definitions?.overage_rate_cents || 0;
-      await sendOverageNotification(supabase, account, overageRate);
+      await sendOverageNotification(account, overageRate, baseLogOptions);
       await supabase
         .from('accounts')
         .update({
@@ -145,7 +175,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Sync usage error:', error);
+    logError('Sync usage error', {
+      ...baseLogOptions,
+      error
+    });
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -154,27 +187,34 @@ serve(async (req) => {
 });
 
 async function sendUsageWarning(
-  supabase: any,
-  account: any,
+  account: Record<string, unknown>,
   level: string,
   percentage: number,
   used: number,
-  limit: number
+  limit: number,
+  logOptions: Pick<LogOptions, 'functionName' | 'correlationId'>
 ) {
-  console.log(`Would send ${level}% warning email to account ${account.id}`);
+  logInfo('Usage warning email pending send', {
+    ...logOptions,
+    accountId: typeof account.id === 'string' ? account.id : null,
+    context: { level, percentage, used, limit }
+  });
   // TODO: Integrate with Resend or email service
   // Email content: "You've used {percentage}% ({used}/{limit} minutes) of your monthly minutes"
   // For 95%: Add upgrade CTA to avoid overage charges
 }
 
 async function sendOverageNotification(
-  supabase: any,
-  account: any,
-  overageRateCents: number
+  account: Record<string, unknown>,
+  overageRateCents: number,
+  logOptions: Pick<LogOptions, 'functionName' | 'correlationId'>
 ) {
   const overageRateDollars = (overageRateCents / 100).toFixed(2);
-  console.log(`Would send overage notification email to account ${account.id}`);
-  console.log(`Overage rate: $${overageRateDollars}/minute`);
+  logInfo('Overage notification email pending send', {
+    ...logOptions,
+    accountId: typeof account.id === 'string' ? account.id : null,
+    context: { overageRateDollars }
+  });
   // TODO: Integrate with Resend
   // Email content: "You're now in overage billing at ${overageRateDollars}/minute"
 }

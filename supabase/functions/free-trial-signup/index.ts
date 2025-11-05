@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber, isValidZipCode } from "../_shared/validators.ts";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "free-trial-signup";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +12,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -39,7 +44,10 @@ serve(async (req) => {
 
     // Block disposable emails
     if (isDisposableEmail(email)) {
-      console.log(`Blocked disposable email: ${email}`);
+      logWarn('Blocked disposable email', {
+        ...baseLogOptions,
+        context: { email }
+      });
       return new Response(
         JSON.stringify({ error: 'Please use a valid business or personal email address' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -63,7 +71,10 @@ serve(async (req) => {
       .gte('created_at', thirtyDaysAgo.toISOString());
 
     if (ipAttempts && ipAttempts >= 3) {
-      console.log(`IP rate limit exceeded: ${clientIP}`);
+      logWarn('IP rate limit exceeded for trial signup', {
+        ...baseLogOptions,
+        context: { clientIP, ipAttempts }
+      });
       await supabase.from('signup_attempts').insert({
         email,
         phone,
@@ -87,7 +98,10 @@ serve(async (req) => {
       .maybeSingle();
 
     if (recentPhoneUse) {
-      console.log(`Phone number recently used: ${phone}`);
+      logWarn('Phone number recently used for trial signup', {
+        ...baseLogOptions,
+        context: { phone }
+      });
       await supabase.from('signup_attempts').insert({
         email,
         phone,
@@ -134,7 +148,11 @@ serve(async (req) => {
     });
 
     if (authError) {
-      console.error('Auth error:', authError);
+      logError('Auth error during free trial signup', {
+        ...baseLogOptions,
+        error: authError,
+        context: { email }
+      });
       await supabase.from('signup_attempts').insert({
         email,
         phone,
@@ -149,7 +167,10 @@ serve(async (req) => {
       );
     }
 
-    console.log('User created successfully:', authData.user.id);
+    logInfo('Trial user created successfully', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, email }
+    });
 
     // Log successful signup
     await supabase.from('signup_attempts').insert({
@@ -172,7 +193,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Free trial signup error:', error);
+    logError('Free trial signup error', {
+      ...baseLogOptions,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

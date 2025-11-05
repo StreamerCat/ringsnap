@@ -1,4 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { extractCorrelationId, logError } from '../_shared/logging.ts';
+
+const FUNCTION_NAME = 'vapi-demo-call';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +9,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -16,7 +21,10 @@ serve(async (req) => {
     const VAPI_ASSISTANT_ID = Deno.env.get('VAPI_DEMO_ASSISTANT_ID');
 
     if (!VAPI_PUBLIC_KEY || !VAPI_ASSISTANT_ID) {
-      console.error('Missing VAPI configuration');
+      logError('Missing VAPI configuration', {
+        ...baseLogOptions,
+        error: new Error('Missing VAPI configuration values')
+      });
       return new Response(
         JSON.stringify({ error: 'VAPI not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -32,7 +40,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('VAPI demo call error:', error);
+    logError('VAPI demo call error', {
+      ...baseLogOptions,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

@@ -1,6 +1,9 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
+
+const FUNCTION_NAME = 'authorize-call';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +11,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -22,7 +27,11 @@ serve(async (req) => {
     const { phoneNumber, customData } = await req.json();
     const accountId = customData?.accountId;
 
-    console.log('Authorize call request:', { phoneNumber, accountId });
+    logInfo('Authorize call request received', {
+      ...baseLogOptions,
+      accountId,
+      context: { phoneNumber }
+    });
 
     if (!accountId) {
       return new Response(
@@ -42,7 +51,11 @@ serve(async (req) => {
       .single();
 
     if (error || !account) {
-      console.error('Account not found:', error);
+      logError('Account not found', {
+        ...baseLogOptions,
+        accountId,
+        error
+      });
       return new Response(
         JSON.stringify({ 
           allowed: false, 
@@ -54,7 +67,11 @@ serve(async (req) => {
 
     // Check account status
     if (['suspended', 'disabled', 'cancelled'].includes(account.account_status)) {
-      console.log('Account not active:', account.account_status);
+      logInfo('Account not active', {
+        ...baseLogOptions,
+        accountId,
+        context: { accountStatus: account.account_status }
+      });
       return new Response(
         JSON.stringify({ 
           allowed: false, 
@@ -72,16 +89,24 @@ serve(async (req) => {
       account.monthly_minutes_limit * (account.overage_cap_percentage / 100)
     );
 
-    console.log('Usage check:', {
-      totalMinutes,
-      monthlyLimit: account.monthly_minutes_limit,
-      safetyCap: safetyCapMinutes,
-      overagePercentage: account.overage_cap_percentage
+    logInfo('Usage check', {
+      ...baseLogOptions,
+      accountId,
+      context: {
+        totalMinutes,
+        monthlyLimit: account.monthly_minutes_limit,
+        safetyCap: safetyCapMinutes,
+        overagePercentage: account.overage_cap_percentage
+      }
     });
 
     // SOFT LIMIT: Only deny if safety cap reached (extreme edge case)
     if (totalMinutes >= safetyCapMinutes) {
-      console.warn('Safety cap reached:', { totalMinutes, safetyCap: safetyCapMinutes });
+      logWarn('Safety cap reached', {
+        ...baseLogOptions,
+        accountId,
+        context: { totalMinutes, safetyCap: safetyCapMinutes }
+      });
       
       // Flag account for review
       await supabase
@@ -116,7 +141,11 @@ serve(async (req) => {
       .gte('created_at', oneHourAgo);
 
     if (recentCalls && recentCalls.length > 50) {
-      console.warn('High call volume detected:', recentCalls.length);
+      logWarn('High call volume detected', {
+        ...baseLogOptions,
+        accountId,
+        context: { recentCalls: recentCalls.length }
+      });
       
       await supabase
         .from('call_pattern_alerts')
@@ -146,7 +175,11 @@ serve(async (req) => {
       const shortCallPercentage = (shortCalls.length / recentCalls.length) * 100;
 
       if (shortCallPercentage > 80) {
-        console.warn('Suspicious short call pattern:', shortCallPercentage);
+        logWarn('Suspicious short call pattern detected', {
+          ...baseLogOptions,
+          accountId,
+          context: { shortCallPercentage }
+        });
         
         await supabase
           .from('call_pattern_alerts')
@@ -173,7 +206,11 @@ serve(async (req) => {
     }
 
     // ALLOW CALL (Soft limit - calls are always allowed until safety cap)
-    console.log('Call authorized');
+    logInfo('Call authorized', {
+      ...baseLogOptions,
+      accountId,
+      context: { phoneNumber }
+    });
     return new Response(
       JSON.stringify({ 
         allowed: true 
@@ -182,7 +219,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Authorization error:', error);
+    logError('Authorization error', {
+      ...baseLogOptions,
+      error
+    });
     return new Response(
       JSON.stringify({ 
         allowed: false, 

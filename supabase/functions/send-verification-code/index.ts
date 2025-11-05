@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isValidPhoneNumber, formatPhoneE164, generateVerificationCode } from "../_shared/validators.ts";
+import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "send-verification-code";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +13,8 @@ const corsHeaders = {
 const VAPI_API_KEY = Deno.env.get('VAPI_API_KEY');
 
 serve(async (req) => {
+  const correlationId = extractCorrelationId(req);
+  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -45,11 +50,13 @@ serve(async (req) => {
     // Send SMS via VAPI (or Twilio)
     if (VAPI_API_KEY) {
       const message = `Your RingSnap verification code is: ${code}. Valid for 10 minutes.`;
-      
+
       // Note: This is a placeholder - actual SMS sending depends on your VAPI/Twilio setup
-      console.log(`Sending verification code ${code} to ${formattedPhone}`);
-      console.log(`Message: ${message}`);
-      
+      logInfo('Sending verification code placeholder', {
+        ...baseLogOptions,
+        context: { formattedPhone, messageLength: message.length }
+      });
+
       // TODO: Implement actual SMS sending via VAPI or Twilio
       // For now, just log it for development
     }
@@ -64,7 +71,10 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Send verification error:', error);
+    logError('Send verification error', {
+      ...baseLogOptions,
+      error
+    });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
