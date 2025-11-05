@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { PhoneVerificationModal } from "@/components/PhoneVerificationModal";
 
 const formSchema = z
   .object({
@@ -27,7 +29,19 @@ const formSchema = z
       .min(10, "Please enter a valid phone number")
       .max(20, "Phone number is too long"),
     trade: z.string().optional(),
-    companyName: z.string().optional()
+    companyName: z.string().optional(),
+    zipCode: z
+      .string()
+      .trim()
+      .regex(/^\d{5}$/, "Please enter a valid 5-digit ZIP code")
+      .optional(),
+    assistantGender: z.enum(['male', 'female']).default('female'),
+    referralCode: z
+      .string()
+      .trim()
+      .length(8, "Referral code must be exactly 8 characters")
+      .optional()
+      .or(z.literal(''))
   });
 
 type FormData = z.infer<typeof formSchema>;
@@ -42,6 +56,8 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
+  const [verificationPhone, setVerificationPhone] = useState("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -50,7 +66,10 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       email: "",
       phone: "",
       trade: "",
-      companyName: ""
+      companyName: "",
+      zipCode: "",
+      assistantGender: "female",
+      referralCode: ""
     }
   });
 
@@ -58,59 +77,80 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     setErrorMessage(null);
     setIsSubmitting(true);
 
-    const trimmedName = data.name.trim();
-    const trimmedEmail = data.email.trim();
     const trimmedPhone = data.phone.trim();
+    setVerificationPhone(trimmedPhone);
 
+    try {
+      // Step 1: Send verification code
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const sendCodeResponse = await fetch(`${supabaseUrl}/functions/v1/send-verification-code`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ phone: trimmedPhone })
+      });
+
+      const sendCodeResult = await sendCodeResponse.json();
+
+      if (!sendCodeResponse.ok || !sendCodeResult?.ok) {
+        throw new Error(sendCodeResult?.error || "Failed to send verification code");
+      }
+
+      // Show verification modal
+      setShowVerification(true);
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error("Verification send failed:", error);
+      const errorMsg = error instanceof Error ? error.message : "Could not send verification code. Please try again.";
+      setErrorMessage(errorMsg);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerificationSuccess = async () => {
+    setShowVerification(false);
+    setIsSubmitting(true);
+
+    const data = form.getValues();
     const payload = {
-      name: trimmedName,
-      email: trimmedEmail,
-      phone: trimmedPhone,
+      name: data.name.trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim(),
       trade: data.trade?.trim() ?? "",
-      companyName: data.companyName?.trim() ?? ""
+      companyName: data.companyName?.trim() ?? "",
+      zipCode: data.zipCode?.trim() ?? "",
+      assistantGender: data.assistantGender,
+      referralCode: data.referralCode?.trim() ?? ""
     };
 
     try {
-      console.log("Submitting signup with payload:", { ...payload, email: payload.email.substring(0, 3) + "***" });
-
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
+
       const response = await fetch(`${supabaseUrl}/functions/v1/free-trial-signup`, {
         method: "POST",
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
-      console.log("Response status:", response.status, response.statusText);
-
-      const result = await response
-        .json()
-        .catch((e) => {
-          console.error("Failed to parse JSON response:", e);
-          return null;
-        });
-
-      console.log("Response data:", result);
+      const result = await response.json();
 
       if (!response.ok || !result?.ok) {
         const errorDetails = result?.details || result?.error || "Unknown error";
-        const errorCode = result?.code || "";
-        const errorHint = result?.hint || "";
-        console.error("Signup failed:", { error: errorDetails, code: errorCode, hint: errorHint });
-
-        // Show detailed error to user
-        setErrorMessage(`Error: ${errorDetails}${errorCode ? ` (${errorCode})` : ''}${errorHint ? ` - ${errorHint}` : ''}`);
-        return;
+        throw new Error(errorDetails);
       }
 
       form.reset();
       setErrorMessage(null);
       onOpenChange(false);
-      navigate("/app");
+      navigate("/onboarding");
     } catch (error) {
       console.error("Signup submission failed:", error);
       const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";
@@ -262,6 +302,71 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="zipCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ZIP Code (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="12345"
+                      {...field}
+                      className="px-3 sm:px-4"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="assistantGender"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Assistant Voice</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="female" id="female" />
+                        <label htmlFor="female" className="text-sm cursor-pointer">Female (Sarah)</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="male" id="male" />
+                        <label htmlFor="male" className="text-sm cursor-pointer">Male (Michael)</label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="referralCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Referral Code (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter 8-character code"
+                      {...field}
+                      maxLength={8}
+                      className="px-3 sm:px-4 uppercase"
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
+
             {errorMessage && (
               <p className="text-sm text-destructive text-center">{errorMessage}</p>
             )}
@@ -271,7 +376,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
               className="w-full h-12 text-base font-semibold rounded-full bg-primary text-white hover:opacity-90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Starting Your Trial..." : "Start Free Trial"}
+              {isSubmitting ? "Sending Code..." : "Continue"}
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
@@ -280,6 +385,13 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
           </form>
         </Form>
       </DialogContent>
+
+      <PhoneVerificationModal
+        open={showVerification}
+        onOpenChange={setShowVerification}
+        phone={verificationPhone}
+        onSuccess={handleVerificationSuccess}
+      />
     </Dialog>
   );
 };

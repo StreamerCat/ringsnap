@@ -14,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,10 @@ const salesFormSchema = z.object({
   emergencyPolicy: z.string().trim().min(10, "Emergency policy required").max(1000),
   planType: z.enum(['starter', 'professional', 'premium']),
   salesRepName: z.string().trim().min(1, "Sales rep name required").max(100),
-  skipPayment: z.boolean().default(false)
+  skipPayment: z.boolean().default(false),
+  zipCode: z.string().trim().regex(/^\d{5}$/, "Valid 5-digit ZIP required").optional().or(z.literal('')),
+  assistantGender: z.enum(['male', 'female']).default('female'),
+  referralCode: z.string().trim().length(8, "Code must be 8 characters").optional().or(z.literal(''))
 });
 
 type FormData = z.infer<typeof salesFormSchema>;
@@ -96,7 +100,10 @@ function SalesSignupFormInner() {
       emergencyPolicy: "",
       planType: "starter",
       salesRepName: "",
-      skipPayment: false
+      skipPayment: false,
+      zipCode: "",
+      assistantGender: "female",
+      referralCode: ""
     }
   });
 
@@ -145,7 +152,10 @@ function SalesSignupFormInner() {
               businessHours: parseBusinessHours(data.businessHours),
               emergencyPolicy: data.emergencyPolicy,
               salesRepName: data.salesRepName,
-              planType: data.planType
+              planType: data.planType,
+              zipCode: data.zipCode?.trim() ?? "",
+              assistantGender: data.assistantGender,
+              referralCode: data.referralCode?.trim() ?? ""
             },
             paymentMethodId,
             skipPayment: data.skipPayment
@@ -312,6 +322,66 @@ function SalesSignupFormInner() {
             />
             {form.formState.errors.emergencyPolicy && (
               <p className="text-sm text-red-500">{form.formState.errors.emergencyPolicy.message}</p>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="zipCode">ZIP Code (Optional)</Label>
+              <Input
+                id="zipCode"
+                {...form.register("zipCode")}
+                placeholder="12345"
+                className="text-base"
+              />
+              {form.formState.errors.zipCode && (
+                <p className="text-sm text-red-500">{form.formState.errors.zipCode.message}</p>
+              )}
+            </div>
+
+            <FormField
+              control={form.control}
+              name="assistantGender"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Assistant Voice</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="female" id="sales-female" />
+                        <label htmlFor="sales-female" className="text-sm cursor-pointer">Female (Sarah)</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="male" id="sales-male" />
+                        <label htmlFor="sales-male" className="text-sm cursor-pointer">Male (Michael)</label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="referralCode">Referral Code (Optional)</Label>
+            <Input
+              id="referralCode"
+              {...form.register("referralCode")}
+              placeholder="Enter 8-character code"
+              maxLength={8}
+              className="text-base uppercase"
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase();
+                form.setValue('referralCode', val);
+              }}
+            />
+            {form.formState.errors.referralCode && (
+              <p className="text-sm text-red-500">{form.formState.errors.referralCode.message}</p>
             )}
           </div>
         </CardContent>
