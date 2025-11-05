@@ -44,7 +44,7 @@ export const EmailCaptureModal = ({ open, onOpenChange, calculatorData }: EmailC
 
     try {
       // Save to database
-      const { error } = await supabase.from("revenue_report_leads").insert({
+      const { error } = await supabase.from("revenue_report_leads" as any).insert({
         name: data.name,
         email: data.email,
         business: data.business,

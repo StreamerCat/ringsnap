@@ -34,6 +34,7 @@ type FormData = z.infer<typeof formSchema>;
 interface FreeTrialSignupFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  source?: string;
 }
 
 export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormProps) => {
@@ -67,7 +68,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     };
 
     try {
-      console.log("Submitting signup with payload:", { ...payload, owner_email: payload.owner_email.substring(0, 3) + "***" });
+      console.log("Submitting signup with payload:", { ...payload, email: payload.email.substring(0, 3) + "***" });
 
       // Using debug endpoint for better error messages
       const response = await fetch("/.netlify/functions/signup-debug", {
