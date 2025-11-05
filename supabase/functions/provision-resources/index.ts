@@ -45,13 +45,19 @@ serve(async (req) => {
     // Fetch account details
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('*')
+      .select('*, phone_number_area_code')
       .eq('id', accountId)
       .single();
 
     if (accountError || !account) {
       throw new Error(`Account not found: ${accountError?.message}`);
     }
+
+    const areaCode = account.phone_number_area_code;
+    if (!areaCode) {
+      throw new Error('No area code selected for account');
+    }
+    console.log('Using selected area code:', areaCode);
 
     // Get plan limits
     const { data: planDef } = await supabase
@@ -66,8 +72,7 @@ serve(async (req) => {
     let vapiPhoneId = null;
     let phoneNumber = null;
     
-    if (VAPI_API_KEY && account.zip_code) {
-      const areaCode = getAreaCodeFromZip(account.zip_code);
+    if (VAPI_API_KEY && areaCode) {
       console.log(`Requesting phone number with area code: ${areaCode}`);
 
       const phoneResponse = await fetch('https://api.vapi.ai/phone-number', {

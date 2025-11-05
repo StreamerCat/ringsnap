@@ -41,27 +41,25 @@ serve(async (req) => {
       );
     }
 
-    const { zipCode, trade, assistantGender, referralCode } = await req.json();
+    const { areaCode, trade, assistantGender, referralCode } = await req.json();
 
     // Validate required fields
-    if (!zipCode || !trade || !assistantGender) {
+    if (!areaCode || !trade || !assistantGender) {
       return new Response(
-        JSON.stringify({ error: 'ZIP code, trade, and assistant voice are required' }),
+        JSON.stringify({ error: 'Area code, trade, and assistant voice are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate ZIP code format
-    if (!isValidZipCode(zipCode)) {
+    // Validate area code format
+    if (!/^\d{3}$/.test(areaCode)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid ZIP code format' }),
+        JSON.stringify({ error: 'Invalid area code format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get area code from ZIP
-    const areaCode = getAreaCodeFromZip(zipCode);
-    console.log(`ZIP ${zipCode} mapped to area code ${areaCode}`);
+    console.log(`Using selected area code: ${areaCode}`);
 
     // Get user's profile to find account_id
     const { data: profile, error: profileError } = await supabase
@@ -84,7 +82,6 @@ serve(async (req) => {
     const { error: updateError } = await supabase
       .from('accounts')
       .update({
-        zip_code: zipCode,
         trade: trade,
         assistant_gender: assistantGender,
         phone_number_area_code: areaCode,

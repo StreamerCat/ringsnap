@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -13,10 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
 const setupSchema = z.object({
-  zipCode: z
-    .string()
-    .trim()
-    .regex(/^\d{5}$/, "Please enter a valid 5-digit ZIP code"),
+  areaCode: z.string().min(3, "Please select an area code"),
   trade: z.string().min(1, "Please select your trade"),
   assistantGender: z.enum(['male', 'female']),
   referralCode: z
@@ -38,16 +35,41 @@ interface OnboardingSetupFormProps {
 export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: OnboardingSetupFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [availableAreaCodes, setAvailableAreaCodes] = useState<string[]>([]);
+  const [loadingAreaCodes, setLoadingAreaCodes] = useState(true);
 
   const form = useForm<SetupFormData>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
-      zipCode: "",
+      areaCode: "",
       trade: "",
       assistantGender: "female",
       referralCode: ""
     }
   });
+
+  useEffect(() => {
+    if (open) {
+      fetchAvailableAreaCodes();
+    }
+  }, [open]);
+
+  const fetchAvailableAreaCodes = async () => {
+    try {
+      setLoadingAreaCodes(true);
+      const { data, error } = await supabase.functions.invoke('get-available-area-codes');
+      
+      if (error) throw error;
+      
+      setAvailableAreaCodes(data.areaCodes || []);
+      console.log('Available area codes:', data);
+    } catch (err) {
+      console.error('Error fetching area codes:', err);
+      setAvailableAreaCodes(['212', '310', '415', '720', '303', '512', '617']);
+    } finally {
+      setLoadingAreaCodes(false);
+    }
+  };
 
   const onSubmit = async (data: SetupFormData) => {
     setErrorMessage(null);
@@ -56,7 +78,7 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
     try {
       const { data: result, error } = await supabase.functions.invoke('complete-onboarding', {
         body: {
-          zipCode: data.zipCode.trim(),
+          areaCode: data.areaCode,
           trade: data.trade,
           assistantGender: data.assistantGender,
           referralCode: data.referralCode?.trim() || null
@@ -108,20 +130,26 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
             <FormField
               control={form.control}
-              name="zipCode"
+              name="areaCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>ZIP Code</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="12345"
-                      {...field}
-                      maxLength={5}
-                      className="px-3 sm:px-4"
-                    />
-                  </FormControl>
+                  <FormLabel>Phone Number Area Code</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingAreaCodes}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingAreaCodes ? "Loading area codes..." : "Select area code"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableAreaCodes.map((code) => (
+                        <SelectItem key={code} value={code}>
+                          {code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormDescription className="text-xs">
-                    Used to match your local area code
+                    Choose the area code for your business phone number
                   </FormDescription>
                   <FormMessage className="text-xs" />
                 </FormItem>
