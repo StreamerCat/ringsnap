@@ -66,7 +66,7 @@ serve(async (req) => {
     // Get user's profile to find account_id
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('account_id')
+      .select('account_id, name, phone')
       .eq('id', user.id)
       .single();
 
@@ -141,7 +141,12 @@ serve(async (req) => {
     // Trigger provisioning (call provision-resources function)
     try {
       const { error: provisionError } = await supabase.functions.invoke('provision-resources', {
-        body: { accountId }
+        body: { 
+          accountId,
+          email: user.email,
+          name: profile.name,
+          phone: profile.phone
+        }
       });
 
       if (provisionError) {
