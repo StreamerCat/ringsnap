@@ -6,22 +6,39 @@ import { useEffect, useRef, useState } from "react";
 import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
+  const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
+  
   useEffect(() => {
-    // Initialize Vapi instance
-    vapiRef.current = new Vapi("9159dfe3-b11f-457c-b41b-e296872027a0");
+    // Fetch VAPI config from secure edge function
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`, {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setVapiConfig(data);
+        // Initialize Vapi instance with fetched public key
+        vapiRef.current = new Vapi(data.publicKey);
+        
+        // Event listeners
+        const handleCallStart = () => setIsCallActive(true);
+        const handleCallEnd = () => setIsCallActive(false);
+        vapiRef.current.on("call-start", handleCallStart);
+        vapiRef.current.on("call-end", handleCallEnd);
+      })
+      .catch(err => console.error('Failed to load VAPI config:', err));
 
-    // Event listeners
-    const handleCallStart = () => setIsCallActive(true);
-    const handleCallEnd = () => setIsCallActive(false);
-    vapiRef.current.on("call-start", handleCallStart);
-    vapiRef.current.on("call-end", handleCallEnd);
     return () => {
       vapiRef.current?.stop();
     };
   }, []);
+  
   const startCall = () => {
-    vapiRef.current?.start("db066c6c-e2e3-424e-9fd1-1473f2ac3b01");
+    if (vapiConfig) {
+      vapiRef.current?.start(vapiConfig.assistantId);
+    }
   };
   const endCall = () => {
     vapiRef.current?.stop();

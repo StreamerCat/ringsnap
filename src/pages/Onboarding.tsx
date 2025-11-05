@@ -8,13 +8,13 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
-type UserRow = Database["public"]["Tables"]["users"]["Row"];
-type UserWithAccount = UserRow & { accounts?: AccountRow | null };
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type ProfileWithAccount = ProfileRow & { accounts?: AccountRow | null };
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [userRecord, setUserRecord] = useState<UserWithAccount | null>(null);
+  const [profile, setProfile] = useState<ProfileWithAccount | null>(null);
   const [account, setAccount] = useState<AccountRow | null>(null);
 
   const checkAuth = useCallback(async () => {
@@ -31,21 +31,21 @@ export default function Onboarding() {
         return;
       }
 
-      const { data: userData, error: userError } = await supabase
-        .from("users")
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
         .select("*, accounts:account_id(*)")
-        .eq("email", user.email)
+        .eq("id", user.id)
         .maybeSingle();
 
-      if (userError) {
-        console.error("Error fetching user record:", userError);
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
         toast.error("Failed to load account information");
         return;
       }
 
-      if (userData) {
-        const typedData = userData as UserWithAccount;
-        setUserRecord(typedData);
+      if (profileData) {
+        const typedData = profileData as ProfileWithAccount;
+        setProfile(typedData);
         setAccount(typedData.accounts ?? null);
       }
     } catch (error) {
@@ -73,8 +73,8 @@ export default function Onboarding() {
     );
   }
 
-  const trialDaysRemaining = account?.trial_end_at
-    ? Math.ceil((new Date(account.trial_end_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const trialDaysRemaining = account?.trial_end_date
+    ? Math.ceil((new Date(account.trial_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 3;
 
   return (
@@ -86,11 +86,11 @@ export default function Onboarding() {
             <Check className="h-8 w-8 text-primary" />
           </div>
           <h1 className="text-4xl font-bold">
-            Welcome to RingSnap{userRecord?.name ? `, ${userRecord.name}!` : ""}
+            Welcome to RingSnap{profile?.name ? `, ${profile.name}!` : ""}
           </h1>
           <p className="text-xl text-muted-foreground">
-            {account?.owner_name
-              ? `Your account is being set up for ${account.owner_name}`
+            {account?.company_name
+              ? `Your account is being set up for ${account.company_name}`
               : "Your account is being prepared."
             }
           </p>
@@ -111,7 +111,7 @@ export default function Onboarding() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Your dedicated number will be sent to {userRecord?.email || account?.owner_email} within the next few minutes.
+                Your dedicated number will be sent to you within the next few minutes.
               </p>
             </CardContent>
           </Card>
@@ -155,40 +155,40 @@ export default function Onboarding() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="font-semibold text-muted-foreground">Account Owner</p>
-                <p className="text-lg">{account?.owner_name || "Not specified"}</p>
+                <p className="font-semibold text-muted-foreground">Company Name</p>
+                <p className="text-lg">{account?.company_name || "Not specified"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Trade</p>
-                <p className="text-lg">{account?.industry || "Not specified"}</p>
+                <p className="text-lg">{account?.trade || "Not specified"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Name</p>
-                <p className="text-lg">{userRecord?.name || account?.owner_name}</p>
+                <p className="text-lg">{profile?.name || "Not specified"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Phone</p>
-                <p className="text-lg">{userRecord?.phone || account?.owner_phone || "Not provided"}</p>
+                <p className="text-lg">{profile?.phone || "Not provided"}</p>
               </div>
               <div>
-                <p className="font-semibold text-muted-foreground">Email</p>
-                <p className="text-lg">{userRecord?.email || account?.owner_email || "Not provided"}</p>
+                <p className="font-semibold text-muted-foreground">Account Status</p>
+                <p className="text-lg capitalize">{account?.subscription_status || "trial"}</p>
               </div>
               <div>
-                <p className="font-semibold text-muted-foreground">Role</p>
-                <p className="text-lg capitalize">{userRecord?.role || "owner"}</p>
-              </div>
-              <div>
-                <p className="font-semibold text-muted-foreground">Trial Status</p>
-                <p className="text-lg capitalize">{account?.plan_status || "trial"}</p>
+                <p className="font-semibold text-muted-foreground">Plan Type</p>
+                <p className="text-lg capitalize">{account?.plan_type || "starter"}</p>
               </div>
               <div>
                 <p className="font-semibold text-muted-foreground">Trial Ends</p>
                 <p className="text-lg">
-                  {account?.trial_end_at
-                    ? new Date(account.trial_end_at).toLocaleString()
+                  {account?.trial_end_date
+                    ? new Date(account.trial_end_date).toLocaleString()
                     : "Pending"}
                 </p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground">Provisioning Status</p>
+                <p className="text-lg capitalize">{account?.provisioning_status || "pending"}</p>
               </div>
             </div>
           </CardContent>

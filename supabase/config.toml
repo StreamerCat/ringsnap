@@ -1,4 +1,10 @@
-project_id = "jwoprcqnvheuljjxwrbu"
+project_id = "lytnlrkdccqmxgdmdxef"
 
 [functions.free-trial-signup]
+verify_jwt = false
+
+[functions.vapi-demo-call]
+verify_jwt = false
+
+[functions.provision-resources]
 verify_jwt = false

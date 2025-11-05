@@ -69,11 +69,15 @@ serve(async (req) => {
 
     console.log('User created successfully:', authData.user.id);
 
+    // Trigger background provisioning (will be implemented in Batch 3)
+    // This will create Stripe customer and VAPI assistant
+    console.log('Provisioning will be triggered by handle_new_user_signup trigger');
+
     return new Response(
       JSON.stringify({ 
         ok: true,
         user_id: authData.user.id,
-        message: 'Trial signup successful'
+        message: 'Trial signup successful. Account provisioning in progress.'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
