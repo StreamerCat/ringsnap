@@ -8,3 +8,21 @@ verify_jwt = false
 
 [functions.provision-resources]
 verify_jwt = false
+
+[functions.send-verification-code]
+verify_jwt = false
+
+[functions.verify-code]
+verify_jwt = false
+
+[functions.handle-sms-inbound]
+verify_jwt = false
+
+[functions.send-sms-confirmation]
+verify_jwt = false
+
+[functions.handle-referral-signup]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

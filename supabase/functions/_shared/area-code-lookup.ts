@@ -27,7 +27,7 @@ export const ZIP_TO_AREA_CODE_MAP: Record<string, string> = {
   // Massachusetts
   '01': '413', '02': '617',
   // Washington
-  '98': '206', '99': '509',
+  '98': '206',
   // Colorado
   '80': '303', '81': '970',
   // Nevada

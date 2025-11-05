@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isDisposableEmail } from "../_shared/disposable-domains.ts";
+import { isValidPhoneNumber, isValidZipCode } from "../_shared/validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,12 +19,93 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { name, email, phone, trade, companyName } = await req.json();
+    const { name, email, phone, trade, companyName, zipCode, assistantGender, referralCode, deviceFingerprint } = await req.json();
 
     // Validate required fields
     if (!name || !email || !phone) {
       return new Response(
         JSON.stringify({ error: 'Name, email, and phone are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate phone format
+    if (!isValidPhoneNumber(phone)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid phone number format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate ZIP code if provided
+    if (zipCode && !isValidZipCode(zipCode)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid ZIP code format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Block disposable emails
+    if (isDisposableEmail(email)) {
+      console.log(`Blocked disposable email: ${email}`);
+      return new Response(
+        JSON.stringify({ error: 'Please use a valid business or personal email address' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get client IP
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0] || 
+                     req.headers.get('cf-connecting-ip') || 
+                     'unknown';
+
+    // Check IP rate limiting (max 3 trials per IP in 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const { count: ipAttempts } = await supabase
+      .from('signup_attempts')
+      .select('*', { count: 'exact', head: true })
+      .eq('ip_address', clientIP)
+      .eq('success', true)
+      .gte('created_at', thirtyDaysAgo.toISOString());
+
+    if (ipAttempts && ipAttempts >= 3) {
+      console.log(`IP rate limit exceeded: ${clientIP}`);
+      await supabase.from('signup_attempts').insert({
+        email,
+        phone,
+        ip_address: clientIP,
+        device_fingerprint: deviceFingerprint,
+        success: false,
+        blocked_reason: 'IP rate limit exceeded (3 trials per 30 days)',
+      });
+      return new Response(
+        JSON.stringify({ error: 'Trial limit reached for this location. Please contact support.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check phone uniqueness (not used in last 30 days)
+    const { data: recentPhoneUse } = await supabase
+      .from('profiles')
+      .select('created_at')
+      .eq('phone', phone)
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .maybeSingle();
+
+    if (recentPhoneUse) {
+      console.log(`Phone number recently used: ${phone}`);
+      await supabase.from('signup_attempts').insert({
+        email,
+        phone,
+        ip_address: clientIP,
+        device_fingerprint: deviceFingerprint,
+        success: false,
+        blocked_reason: 'Phone number used within 30 days',
+      });
+      return new Response(
+        JSON.stringify({ error: 'This phone number was recently used for a trial' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -55,12 +138,23 @@ serve(async (req) => {
         name,
         phone,
         trade: trade || null,
+        zip_code: zipCode || null,
+        assistant_gender: assistantGender || 'female',
+        referral_code: referralCode || null,
         source: 'website'
       }
     });
 
     if (authError) {
       console.error('Auth error:', authError);
+      await supabase.from('signup_attempts').insert({
+        email,
+        phone,
+        ip_address: clientIP,
+        device_fingerprint: deviceFingerprint,
+        success: false,
+        blocked_reason: authError.message,
+      });
       return new Response(
         JSON.stringify({ error: authError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -69,9 +163,46 @@ serve(async (req) => {
 
     console.log('User created successfully:', authData.user.id);
 
-    // Trigger background provisioning (will be implemented in Batch 3)
-    // This will create Stripe customer and VAPI assistant
-    console.log('Provisioning will be triggered by handle_new_user_signup trigger');
+    // Log successful signup
+    await supabase.from('signup_attempts').insert({
+      email,
+      phone,
+      ip_address: clientIP,
+      device_fingerprint: deviceFingerprint,
+      success: true,
+    });
+
+    // Handle referral if provided
+    if (referralCode) {
+      const { data: referralCodeData } = await supabase
+        .from('referral_codes')
+        .select('account_id')
+        .eq('code', referralCode)
+        .maybeSingle();
+
+      if (referralCodeData) {
+        // Get referee account ID (will be created by trigger)
+        setTimeout(async () => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('account_id')
+            .eq('id', authData.user.id)
+            .single();
+
+          if (profile) {
+            await supabase.from('referrals').insert({
+              referrer_account_id: referralCodeData.account_id,
+              referee_account_id: profile.account_id,
+              referral_code: referralCode,
+              referee_email: email,
+              referee_phone: phone,
+              referee_signup_ip: clientIP,
+              status: 'pending',
+            });
+          }
+        }, 2000);
+      }
+    }
 
     return new Response(
       JSON.stringify({ 
