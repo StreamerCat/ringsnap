@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Loader2, Phone, Settings, TestTube } from "lucide-react";
+import { Check, Loader2, Phone, Settings, TestTube, Copy, User, UserCircle2, Clock, TrendingUp } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -16,6 +19,9 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileWithAccount | null>(null);
   const [account, setAccount] = useState<AccountRow | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [assistant, setAssistant] = useState<any | null>(null);
+  const [usageStats, setUsageStats] = useState({ minutesUsed: 0, minutesLimit: 150 });
 
   const checkAuth = useCallback(async () => {
     try {
@@ -46,7 +52,50 @@ export default function Onboarding() {
       if (profileData) {
         const typedData = profileData as ProfileWithAccount;
         setProfile(typedData);
-        setAccount(typedData.accounts ?? null);
+        const accountData = typedData.accounts ?? null;
+        setAccount(accountData);
+
+        // Fetch additional data in parallel
+        if (accountData?.id) {
+          const [phoneResult, assistantResult, usageResult] = await Promise.all([
+            supabase
+              .from("phone_numbers")
+              .select("*")
+              .eq("account_id", accountData.id)
+              .eq("is_primary", true)
+              .maybeSingle(),
+            supabase
+              .from("assistants")
+              .select("*")
+              .eq("account_id", accountData.id)
+              .eq("is_primary", true)
+              .maybeSingle(),
+            supabase
+              .from("usage_logs")
+              .select("call_duration_seconds")
+              .eq("account_id", accountData.id)
+          ]);
+
+          if (phoneResult.data) {
+            setPhoneNumber(phoneResult.data.phone_number);
+          }
+
+          if (assistantResult.data) {
+            setAssistant(assistantResult.data);
+          }
+
+          if (usageResult.data) {
+            const totalSeconds = usageResult.data.reduce(
+              (sum, log) => sum + (log.call_duration_seconds || 0),
+              0
+            );
+            const totalMinutes = Math.ceil(totalSeconds / 60);
+            setUsageStats({
+              minutesUsed: totalMinutes,
+              minutesLimit: accountData.monthly_minutes_limit || 150
+            });
+          }
+        }
       }
     } catch (error) {
       console.error("Error loading account:", error);
@@ -99,11 +148,120 @@ export default function Onboarding() {
           </div>
         </div>
 
+        {/* Phone Number Card */}
+        {phoneNumber && (
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5 text-primary" />
+                Your RingSnap Number
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-3xl font-bold tracking-tight">
+                  {phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3")}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(phoneNumber);
+                    toast.success("Phone number copied to clipboard!");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={account?.provisioning_status === 'completed' ? 'default' : 'secondary'}>
+                  {account?.provisioning_status || 'pending'}
+                </Badge>
+                {account?.phone_number_area_code && (
+                  <Badge variant="outline">Area: {account.phone_number_area_code}</Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Usage Progress Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              Trial Usage
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Minutes Used</span>
+                <span className="font-semibold">
+                  {usageStats.minutesUsed} / {usageStats.minutesLimit} minutes
+                </span>
+              </div>
+              <Progress value={(usageStats.minutesUsed / usageStats.minutesLimit) * 100} />
+            </div>
+            {(usageStats.minutesUsed / usageStats.minutesLimit) * 100 >= 80 && (
+              <UsageWarningAlert
+                usagePercent={(usageStats.minutesUsed / usageStats.minutesLimit) * 100}
+                remainingMinutes={usageStats.minutesLimit - usageStats.minutesUsed}
+                onDismiss={() => {}}
+              />
+            )}
+            <Button variant="gradient" className="w-full" onClick={() => navigate('/dashboard')}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Upgrade Plan
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Assistant Details Card */}
+        {assistant && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {assistant.voice_gender === 'male' ? (
+                  <User className="h-5 w-5 text-primary" />
+                ) : (
+                  <UserCircle2 className="h-5 w-5 text-primary" />
+                )}
+                Your AI Assistant
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold">{assistant.name || 'AI Assistant'}</p>
+                  <p className="text-sm text-muted-foreground capitalize">
+                    {assistant.voice_gender} Voice
+                  </p>
+                </div>
+                <Badge variant={assistant.status === 'active' ? 'default' : 'secondary'}>
+                  {assistant.status}
+                </Badge>
+              </div>
+              {phoneNumber && (
+                <Button variant="outline" className="w-full" asChild>
+                  <a href={`tel:${phoneNumber}`}>
+                    <Phone className="h-4 w-4 mr-2" />
+                    Make Test Call
+                  </a>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Next Steps */}
         <div className="grid gap-6 md:grid-cols-3">
           <Card>
             <CardHeader>
-              <Phone className="h-8 w-8 text-primary mb-2" />
+              <div className="flex items-center justify-between">
+                <Phone className="h-8 w-8 text-primary mb-2" />
+                {phoneNumber && <Check className="h-5 w-5 text-green-500" />}
+              </div>
               <CardTitle>1. Forward Your Phone</CardTitle>
               <CardDescription>
                 Set up call forwarding from your business line to your RingSnap number
@@ -111,7 +269,10 @@ export default function Onboarding() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Your dedicated number will be sent to you within the next few minutes.
+                {phoneNumber 
+                  ? "✓ Your RingSnap number is ready above!"
+                  : "Your dedicated number will be sent to you within the next few minutes."
+                }
               </p>
             </CardContent>
           </Card>
@@ -124,10 +285,18 @@ export default function Onboarding() {
                 Call your business line to hear your AI assistant in action
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 The AI will answer professionally and capture lead information automatically.
               </p>
+              {phoneNumber && (
+                <Button variant="outline" size="sm" asChild className="w-full">
+                  <a href={`tel:${phoneNumber}`}>
+                    <Phone className="h-3 w-3 mr-2" />
+                    Call Now
+                  </a>
+                </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -139,10 +308,13 @@ export default function Onboarding() {
                 Adjust your greeting, business hours, and notification preferences
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 Access your dashboard to personalize your AI assistant's behavior.
               </p>
+              <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/dashboard')}>
+                Go to Dashboard
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -196,8 +368,8 @@ export default function Onboarding() {
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" onClick={() => window.location.href = "/"}>
-            Return to Homepage
+          <Button size="lg" variant="gradient" onClick={() => navigate('/dashboard')}>
+            Go to Dashboard
           </Button>
           <Button size="lg" variant="outline" onClick={handleLogout}>
             Sign Out
