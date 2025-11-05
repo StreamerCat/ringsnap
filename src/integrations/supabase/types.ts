@@ -14,20 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_credits: {
+        Row: {
+          account_id: string | null
+          amount_cents: number
+          applied_to_invoice_id: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          source: string
+          source_id: string | null
+          status: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          amount_cents: number
+          applied_to_invoice_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          source: string
+          source_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          amount_cents?: number
+          applied_to_invoice_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          source?: string
+          source_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_credits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
+          account_status: string | null
+          assistant_gender: string | null
+          billing_cycle_start: string | null
+          billing_state: string | null
           business_hours: Json | null
+          call_recording_consent_accepted: boolean | null
+          call_recording_consent_date: string | null
+          call_recording_enabled: boolean | null
+          call_recording_retention_days: number | null
           company_domain: string | null
           company_name: string
+          company_website: string | null
           created_at: string | null
+          custom_instructions: string | null
+          daily_sms_quota: number | null
+          daily_sms_sent: number | null
+          device_fingerprint: string | null
+          email_verified: boolean | null
           emergency_policy: string | null
+          flagged_reason: string | null
           id: string
+          is_flagged_for_review: boolean | null
+          last_usage_warning_level: string | null
+          last_usage_warning_sent_at: string | null
+          monthly_minutes_limit: number | null
+          monthly_minutes_used: number | null
           onboarding_completed: boolean | null
+          overage_cap_percentage: number | null
+          overage_minutes_used: number | null
+          phone_number_area_code: string | null
+          phone_number_held_until: string | null
+          phone_number_status: string | null
+          phone_verified: boolean | null
           plan_type: string | null
           provisioning_error: string | null
           provisioning_status: string | null
           sales_rep_name: string | null
           service_area: string | null
+          service_specialties: string | null
+          signup_ip: string | null
+          sms_appointment_confirmations: boolean | null
+          sms_enabled: boolean | null
+          sms_reminders: boolean | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_status:
@@ -40,20 +115,52 @@ export type Database = {
           vapi_assistant_id: string | null
           vapi_phone_number: string | null
           wants_advanced_voice: boolean | null
+          zip_code: string | null
         }
         Insert: {
+          account_status?: string | null
+          assistant_gender?: string | null
+          billing_cycle_start?: string | null
+          billing_state?: string | null
           business_hours?: Json | null
+          call_recording_consent_accepted?: boolean | null
+          call_recording_consent_date?: string | null
+          call_recording_enabled?: boolean | null
+          call_recording_retention_days?: number | null
           company_domain?: string | null
           company_name: string
+          company_website?: string | null
           created_at?: string | null
+          custom_instructions?: string | null
+          daily_sms_quota?: number | null
+          daily_sms_sent?: number | null
+          device_fingerprint?: string | null
+          email_verified?: boolean | null
           emergency_policy?: string | null
+          flagged_reason?: string | null
           id?: string
+          is_flagged_for_review?: boolean | null
+          last_usage_warning_level?: string | null
+          last_usage_warning_sent_at?: string | null
+          monthly_minutes_limit?: number | null
+          monthly_minutes_used?: number | null
           onboarding_completed?: boolean | null
+          overage_cap_percentage?: number | null
+          overage_minutes_used?: number | null
+          phone_number_area_code?: string | null
+          phone_number_held_until?: string | null
+          phone_number_status?: string | null
+          phone_verified?: boolean | null
           plan_type?: string | null
           provisioning_error?: string | null
           provisioning_status?: string | null
           sales_rep_name?: string | null
           service_area?: string | null
+          service_specialties?: string | null
+          signup_ip?: string | null
+          sms_appointment_confirmations?: boolean | null
+          sms_enabled?: boolean | null
+          sms_reminders?: boolean | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?:
@@ -66,20 +173,52 @@ export type Database = {
           vapi_assistant_id?: string | null
           vapi_phone_number?: string | null
           wants_advanced_voice?: boolean | null
+          zip_code?: string | null
         }
         Update: {
+          account_status?: string | null
+          assistant_gender?: string | null
+          billing_cycle_start?: string | null
+          billing_state?: string | null
           business_hours?: Json | null
+          call_recording_consent_accepted?: boolean | null
+          call_recording_consent_date?: string | null
+          call_recording_enabled?: boolean | null
+          call_recording_retention_days?: number | null
           company_domain?: string | null
           company_name?: string
+          company_website?: string | null
           created_at?: string | null
+          custom_instructions?: string | null
+          daily_sms_quota?: number | null
+          daily_sms_sent?: number | null
+          device_fingerprint?: string | null
+          email_verified?: boolean | null
           emergency_policy?: string | null
+          flagged_reason?: string | null
           id?: string
+          is_flagged_for_review?: boolean | null
+          last_usage_warning_level?: string | null
+          last_usage_warning_sent_at?: string | null
+          monthly_minutes_limit?: number | null
+          monthly_minutes_used?: number | null
           onboarding_completed?: boolean | null
+          overage_cap_percentage?: number | null
+          overage_minutes_used?: number | null
+          phone_number_area_code?: string | null
+          phone_number_held_until?: string | null
+          phone_number_status?: string | null
+          phone_verified?: boolean | null
           plan_type?: string | null
           provisioning_error?: string | null
           provisioning_status?: string | null
           sales_rep_name?: string | null
           service_area?: string | null
+          service_specialties?: string | null
+          signup_ip?: string | null
+          sms_appointment_confirmations?: boolean | null
+          sms_enabled?: boolean | null
+          sms_reminders?: boolean | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?:
@@ -92,6 +231,203 @@ export type Database = {
           vapi_assistant_id?: string | null
           vapi_phone_number?: string | null
           wants_advanced_voice?: boolean | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
+      assistants: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          custom_instructions: string | null
+          id: string
+          is_primary: boolean | null
+          language: string | null
+          name: string
+          phone_number_id: string | null
+          status: string | null
+          updated_at: string | null
+          vapi_assistant_id: string | null
+          voice_gender: string | null
+          voice_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          custom_instructions?: string | null
+          id?: string
+          is_primary?: boolean | null
+          language?: string | null
+          name: string
+          phone_number_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          vapi_assistant_id?: string | null
+          voice_gender?: string | null
+          voice_id: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          custom_instructions?: string | null
+          id?: string
+          is_primary?: boolean | null
+          language?: string | null
+          name?: string
+          phone_number_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          vapi_assistant_id?: string | null
+          voice_gender?: string | null
+          voice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistants_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistants_phone_number_id_fkey"
+            columns: ["phone_number_id"]
+            isOneToOne: false
+            referencedRelation: "phone_numbers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_pattern_alerts: {
+        Row: {
+          account_id: string | null
+          alert_details: Json | null
+          alert_type: string
+          auto_flagged: boolean | null
+          created_at: string | null
+          id: string
+          reviewed: boolean | null
+          severity: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          alert_details?: Json | null
+          alert_type: string
+          auto_flagged?: boolean | null
+          created_at?: string | null
+          id?: string
+          reviewed?: boolean | null
+          severity?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          alert_details?: Json | null
+          alert_type?: string
+          auto_flagged?: boolean | null
+          created_at?: string | null
+          id?: string
+          reviewed?: boolean | null
+          severity?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_pattern_alerts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phone_numbers: {
+        Row: {
+          account_id: string | null
+          area_code: string
+          created_at: string | null
+          held_until: string | null
+          id: string
+          is_primary: boolean | null
+          label: string | null
+          phone_number: string
+          purpose: string | null
+          status: string | null
+          updated_at: string | null
+          vapi_phone_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          area_code: string
+          created_at?: string | null
+          held_until?: string | null
+          id?: string
+          is_primary?: boolean | null
+          label?: string | null
+          phone_number: string
+          purpose?: string | null
+          status?: string | null
+          updated_at?: string | null
+          vapi_phone_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          area_code?: string
+          created_at?: string | null
+          held_until?: string | null
+          id?: string
+          is_primary?: boolean | null
+          label?: string | null
+          phone_number?: string
+          purpose?: string | null
+          status?: string | null
+          updated_at?: string | null
+          vapi_phone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_numbers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_definitions: {
+        Row: {
+          call_recording_enabled: boolean | null
+          max_assistants: number
+          max_phone_numbers: number
+          monthly_minutes_limit: number
+          name: string
+          overage_rate_cents: number
+          plan_type: string
+          price_cents: number
+          sms_enabled: boolean | null
+          stripe_price_id: string | null
+        }
+        Insert: {
+          call_recording_enabled?: boolean | null
+          max_assistants: number
+          max_phone_numbers: number
+          monthly_minutes_limit: number
+          name: string
+          overage_rate_cents: number
+          plan_type: string
+          price_cents: number
+          sms_enabled?: boolean | null
+          stripe_price_id?: string | null
+        }
+        Update: {
+          call_recording_enabled?: boolean | null
+          max_assistants?: number
+          max_phone_numbers?: number
+          monthly_minutes_limit?: number
+          name?: string
+          overage_rate_cents?: number
+          plan_type?: string
+          price_cents?: number
+          sms_enabled?: boolean | null
+          stripe_price_id?: string | null
         }
         Relationships: []
       }
@@ -130,6 +466,108 @@ export type Database = {
           {
             foreignKeyName: "profiles_account_id_fkey"
             columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_codes: {
+        Row: {
+          account_id: string | null
+          code: string
+          created_at: string | null
+          id: string
+        }
+        Insert: {
+          account_id?: string | null
+          code: string
+          created_at?: string | null
+          id?: string
+        }
+        Update: {
+          account_id?: string | null
+          code?: string
+          created_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_codes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          converted_at: string | null
+          created_at: string | null
+          flag_reason: string | null
+          id: string
+          is_flagged: boolean | null
+          referee_account_id: string | null
+          referee_credit_cents: number | null
+          referee_email: string | null
+          referee_phone: string | null
+          referee_signup_ip: string | null
+          referral_code: string | null
+          referrer_account_id: string | null
+          referrer_credit_cents: number | null
+          status: string | null
+        }
+        Insert: {
+          converted_at?: string | null
+          created_at?: string | null
+          flag_reason?: string | null
+          id?: string
+          is_flagged?: boolean | null
+          referee_account_id?: string | null
+          referee_credit_cents?: number | null
+          referee_email?: string | null
+          referee_phone?: string | null
+          referee_signup_ip?: string | null
+          referral_code?: string | null
+          referrer_account_id?: string | null
+          referrer_credit_cents?: number | null
+          status?: string | null
+        }
+        Update: {
+          converted_at?: string | null
+          created_at?: string | null
+          flag_reason?: string | null
+          id?: string
+          is_flagged?: boolean | null
+          referee_account_id?: string | null
+          referee_credit_cents?: number | null
+          referee_email?: string | null
+          referee_phone?: string | null
+          referee_signup_ip?: string | null
+          referral_code?: string | null
+          referrer_account_id?: string | null
+          referrer_credit_cents?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_referee_account_id_fkey"
+            columns: ["referee_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referral_code_fkey"
+            columns: ["referral_code"]
+            isOneToOne: false
+            referencedRelation: "referral_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "referrals_referrer_account_id_fkey"
+            columns: ["referrer_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
@@ -181,42 +619,167 @@ export type Database = {
         }
         Relationships: []
       }
+      signup_attempts: {
+        Row: {
+          blocked_reason: string | null
+          created_at: string | null
+          device_fingerprint: string | null
+          email: string
+          id: string
+          ip_address: string
+          phone: string | null
+          success: boolean | null
+        }
+        Insert: {
+          blocked_reason?: string | null
+          created_at?: string | null
+          device_fingerprint?: string | null
+          email: string
+          id?: string
+          ip_address: string
+          phone?: string | null
+          success?: boolean | null
+        }
+        Update: {
+          blocked_reason?: string | null
+          created_at?: string | null
+          device_fingerprint?: string | null
+          email?: string
+          id?: string
+          ip_address?: string
+          phone?: string | null
+          success?: boolean | null
+        }
+        Relationships: []
+      }
+      sms_messages: {
+        Row: {
+          account_id: string | null
+          conversation_id: string | null
+          created_at: string | null
+          direction: string
+          from_number: string
+          id: string
+          message_body: string
+          phone_number_id: string | null
+          status: string | null
+          to_number: string
+          vapi_message_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          direction: string
+          from_number: string
+          id?: string
+          message_body: string
+          phone_number_id?: string | null
+          status?: string | null
+          to_number: string
+          vapi_message_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          direction?: string
+          from_number?: string
+          id?: string
+          message_body?: string
+          phone_number_id?: string | null
+          status?: string | null
+          to_number?: string
+          vapi_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_messages_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_phone_number_id_fkey"
+            columns: ["phone_number_id"]
+            isOneToOne: false
+            referencedRelation: "phone_numbers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      state_recording_laws: {
+        Row: {
+          consent_type: string
+          notification_text: string | null
+          requires_notification: boolean | null
+          state_code: string
+          state_name: string
+        }
+        Insert: {
+          consent_type: string
+          notification_text?: string | null
+          requires_notification?: boolean | null
+          state_code: string
+          state_name: string
+        }
+        Update: {
+          consent_type?: string
+          notification_text?: string | null
+          requires_notification?: boolean | null
+          state_code?: string
+          state_name?: string
+        }
+        Relationships: []
+      }
       trial_signups: {
         Row: {
+          assistant_gender: string | null
           created_at: string
           email: string
           id: string
           name: string
           phone: string
+          referral_code: string | null
           source: string | null
           trade: string | null
           wants_advanced_voice: boolean | null
+          zip_code: string | null
         }
         Insert: {
+          assistant_gender?: string | null
           created_at?: string
           email: string
           id?: string
           name: string
           phone: string
+          referral_code?: string | null
           source?: string | null
           trade?: string | null
           wants_advanced_voice?: boolean | null
+          zip_code?: string | null
         }
         Update: {
+          assistant_gender?: string | null
           created_at?: string
           email?: string
           id?: string
           name?: string
           phone?: string
+          referral_code?: string | null
           source?: string | null
           trade?: string | null
           wants_advanced_voice?: boolean | null
+          zip_code?: string | null
         }
         Relationships: []
       }
       usage_logs: {
         Row: {
           account_id: string
+          appointment_booked: boolean | null
+          assistant_id: string | null
           call_cost_cents: number | null
           call_duration_seconds: number | null
           call_id: string | null
@@ -224,10 +787,19 @@ export type Database = {
           created_at: string | null
           customer_phone: string | null
           id: string
+          is_overage: boolean | null
           metadata: Json | null
+          phone_number_id: string | null
+          recording_duration_seconds: number | null
+          recording_expires_at: string | null
+          recording_url: string | null
+          was_emergency: boolean | null
+          was_transferred: boolean | null
         }
         Insert: {
           account_id: string
+          appointment_booked?: boolean | null
+          assistant_id?: string | null
           call_cost_cents?: number | null
           call_duration_seconds?: number | null
           call_id?: string | null
@@ -235,10 +807,19 @@ export type Database = {
           created_at?: string | null
           customer_phone?: string | null
           id?: string
+          is_overage?: boolean | null
           metadata?: Json | null
+          phone_number_id?: string | null
+          recording_duration_seconds?: number | null
+          recording_expires_at?: string | null
+          recording_url?: string | null
+          was_emergency?: boolean | null
+          was_transferred?: boolean | null
         }
         Update: {
           account_id?: string
+          appointment_booked?: boolean | null
+          assistant_id?: string | null
           call_cost_cents?: number | null
           call_duration_seconds?: number | null
           call_id?: string | null
@@ -246,7 +827,14 @@ export type Database = {
           created_at?: string | null
           customer_phone?: string | null
           id?: string
+          is_overage?: boolean | null
           metadata?: Json | null
+          phone_number_id?: string | null
+          recording_duration_seconds?: number | null
+          recording_expires_at?: string | null
+          recording_url?: string | null
+          was_emergency?: boolean | null
+          was_transferred?: boolean | null
         }
         Relationships: [
           {
@@ -254,6 +842,20 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_logs_assistant_id_fkey"
+            columns: ["assistant_id"]
+            isOneToOne: false
+            referencedRelation: "assistants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_logs_phone_number_id_fkey"
+            columns: ["phone_number_id"]
+            isOneToOne: false
+            referencedRelation: "phone_numbers"
             referencedColumns: ["id"]
           },
         ]
@@ -273,6 +875,45 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      voice_library: {
+        Row: {
+          accent: string | null
+          created_at: string | null
+          gender: string | null
+          id: string
+          is_premium: boolean | null
+          provider: string
+          sample_url: string | null
+          tone: string | null
+          voice_id: string
+          voice_name: string
+        }
+        Insert: {
+          accent?: string | null
+          created_at?: string | null
+          gender?: string | null
+          id?: string
+          is_premium?: boolean | null
+          provider?: string
+          sample_url?: string | null
+          tone?: string | null
+          voice_id: string
+          voice_name: string
+        }
+        Update: {
+          accent?: string | null
+          created_at?: string | null
+          gender?: string | null
+          id?: string
+          is_premium?: boolean | null
+          provider?: string
+          sample_url?: string | null
+          tone?: string | null
+          voice_id?: string
+          voice_name?: string
         }
         Relationships: []
       }
