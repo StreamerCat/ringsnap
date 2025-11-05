@@ -18,12 +18,15 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let currentAccountId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { accountId, email, name, phone } = await req.json();
+    currentAccountId = accountId;
 
     if (!accountId) {
       return new Response(
@@ -378,8 +381,7 @@ serve(async (req) => {
     console.error('Provisioning error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     
-    const { accountId } = await req.json().catch(() => ({}));
-    if (accountId) {
+    if (currentAccountId) {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -390,7 +392,7 @@ serve(async (req) => {
           provisioning_status: 'failed',
           provisioning_error: errorMessage,
         })
-        .eq('id', accountId);
+        .eq('id', currentAccountId);
     }
 
     return new Response(
