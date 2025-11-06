@@ -2,6 +2,281 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 
+type BaseLogContext = {
+  functionName: string;
+  correlationId: string;
+  accountId?: string | null;
+};
+
+type StripeInvoiceLine = {
+  description?: string | null;
+  plan?: { nickname?: string | null } | null;
+  amount?: number | null;
+  amount_excluding_tax?: number | null;
+  quantity?: number | null;
+};
+
+type StripeInvoice = {
+  id: string;
+  number?: string | null;
+  amount_paid?: number | null;
+  amount_due?: number | null;
+  total?: number | null;
+  status_transitions?: { paid_at?: number | null } | null;
+  finalized_at?: number | null;
+  created?: number | null;
+  period_start?: number | null;
+  period_end?: number | null;
+  invoice_pdf?: string | null;
+  hosted_invoice_url?: string | null;
+  lines?: { data?: StripeInvoiceLine[] | null } | null;
+  customer?: string | null;
+};
+
+type AccountRecord = {
+  id: string;
+  company_name?: string | null;
+  stripe_customer_id?: string | null;
+};
+
+type ProfileRecord = {
+  id: string;
+  name?: string | null;
+  account_id?: string | null;
+};
+
+const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
+
+function formatCurrencyFromCents(amountInCents: number | null | undefined): string {
+  if (typeof amountInCents !== 'number' || !Number.isFinite(amountInCents)) {
+    return CURRENCY_FORMATTER.format(0);
+  }
+
+  return CURRENCY_FORMATTER.format(amountInCents / 100);
+}
+
+function formatDateFromUnix(unixTimestamp: number | null | undefined): string | null {
+  if (typeof unixTimestamp !== 'number' || !Number.isFinite(unixTimestamp)) {
+    return null;
+  }
+
+  return DATE_FORMATTER.format(new Date(unixTimestamp * 1000));
+}
+
+async function sendInvoiceEmail({
+  invoice,
+  account,
+  primaryProfile,
+  recipientEmail,
+  logOptions,
+}: {
+  invoice: StripeInvoice;
+  account: AccountRecord;
+  primaryProfile: ProfileRecord | null;
+  recipientEmail: string | null;
+  logOptions: BaseLogContext;
+}): Promise<void> {
+  const logBase = {
+    ...logOptions,
+    accountId: logOptions.accountId ?? account.id,
+  };
+
+  const logContextBase = {
+    ...logBase,
+    context: {
+      invoiceId: invoice.id,
+      recipientEmail,
+      accountStripeCustomerId: account.stripe_customer_id ?? null,
+    },
+  } as const;
+
+  if (!recipientEmail) {
+    logInfo('No primary email available for invoice notification', logContextBase);
+    return;
+  }
+
+  if (!RESEND_API_KEY) {
+    logInfo('Resend API key not configured; skipping invoice email send', logContextBase);
+    return;
+  }
+
+  const customerName = primaryProfile?.name || account.company_name || 'there';
+  const invoiceNumber = invoice.number ?? invoice.id;
+  const paidAt = formatDateFromUnix(
+    invoice.status_transitions?.paid_at ?? invoice.finalized_at ?? invoice.created,
+  );
+  const periodStart = formatDateFromUnix(invoice.period_start);
+  const periodEnd = formatDateFromUnix(invoice.period_end);
+  const amountFormatted = formatCurrencyFromCents(
+    invoice.amount_paid ?? invoice.amount_due ?? invoice.total ?? 0,
+  );
+  const invoicePdfUrl = invoice.invoice_pdf ?? invoice.hosted_invoice_url ?? null;
+  const hostedInvoiceUrl = invoice.hosted_invoice_url ?? null;
+
+  const lineItemSource = Array.isArray(invoice.lines?.data) ? invoice.lines?.data ?? [] : [];
+  const lineItems: Array<{ description: string; amount: string; quantity: number | null }> = lineItemSource.map(
+    (line) => {
+      const description = line?.description ?? line?.plan?.nickname ?? 'Charge';
+      const rawAmountCents = line?.amount ?? line?.amount_excluding_tax;
+      const quantity = typeof line?.quantity === 'number' ? line.quantity : null;
+      const amount = formatCurrencyFromCents(typeof rawAmountCents === 'number' ? rawAmountCents : 0);
+      return { description, amount, quantity };
+    },
+  );
+
+  const lineItemsHtml = lineItems.length
+    ? `<ul style="margin: 0 0 16px 16px; padding: 0;">${lineItems
+        .map((item) => `<li style="margin-bottom: 8px;">${item.description}${item.quantity ? ` (x${item.quantity})` : ''} - ${item.amount}</li>`)
+        .join('')}</ul>`
+    : '';
+
+  const lineItemsTextLines = lineItems.map((item) => `• ${item.description}${item.quantity ? ` (x${item.quantity})` : ''} - ${item.amount}`);
+
+  const billingPeriodText = periodStart && periodEnd ? `${periodStart} - ${periodEnd}` : null;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RingSnap payment receipt</title>
+  </head>
+  <body style="margin:0; padding:24px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color:#f9fafb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden;">
+      <tr>
+        <td style="padding:32px;">
+          <h1 style="margin:0 0 16px 0; font-size:22px; color:#111827;">Payment received</h1>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">Hi ${customerName},</p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">Thanks for your payment of <strong>${amountFormatted}</strong> for RingSnap.</p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Invoice number: <strong>${invoiceNumber}</strong><br/>
+            ${paidAt ? `Paid on: <strong>${paidAt}</strong><br/>` : ''}
+            ${billingPeriodText ? `Billing period: ${billingPeriodText}` : ''}
+          </p>
+          ${lineItemsHtml}
+          ${invoicePdfUrl ? `<p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">Download your receipt as a PDF: <a href="${invoicePdfUrl}" target="_blank" rel="noopener" style="color:#D95F3C;">View PDF</a></p>` : ''}
+          ${hostedInvoiceUrl && hostedInvoiceUrl !== invoicePdfUrl ? `<p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">View the invoice in your browser: <a href="${hostedInvoiceUrl}" target="_blank" rel="noopener" style="color:#D95F3C;">Open invoice</a></p>` : ''}
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">Need anything? Reply to this email and our team will help.</p>
+          <p style="margin:24px 0 0 0; color:#6b7280; font-size:14px;">— The RingSnap Team</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+  `;
+
+  const textBodyLines = [
+    `Hi ${customerName},`,
+    '',
+    `Thanks for your payment of ${amountFormatted} for RingSnap.`,
+    '',
+    `Invoice number: ${invoiceNumber}`,
+  ];
+
+  if (paidAt) {
+    textBodyLines.push(`Paid on: ${paidAt}`);
+  }
+
+  if (billingPeriodText) {
+    textBodyLines.push(`Billing period: ${billingPeriodText}`);
+  }
+
+  if (lineItemsTextLines.length) {
+    textBodyLines.push('', 'Line items:', ...lineItemsTextLines);
+  }
+
+  if (invoicePdfUrl) {
+    textBodyLines.push('', `Download PDF: ${invoicePdfUrl}`);
+  }
+
+  if (hostedInvoiceUrl && hostedInvoiceUrl !== invoicePdfUrl) {
+    textBodyLines.push(`View online: ${hostedInvoiceUrl}`);
+  }
+
+  textBodyLines.push('', 'Need anything? Reply to this email and our team will help.', '', '— The RingSnap Team');
+
+  const textBody = textBodyLines.join('\n');
+
+  const subject = invoiceNumber
+    ? `Payment receipt for RingSnap invoice ${invoiceNumber}`
+    : 'Payment receipt for your RingSnap subscription';
+
+  logInfo('Sending invoice email via Resend', {
+    ...logContextBase,
+    context: {
+      ...logContextBase.context,
+      subject,
+    },
+  });
+
+  let response: Response;
+  let responseBody = '';
+
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'RingSnap Billing <billing@ringsnap.com>',
+        to: recipientEmail,
+        subject,
+        html: htmlBody,
+        text: textBody,
+      }),
+    });
+    responseBody = await response.text();
+  } catch (error) {
+    logError('Invoice email send failed - network or fetch error', {
+      ...logContextBase,
+      error,
+    });
+    throw error;
+  }
+
+  if (!response.ok) {
+    const error = new Error(`Resend API error ${response.status}: ${responseBody}`);
+    logError('Invoice email send failed - Resend returned error', {
+      ...logContextBase,
+      error,
+    });
+    throw error;
+  }
+
+  let resendMessageId: string | null = null;
+  try {
+    if (responseBody) {
+      const parsed = JSON.parse(responseBody);
+      if (parsed && typeof parsed === 'object' && 'id' in parsed) {
+        resendMessageId = String((parsed as { id: string }).id);
+      }
+    }
+  } catch (_parseError) {
+    // Ignore JSON parse errors for logging, but keep raw response
+  }
+
+  logInfo('Invoice email sent successfully', {
+    ...logContextBase,
+    context: {
+      ...logContextBase.context,
+      resendMessageId,
+      responseStatus: response.status,
+    },
+  });
+}
+
 const FUNCTION_NAME = "stripe-webhook";
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET');
@@ -31,23 +306,84 @@ serve(async (req) => {
 
     switch (event.type) {
       case 'invoice.payment_succeeded': {
-        const invoice = event.data.object;
+        const invoice = event.data.object as StripeInvoice;
         const customerId = invoice.customer;
 
+        if (!customerId) {
+          logError('Invoice payment succeeded event missing customer id', {
+            ...baseLogOptions,
+            context: { invoiceId: invoice.id },
+          });
+          break;
+        }
+
         // Find account
-        const { data: account } = await supabase
-          .from('accounts')
-          .select('*')
+        const { data: account, error: accountLookupError } = await supabase
+          .from<AccountRecord>('accounts')
+          .select('id, company_name, stripe_customer_id')
           .eq('stripe_customer_id', customerId)
           .maybeSingle();
 
-        if (!account) break;
+        if (accountLookupError) {
+          logError('Failed to load account for Stripe customer', {
+            ...baseLogOptions,
+            context: { customerId },
+            error: accountLookupError,
+          });
+          throw accountLookupError;
+        }
+
+        if (!account) {
+          logInfo('No account found for Stripe customer', {
+            ...baseLogOptions,
+            context: { customerId, invoiceId: invoice.id },
+          });
+          break;
+        }
 
         currentAccountId = account.id;
 
+        // Load primary profile for account
+        const { data: primaryProfile, error: primaryProfileError } = await supabase
+          .from<ProfileRecord>('profiles')
+          .select('id, name, account_id')
+          .eq('account_id', account.id)
+          .eq('is_primary', true)
+          .maybeSingle();
+
+        if (primaryProfileError) {
+          logError('Failed to load primary profile for account', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            context: { invoiceId: invoice.id },
+            error: primaryProfileError,
+          });
+        }
+
+        let primaryUserEmail: string | null = null;
+        if (primaryProfile?.id) {
+          const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(primaryProfile.id);
+          if (authUserError) {
+            logError('Failed to load Supabase auth user for primary profile', {
+              ...baseLogOptions,
+              accountId: currentAccountId,
+              context: { invoiceId: invoice.id, profileId: primaryProfile.id },
+              error: authUserError,
+            });
+          } else {
+            primaryUserEmail = authUserData?.user?.email ?? null;
+          }
+        } else {
+          logInfo('No primary profile found for account during invoice processing', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            context: { invoiceId: invoice.id },
+          });
+        }
+
         // Apply account credits to invoice
         const invoiceAmountCents = invoice.amount_due;
-        
+
         const { data: credits } = await supabase
           .from('account_credits')
           .select('*')
@@ -134,6 +470,14 @@ serve(async (req) => {
             // TODO: Send emails to referrer and referee
           }
         }
+
+        await sendInvoiceEmail({
+          invoice,
+          account,
+          primaryProfile: primaryProfile ?? null,
+          recipientEmail: primaryUserEmail,
+          logOptions: { ...baseLogOptions, accountId: currentAccountId },
+        });
 
         break;
       }
