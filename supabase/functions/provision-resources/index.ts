@@ -354,7 +354,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'RingSnap <welcome@ringsnap.com>',
+            from: 'RingSnap <welcome@getringsnap.com>',
             to: email,
             subject: 'Your RingSnap line is live - start catching every call',
             html: `
@@ -439,7 +439,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'RingSnap <welcome@ringsnap.com>',
+            from: 'RingSnap <welcome@getringsnap.com>',
             to: email,
             subject: 'Your RingSnap account setup is underway',
             html: `

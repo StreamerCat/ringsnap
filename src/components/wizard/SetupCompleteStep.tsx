@@ -178,9 +178,9 @@ export const SetupCompleteStep = ({ formData }: SetupCompleteStepProps) => {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <Button variant="outline" asChild>
-              <a href="mailto:support@ringsnap.com">
+              <a href="mailto:support@getringsnap.com">
                 <Mail className="mr-2 h-4 w-4" />
-                support@ringsnap.com
+                support@getringsnap.com
               </a>
             </Button>
             <Button variant="outline" asChild>

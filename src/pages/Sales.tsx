@@ -144,7 +144,7 @@ export default function Sales() {
     doc.setFontSize(10);
     doc.setTextColor(128, 128, 128);
     doc.text('RingSnap - AI Receptionist for Contractors', pageWidth / 2, 280, { align: 'center' });
-    doc.text('www.ringsnap.com', pageWidth / 2, 287, { align: 'center' });
+    doc.text('www.getringsnap.com', pageWidth / 2, 287, { align: 'center' });
 
     // Save
     doc.save(`ringsnap-roi-${companyName.toLowerCase().replace(/\s+/g, '-')}.pdf`);

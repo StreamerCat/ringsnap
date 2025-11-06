@@ -676,8 +676,8 @@ export default function Onboarding() {
           <CardContent className="pt-6">
             <p className="text-center text-sm text-muted-foreground">
               Need help? Contact our support team at{" "}
-              <a href="mailto:support@ringsnap.com" className="text-primary hover:underline">
-                support@ringsnap.com
+              <a href="mailto:support@getringsnap.com" className="text-primary hover:underline">
+                support@getringsnap.com
               </a>
             </p>
           </CardContent>

@@ -3,7 +3,7 @@ import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 
 const FUNCTION_NAME = "send-forwarding-instructions";
 const RESEND_API_URL = "https://api.resend.com/emails";
-const FROM_ADDRESS = "RingSnap <support@ringsnap.com>";
+const FROM_ADDRESS = "RingSnap <support@getringsnap.com>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

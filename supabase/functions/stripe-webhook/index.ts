@@ -230,7 +230,7 @@ async function sendInvoiceEmail({
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'RingSnap Billing <billing@ringsnap.com>',
+        from: 'RingSnap Billing <billing@getringsnap.com>',
         to: recipientEmail,
         subject,
         html: htmlBody,

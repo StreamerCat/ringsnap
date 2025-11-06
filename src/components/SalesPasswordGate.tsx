@@ -113,7 +113,7 @@ export const SalesPasswordGate = ({
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="your.email@ringsnap.com"
+              placeholder="your.email@getringsnap.com"
               required
               className="text-base"
               style={{ fontSize: "16px" }}

@@ -252,7 +252,7 @@ const AdminUsers = () => {
                   type="email"
                   value={newStaffEmail}
                   onChange={(e) => setNewStaffEmail(e.target.value)}
-                  placeholder="staff@ringsnap.com"
+                  placeholder="staff@getringsnap.com"
                 />
               </div>
               <div>
