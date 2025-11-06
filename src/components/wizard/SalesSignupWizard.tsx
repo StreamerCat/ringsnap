@@ -26,7 +26,7 @@ import {
 import * as z from "zod";
 
 // Initialize Stripe
-const stripePromise = loadStripe('pk_live_51SKmvhIdevV48BnphmyhXOa4qTOobfciT5pKXjeB5mwzR0SMAqVwI3ohYUnlw6CcWlvkyFnJqrSDGNLlFiXxov8d00r0kkXb0i');
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 const STORAGE_KEY = "ringsnap_wizard_progress";
 

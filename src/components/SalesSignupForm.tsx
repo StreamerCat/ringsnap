@@ -21,7 +21,7 @@ import { SalesSuccessModal, type SalesSuccessModalData } from "@/components/Sale
 import { TRADES } from "@/components/wizard/types";
 
 // Initialize Stripe - Replace with your live publishable key from https://dashboard.stripe.com/apikeys
-const stripePromise = loadStripe('pk_live_51SKmvhIdevV48BnphmyhXOa4qTOobfciT5pKXjeB5mwzR0SMAqVwI3ohYUnlw6CcWlvkyFnJqrSDGNLlFiXxov8d00r0kkXb0i');
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // Form schema
 const salesFormSchema = z.object({
