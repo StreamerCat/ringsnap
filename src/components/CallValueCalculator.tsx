@@ -249,11 +249,11 @@ export const CallValueCalculator = ({
         </div>
       </CardContent>
     </Card>;
-  return <section id="calculator" className="section-spacer bg-slate-50">
-      <div className="container mx-auto max-w-7xl px-4">
-        <hr className="section-divider mb-10" />
+  return <section id="calculator" className="py-12 sm:py-16 lg:py-20 bg-slate-50">
+      <div className="container mx-auto max-w-7xl px-4 sm:px-6">
+        <hr className="section-divider mb-6 sm:mb-8" />
 
-        <div className="space-y-12">
+        <div className="space-y-8 sm:space-y-10 lg:space-y-12">
           <header className="space-y-6">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.28em] text-primary">
               <Sparkles className="h-4 w-4" /> For home-service teams
@@ -279,7 +279,7 @@ Drop in your call volume to see how much revenue RingSnap recovers.</p>
           </header>
 
           <Card className="border border-slate-200 shadow-sm">
-            <CardHeader className="space-y-6">
+            <CardHeader className="space-y-6 p-4 sm:p-6">
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <Badge variant="secondary" className="border border-primary/10 bg-primary/10 text-primary">
                   60-second ROI snapshot
@@ -300,7 +300,7 @@ Drop in your call volume to see how much revenue RingSnap recovers.</p>
               </ToggleGroup>
               <p className="max-w-xl text-sm text-muted-foreground">{presetInsight}</p>
             </CardHeader>
-            <CardContent className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)] lg:items-start lg:gap-10 lg:space-y-0">
+            <CardContent className="space-y-6 p-4 sm:p-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)] lg:items-start lg:gap-10 lg:space-y-0">
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-3">
                   {quickStats.map(stat => <div key={stat.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -333,13 +333,25 @@ Drop in your call volume to see how much revenue RingSnap recovers.</p>
                 
 
                 <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-                  <div className="flex-col flex-auto gap-3.5 rounded-2xl border border-dashed border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:flex-1 ">
+                  <div className="flex flex-col sm:flex-row gap-3.5 items-start sm:items-center justify-between rounded-2xl border border-dashed border-slate-200 bg-white p-4">
                     <div>
                       <div className="text-sm font-semibold text-slate-700">Using {tradePresets[selectedPreset].label} benchmarks</div>
                       <p className="text-xs text-muted-foreground">Dial in the math—every tweak updates the ROI story immediately.</p>
                     </div>
                     <CollapsibleTrigger asChild>
-                      
+                      <Button variant="outline" size="sm" className="shrink-0 mt-2 sm:mt-0">
+                        {isAdvancedOpen ? (
+                          <>
+                            <ChevronUp className="h-4 w-4 mr-2" />
+                            Hide Controls
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4 mr-2" />
+                            Show Controls
+                          </>
+                        )}
+                      </Button>
                     </CollapsibleTrigger>
                   </div>
                   <CollapsibleContent forceMount>
@@ -394,14 +406,6 @@ Drop in your call volume to see how much revenue RingSnap recovers.</p>
               </div>
             </CardContent>
           </Card>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="border border-slate-200 shadow-sm">
-              
-            </Card>
-
-            
-          </div>
         </div>
       </div>
     </section>;
