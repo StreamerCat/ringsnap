@@ -121,8 +121,11 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
         throw new Error(errorDetails);
       }
 
+      let ringSnapNumber: string | null = null;
+
       if (result.phone) {
-        runIfMounted(() => setProvisionedNumber(result.phone));
+        setProvisionedNumber(result.phone);
+        ringSnapNumber = result.phone;
       }
 
       if (result.jobId) {
@@ -152,12 +155,30 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
         });
       }
 
-      runIfMounted(() => {
-        form.reset();
-        setErrorMessage(null);
-        onOpenChange(false);
-        navigate("/onboarding");
-      });
+      if (ringSnapNumber) {
+        try {
+          const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-forwarding-instructions', {
+            body: {
+              email: payload.email,
+              phoneNumber: ringSnapNumber,
+              companyName: payload.companyName || null
+            }
+          });
+
+          if (emailError) {
+            console.error('Forwarding instructions invocation failed:', emailError);
+          } else if (!emailResult?.success) {
+            console.error('Forwarding instructions returned error:', emailResult?.error);
+          }
+        } catch (forwardingError) {
+          console.error('Forwarding instructions request threw:', forwardingError);
+        }
+      }
+
+      form.reset();
+      setErrorMessage(null);
+      onOpenChange(false);
+      navigate("/onboarding");
     } catch (error) {
       console.error("Signup submission failed:", error);
       const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";

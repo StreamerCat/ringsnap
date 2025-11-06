@@ -16,9 +16,17 @@ type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type ProfileWithAccount = ProfileRow & { accounts?: AccountRow | null };
 
+const ENABLE_DEBUG = true;
+const dbg = (...args: unknown[]) => {
+  if (ENABLE_DEBUG) {
+    console.debug("[Onboarding]", ...args);
+  }
+};
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState<ProfileWithAccount | null>(null);
   const [account, setAccount] = useState<AccountRow | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
@@ -27,19 +35,69 @@ export default function Onboarding() {
   const [showSetupForm, setShowSetupForm] = useState(false);
 
   const checkAuth = useCallback(async () => {
+    dbg("Starting auth check");
+    setAuthReady(false);
+    setLoading(true);
+    setProfile(null);
+    setAccount(null);
+    setPhoneNumber(null);
+    setAssistant(null);
+    setUsageStats({ minutesUsed: 0, minutesLimit: 150 });
+
+    const maxAttempts = 5;
+    const retryDelayMs = 300;
+    let user = null;
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const {
+          data: { user: fetchedUser },
+          error
+        } = await supabase.auth.getUser();
+
+        if (error) {
+          dbg("getUser error", error);
+          lastError = error;
+          break;
+        }
+
+        if (fetchedUser) {
+          dbg("User found", fetchedUser.id, "on attempt", attempt + 1);
+          user = fetchedUser;
+          break;
+        }
+
+        dbg("No user found on attempt", attempt + 1, "of", maxAttempts);
+      } catch (error) {
+        dbg("getUser threw", error);
+        lastError = error;
+        break;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        dbg("Retrying auth check after delay");
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+    }
+
+    if (!user) {
+      dbg("Unable to resolve authenticated user", lastError);
+      setAuthReady(true);
+      setLoading(false);
+      navigate("/");
+      return;
+    }
+
+    if (!user.email) {
+      dbg("Authenticated user missing email, redirecting");
+      setAuthReady(true);
+      setLoading(false);
+      navigate("/");
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        navigate("/");
-        return;
-      }
-
-      if (!user.email) {
-        navigate("/");
-        return;
-      }
-
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*, accounts:account_id(*)")
@@ -47,19 +105,20 @@ export default function Onboarding() {
         .maybeSingle();
 
       if (profileError) {
-        console.error("Error fetching profile:", profileError);
+        dbg("Error fetching profile", profileError);
         toast.error("Failed to load account information");
         return;
       }
 
       if (profileData) {
+        dbg("Profile data loaded for user", user.id);
         const typedData = profileData as ProfileWithAccount;
         setProfile(typedData);
         const accountData = typedData.accounts ?? null;
         setAccount(accountData);
 
-        // Fetch additional data in parallel
         if (accountData?.id) {
+          dbg("Fetching supplemental account data", accountData.id);
           const [phoneResult, assistantResult, usageResult] = await Promise.all([
             supabase
               .from("phone_numbers")
@@ -80,10 +139,12 @@ export default function Onboarding() {
           ]);
 
           if (phoneResult.data) {
+            dbg("Primary phone number loaded");
             setPhoneNumber(phoneResult.data.phone_number);
           }
 
           if (assistantResult.data) {
+            dbg("Primary assistant loaded");
             setAssistant(assistantResult.data);
           }
 
@@ -93,23 +154,44 @@ export default function Onboarding() {
               0
             );
             const totalMinutes = Math.ceil(totalSeconds / 60);
+            dbg("Usage stats computed", totalMinutes, "minutes");
             setUsageStats({
               minutesUsed: totalMinutes,
               minutesLimit: accountData.monthly_minutes_limit || 150
             });
           }
         }
+      } else {
+        dbg("No profile data returned for user", user.id);
       }
     } catch (error) {
-      console.error("Error loading account:", error);
+      dbg("Error loading account data", error);
       toast.error("Failed to load account information");
     } finally {
+      dbg("Auth check complete");
+      setAuthReady(true);
       setLoading(false);
     }
   }, [navigate]);
 
   useEffect(() => {
     checkAuth();
+  }, [checkAuth]);
+
+  useEffect(() => {
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      dbg("Auth state change", event, session?.user?.id);
+      if (session?.user) {
+        checkAuth();
+      }
+    });
+
+    return () => {
+      dbg("Cleaning up auth state subscription");
+      subscription.unsubscribe();
+    };
   }, [checkAuth]);
 
   // Show setup form if provisioning status is pending
@@ -152,7 +234,7 @@ export default function Onboarding() {
     navigate("/");
   };
 
-  if (loading) {
+  if (!authReady || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
