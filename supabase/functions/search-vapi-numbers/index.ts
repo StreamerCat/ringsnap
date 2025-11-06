@@ -96,7 +96,7 @@ serve(async (req) => {
         Authorization: `Bearer ${VAPI_API_KEY}`
       },
       body: JSON.stringify({
-        areaCode: normalizedAreaCode,
+        numberDesiredAreaCode: normalizedAreaCode,
         limit: searchLimit,
         country: "US"
       })

@@ -12,7 +12,6 @@ import { BusinessEssentialsStep } from "./BusinessEssentialsStep";
 import { PlanSelectionStep } from "./PlanSelectionStep";
 import { BusinessDetailsStep } from "./BusinessDetailsStep";
 import { PaymentStep } from "./PaymentStep";
-import { PhoneNumberSelectionStep } from "./PhoneNumberSelectionStep";
 import { SetupCompleteStep } from "./SetupCompleteStep";
 import {
   WizardStep,
@@ -20,7 +19,6 @@ import {
   businessEssentialsSchema,
   planSelectionSchema,
   businessDetailsSchema,
-  phoneSelectionSchema,
   parseBusinessHours,
 } from "./types";
 import * as z from "zod";
@@ -34,7 +32,6 @@ const STORAGE_KEY = "ringsnap_wizard_progress";
 function WizardInner() {
   const [currentStep, setCurrentStep] = useState<WizardStep>(WizardStep.BusinessEssentials);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isProvisioning, setIsProvisioning] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
 
@@ -56,9 +53,6 @@ function WizardInner() {
       emergencyPolicy: "",
       assistantGender: "female",
       salesRepName: "",
-      selectedAreaCode: "",
-      selectedPhoneNumber: undefined,
-      selectedPhoneId: undefined,
     },
   });
 
@@ -138,14 +132,6 @@ function WizardInner() {
             setCardError("Please complete your card details");
             return false;
           }
-          return true;
-
-        case WizardStep.PhoneNumberSelection:
-          phoneSelectionSchema.parse({
-            selectedAreaCode: values.selectedAreaCode,
-            selectedPhoneNumber: values.selectedPhoneNumber,
-            selectedPhoneId: values.selectedPhoneId,
-          });
           return true;
 
         default:
@@ -238,9 +224,16 @@ function WizardInner() {
       form.setValue("stripeCustomerId", data.stripeCustomerId);
       form.setValue("subscriptionId", data.subscriptionId);
       form.setValue("tempPassword", data.tempPassword);
+      form.setValue("vapiPhoneNumber", data.vapiPhoneNumber);
+      form.setValue("vapiAssistantId", data.vapiAssistantId);
 
-      toast.success("Payment successful!");
-      setCurrentStep(WizardStep.PhoneNumberSelection);
+      if (data.provisioned) {
+        toast.success("Payment successful! Your phone number is being activated.");
+      } else {
+        toast.success("Payment successful! Your account is being set up.");
+      }
+
+      setCurrentStep(WizardStep.SetupComplete);
     } catch (err) {
       console.error("Payment error:", err);
       const message = err instanceof Error ? err.message : "Payment failed";
@@ -251,38 +244,6 @@ function WizardInner() {
     }
   };
 
-  const handleProvision = async () => {
-    setIsProvisioning(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("provision-sales-account", {
-        body: {
-          accountId: form.getValues("accountId"),
-          userId: form.getValues("userId"),
-          selectedPhoneNumber: form.getValues("selectedPhoneNumber"),
-          selectedPhoneId: form.getValues("selectedPhoneId"),
-          areaCode: form.getValues("selectedAreaCode"),
-        },
-      });
-
-      if (error) throw error;
-
-      // Store provisioned data
-      form.setValue("vapiPhoneNumber", data.vapiPhoneNumber);
-      form.setValue("vapiAssistantId", data.vapiAssistantId);
-
-      toast.success("Your AI assistant is now active!");
-      setCurrentStep(WizardStep.SetupComplete);
-
-      // Clear saved progress
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch (err) {
-      console.error("Provisioning error:", err);
-      toast.error("Provisioning failed. Please try selecting a different number.");
-    } finally {
-      setIsProvisioning(false);
-    }
-  };
 
   const renderStep = () => {
     switch (currentStep) {
@@ -301,14 +262,6 @@ function WizardInner() {
             cardError={cardError}
           />
         );
-      case WizardStep.PhoneNumberSelection:
-        return (
-          <PhoneNumberSelectionStep
-            form={form}
-            onProvision={handleProvision}
-            isProvisioning={isProvisioning}
-          />
-        );
       case WizardStep.SetupComplete:
         return <SetupCompleteStep formData={form.getValues()} />;
       default:
@@ -316,8 +269,7 @@ function WizardInner() {
     }
   };
 
-  const canGoNext =
-    currentStep < WizardStep.PhoneNumberSelection && currentStep !== WizardStep.Payment;
+  const canGoNext = currentStep < WizardStep.Payment;
   const canGoBack = currentStep > WizardStep.BusinessEssentials && currentStep < WizardStep.SetupComplete;
   const showPaymentButton = currentStep === WizardStep.Payment;
   const isComplete = currentStep === WizardStep.SetupComplete;
@@ -334,7 +286,7 @@ function WizardInner() {
             <Button
               variant="outline"
               onClick={handleBack}
-              disabled={!canGoBack || isSubmitting || isProvisioning}
+              disabled={!canGoBack || isSubmitting}
               size="lg"
             >
               <ArrowLeft className="mr-2 h-5 w-5" />
