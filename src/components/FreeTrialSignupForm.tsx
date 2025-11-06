@@ -9,7 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+
+type SignupFunctionResponse = {
+  ok: boolean;
+  error?: string;
+  phone?: string;
+  jobId?: string;
+  email?: string;
+  password?: string;
+  message?: string;
+};
 const formSchema = z.object({
   name: z
     .string()
@@ -74,34 +85,93 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     };
 
     try {
-      const response = await fetch(`/api/signup`, {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+      const fetchSignupDirectly = async (): Promise<SignupFunctionResponse> => {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+          throw new Error("Service configuration error. Please try again later.");
+        }
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          apikey: supabaseAnonKey,
+        };
+
+        const accessToken = sessionData?.session?.access_token;
+        if (accessToken) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+        }
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/free-trial-signup`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        const responseText = await response.text();
+        let parsedResult: SignupFunctionResponse | null = null;
+
+        if (responseText) {
+          try {
+            parsedResult = JSON.parse(responseText) as SignupFunctionResponse;
+          } catch (parseError) {
+            console.error("Failed to parse signup response:", parseError);
+            throw new Error("Received an unexpected response. Please try again.");
+          }
+        }
+
+        if (!response.ok || !parsedResult?.ok) {
+          const errorDetails = parsedResult?.error || "Unknown error";
+          throw new Error(errorDetails);
+        }
+
+        return parsedResult;
+      };
+
+      const { data: result, error: invokeError } = await supabase.functions.invoke<SignupFunctionResponse>('free-trial-signup', {
+        body: payload
       });
 
-      const result = await response.json();
+      let signupResult = result ?? null;
 
-      if (!response.ok || !result?.ok) {
-        const errorDetails = result?.error || "Unknown error";
+      if (invokeError) {
+        if (invokeError instanceof FunctionsHttpError && invokeError.context) {
+          const errorBody = await invokeError.context.json().catch(() => null);
+          const errorDetails = errorBody?.error || invokeError.message || "Unknown error";
+          throw new Error(errorDetails);
+        }
+
+        if (invokeError.message?.includes("Unexpected end of JSON input")) {
+          signupResult = await fetchSignupDirectly();
+        } else {
+          throw new Error(invokeError.message || "Could not start your trial. Please try again.");
+        }
+      }
+
+      if (!signupResult) {
+        signupResult = await fetchSignupDirectly();
+      }
+
+      if (!signupResult?.ok) {
+        const errorDetails = signupResult?.error || "Unknown error";
         throw new Error(errorDetails);
       }
 
-      if (result.phone) {
-        setProvisionedNumber(result.phone);
+      if (signupResult.phone) {
+        setProvisionedNumber(signupResult.phone);
       }
 
-      if (result.jobId) {
-        setProvisionJobId(result.jobId);
+      if (signupResult.jobId) {
+        setProvisionJobId(signupResult.jobId);
       }
 
       // Sign in with returned credentials for instant login when available
-      if (result.email && result.password) {
+      if (signupResult.email && signupResult.password) {
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: result.email,
-          password: result.password,
+          email: signupResult.email,
+          password: signupResult.password,
         });
 
         if (signInError) {
