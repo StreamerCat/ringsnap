@@ -319,7 +319,7 @@ serve(async (req) => {
 
         // Find account
         const { data: account, error: accountLookupError } = await supabase
-          .from<AccountRecord>('accounts')
+          .from('accounts')
           .select('id, company_name, stripe_customer_id')
           .eq('stripe_customer_id', customerId)
           .maybeSingle();
@@ -345,7 +345,7 @@ serve(async (req) => {
 
         // Load primary profile for account
         const { data: primaryProfile, error: primaryProfileError } = await supabase
-          .from<ProfileRecord>('profiles')
+          .from('profiles')
           .select('id, name, account_id')
           .eq('account_id', account.id)
           .eq('is_primary', true)
@@ -382,7 +382,7 @@ serve(async (req) => {
         }
 
         // Apply account credits to invoice
-        const invoiceAmountCents = invoice.amount_due;
+        const invoiceAmountCents = invoice.amount_due ?? 0;
 
         const { data: credits } = await supabase
           .from('account_credits')
@@ -391,7 +391,7 @@ serve(async (req) => {
           .eq('status', 'available')
           .order('expires_at', { ascending: true });
 
-        let remainingAmount = invoiceAmountCents;
+        let remainingAmount: number = invoiceAmountCents;
         
         for (const credit of credits || []) {
           if (remainingAmount <= 0) break;

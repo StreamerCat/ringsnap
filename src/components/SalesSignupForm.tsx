@@ -96,6 +96,8 @@ function SalesSignupFormInner() {
   const [error, setError] = useState<string | null>(null);
   const [cardError, setCardError] = useState<string | null>(null);
   const [cardComplete, setCardComplete] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<SalesSuccessModalData | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const stripe = useStripe();
@@ -158,8 +160,7 @@ function SalesSignupFormInner() {
         setIsSubmitting(false);
         return;
       }
-      const paymentMethodId = paymentMethod.id;
-
+      
       const paymentMethodId = paymentMethod.id;
 
       // Call edge function
@@ -203,7 +204,7 @@ function SalesSignupFormInner() {
         ringSnapNumber: typedResult.ringSnapNumber ?? null,
         tempPassword: typedResult.tempPassword,
         accountId: typedResult.accountId ?? null,
-        subscriptionStatus: typedResult.subscriptionStatus ?? (data.skipPayment ? 'trial' : 'active'),
+        subscriptionStatus: typedResult.subscriptionStatus ?? 'active',
         planType: data.planType,
         salesRepName: data.salesRepName,
       };
