@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle2 } from "lucide-react";
@@ -34,7 +33,6 @@ const salesFormSchema = z.object({
   emergencyPolicy: z.string().trim().min(10, "Emergency policy required").max(1000),
   planType: z.enum(['starter', 'professional', 'premium']),
   salesRepName: z.string().trim().min(1, "Sales rep name required").max(100),
-  skipPayment: z.boolean().default(false),
   zipCode: z.string().trim().regex(/^\d{5}$/, "Valid 5-digit ZIP required").optional().or(z.literal('')),
   assistantGender: z.enum(['male', 'female']).default('female'),
   referralCode: z.string().trim().length(8, "Code must be 8 characters").optional().or(z.literal(''))
@@ -100,7 +98,6 @@ function SalesSignupFormInner() {
       emergencyPolicy: "",
       planType: "starter",
       salesRepName: "",
-      skipPayment: false,
       zipCode: "",
       assistantGender: "female",
       referralCode: ""
@@ -112,30 +109,34 @@ function SalesSignupFormInner() {
     setError(null);
 
     try {
-      let paymentMethodId = null;
-
-      // Create payment method if not skipping payment
-      if (!data.skipPayment && stripe && elements) {
-        const cardElement = elements.getElement(CardElement);
-        if (!cardElement) {
-          throw new Error("Card element not found");
-        }
-
-        const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
-          type: 'card',
-          card: cardElement,
-          billing_details: {
-            name: data.name,
-            email: data.email,
-            phone: data.phone
-          }
-        });
-
-        if (stripeError) {
-          throw new Error(stripeError.message);
-        }
-        paymentMethodId = paymentMethod.id;
+      if (!stripe || !elements) {
+        throw new Error("Payment service is unavailable. Please try again.");
       }
+
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error("Card element not found");
+      }
+
+      const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: data.name,
+          email: data.email,
+          phone: data.phone
+        }
+      });
+
+      if (stripeError) {
+        throw new Error(stripeError.message);
+      }
+
+      if (!paymentMethod) {
+        throw new Error("Payment method could not be created");
+      }
+
+      const paymentMethodId = paymentMethod.id;
 
       // Call edge function
       const { data: result, error: functionError } = await supabase.functions.invoke(
@@ -157,8 +158,7 @@ function SalesSignupFormInner() {
               assistantGender: data.assistantGender,
               referralCode: data.referralCode?.trim() ?? ""
             },
-            paymentMethodId,
-            skipPayment: data.skipPayment
+            paymentMethodId
           }
         }
       );
@@ -177,9 +177,10 @@ function SalesSignupFormInner() {
         navigate('/onboarding');
       }, 2000);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Signup error:', err);
-      setError(err.message || 'Failed to create account. Please try again.');
+      const message = err instanceof Error ? err.message : 'Failed to create account. Please try again.';
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -451,41 +452,27 @@ function SalesSignupFormInner() {
           <CardTitle>Payment Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="skipPayment">Skip Payment (Trial Mode)</Label>
-              <p className="text-sm text-muted-foreground">Create account without payment capture</p>
-            </div>
-            <Switch
-              id="skipPayment"
-              checked={form.watch('skipPayment')}
-              onCheckedChange={(checked) => form.setValue('skipPayment', checked)}
-            />
-          </div>
-
-          {!form.watch('skipPayment') && (
-            <div className="space-y-2">
-              <Label>Card Details</Label>
-              <div className="border rounded-lg p-3 bg-white">
-                <CardElement
-                  options={{
-                    style: {
-                      base: {
-                        fontSize: '16px',
-                        color: '#424770',
-                        '::placeholder': {
-                          color: '#aab7c4',
-                        },
-                      },
-                      invalid: {
-                        color: '#9e2146',
+          <div className="space-y-2">
+            <Label>Card Details</Label>
+            <div className="border rounded-lg p-3 bg-white">
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#424770',
+                      '::placeholder': {
+                        color: '#aab7c4',
                       },
                     },
-                  }}
-                />
-              </div>
+                    invalid: {
+                      color: '#9e2146',
+                    },
+                  },
+                }}
+              />
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
