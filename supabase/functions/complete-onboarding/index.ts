@@ -51,12 +51,21 @@ serve(async (req) => {
       );
     }
 
-    const { areaCode, trade, assistantGender, referralCode } = await req.json();
+    const {
+      areaCode,
+      selectedNumber,
+      companyName,
+      trade,
+      assistantGender,
+      defaultAvailability,
+      connectCalendar,
+      referralCode
+    } = await req.json();
 
     // Validate required fields
-    if (!areaCode || !trade || !assistantGender) {
+    if (!areaCode || !selectedNumber || !companyName || !trade || !assistantGender) {
       return new Response(
-        JSON.stringify({ error: 'Area code, trade, and assistant voice are required' }),
+        JSON.stringify({ error: 'Area code, phone number, company name, trade, and assistant voice are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -69,9 +78,9 @@ serve(async (req) => {
       );
     }
 
-    logInfo('Using selected area code', {
+    logInfo('Using selected phone number and company details', {
       ...baseLogOptions,
-      context: { areaCode }
+      context: { areaCode, selectedNumber, companyName }
     });
 
     // Get user's profile to find account_id
@@ -96,15 +105,23 @@ serve(async (req) => {
     currentAccountId = accountId;
 
     // Update account with setup data
+    const updateData: Record<string, unknown> = {
+      trade: trade,
+      company_name: companyName,
+      assistant_gender: assistantGender,
+      phone_number_area_code: areaCode,
+      provisioning_status: 'provisioning',
+      updated_at: new Date().toISOString()
+    };
+
+    // Add optional fields if provided
+    if (defaultAvailability) {
+      updateData.custom_instructions = defaultAvailability;
+    }
+
     const { error: updateError } = await supabase
       .from('accounts')
-      .update({
-        trade: trade,
-        assistant_gender: assistantGender,
-        phone_number_area_code: areaCode,
-        provisioning_status: 'provisioning',
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', accountId);
 
     if (updateError) {
@@ -169,11 +186,14 @@ serve(async (req) => {
     // Trigger provisioning (call provision-resources function)
     try {
       const { error: provisionError } = await supabase.functions.invoke('provision-resources', {
-        body: { 
+        body: {
           accountId,
           email: user.email,
           name: profile.name,
-          phone: profile.phone
+          phone: profile.phone,
+          selectedNumber,
+          companyName,
+          defaultAvailability: defaultAvailability || null
         }
       });
 
