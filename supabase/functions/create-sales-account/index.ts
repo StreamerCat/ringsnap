@@ -34,13 +34,26 @@ serve(async (req) => {
     );
 
     // Parse request body
-    const { customerInfo, paymentMethodId, skipPayment } = await req.json();
+    const { customerInfo, paymentMethodId } = await req.json();
+
+    if (!paymentMethodId) {
+      logError('Missing payment method', {
+        ...baseLogOptions,
+        context: { email: customerInfo?.email }
+      });
+      return new Response(
+        JSON.stringify({ error: 'Payment method is required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
 
     logInfo('Creating sales account', {
       ...baseLogOptions,
       context: {
         email: customerInfo.email,
-        skipPayment,
         hasPlanType: !!customerInfo.planType
       }
     });
@@ -48,52 +61,54 @@ serve(async (req) => {
     let stripeCustomerId = null;
     let subscriptionId = null;
 
-    // Step 1: Create Stripe customer (if payment not skipped)
-    if (!skipPayment && paymentMethodId) {
-      const customer = await stripe.customers.create({
-        email: customerInfo.email,
-        name: customerInfo.name,
-        phone: customerInfo.phone,
-        metadata: {
-          company_name: customerInfo.companyName,
-          trade: customerInfo.trade,
-          sales_rep: customerInfo.salesRepName,
-          source: 'sales-team'
-        }
-      });
-      stripeCustomerId = customer.id;
-      logInfo('Stripe customer created', {
-        ...baseLogOptions,
-        context: { stripeCustomerId, email: customerInfo.email }
-      });
+    // Step 1: Create Stripe customer and subscription
+    const customer = await stripe.customers.create({
+      email: customerInfo.email,
+      name: customerInfo.name,
+      phone: customerInfo.phone,
+      metadata: {
+        company_name: customerInfo.companyName,
+        trade: customerInfo.trade,
+        sales_rep: customerInfo.salesRepName,
+        source: 'sales-team'
+      }
+    });
+    stripeCustomerId = customer.id;
+    logInfo('Stripe customer created', {
+      ...baseLogOptions,
+      context: { stripeCustomerId, email: customerInfo.email }
+    });
 
-      // Attach payment method
-      await stripe.paymentMethods.attach(paymentMethodId, {
-        customer: stripeCustomerId,
-      });
+    // Attach payment method
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: stripeCustomerId,
+    });
 
-      // Set as default payment method
-      await stripe.customers.update(stripeCustomerId, {
-        invoice_settings: {
-          default_payment_method: paymentMethodId,
-        },
-      });
+    // Set as default payment method
+    await stripe.customers.update(stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
 
-      // Create subscription based on plan_type
-      const priceId = getPriceIdForPlan(customerInfo.planType);
-      const subscription = await stripe.subscriptions.create({
-        customer: stripeCustomerId,
-        items: [{ price: priceId }],
-        metadata: {
-          sales_rep: customerInfo.salesRepName,
-          plan_type: customerInfo.planType
-        }
-      });
-      subscriptionId = subscription.id;
-      logInfo('Subscription created', {
-        ...baseLogOptions,
-        context: { subscriptionId, planType: customerInfo.planType }
-      });
+    // Create subscription based on plan_type
+    const priceId = getPriceIdForPlan(customerInfo.planType);
+    const subscription = await stripe.subscriptions.create({
+      customer: stripeCustomerId,
+      items: [{ price: priceId }],
+      metadata: {
+        sales_rep: customerInfo.salesRepName,
+        plan_type: customerInfo.planType
+      }
+    });
+    subscriptionId = subscription.id;
+    logInfo('Subscription created', {
+      ...baseLogOptions,
+      context: { subscriptionId, planType: customerInfo.planType, status: subscription.status }
+    });
+
+    if (subscription.status !== 'active') {
+      throw new Error(`Subscription not active. Status: ${subscription.status}`);
     }
 
     // Step 2: Generate secure temporary password
@@ -159,9 +174,7 @@ serve(async (req) => {
           business_hours: customerInfo.businessHours,
           emergency_policy: customerInfo.emergencyPolicy,
           plan_type: customerInfo.planType,
-          subscription_status: skipPayment ? 'trial' : 'active',
-          trial_start_date: skipPayment ? new Date().toISOString() : null,
-          trial_end_date: skipPayment ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() : null
+          subscription_status: 'active'
         })
         .eq('id', profile.account_id);
 
@@ -171,10 +184,54 @@ serve(async (req) => {
         context: {
           salesRepName: customerInfo.salesRepName,
           planType: customerInfo.planType,
-          subscriptionStatus: skipPayment ? 'trial' : 'active'
+          subscriptionStatus: 'active'
         }
       });
     }
+
+    if (!profile?.account_id) {
+      throw new Error('Account record not found after user creation');
+    }
+
+    const { data: accountDetails, error: accountDetailsError } = await supabaseAdmin
+      .from('accounts')
+      .select('id, plan_type, phone_number_e164, vapi_numbers (phone_e164)')
+      .eq('id', profile.account_id)
+      .single();
+
+    if (accountDetailsError) {
+      logError('Failed to fetch account details', {
+        ...baseLogOptions,
+        accountId: profile?.account_id ?? undefined,
+        error: accountDetailsError
+      });
+      throw accountDetailsError;
+    }
+
+    const vapiNumberRelation = accountDetails?.vapi_numbers;
+    let vapiPhoneNumber = Array.isArray(vapiNumberRelation) && vapiNumberRelation.length > 0
+      ? vapiNumberRelation[0]?.phone_e164 ?? null
+      : accountDetails?.phone_number_e164 ?? null;
+
+    if (!vapiPhoneNumber) {
+      const { data: vapiRecord, error: vapiError } = await supabaseAdmin
+        .from('vapi_numbers')
+        .select('phone_e164')
+        .eq('account_id', profile.account_id)
+        .maybeSingle();
+
+      if (vapiError) {
+        logError('Failed to fetch VAPI number', {
+          ...baseLogOptions,
+          accountId: profile.account_id,
+          error: vapiError
+        });
+      }
+
+      vapiPhoneNumber = vapiRecord?.phone_e164 ?? null;
+    }
+
+    const planType = accountDetails?.plan_type ?? customerInfo.planType;
 
     // Return success response
     return new Response(
@@ -182,10 +239,12 @@ serve(async (req) => {
         success: true,
         userId: authData.user.id,
         accountId: profile?.account_id,
+        planType,
         stripeCustomerId,
         subscriptionId,
         tempPassword,
-        subscriptionStatus: skipPayment ? 'trial' : 'active'
+        subscriptionStatus: 'active',
+        vapiPhoneNumber
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

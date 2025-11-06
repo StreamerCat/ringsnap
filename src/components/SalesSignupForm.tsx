@@ -148,6 +148,8 @@ function SalesSignupFormInner() {
       }
       const paymentMethodId = paymentMethod.id;
 
+      const paymentMethodId = paymentMethod.id;
+
       // Call edge function
       const { data: result, error: functionError } = await supabase.functions.invoke(
         'create-sales-account',
