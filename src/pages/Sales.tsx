@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { Helmet } from 'react-helmet';
 import { Card, CardContent } from "@/components/ui/card";
 import { CallValueCalculator } from "@/components/CallValueCalculator";
-import { SalesSignupForm } from "@/components/SalesSignupForm";
+import { SalesSignupWizard } from "@/components/wizard/SalesSignupWizard";
 import { SalesPasswordGate } from "@/components/SalesPasswordGate";
 import Vapi from "@vapi-ai/web";
 import { useEffect, useRef } from "react";
@@ -237,7 +237,7 @@ export default function Sales() {
             </p>
           </div>
 
-          <SalesSignupForm />
+          <SalesSignupWizard />
         </div>
       </section>
 
