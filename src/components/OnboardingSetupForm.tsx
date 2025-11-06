@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,9 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { searchNumbersByAreaCode } from "@/lib/vapi";
+
+const AREA_CODE_REGEX = /^\d{3}$/;
+const dlog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) {
+    console.debug("[OnboardingSetupForm]", ...args);
+  }
+};
 
 const setupSchema = z.object({
-  areaCode: z.string().min(3, "Please select an area code"),
+  areaCode: z
+    .string()
+    .trim()
+    .regex(AREA_CODE_REGEX, "Please enter a valid 3-digit area code"),
   trade: z.string().min(1, "Please select your trade"),
   assistantGender: z.enum(['male', 'female']),
   referralCode: z
@@ -37,6 +48,9 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [availableAreaCodes, setAvailableAreaCodes] = useState<string[]>([]);
   const [loadingAreaCodes, setLoadingAreaCodes] = useState(true);
+  const [areaCodeNumbers, setAreaCodeNumbers] = useState<string[]>([]);
+  const [numbersError, setNumbersError] = useState<string | null>(null);
+  const [searchingNumbers, setSearchingNumbers] = useState(false);
 
   const form = useForm<SetupFormData>({
     resolver: zodResolver(setupSchema),
@@ -48,17 +62,69 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
     }
   });
 
+  const areaCodeValue = form.watch("areaCode");
+  const normalizedAreaCode = useMemo(() => areaCodeValue?.trim() ?? "", [areaCodeValue]);
+
   useEffect(() => {
     if (open) {
       fetchAvailableAreaCodes();
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!normalizedAreaCode || !AREA_CODE_REGEX.test(normalizedAreaCode)) {
+      setAreaCodeNumbers([]);
+      setNumbersError(null);
+      setSearchingNumbers(false);
+      return;
+    }
+
+    let isActive = true;
+    const controller = new AbortController();
+
+    setSearchingNumbers(true);
+    setNumbersError(null);
+
+    searchNumbersByAreaCode(normalizedAreaCode, controller.signal)
+      .then((numbers) => {
+        if (!isActive) return;
+        setAreaCodeNumbers(numbers);
+        dlog("searchNumbers success", { areaCode: normalizedAreaCode, count: numbers.length });
+      })
+      .catch((error) => {
+        if (!isActive) return;
+
+        if (error instanceof DOMException && error.name === "AbortError") {
+          dlog("searchNumbers aborted", { areaCode: normalizedAreaCode });
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : "Unable to search for phone numbers. Please try again.";
+        const friendlyMessage = /timed out/i.test(message)
+          ? "Searching for phone numbers timed out. Please try again."
+          : message;
+
+        dlog("searchNumbers failed", { areaCode: normalizedAreaCode, message: friendlyMessage });
+
+        setAreaCodeNumbers([]);
+        setNumbersError(friendlyMessage);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setSearchingNumbers(false);
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [normalizedAreaCode]);
+
   const fetchAvailableAreaCodes = async () => {
     try {
       setLoadingAreaCodes(true);
       const { data, error } = await supabase.functions.invoke('get-available-area-codes');
-      
+
       if (error) throw error;
       
       setAvailableAreaCodes(data.areaCodes || []);
@@ -147,9 +213,27 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </Select>
-                  <FormDescription className="text-xs">
-                    Choose the area code for your business phone number
+                    </Select>
+                  <FormDescription className="text-xs space-y-1">
+                    <p>Choose the area code for your business phone number.</p>
+                    {searchingNumbers && (
+                      <p className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Searching for available numbers...
+                      </p>
+                    )}
+                    {!searchingNumbers && numbersError && (
+                      <p className="text-destructive">{numbersError}</p>
+                    )}
+                    {!searchingNumbers && !numbersError && areaCodeNumbers.length > 0 && (
+                      <p className="text-muted-foreground">
+                        Example available numbers: {areaCodeNumbers.slice(0, 3).join(", ")}
+                        {areaCodeNumbers.length > 3 ? ` (+${areaCodeNumbers.length - 3} more)` : ""}
+                      </p>
+                    )}
+                    {!searchingNumbers && !numbersError && areaCodeNumbers.length === 0 && AREA_CODE_REGEX.test(normalizedAreaCode) && (
+                      <p className="text-muted-foreground">No available numbers were returned for this area code.</p>
+                    )}
                   </FormDescription>
                   <FormMessage className="text-xs" />
                 </FormItem>
