@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Lock, CreditCard, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SalesSuccessModal, type SalesSuccessModalData } from "@/components/SalesSuccessModal";
 
@@ -122,6 +122,7 @@ function SalesSignupFormInner() {
     } as Partial<FormData>
   });
   const selectedPlan = form.watch('planType');
+  const selectedPlanDetails = plans.find(p => p.value === selectedPlan);
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
@@ -499,15 +500,79 @@ function SalesSignupFormInner() {
         </CardContent>
       </Card>
 
+      {/* Order Summary Card */}
+      {selectedPlanDetails && (
+        <Card className="border-2 border-primary/20">
+          <CardHeader>
+            <CardTitle>Order Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-semibold text-lg">{selectedPlanDetails.name} Plan</h3>
+                <p className="text-sm text-muted-foreground">{selectedPlanDetails.calls} calls/month</p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-primary">${selectedPlanDetails.price}</div>
+                <div className="text-sm text-muted-foreground">per month</div>
+              </div>
+            </div>
+            
+            <div className="space-y-2 pt-2 border-t">
+              <p className="text-sm font-medium">Included features:</p>
+              {selectedPlanDetails.features.map((feature, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-sm">
+                  <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="pt-4 border-t space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Billing cycle:</span>
+                <span className="font-medium">Monthly</span>
+              </div>
+              <div className="flex justify-between text-base">
+                <span className="font-semibold">Due today:</span>
+                <span className="font-bold text-primary">${selectedPlanDetails.price}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Payment Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Payment Information</CardTitle>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <CardTitle>Payment Information</CardTitle>
+              <Lock className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">All transactions are secure and encrypted</p>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+            <div className="flex items-center gap-2 text-sm">
+              <Lock className="h-4 w-4 text-emerald-600" />
+              <span className="font-medium">Secure checkout</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">Powered by Stripe</span>
+              <div className="flex gap-1">
+                {[1,2,3,4].map(i => <CreditCard key={i} className="h-4 w-4 text-muted-foreground" />)}
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-3">
-            <Label>Card Details</Label>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm min-h-[56px] flex items-center">
+            <div>
+              <Label className="text-base">Card information</Label>
+              <p className="text-xs text-muted-foreground mt-1">Securely enter your card number, expiry, and CVC</p>
+            </div>
+            <div className="rounded-lg border-2 border-input bg-muted/30 px-4 py-4 shadow-sm min-h-[56px] flex items-center focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
               <CardElement
                 onChange={(event) => {
                   setCardComplete(event.complete);
@@ -516,24 +581,24 @@ function SalesSignupFormInner() {
                 options={{
                   style: {
                     base: {
-                      color: '#0f172a',
+                      color: 'hsl(var(--foreground))',
                       fontSize: '16px',
+                      fontFamily: 'system-ui, -apple-system, sans-serif',
                       fontSmoothing: 'antialiased',
-                      '::placeholder': {
-                        color: '#94a3b8',
-                      },
+                      '::placeholder': { color: 'hsl(var(--muted-foreground))' },
                     },
-                    invalid: {
-                      color: '#ef4444',
-                    },
+                    invalid: { color: '#ef4444' },
                   },
                   hidePostalCode: true,
                 }}
               />
             </div>
-            {cardError && (
-              <p className="text-sm text-red-500">{cardError}</p>
-            )}
+            {cardError && <p className="text-sm text-red-500 flex items-center gap-1">{cardError}</p>}
+          </div>
+
+          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
+            <Lock className="h-3 w-3 mt-0.5 flex-shrink-0" />
+            <p>Your payment information is encrypted and secure. We never store your card details.</p>
           </div>
         </CardContent>
       </Card>
@@ -550,9 +615,14 @@ function SalesSignupFormInner() {
         type="submit"
         size="lg"
         className="w-full min-h-[44px]"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !selectedPlan}
       >
-        {isSubmitting ? "Creating Account..." : "Create Account & Start"}
+        {isSubmitting 
+          ? "Processing secure payment..." 
+          : selectedPlanDetails 
+            ? `Pay $${selectedPlanDetails.price} & Create Account` 
+            : "Create Account & Start"
+        }
       </Button>
         </form>
       </Form>
