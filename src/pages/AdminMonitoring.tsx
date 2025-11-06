@@ -396,6 +396,9 @@ const AdminMonitoring = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate("/admin/users")}>
+              Staff Management
+            </Button>
             <Button variant="outline" onClick={() => navigate(-1)}>
               Go back
             </Button>

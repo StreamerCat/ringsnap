@@ -266,7 +266,7 @@ export default function CustomerDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 lg:grid-cols-6 mb-8">
+          <TabsList className="grid grid-cols-3 lg:grid-cols-7 mb-8">
             <TabsTrigger value="overview">
               <TrendingUp className="h-4 w-4 mr-2" />
               Overview
@@ -278,6 +278,10 @@ export default function CustomerDashboard() {
             <TabsTrigger value="assistants">
               <Users className="h-4 w-4 mr-2" />
               Assistants
+            </TabsTrigger>
+            <TabsTrigger value="team" onClick={() => navigate("/dashboard/team")}>
+              <Users className="h-4 w-4 mr-2" />
+              Team
             </TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="h-4 w-4 mr-2" />
