@@ -16,6 +16,7 @@ export const businessEssentialsSchema = z.object({
   trade: z.string().min(1, "Trade required"),
   serviceArea: z.string().trim().min(1, "Service area required").max(200),
   zipCode: z.string().trim().regex(/^\d{5}$/, "Valid 5-digit ZIP required"),
+  referralCode: z.string().optional(),
 });
 
 export const planSelectionSchema = z.object({
@@ -31,7 +32,7 @@ export const businessDetailsSchema = z.object({
   businessHours: z.string().trim().min(1, "Business hours required"),
   emergencyPolicy: z.string().trim().min(10, "Emergency policy required (min 10 characters)").max(1000),
   assistantGender: z.enum(['male', 'female']).default('female'),
-  salesRepName: z.string().trim().min(1, "Sales rep name required").max(100),
+  salesRepName: z.string().trim().max(100).optional(),
 });
 
 export const phoneSelectionSchema = z.object({
@@ -47,10 +48,11 @@ export interface WizardFormData {
   trade: string;
   serviceArea: string;
   zipCode: string;
-  
+  referralCode?: string;
+
   // Step 2: Plan Selection
   planType: 'starter' | 'professional' | 'premium';
-  
+
   // Step 3: Business Details
   customerName: string;
   customerEmail: string;
@@ -58,7 +60,7 @@ export interface WizardFormData {
   businessHours: string;
   emergencyPolicy: string;
   assistantGender: 'male' | 'female';
-  salesRepName: string;
+  salesRepName?: string;
   
   // Step 4: Payment (Stripe)
   paymentMethodId?: string;

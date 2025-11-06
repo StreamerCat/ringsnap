@@ -4,16 +4,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, MapPin, Hash } from "lucide-react";
+import { Building2, MapPin, Hash, Gift } from "lucide-react";
 import { WizardFormData, TRADES } from "./types";
 
 interface BusinessEssentialsStepProps {
   form: UseFormReturn<WizardFormData>;
+  showReferralCode?: boolean;
 }
 
-export const BusinessEssentialsStep = ({ form }: BusinessEssentialsStepProps) => {
+export const BusinessEssentialsStep = ({ form, showReferralCode = true }: BusinessEssentialsStepProps) => {
   const selectedTrade = form.watch("trade");
   const [customTrade, setCustomTrade] = useState("");
+  const referralCode = form.watch("referralCode");
+
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="text-center space-y-2">
@@ -128,6 +131,36 @@ export const BusinessEssentialsStep = ({ form }: BusinessEssentialsStepProps) =>
               <p className="text-sm text-destructive">{form.formState.errors.zipCode.message}</p>
             )}
           </div>
+
+          {/* Referral Code (Optional) */}
+          {showReferralCode && (
+            <div className="space-y-2">
+              <Label htmlFor="referralCode" className="flex items-center gap-2 text-base font-medium">
+                <Gift className="h-4 w-4 text-primary" />
+                Referral Code <span className="text-muted-foreground text-sm">(Optional)</span>
+              </Label>
+              <Input
+                id="referralCode"
+                {...form.register("referralCode")}
+                placeholder="Enter code if you have one"
+                className="text-base input-focus h-12"
+              />
+              {referralCode && referralCode.startsWith("SALES-") && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <Gift className="h-4 w-4" />
+                  <span>✓ Sales assistance enabled</span>
+                </div>
+              )}
+              {referralCode && !referralCode.startsWith("SALES-") && referralCode.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  🎁 You'll receive special benefits with this referral
+                </p>
+              )}
+              {form.formState.errors.referralCode && (
+                <p className="text-sm text-destructive">{form.formState.errors.referralCode.message}</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
