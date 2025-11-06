@@ -469,17 +469,24 @@ export function OnboardingWizard({
                 />
 
                 <div className="space-y-3 rounded-lg border bg-muted/40 p-6">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-lg">Available Numbers</h4>
-                    {numberSearchState === "loading" && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                    {numberSearchState === "success" && (
-                      <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600">
-                        Ready
-                      </Badge>
-                    )}
+                  <div className="flex items-center gap-2 justify-between">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-lg">Available Numbers</h4>
+                      {numberSearchState === "loading" && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      {numberSearchState === "success" && (
+                        <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600">
+                          Preview
+                        </Badge>
+                      )}
+                    </div>
                   </div>
+                  {numberSearchState === "success" && (
+                    <p className="text-xs text-muted-foreground">
+                      Preview numbers in your area code. We'll provision your actual number when you complete setup.
+                    </p>
+                  )}
 
                   {numberSearchState === "idle" && (
                     <p className="text-sm text-muted-foreground">

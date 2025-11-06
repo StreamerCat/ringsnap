@@ -84,82 +84,42 @@ serve(async (req) => {
       throw new Error("VAPI_API_KEY not configured");
     }
 
-    logInfo("Searching for phone numbers", {
+    logInfo("Generating preview phone numbers", {
       ...baseLog,
       context: { areaCode: normalizedAreaCode, limit: searchLimit }
     });
 
-    const response = await fetch(`${VAPI_BASE_URL}/phone-number/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${VAPI_API_KEY}`
-      },
-      body: JSON.stringify({
-        areaCode: normalizedAreaCode,
-        limit: searchLimit,
-        country: "US"
-      })
-    });
+    // Vapi doesn't have a phone number search endpoint.
+    // Instead, we generate preview numbers for UI purposes.
+    // The actual provisioning happens when the user submits the form.
 
-    const text = await response.text();
-    let payload: VapiSearchResponse | VapiPhoneResult[] | null = null;
+    // Generate realistic preview numbers based on the area code
+    const previewNumbers: VapiPhoneResult[] = [];
+    const baseNumber = Math.floor(Math.random() * 900) + 100; // Random 3-digit number
 
-    if (text) {
-      try {
-        payload = JSON.parse(text) as VapiSearchResponse | VapiPhoneResult[];
-      } catch (error) {
-        logWarn("Unable to parse Vapi response", {
-          ...baseLog,
-          context: { error, response: text }
-        });
-        payload = null;
-      }
-    }
+    for (let i = 0; i < searchLimit; i++) {
+      const exchange = (baseNumber + i).toString().padStart(3, '0');
+      const lineNumber = Math.floor(Math.random() * 9000) + 1000; // Random 4-digit number
+      const fullNumber = `+1${normalizedAreaCode}${exchange}${lineNumber}`;
 
-    if (!response.ok) {
-      const errorMessage =
-        (payload && "message" in payload && payload.message) ||
-        (payload && "error" in payload && payload.error) ||
-        text ||
-        "Vapi search failed";
-
-      logWarn("Vapi search returned an error", {
-        ...baseLog,
-        context: { status: response.status, message: errorMessage }
-      });
-
-      let suggestions: string[] | undefined;
-      if (typeof errorMessage === "string") {
-        const match = errorMessage.match(/available area codes: ([\d,\s]+)/i);
-        if (match) {
-          suggestions = match[1]
-            .split(",")
-            .map((code) => code.trim())
-            .filter((code) => code.length === 3);
-        }
-      }
-
-      return json(200, {
-        areaCode: normalizedAreaCode,
-        numbers: [],
-        source: "vapi",
-        error: typeof errorMessage === "string" ? errorMessage : "Unable to search for numbers",
-        suggestions
+      previewNumbers.push({
+        id: `preview-${normalizedAreaCode}-${i}`,
+        phoneNumber: fullNumber,
+        number: fullNumber,
+        provider: "vapi"
       });
     }
 
-    const results = extractNumbers(payload);
-
-    logInfo("Vapi search succeeded", {
+    logInfo("Preview numbers generated", {
       ...baseLog,
-      context: { count: results.length }
+      context: { count: previewNumbers.length }
     });
 
     return json(200, {
       areaCode: normalizedAreaCode,
-      numbers: results,
-      source: "vapi"
+      numbers: previewNumbers,
+      source: "vapi-preview",
+      info: "Preview numbers shown. Actual number will be provisioned on submission."
     });
   } catch (error) {
     logError("Unexpected error while searching numbers", {
