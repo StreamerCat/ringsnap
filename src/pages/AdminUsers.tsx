@@ -183,10 +183,24 @@ const AdminUsers = () => {
           });
       }
 
-      toast({
-        title: "Success",
-        description: "Staff member added successfully",
+      // Send password reset email
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(newStaffEmail, {
+        redirectTo: `${window.location.origin}/onboarding`
       });
+
+      if (resetError) {
+        console.error("Failed to send password reset email:", resetError);
+        toast({
+          title: "Warning",
+          description: `Staff member added, but failed to send password reset email. Please send manually.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: `Staff member ${newStaffName || newStaffEmail} added. Password reset email sent to ${newStaffEmail}`,
+        });
+      }
 
       setAddDialogOpen(false);
       setNewStaffEmail('');

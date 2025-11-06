@@ -11,8 +11,10 @@ import { Loader2 } from "lucide-react";
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const checkIfAlreadyLoggedIn = useCallback(async () => {
     try {
@@ -31,25 +33,48 @@ export default function Login() {
     checkIfAlreadyLoggedIn();
   }, [checkIfAlreadyLoggedIn]);
 
-  const handlePasswordlessLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/onboarding`,
-        },
+        password,
       });
 
       if (error) throw error;
 
-      toast.success("Check your email for the login link!");
-      setEmail("");
+      toast.success("Logged in successfully!");
+      navigate("/onboarding");
     } catch (error: unknown) {
       console.error("Login error:", error);
-      const message = error instanceof Error ? error.message : "Failed to send login link";
+      const message = error instanceof Error ? error.message : "Failed to sign in";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/onboarding`,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password reset link sent to your email!");
+      setShowResetPassword(false);
+    } catch (error: unknown) {
+      console.error("Reset password error:", error);
+      const message = error instanceof Error ? error.message : "Failed to send reset link";
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -74,33 +99,86 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handlePasswordlessLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+          {showResetPassword ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <Button onClick={handleResetPassword} className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Send Reset Link"
+                )}
+              </Button>
+              <Button 
+                variant="link" 
+                className="w-full"
+                onClick={() => setShowResetPassword(false)}
                 disabled={isLoading}
-              />
+              >
+                Back to Login
+              </Button>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send Magic Link"
-              )}
-            </Button>
-            <p className="text-sm text-center text-muted-foreground">
-              We'll send you a secure link to sign in without a password
-            </p>
-          </form>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+              <Button 
+                type="button"
+                variant="link" 
+                className="w-full text-sm"
+                onClick={() => setShowResetPassword(true)}
+                disabled={isLoading}
+              >
+                Forgot Password?
+              </Button>
+            </form>
+          )}
           
           <div className="mt-6 text-center">
             <Button variant="link" onClick={() => navigate("/")}>
