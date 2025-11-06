@@ -58,6 +58,38 @@ export type Database = {
           },
         ]
       }
+      account_members: {
+        Row: {
+          account_id: string
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["account_role"]
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["account_role"]
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["account_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_members_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           account_status: string | null
@@ -433,32 +465,32 @@ export type Database = {
       }
       profiles: {
         Row: {
-          account_id: string
+          account_id: string | null
           created_at: string | null
           id: string
           is_primary: boolean | null
-          name: string
-          phone: string
+          name: string | null
+          phone: string | null
           source: string | null
           updated_at: string | null
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           created_at?: string | null
           id: string
           is_primary?: boolean | null
-          name: string
-          phone: string
+          name?: string | null
+          phone?: string | null
           source?: string | null
           updated_at?: string | null
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           created_at?: string | null
           id?: string
           is_primary?: boolean | null
-          name?: string
-          phone?: string
+          name?: string | null
+          phone?: string | null
           source?: string | null
           updated_at?: string | null
         }
@@ -619,7 +651,7 @@ export type Database = {
         }
         Relationships: []
       }
-      role_change_audit: {
+      role_audit_log: {
         Row: {
           account_id: string | null
           change_type: string
@@ -627,8 +659,8 @@ export type Database = {
           context: string | null
           created_at: string | null
           id: string
-          new_role: Database["public"]["Enums"]["app_role"]
-          old_role: Database["public"]["Enums"]["app_role"] | null
+          new_role: string | null
+          old_role: string | null
           target_user_id: string
         }
         Insert: {
@@ -638,8 +670,8 @@ export type Database = {
           context?: string | null
           created_at?: string | null
           id?: string
-          new_role: Database["public"]["Enums"]["app_role"]
-          old_role?: Database["public"]["Enums"]["app_role"] | null
+          new_role?: string | null
+          old_role?: string | null
           target_user_id: string
         }
         Update: {
@@ -649,19 +681,11 @@ export type Database = {
           context?: string | null
           created_at?: string | null
           id?: string
-          new_role?: Database["public"]["Enums"]["app_role"]
-          old_role?: Database["public"]["Enums"]["app_role"] | null
+          new_role?: string | null
+          old_role?: string | null
           target_user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "role_change_audit_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       signup_attempts: {
         Row: {
@@ -752,6 +776,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      staff_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["staff_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["staff_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["staff_role"]
+          user_id?: string
+        }
+        Relationships: []
       }
       state_recording_laws: {
         Row: {
@@ -904,24 +949,6 @@ export type Database = {
           },
         ]
       }
-      user_roles: {
-        Row: {
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
       voice_library: {
         Row: {
           accent: string | null
@@ -968,9 +995,17 @@ export type Database = {
     Functions: {
       extract_email_domain: { Args: { email: string }; Returns: string }
       get_user_account_id: { Args: { _user_id: string }; Returns: string }
-      has_role: {
+      has_account_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
+          _account_id: string
+          _role: Database["public"]["Enums"]["account_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_platform_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["staff_role"]
           _user_id: string
         }
         Returns: boolean
@@ -978,7 +1013,8 @@ export type Database = {
       is_generic_email_domain: { Args: { domain: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "owner" | "admin" | "user"
+      account_role: "owner" | "admin" | "user"
+      staff_role: "platform_owner" | "platform_admin" | "support" | "viewer"
       subscription_status:
         | "trial"
         | "active"
@@ -1112,7 +1148,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "admin", "user"],
+      account_role: ["owner", "admin", "user"],
+      staff_role: ["platform_owner", "platform_admin", "support", "viewer"],
       subscription_status: [
         "trial",
         "active",
