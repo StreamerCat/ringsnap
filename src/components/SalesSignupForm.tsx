@@ -20,7 +20,7 @@ import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Initialize Stripe - Replace with your live publishable key from https://dashboard.stripe.com/apikeys
-const stripePromise = loadStripe('pk_live_YOUR_PUBLISHABLE_KEY_HERE');
+const stripePromise = loadStripe('pk_live_51SKmvhIdevV48BnphmyhXOa4qTOobfciT5pKXjeB5mwzR0SMAqVwI3ohYUnlw6CcWlvkyFnJqrSDGNLlFiXxov8d00r0kkXb0i');
 
 // Form schema
 const salesFormSchema = z.object({
