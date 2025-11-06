@@ -85,77 +85,16 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     };
 
     try {
-      const fetchSignupDirectly = async (): Promise<SignupFunctionResponse> => {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-        if (!supabaseUrl || !supabaseAnonKey) {
-          throw new Error("Service configuration error. Please try again later.");
-        }
-
-        const { data: sessionData } = await supabase.auth.getSession();
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          apikey: supabaseAnonKey,
-        };
-
-        const accessToken = sessionData?.session?.access_token;
-        if (accessToken) {
-          headers["Authorization"] = `Bearer ${accessToken}`;
-        }
-
-        const response = await fetch(`${supabaseUrl}/functions/v1/free-trial-signup`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-        });
-
-        const responseText = await response.text();
-        let parsedResult: SignupFunctionResponse | null = null;
-
-        if (responseText) {
-          try {
-            parsedResult = JSON.parse(responseText) as SignupFunctionResponse;
-          } catch (parseError) {
-            console.error("Failed to parse signup response:", parseError);
-            throw new Error("Received an unexpected response. Please try again.");
-          }
-        }
-
-        if (!response.ok || !parsedResult?.ok) {
-          const errorDetails = parsedResult?.error || "Unknown error";
-          throw new Error(errorDetails);
-        }
-
-        return parsedResult;
-      };
-
-      const { data: result, error: invokeError } = await supabase.functions.invoke<SignupFunctionResponse>('free-trial-signup', {
+      const { data: result, error: invokeError } = await supabase.functions.invoke('free-trial-signup', {
         body: payload
       });
 
-      let signupResult = result ?? null;
-
       if (invokeError) {
-        if (invokeError instanceof FunctionsHttpError && invokeError.context) {
-          const errorBody = await invokeError.context.json().catch(() => null);
-          const errorDetails = errorBody?.error || invokeError.message || "Unknown error";
-          throw new Error(errorDetails);
-        }
-
-        if (invokeError.message?.includes("Unexpected end of JSON input")) {
-          signupResult = await fetchSignupDirectly();
-        } else {
-          throw new Error(invokeError.message || "Could not start your trial. Please try again.");
-        }
+        throw new Error(invokeError.message);
       }
 
-      if (!signupResult) {
-        signupResult = await fetchSignupDirectly();
-      }
-
-      if (!signupResult?.ok) {
-        const errorDetails = signupResult?.error || "Unknown error";
+      if (!result?.ok) {
+        const errorDetails = result?.error || "Unknown error";
         throw new Error(errorDetails);
       }
 
