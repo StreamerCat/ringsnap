@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const FUNCTION_NAME = "create-sales-account";
 
@@ -33,8 +34,43 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Parse request body
-    const { customerInfo, paymentMethodId } = await req.json();
+    // Define validation schema
+    const customerInfoSchema = z.object({
+      name: z.string().trim().min(1).max(100),
+      email: z.string().email().max(255),
+      phone: z.string().min(1),
+      companyName: z.string().trim().min(1).max(200),
+      trade: z.string().max(100).optional(),
+      zipCode: z.string().optional(),
+      serviceArea: z.string().max(200).optional(),
+      businessHours: z.record(z.string()).optional(),
+      emergencyPolicy: z.string().max(1000).optional(),
+      assistantGender: z.enum(['female', 'male']).optional(),
+      salesRepName: z.string().max(100).optional(),
+      planType: z.string(),
+    });
+
+    const salesAccountSchema = z.object({
+      customerInfo: customerInfoSchema,
+      paymentMethodId: z.string().min(1),
+    });
+
+    // Parse and validate request body
+    const rawData = await req.json();
+    let validatedData;
+    try {
+      validatedData = salesAccountSchema.parse(rawData);
+    } catch (zodError: any) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input data', details: zodError.errors }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    const { customerInfo, paymentMethodId } = validatedData;
 
     if (!paymentMethodId) {
       logError('Missing payment method', {

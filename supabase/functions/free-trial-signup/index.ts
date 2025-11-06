@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber, isValidZipCode } from "../_shared/validators.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const FUNCTION_NAME = "free-trial-signup";
 
@@ -24,15 +25,35 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { name, email, phone, companyName, deviceFingerprint } = await req.json();
+    // Define validation schema
+    const signupSchema = z.object({
+      name: z.string().trim().min(1, 'Name required').max(100, 'Name too long'),
+      email: z.string().email('Invalid email').max(255, 'Email too long'),
+      phone: z.string().min(1, 'Phone required'),
+      companyName: z.string().max(200).optional(),
+      deviceFingerprint: z.string().max(500).optional(),
+      trade: z.string().max(100).optional(),
+      wantsAdvancedVoice: z.boolean().optional(),
+      zipCode: z.string().optional(),
+      assistantGender: z.enum(['female', 'male']).optional(),
+      referralCode: z.string().max(50).optional(),
+      source: z.string().max(100).optional(),
+    });
 
-    // Validate required fields
-    if (!name || !email || !phone) {
+    const rawData = await req.json();
+    
+    // Validate input
+    let validatedData;
+    try {
+      validatedData = signupSchema.parse(rawData);
+    } catch (zodError: any) {
       return new Response(
-        JSON.stringify({ error: 'Name, email, and phone are required' }),
+        JSON.stringify({ error: 'Invalid input data', details: zodError.errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { name, email, phone, companyName } = validatedData;
 
     // Validate phone format
     if (!isValidPhoneNumber(phone)) {
@@ -79,7 +100,7 @@ serve(async (req) => {
         email,
         phone,
         ip_address: clientIP,
-        device_fingerprint: deviceFingerprint,
+        device_fingerprint: validatedData.deviceFingerprint,
         success: false,
         blocked_reason: 'IP rate limit exceeded (3 trials per 30 days)',
       });
@@ -106,7 +127,7 @@ serve(async (req) => {
         email,
         phone,
         ip_address: clientIP,
-        device_fingerprint: deviceFingerprint,
+        device_fingerprint: validatedData.deviceFingerprint,
         success: false,
         blocked_reason: 'Phone number used within 30 days',
       });
@@ -157,7 +178,7 @@ serve(async (req) => {
         email,
         phone,
         ip_address: clientIP,
-        device_fingerprint: deviceFingerprint,
+        device_fingerprint: validatedData.deviceFingerprint,
         success: false,
         blocked_reason: authError.message,
       });
@@ -177,7 +198,7 @@ serve(async (req) => {
       email,
       phone,
       ip_address: clientIP,
-      device_fingerprint: deviceFingerprint,
+      device_fingerprint: validatedData.deviceFingerprint,
       success: true,
     });
 

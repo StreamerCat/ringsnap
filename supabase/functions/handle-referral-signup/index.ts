@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const FUNCTION_NAME = "handle-referral-signup";
 
@@ -23,15 +24,28 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { referralCode, refereeAccountId, refereeEmail, refereePhone, refereeIP } = await req.json();
-    currentAccountId = refereeAccountId ?? null;
+    // Define validation schema
+    const referralSchema = z.object({
+      referralCode: z.string().trim().min(1).max(50),
+      refereeAccountId: z.string().uuid(),
+      refereeEmail: z.string().email().max(255),
+      refereePhone: z.string().min(1),
+      refereeIP: z.string().max(45),
+    });
 
-    if (!referralCode || !refereeAccountId) {
+    const rawData = await req.json();
+    let validatedData;
+    try {
+      validatedData = referralSchema.parse(rawData);
+    } catch (zodError: any) {
       return new Response(
-        JSON.stringify({ error: 'Referral code and referee account required' }),
+        JSON.stringify({ error: 'Invalid input data', details: zodError.errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { referralCode, refereeAccountId, refereeEmail, refereePhone, refereeIP } = validatedData;
+    currentAccountId = refereeAccountId;
 
     // Find referrer
     const { data: referralCodeData } = await supabase
