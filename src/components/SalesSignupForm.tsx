@@ -102,6 +102,7 @@ function SalesSignupFormInner() {
   const { toast } = useToast();
   const stripe = useStripe();
   const elements = useElements();
+  const isStripeReady = stripe && elements;
 
   const form = useForm<FormData>({
     resolver: zodResolver(salesFormSchema),
@@ -543,65 +544,76 @@ function SalesSignupFormInner() {
       )}
 
       {/* Payment Section */}
-      <Card>
-        <CardHeader>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <CardTitle>Payment Information</CardTitle>
-              <Lock className="h-4 w-4 text-muted-foreground" />
+      {!isStripeReady ? (
+        <Card>
+          <CardContent className="py-8">
+            <div className="flex items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              <p className="text-sm text-muted-foreground">Loading secure payment...</p>
             </div>
-            <p className="text-sm text-muted-foreground">All transactions are secure and encrypted</p>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-            <div className="flex items-center gap-2 text-sm">
-              <Lock className="h-4 w-4 text-emerald-600" />
-              <span className="font-medium">Secure checkout</span>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <CardTitle>Payment Information</CardTitle>
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">All transactions are secure and encrypted</p>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">Powered by Stripe</span>
-              <div className="flex gap-1">
-                {[1,2,3,4].map(i => <CreditCard key={i} className="h-4 w-4 text-muted-foreground" />)}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+              <div className="flex items-center gap-2 text-sm">
+                <Lock className="h-4 w-4 text-emerald-600" />
+                <span className="font-medium">Secure checkout</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">Powered by Stripe</span>
+                <div className="flex gap-1">
+                  {[1,2,3,4].map(i => <CreditCard key={i} className="h-4 w-4 text-muted-foreground" />)}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-3">
-            <div>
-              <Label className="text-base">Card information</Label>
-              <p className="text-xs text-muted-foreground mt-1">Securely enter your card number, expiry, and CVC</p>
-            </div>
-            <div className="rounded-lg border-2 border-input bg-muted/30 px-4 py-4 shadow-sm min-h-[56px] flex items-center focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
-              <CardElement
-                onChange={(event) => {
-                  setCardComplete(event.complete);
-                  setCardError(event.error ? event.error.message ?? "" : null);
-                }}
-                options={{
-                  style: {
-                    base: {
-                      color: 'hsl(var(--foreground))',
-                      fontSize: '16px',
-                      fontFamily: 'system-ui, -apple-system, sans-serif',
-                      fontSmoothing: 'antialiased',
-                      '::placeholder': { color: 'hsl(var(--muted-foreground))' },
+            <div className="space-y-3">
+              <div>
+                <Label className="text-base">Card information</Label>
+                <p className="text-xs text-muted-foreground mt-1">Securely enter your card number, expiry, and CVC</p>
+              </div>
+              <div className="rounded-lg border-2 border-input px-4 py-3 bg-background transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+                <CardElement
+                  onChange={(event) => {
+                    setCardComplete(event.complete);
+                    setCardError(event.error ? event.error.message ?? "" : null);
+                  }}
+                  options={{
+                    style: {
+                      base: {
+                        color: '#2C3639',
+                        fontSize: '16px',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        fontSmoothing: 'antialiased',
+                        '::placeholder': { color: '#88A096' },
+                      },
+                      invalid: { color: '#ef4444' },
                     },
-                    invalid: { color: '#ef4444' },
-                  },
-                  hidePostalCode: true,
-                }}
-              />
+                    hidePostalCode: true,
+                  }}
+                />
+              </div>
+              {cardError && <p className="text-sm text-red-500 flex items-center gap-1">{cardError}</p>}
             </div>
-            {cardError && <p className="text-sm text-red-500 flex items-center gap-1">{cardError}</p>}
-          </div>
 
-          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-            <Lock className="h-3 w-3 mt-0.5 flex-shrink-0" />
-            <p>Your payment information is encrypted and secure. We never store your card details.</p>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
+              <Lock className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              <p>Your payment information is encrypted and secure. We never store your card details.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error Display */}
       {error && (
@@ -615,7 +627,7 @@ function SalesSignupFormInner() {
         type="submit"
         size="lg"
         className="w-full min-h-[44px]"
-        disabled={isSubmitting || !selectedPlan}
+        disabled={isSubmitting || !selectedPlan || !isStripeReady}
       >
         {isSubmitting 
           ? "Processing secure payment..." 

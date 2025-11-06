@@ -14,25 +14,38 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type AssistantRow = Database["public"]["Tables"]["assistants"]["Row"];
 type ProfileWithAccount = ProfileRow & { accounts?: AccountRow | null };
 
-const ENABLE_DEBUG = true;
-const dbg = (...args: unknown[]) => {
-  if (ENABLE_DEBUG) {
+const DEBUG_ONBOARDING = true;
+const dlog = (...args: unknown[]) => {
+  if (DEBUG_ONBOARDING) {
     console.debug("[Onboarding]", ...args);
   }
 };
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState<ProfileWithAccount | null>(null);
   const [account, setAccount] = useState<AccountRow | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
-  const [assistant, setAssistant] = useState<any | null>(null);
+  const [assistant, setAssistant] = useState<AssistantRow | null>(null);
   const [usageStats, setUsageStats] = useState({ minutesUsed: 0, minutesLimit: 150 });
   const [showSetupForm, setShowSetupForm] = useState(false);
+  const [authStatus, setAuthStatus] = useState<"checking" | "ready" | "error" | "signed-out">("checking");
+  const [statusMessage, setStatusMessage] = useState("Checking your session...");
+  const [lastAuthError, setLastAuthError] = useState<unknown>(null);
+
+  useEffect(() => {
+    dlog("Onboarding component mounted");
+    return () => {
+      dlog("Onboarding component unmounted");
+    };
+  }, []);
+
+  useEffect(() => {
+    dlog("Auth status updated", authStatus, statusMessage, lastAuthError);
+  }, [authStatus, statusMessage, lastAuthError]);
 
   const derivedAreaCode = useMemo(() => {
     const digits = (profile?.phone ?? "").replace(/\D/g, "");
@@ -43,9 +56,10 @@ export default function Onboarding() {
   }, [profile?.phone]);
 
   const checkAuth = useCallback(async () => {
-    dbg("Starting auth check");
-    setAuthReady(false);
-    setLoading(true);
+    dlog("Starting auth check");
+    setAuthStatus("checking");
+    setStatusMessage("Verifying your session...");
+    setLastAuthError(null);
     setProfile(null);
     setAccount(null);
     setPhoneNumber(null);
@@ -53,11 +67,14 @@ export default function Onboarding() {
     setUsageStats({ minutesUsed: 0, minutesLimit: 150 });
 
     const maxAttempts = 5;
-    const retryDelayMs = 300;
+    const minDelay = 300;
+    const maxDelay = 500;
     let user = null;
     let lastError: unknown = null;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const attemptNumber = attempt + 1;
+      setStatusMessage(`Verifying your session (attempt ${attemptNumber}/${maxAttempts})...`);
       try {
         const {
           data: { user: fetchedUser },
@@ -65,43 +82,48 @@ export default function Onboarding() {
         } = await supabase.auth.getUser();
 
         if (error) {
-          dbg("getUser error", error);
+          dlog("getUser error", attemptNumber, error);
           lastError = error;
-          break;
-        }
-
-        if (fetchedUser) {
-          dbg("User found", fetchedUser.id, "on attempt", attempt + 1);
+        } else if (fetchedUser) {
+          dlog("User found", fetchedUser.id, "on attempt", attemptNumber);
           user = fetchedUser;
           break;
+        } else {
+          dlog("No user found on attempt", attemptNumber, "of", maxAttempts);
         }
-
-        dbg("No user found on attempt", attempt + 1, "of", maxAttempts);
       } catch (error) {
-        dbg("getUser threw", error);
+        dlog("getUser threw", attemptNumber, error);
         lastError = error;
+      }
+
+      if (user) {
         break;
       }
 
       if (attempt < maxAttempts - 1) {
-        dbg("Retrying auth check after delay");
+        const retryDelayMs = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+        dlog("Retrying auth check after delay", retryDelayMs, "ms");
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
 
     if (!user) {
-      dbg("Unable to resolve authenticated user", lastError);
-      setAuthReady(true);
-      setLoading(false);
-      navigate("/");
+      dlog("Unable to resolve authenticated user after retries", lastError);
+      setAuthStatus(lastError ? "error" : "signed-out");
+      setStatusMessage(
+        lastError
+          ? "We couldn't verify your session. Please try again."
+          : "No active session detected. You may need to sign in again."
+      );
+      setLastAuthError(lastError);
       return;
     }
 
     if (!user.email) {
-      dbg("Authenticated user missing email, redirecting");
-      setAuthReady(true);
-      setLoading(false);
-      navigate("/");
+      dlog("Authenticated user missing email, prompting sign-in");
+      setAuthStatus("error");
+      setStatusMessage("Your account is missing an email address. Please sign in again.");
+      setLastAuthError(new Error("User missing email"));
       return;
     }
 
@@ -113,20 +135,23 @@ export default function Onboarding() {
         .maybeSingle();
 
       if (profileError) {
-        dbg("Error fetching profile", profileError);
+        dlog("Error fetching profile", profileError);
         toast.error("Failed to load account information");
+        setAuthStatus("error");
+        setStatusMessage("We hit a snag while loading your profile. Please try again.");
+        setLastAuthError(profileError);
         return;
       }
 
       if (profileData) {
-        dbg("Profile data loaded for user", user.id);
+        dlog("Profile data loaded for user", user.id);
         const typedData = profileData as ProfileWithAccount;
         setProfile(typedData);
         const accountData = typedData.accounts ?? null;
         setAccount(accountData);
 
         if (accountData?.id) {
-          dbg("Fetching supplemental account data", accountData.id);
+          dlog("Fetching supplemental account data", accountData.id);
           const [phoneResult, assistantResult, usageResult] = await Promise.all([
             supabase
               .from("phone_numbers")
@@ -147,12 +172,12 @@ export default function Onboarding() {
           ]);
 
           if (phoneResult.data) {
-            dbg("Primary phone number loaded");
+            dlog("Primary phone number loaded");
             setPhoneNumber(phoneResult.data.phone_number);
           }
 
           if (assistantResult.data) {
-            dbg("Primary assistant loaded");
+            dlog("Primary assistant loaded");
             setAssistant(assistantResult.data);
           }
 
@@ -162,7 +187,7 @@ export default function Onboarding() {
               0
             );
             const totalMinutes = Math.ceil(totalSeconds / 60);
-            dbg("Usage stats computed", totalMinutes, "minutes");
+            dlog("Usage stats computed", totalMinutes, "minutes");
             setUsageStats({
               minutesUsed: totalMinutes,
               minutesLimit: accountData.monthly_minutes_limit || 150
@@ -170,17 +195,23 @@ export default function Onboarding() {
           }
         }
       } else {
-        dbg("No profile data returned for user", user.id);
+        dlog("No profile data returned for user", user.id);
       }
     } catch (error) {
-      dbg("Error loading account data", error);
+      dlog("Error loading account data", error);
       toast.error("Failed to load account information");
+      setAuthStatus("error");
+      setStatusMessage("We couldn't load your account data. Please try again.");
+      setLastAuthError(error);
+      return;
     } finally {
-      dbg("Auth check complete");
-      setAuthReady(true);
-      setLoading(false);
+      if (user) {
+        dlog("Auth check complete with active session", user.id);
+        setAuthStatus("ready");
+        setStatusMessage("Session verified");
+      }
     }
-  }, [navigate]);
+  }, []);
 
   useEffect(() => {
     checkAuth();
@@ -190,14 +221,21 @@ export default function Onboarding() {
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((event, session) => {
-      dbg("Auth state change", event, session?.user?.id);
+      dlog("Auth state change", event, session?.user?.id);
       if (session?.user) {
         checkAuth();
+        return;
+      }
+
+      if (event === "SIGNED_OUT" || !session?.user) {
+        dlog("Auth state indicates signed out, staying on onboarding");
+        setAuthStatus("signed-out");
+        setStatusMessage("You're signed out. Please log in again to continue.");
       }
     });
 
     return () => {
-      dbg("Cleaning up auth state subscription");
+      dlog("Cleaning up auth state subscription");
       subscription.unsubscribe();
     };
   }, [checkAuth]);
@@ -206,31 +244,37 @@ export default function Onboarding() {
   useEffect(() => {
     if (account?.provisioning_status === 'pending') {
       setShowSetupForm(true);
+      dlog("Provisioning pending - showing setup form");
     } else {
       setShowSetupForm(false);
+      if (account) {
+        dlog("Provisioning status", account.provisioning_status);
+      }
     }
-  }, [account?.provisioning_status]);
+  }, [account]);
 
   const handleSetupComplete = async () => {
+    dlog("Setup completed by user - beginning provisioning poll");
     setShowSetupForm(false);
     toast.success("Setup complete! Provisioning your resources...");
 
-    await checkAuth();
-
     // Poll for provisioning completion (faster 3s polling)
     const pollInterval = setInterval(async () => {
+      dlog("Polling provisioning status", account?.id);
       const { data: updatedAccount } = await supabase
         .from('accounts')
         .select('*')
         .eq('id', account?.id)
         .single();
-      
+
       if (updatedAccount?.provisioning_status === 'completed') {
         clearInterval(pollInterval);
+        dlog("Provisioning completed", updatedAccount.id);
         toast.success("Your account is ready!");
         await checkAuth(); // Refresh all data
       } else if (updatedAccount?.provisioning_status === 'failed') {
         clearInterval(pollInterval);
+        dlog("Provisioning failed", updatedAccount?.id);
         toast.error("Provisioning failed. Please contact support.");
       }
     }, 3000); // Poll every 3 seconds (faster)
@@ -240,20 +284,71 @@ export default function Onboarding() {
   };
 
   const handleLogout = async () => {
+    dlog("User initiated logout");
     await supabase.auth.signOut();
+    dlog("Logout complete, navigating to home");
     navigate("/");
   };
 
-  if (!authReady || loading) {
+  if (authStatus !== "ready") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted p-6">
+        <Card className="max-w-md w-full text-center shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl">{statusMessage}</CardTitle>
+            <CardDescription>
+              {authStatus === "checking"
+                ? "Hang tight while we verify your account details."
+                : authStatus === "error"
+                  ? "Something went wrong while loading your information."
+                  : "You're currently signed out."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {authStatus === "checking" ? (
+              <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+            ) : (
+              <UserCircle2 className="h-10 w-10 text-primary mx-auto" />
+            )}
+            {lastAuthError && authStatus === "error" && (
+              <pre className="bg-muted rounded-md p-3 text-xs text-left whitespace-pre-wrap break-words">
+                {lastAuthError instanceof Error ? lastAuthError.message : String(lastAuthError)}
+              </pre>
+            )}
+            <div className="flex flex-col gap-2">
+              {authStatus === "checking" && (
+                <Button variant="outline" disabled>
+                  Still verifying...
+                </Button>
+              )}
+              {authStatus === "error" && (
+                <>
+                  <Button onClick={() => {
+                    dlog("Retry requested from error state");
+                    checkAuth();
+                  }}>
+                    Retry session check
+                  </Button>
+                  <Button variant="outline" onClick={handleLogout}>
+                    Sign out
+                  </Button>
+                </>
+              )}
+              {authStatus === "signed-out" && (
+                <Button onClick={handleLogout}>
+                  Return to sign in
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   // Show setup form modal if provisioning is pending
   if (account?.provisioning_status === 'pending') {
+    dlog("Rendering provisioning setup form");
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
         <div className="max-w-2xl mx-auto text-center space-y-8">
@@ -405,7 +500,14 @@ export default function Onboarding() {
                 onDismiss={() => {}}
               />
             )}
-            <Button variant="gradient" className="w-full" onClick={() => navigate('/dashboard')}>
+            <Button
+              variant="gradient"
+              className="w-full"
+              onClick={() => {
+                dlog("Navigating to dashboard from onboarding upgrade button");
+                navigate('/dashboard');
+              }}
+            >
               <TrendingUp className="h-4 w-4 mr-2" />
               Upgrade Plan
             </Button>
