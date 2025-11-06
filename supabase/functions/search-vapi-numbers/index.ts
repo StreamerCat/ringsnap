@@ -111,8 +111,7 @@ serve(async (req) => {
       } catch (error) {
         logWarn("Unable to parse Vapi response", {
           ...baseLog,
-          error,
-          context: { response: text }
+          context: { error, response: text }
         });
         payload = null;
       }
