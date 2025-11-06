@@ -87,8 +87,11 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
         throw new Error(errorDetails);
       }
 
+      let ringSnapNumber: string | null = null;
+
       if (result.phone) {
         setProvisionedNumber(result.phone);
+        ringSnapNumber = result.phone;
       }
 
       if (result.jobId) {
@@ -104,6 +107,26 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
 
         if (signInError) {
           throw new Error('Account created but failed to sign in. Please use the login page.');
+        }
+      }
+
+      if (ringSnapNumber) {
+        try {
+          const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-forwarding-instructions', {
+            body: {
+              email: payload.email,
+              phoneNumber: ringSnapNumber,
+              companyName: payload.companyName || null
+            }
+          });
+
+          if (emailError) {
+            console.error('Forwarding instructions invocation failed:', emailError);
+          } else if (!emailResult?.success) {
+            console.error('Forwarding instructions returned error:', emailResult?.error);
+          }
+        } catch (forwardingError) {
+          console.error('Forwarding instructions request threw:', forwardingError);
         }
       }
 
