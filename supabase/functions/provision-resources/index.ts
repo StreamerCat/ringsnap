@@ -330,29 +330,34 @@ serve(async (req) => {
 
     // 9. Send welcome email with setup instructions
     if (RESEND_API_KEY && email) {
-      const formatPhone = (phone: string) => {
-        const cleaned = phone.replace(/\D/g, "");
-        if (cleaned.length === 11 && cleaned.startsWith("1")) {
-          return cleaned.substring(1).replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3");
-        }
-        return phone;
-      };
-
-      const formattedPhone = formatPhone(phoneNumber);
-      const cleanNumber = phoneNumber.replace(/\D/g, '').slice(-10);
       const userName = name || 'there';
 
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: 'RingSnap <welcome@ringsnap.com>',
-          to: email,
-          subject: 'Your RingSnap line is live - start catching every call',
-          html: `
+      if (phoneNumber) {
+        const formatPhone = (phone: string) => {
+          const cleaned = phone.replace(/\D/g, "");
+          if (cleaned.length === 11 && cleaned.startsWith("1")) {
+            return cleaned.substring(1).replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3");
+          }
+          if (cleaned.length === 10) {
+            return cleaned.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3");
+          }
+          return phone;
+        };
+
+        const formattedPhone = formatPhone(phoneNumber);
+        const cleanNumber = phoneNumber.replace(/\D/g, '').slice(-10);
+
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'RingSnap <welcome@ringsnap.com>',
+            to: email,
+            subject: 'Your RingSnap line is live - start catching every call',
+            html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -417,15 +422,73 @@ serve(async (req) => {
   </table>
 </body>
 </html>
-          `,
-        }),
-      });
-      
-      logInfo('Welcome email sent', {
-        ...baseLogOptions,
-        accountId,
-        context: { email }
-      });
+            `,
+          }),
+        });
+
+        logInfo('Welcome email sent', {
+          ...baseLogOptions,
+          accountId,
+          context: { email }
+        });
+      } else {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'RingSnap <welcome@ringsnap.com>',
+            to: email,
+            subject: 'Your RingSnap account setup is underway',
+            html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your RingSnap Account</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #f9fafb; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #111827; line-height: 1.3;">We're getting your RingSnap line ready</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 40px 40px; color: #374151; font-size: 16px; line-height: 1.6;">
+              <p style="margin: 0 0 20px 0;">Hey ${userName},</p>
+              <p style="margin: 0 0 20px 0;">Thanks for joining RingSnap! We're finishing up the setup of your new forwarding line.</p>
+              <p style="margin: 0 0 20px 0;">We'll send you another email with forwarding instructions as soon as your number is assigned. In the meantime, feel free to reply to this message if you have any questions.</p>
+              <p style="margin: 30px 0 0 0; color: #6b7280; font-size: 14px;">- The RingSnap Team</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+            `,
+          }),
+        });
+
+        logInfo('Welcome email skipped phone-specific content', {
+          ...baseLogOptions,
+          accountId,
+          context: { email }
+        });
+      }
     }
 
     logInfo('Provisioning completed', {
