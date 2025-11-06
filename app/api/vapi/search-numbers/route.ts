@@ -4,6 +4,22 @@ const VAPI_BASE_URL = process.env.VAPI_BASE_URL ?? "https://api.vapi.ai";
 const VAPI_SERVER_KEY = process.env.VAPI_SERVER_KEY ?? process.env.VAPI_API_KEY;
 const SEARCH_TIMEOUT_MS = 8000;
 
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  if (error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+
+  if (error instanceof Error) {
+    return error.name === "AbortError";
+  }
+
+  return false;
+}
+
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return Response.json(body, {
     status,
@@ -89,6 +105,17 @@ export async function GET(req: NextRequest) {
     controller.abort();
   }, SEARCH_TIMEOUT_MS);
 
+  const abortUpstreamRequest = () => controller.abort();
+  const requestSignal: AbortSignal | undefined = (req as Request).signal;
+
+  if (requestSignal) {
+    if (requestSignal.aborted) {
+      abortUpstreamRequest();
+    } else {
+      requestSignal.addEventListener("abort", abortUpstreamRequest);
+    }
+  }
+
   try {
     const upstreamUrl = new URL("/phone-number/search", VAPI_BASE_URL);
     upstreamUrl.searchParams.set("areaCode", areaCode);
@@ -157,7 +184,7 @@ export async function GET(req: NextRequest) {
       numbers,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       const code = timedOut ? "upstream_timeout" : "request_aborted";
       const message = timedOut
         ? "The upstream Vapi search request timed out."
@@ -184,5 +211,8 @@ export async function GET(req: NextRequest) {
     });
   } finally {
     clearTimeout(timeoutId);
+    if (requestSignal) {
+      requestSignal.removeEventListener("abort", abortUpstreamRequest);
+    }
   }
 }

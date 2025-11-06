@@ -5,7 +5,6 @@ import * as z from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -72,10 +71,22 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
   }, [open]);
 
   useEffect(() => {
+    if (!open) {
+      setAreaCodeNumbers([]);
+      setNumbersError(null);
+      setSearchingNumbers(false);
+      dlog("searchNumbers skipped", { reason: "dialog_closed" });
+      return;
+    }
+
     if (!normalizedAreaCode || !AREA_CODE_REGEX.test(normalizedAreaCode)) {
       setAreaCodeNumbers([]);
       setNumbersError(null);
       setSearchingNumbers(false);
+      dlog("searchNumbers skipped", {
+        areaCode: normalizedAreaCode,
+        reason: "invalid_area_code",
+      });
       return;
     }
 
@@ -118,7 +129,7 @@ export const OnboardingSetupForm = ({ open, onOpenChange, onSuccess }: Onboardin
       isActive = false;
       controller.abort();
     };
-  }, [normalizedAreaCode]);
+  }, [normalizedAreaCode, open]);
 
   const fetchAvailableAreaCodes = async () => {
     try {

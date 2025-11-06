@@ -1,6 +1,22 @@
 const AREA_CODE_REGEX = /^\d{3}$/;
 const SEARCH_TIMEOUT_MS = 8000;
 
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  if (error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+
+  if (error instanceof Error) {
+    return error.name === "AbortError";
+  }
+
+  return false;
+}
+
 function normalizeNumbers(payload: unknown): string[] {
   const normalize = (value: unknown): string | null => {
     if (typeof value === "string") {
@@ -105,15 +121,12 @@ export async function searchNumbersByAreaCode(areaCode: string, signal?: AbortSi
     const payload = await response.json();
     return normalizeNumbers(payload);
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError(error)) {
       if (timedOut) {
         throw new Error("Request timed out while searching for phone numbers");
       }
-      throw error;
-    }
 
-    if ((error as Error)?.name === "AbortError" && timedOut) {
-      throw new Error("Request timed out while searching for phone numbers");
+      throw error;
     }
 
     if (error instanceof Error) {
