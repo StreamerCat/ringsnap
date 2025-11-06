@@ -103,9 +103,9 @@ Deno.serve(async (req) => {
     await supabase
       .from('role_audit_log')
       .insert({
-        user_id: target_user_id,
-        changed_by: user.id,
-        role_type: 'staff',
+        target_user_id: target_user_id,
+        changed_by_user_id: user.id,
+        change_type: 'staff',
         old_role: oldRoleData?.role || null,
         new_role: action === 'remove' ? null : new_role
       });

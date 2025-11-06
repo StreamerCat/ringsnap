@@ -35,3 +35,30 @@ verify_jwt = false
 
 [functions.complete-onboarding]
 verify_jwt = true
+
+[functions.create-sales-account]
+verify_jwt = false
+
+[functions.authorize-call]
+verify_jwt = true
+
+[functions.get-available-area-codes]
+verify_jwt = false
+
+[functions.manage-phone-lifecycle]
+verify_jwt = true
+
+[functions.manage-staff-role]
+verify_jwt = true
+
+[functions.provision]
+verify_jwt = true
+
+[functions.reset-monthly-usage]
+verify_jwt = true
+
+[functions.send-forwarding-instructions]
+verify_jwt = false
+
+[functions.sync-usage]
+verify_jwt = true
