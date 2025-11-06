@@ -108,14 +108,17 @@ export const PLANS = [
 export const TRADES = [
   { value: 'hvac', label: 'HVAC' },
   { value: 'plumbing', label: 'Plumbing' },
-  { value: 'electrician', label: 'Electrician' },
-  { value: 'landscaping', label: 'Landscaping' },
-  { value: 'general_contractor', label: 'General Contractor' },
+  { value: 'electrical', label: 'Electrical' },
   { value: 'roofing', label: 'Roofing' },
-  { value: 'pest_control', label: 'Pest Control' },
-  { value: 'garage_door', label: 'Garage Door Repair' },
+  { value: 'general_contractor', label: 'General Contractor' },
   { value: 'carpentry', label: 'Carpentry' },
   { value: 'painting', label: 'Painting' },
+  { value: 'landscaping', label: 'Landscaping' },
+  { value: 'pest_control', label: 'Pest Control' },
+  { value: 'garage_door', label: 'Garage Door Repair' },
+  { value: 'appliance_repair', label: 'Appliance Repair' },
+  { value: 'restaurant', label: 'Restaurant' },
+  { value: 'local_services', label: 'Local Services' },
   { value: 'other', label: 'Other' },
 ];
 

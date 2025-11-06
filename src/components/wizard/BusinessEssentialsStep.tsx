@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,8 @@ interface BusinessEssentialsStepProps {
 }
 
 export const BusinessEssentialsStep = ({ form }: BusinessEssentialsStepProps) => {
+  const selectedTrade = form.watch("trade");
+  const [customTrade, setCustomTrade] = useState("");
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="text-center space-y-2">
@@ -50,8 +53,15 @@ export const BusinessEssentialsStep = ({ form }: BusinessEssentialsStepProps) =>
               Trade/Industry <span className="text-primary">*</span>
             </Label>
             <Select
-              value={form.watch("trade")}
-              onValueChange={(value) => form.setValue("trade", value, { shouldValidate: true })}
+              value={selectedTrade === "other" ? "other" : form.watch("trade")}
+              onValueChange={(value) => {
+                if (value === "other") {
+                  form.setValue("trade", "other", { shouldValidate: true });
+                  setCustomTrade("");
+                } else {
+                  form.setValue("trade", value, { shouldValidate: true });
+                }
+              }}
             >
               <SelectTrigger className="h-12 text-base">
                 <SelectValue placeholder="Select your trade" />
@@ -64,6 +74,18 @@ export const BusinessEssentialsStep = ({ form }: BusinessEssentialsStepProps) =>
                 ))}
               </SelectContent>
             </Select>
+            {selectedTrade === "other" && (
+              <Input
+                value={customTrade}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setCustomTrade(value);
+                  form.setValue("trade", value, { shouldValidate: true });
+                }}
+                placeholder="Enter your trade or industry"
+                className="text-base input-focus h-12 mt-2"
+              />
+            )}
             {form.formState.errors.trade && (
               <p className="text-sm text-destructive">{form.formState.errors.trade.message}</p>
             )}

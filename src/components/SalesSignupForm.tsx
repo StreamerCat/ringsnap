@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle2, Lock, CreditCard, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SalesSuccessModal, type SalesSuccessModalData } from "@/components/SalesSuccessModal";
+import { TRADES } from "@/components/wizard/types";
 
 // Initialize Stripe - Replace with your live publishable key from https://dashboard.stripe.com/apikeys
 const stripePromise = loadStripe('pk_live_51SKmvhIdevV48BnphmyhXOa4qTOobfciT5pKXjeB5mwzR0SMAqVwI3ohYUnlw6CcWlvkyFnJqrSDGNLlFiXxov8d00r0kkXb0i');
@@ -98,6 +99,7 @@ function SalesSignupFormInner() {
   const [cardComplete, setCardComplete] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState<SalesSuccessModalData | null>(null);
+  const [customTrade, setCustomTrade] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const stripe = useStripe();
@@ -123,6 +125,7 @@ function SalesSignupFormInner() {
     } as Partial<FormData>
   });
   const selectedPlan = form.watch('planType');
+  const selectedTrade = form.watch('trade');
   const selectedPlanDetails = plans.find(p => p.value === selectedPlan);
 
   const onSubmit = async (data: FormData) => {
@@ -302,26 +305,42 @@ function SalesSignupFormInner() {
             render={({ field }) => (
               <FormItem className="sm:col-span-2">
                 <FormLabel>Trade *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select 
+                  onValueChange={(value) => {
+                    if (value === "other") {
+                      field.onChange("other");
+                      setCustomTrade("");
+                    } else {
+                      field.onChange(value);
+                    }
+                  }} 
+                  defaultValue={field.value}
+                >
                   <FormControl>
                     <SelectTrigger className="text-base">
                       <SelectValue placeholder="Select your trade" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="hvac">HVAC</SelectItem>
-                    <SelectItem value="plumbing">Plumbing</SelectItem>
-                    <SelectItem value="electrician">Electrician</SelectItem>
-                    <SelectItem value="landscaping">Landscaping</SelectItem>
-                    <SelectItem value="general_contractor">General Contractor</SelectItem>
-                    <SelectItem value="roofing">Roofing</SelectItem>
-                    <SelectItem value="pest_control">Pest Control</SelectItem>
-                    <SelectItem value="garage_door">Garage Door Repair</SelectItem>
-                    <SelectItem value="carpentry">Carpentry</SelectItem>
-                    <SelectItem value="painting">Painting</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {TRADES.map((trade) => (
+                      <SelectItem key={trade.value} value={trade.value}>
+                        {trade.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {selectedTrade === "other" && (
+                  <Input
+                    value={customTrade}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCustomTrade(value);
+                      field.onChange(value);
+                    }}
+                    placeholder="Enter your trade or industry"
+                    className="text-base mt-2"
+                  />
+                )}
                 <FormMessage />
               </FormItem>
             )}
