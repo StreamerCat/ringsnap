@@ -169,12 +169,15 @@ serve(async (req) => {
       await supabaseAdmin
         .from('accounts')
         .update({
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id: subscriptionId,
           sales_rep_name: customerInfo.salesRepName,
           service_area: customerInfo.serviceArea,
           business_hours: customerInfo.businessHours,
           emergency_policy: customerInfo.emergencyPolicy,
           plan_type: customerInfo.planType,
-          subscription_status: 'active'
+          subscription_status: 'active',
+          phone_number_area_code: customerInfo.zipCode || null
         })
         .eq('id', profile.account_id);
 
@@ -193,45 +196,67 @@ serve(async (req) => {
       throw new Error('Account record not found after user creation');
     }
 
-    const { data: accountDetails, error: accountDetailsError } = await supabaseAdmin
-      .from('accounts')
-      .select('id, plan_type, phone_number_e164, vapi_numbers (phone_e164)')
-      .eq('id', profile.account_id)
-      .single();
+    // Step 6: Provision resources immediately (phone number + assistant)
+    logInfo('Starting immediate provisioning for sales account', {
+      ...baseLogOptions,
+      accountId: profile.account_id,
+      context: { email: customerInfo.email }
+    });
 
-    if (accountDetailsError) {
-      logError('Failed to fetch account details', {
-        ...baseLogOptions,
-        accountId: profile?.account_id ?? undefined,
-        error: accountDetailsError
-      });
-      throw accountDetailsError;
-    }
+    let vapiPhoneNumber = null;
+    let vapiAssistantId = null;
+    let provisioningSucceeded = false;
 
-    const vapiNumberRelation = accountDetails?.vapi_numbers;
-    let vapiPhoneNumber = Array.isArray(vapiNumberRelation) && vapiNumberRelation.length > 0
-      ? vapiNumberRelation[0]?.phone_e164 ?? null
-      : accountDetails?.phone_number_e164 ?? null;
+    try {
+      const { data: provisionData, error: provisionError } = await supabaseAdmin.functions.invoke(
+        'provision-resources',
+        {
+          body: {
+            accountId: profile.account_id,
+            email: customerInfo.email,
+            name: customerInfo.name,
+            phone: customerInfo.phone
+            // No selectedNumber - let Vapi auto-assign from area code stored in account
+          }
+        }
+      );
 
-    if (!vapiPhoneNumber) {
-      const { data: vapiRecord, error: vapiError } = await supabaseAdmin
-        .from('vapi_numbers')
-        .select('phone_e164')
-        .eq('account_id', profile.account_id)
-        .maybeSingle();
-
-      if (vapiError) {
-        logError('Failed to fetch VAPI number', {
+      if (provisionError) {
+        logError('Provisioning failed for sales account', {
           ...baseLogOptions,
           accountId: profile.account_id,
-          error: vapiError
+          error: provisionError
         });
+        // Don't fail the whole signup - provisioning can be retried
+        // Customer has already paid, so we create the account regardless
+      } else {
+        provisioningSucceeded = true;
+        logInfo('Provisioning succeeded for sales account', {
+          ...baseLogOptions,
+          accountId: profile.account_id,
+          context: { phoneNumber: provisionData?.phoneNumber }
+        });
+
+        // Wait briefly then fetch updated account with provisioned resources
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const { data: updatedAccount } = await supabaseAdmin
+          .from('accounts')
+          .select('vapi_phone_number, vapi_assistant_id')
+          .eq('id', profile.account_id)
+          .single();
+
+        vapiPhoneNumber = updatedAccount?.vapi_phone_number;
+        vapiAssistantId = updatedAccount?.vapi_assistant_id;
       }
-
-      vapiPhoneNumber = vapiRecord?.phone_e164 ?? null;
+    } catch (provisioningError) {
+      logError('Provisioning error during sales account creation', {
+        ...baseLogOptions,
+        accountId: profile.account_id,
+        error: provisioningError
+      });
+      // Continue - don't fail the signup
     }
-
-    const planType = accountDetails?.plan_type ?? customerInfo.planType;
 
     // Return success response
     return new Response(
@@ -239,12 +264,14 @@ serve(async (req) => {
         success: true,
         userId: authData.user.id,
         accountId: profile?.account_id,
-        planType,
+        planType: customerInfo.planType,
         stripeCustomerId,
         subscriptionId,
         tempPassword,
         subscriptionStatus: 'active',
-        vapiPhoneNumber
+        vapiPhoneNumber,
+        vapiAssistantId,
+        provisioned: provisioningSucceeded && !!vapiPhoneNumber
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
