@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/components/ui/use-toast";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SalesSuccessModal, type SalesSuccessModalData } from "@/components/SalesSuccessModal";
 
 // Initialize Stripe - Replace with your live publishable key from https://dashboard.stripe.com/apikeys
 const stripePromise = loadStripe('pk_live_51SKmvhIdevV48BnphmyhXOa4qTOobfciT5pKXjeB5mwzR0SMAqVwI3ohYUnlw6CcWlvkyFnJqrSDGNLlFiXxov8d00r0kkXb0i');
@@ -41,6 +42,17 @@ const salesFormSchema = z.object({
 });
 
 type FormData = z.infer<typeof salesFormSchema>;
+
+type CreateSalesAccountResponse = {
+  success?: boolean;
+  userId?: string;
+  accountId?: string | null;
+  stripeCustomerId?: string | null;
+  subscriptionId?: string | null;
+  tempPassword: string;
+  subscriptionStatus?: string | null;
+  ringSnapNumber?: string | null;
+};
 
 // Plan data
 const plans = [
@@ -82,6 +94,8 @@ function parseBusinessHours(hoursText: string): object {
 function SalesSignupFormInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<SalesSuccessModalData | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const stripe = useStripe();
@@ -165,17 +179,32 @@ function SalesSignupFormInner() {
 
       if (functionError) throw functionError;
 
-      // Show success with temp password
-      toast({
-        title: "Account Created!",
-        description: `Login credentials sent to ${data.email}. Temp password: ${result.tempPassword}`,
-        duration: 10000
-      });
+      const typedResult = result as CreateSalesAccountResponse;
 
-      // Redirect to onboarding
-      setTimeout(() => {
-        navigate('/onboarding');
-      }, 2000);
+      if (!typedResult || !typedResult.tempPassword) {
+        throw new Error('Missing credentials in account creation response.');
+      }
+
+      const modalPayload: SalesSuccessModalData = {
+        customerName: data.name,
+        customerEmail: data.email,
+        customerPhone: data.phone,
+        companyName: data.companyName,
+        ringSnapNumber: typedResult.ringSnapNumber ?? null,
+        tempPassword: typedResult.tempPassword,
+        accountId: typedResult.accountId ?? null,
+        subscriptionStatus: typedResult.subscriptionStatus ?? (data.skipPayment ? 'trial' : 'active'),
+        planType: data.planType,
+        salesRepName: data.salesRepName,
+      };
+
+      setSuccessData(modalPayload);
+      setShowSuccessModal(true);
+
+      toast({
+        title: "Account created",
+        description: "Review the forwarding instructions and share them with your customer.",
+      });
 
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -186,8 +215,9 @@ function SalesSignupFormInner() {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         {/* Customer Info Section */}
         <Card>
         <CardHeader>
@@ -505,8 +535,20 @@ function SalesSignupFormInner() {
       >
         {isSubmitting ? "Creating Account..." : "Create Account & Start"}
       </Button>
-      </form>
-    </Form>
+        </form>
+      </Form>
+      <SalesSuccessModal
+        open={showSuccessModal}
+        onOpenChange={setShowSuccessModal}
+        onDone={() => {
+          setShowSuccessModal(false);
+          form.reset();
+          setSuccessData(null);
+          navigate('/onboarding');
+        }}
+        data={successData}
+      />
+    </>
   );
 }
 
