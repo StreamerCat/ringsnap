@@ -74,17 +74,15 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
     };
 
     try {
-      const response = await fetch(`/api/signup`, {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+      const { data: result, error: invokeError } = await supabase.functions.invoke('free-trial-signup', {
+        body: payload
       });
 
-      const result = await response.json();
+      if (invokeError) {
+        throw new Error(invokeError.message);
+      }
 
-      if (!response.ok || !result?.ok) {
+      if (!result?.ok) {
         const errorDetails = result?.error || "Unknown error";
         throw new Error(errorDetails);
       }
