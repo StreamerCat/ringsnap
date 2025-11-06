@@ -7,7 +7,7 @@ import { Check, Loader2, Phone, Settings, TestTube, Copy, User, UserCircle2, Clo
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
-import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { OnboardingForm } from "@/components/OnboardingForm";
 import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -363,12 +363,14 @@ export default function Onboarding() {
           </p>
         </div>
 
-        <OnboardingWizard
+        <OnboardingForm
           open={showSetupForm}
           onOpenChange={setShowSetupForm}
           onSuccess={handleSetupComplete}
           initialProfile={profile}
+          initialAccount={account}
           defaultPhone={profile?.phone ?? null}
+          defaultAreaCode={derivedAreaCode}
         />
       </div>
     );
