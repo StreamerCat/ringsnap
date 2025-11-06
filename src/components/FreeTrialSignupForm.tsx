@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +43,40 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [provisionedNumber, setProvisionedNumber] = useState<string | null>(null);
   const [provisionJobId, setProvisionJobId] = useState<string | null>(null);
+  const isMountedRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const runIfMounted = (callback: () => void) => {
+    if (isMountedRef.current) {
+      callback();
+    }
+  };
+
+  const waitForSession = async (maxAttempts = 10, delayMs = 300) => {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.debug("FreeTrialSignupForm: Session polling error", error);
+      }
+
+      if (data?.session?.user) {
+        return data.session;
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    return null;
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -61,10 +95,10 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const isGenericEmail = emailDomain ? genericDomains.includes(emailDomain) : false;
 
   const onSubmit = async (data: FormData) => {
-    setErrorMessage(null);
-    setProvisionedNumber(null);
-    setProvisionJobId(null);
-    setIsSubmitting(true);
+    runIfMounted(() => setErrorMessage(null));
+    runIfMounted(() => setProvisionedNumber(null));
+    runIfMounted(() => setProvisionJobId(null));
+    runIfMounted(() => setIsSubmitting(true));
 
     const payload = {
       name: data.name.trim(),
@@ -88,11 +122,11 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       }
 
       if (result.phone) {
-        setProvisionedNumber(result.phone);
+        runIfMounted(() => setProvisionedNumber(result.phone));
       }
 
       if (result.jobId) {
-        setProvisionJobId(result.jobId);
+        runIfMounted(() => setProvisionJobId(result.jobId));
       }
 
       // Sign in with returned credentials for instant login when available
@@ -105,18 +139,31 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
         if (signInError) {
           throw new Error('Account created but failed to sign in. Please use the login page.');
         }
+
+        const session = await waitForSession();
+
+        if (!session) {
+          throw new Error('Account created but we could not confirm your session. Please log in manually.');
+        }
+
+        console.debug("FreeTrialSignupForm: Navigating to onboarding", {
+          userId: session.user.id,
+          hasPhone: Boolean(result.phone),
+        });
       }
 
-      form.reset();
-      setErrorMessage(null);
-      onOpenChange(false);
-      navigate("/onboarding");
+      runIfMounted(() => {
+        form.reset();
+        setErrorMessage(null);
+        onOpenChange(false);
+        navigate("/onboarding");
+      });
     } catch (error) {
       console.error("Signup submission failed:", error);
       const errorMsg = error instanceof Error ? error.message : "Could not start your trial. Please try again.";
-      setErrorMessage(errorMsg);
+      runIfMounted(() => setErrorMessage(errorMsg));
     } finally {
-      setIsSubmitting(false);
+      runIfMounted(() => setIsSubmitting(false));
     }
   };
 
