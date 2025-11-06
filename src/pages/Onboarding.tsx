@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { HybridOnboardingFlow } from "@/components/onboarding/HybridOnboardingFlow";
+import { LimitedTrialBanner } from "@/components/onboarding/LimitedTrialBanner";
 import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -363,12 +365,14 @@ export default function Onboarding() {
           </p>
         </div>
 
-        <OnboardingWizard
+        <HybridOnboardingFlow
           open={showSetupForm}
           onOpenChange={setShowSetupForm}
           onSuccess={handleSetupComplete}
           initialProfile={profile}
           defaultPhone={profile?.phone ?? null}
+          accountId={account?.id || ''}
+          hasPaymentMethod={account?.has_payment_method || false}
         />
       </div>
     );
@@ -381,6 +385,16 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted py-8 px-4 sm:py-12">
       <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+        {/* Limited Trial Banner - Shows for cardless trial users */}
+        {account?.trial_type === 'cardless' && !account?.has_payment_method && (
+          <LimitedTrialBanner
+            accountId={account.id}
+            minutesUsed={usageStats.minutesUsed}
+            minutesLimit={30}
+            onPaymentAdded={checkAuth}
+          />
+        )}
+
         {/* Progress Banner - Shows during provisioning */}
         {account?.provisioning_status === 'provisioning' && (
           <Card className="border-2 border-blue-500 bg-blue-50 shadow-lg sticky top-4 z-10">
