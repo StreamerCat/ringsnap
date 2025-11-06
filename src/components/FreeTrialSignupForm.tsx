@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import type { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 const formSchema = z.object({
   name: z
@@ -113,7 +114,51 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       });
 
       if (invokeError) {
-        throw new Error(invokeError.message);
+        const httpError = invokeError as FunctionsHttpError;
+        const fallbackMessage = "Could not start your trial. Please try again.";
+        let detailedMessage: string | null = null;
+
+        if (httpError?.context) {
+          const contextResponse = httpError.context;
+          const responseForJson = typeof contextResponse.clone === "function"
+            ? contextResponse.clone()
+            : contextResponse;
+
+          try {
+            const errorJson = await responseForJson.json();
+            if (errorJson && typeof errorJson.error === "string") {
+              detailedMessage = errorJson.error.trim();
+            }
+          } catch (jsonError) {
+            try {
+              const responseForText = responseForJson === contextResponse && typeof contextResponse.clone === "function"
+                ? contextResponse.clone()
+                : contextResponse;
+              const errorText = await responseForText.text();
+              if (errorText) {
+                const parsedText = (() => {
+                  try {
+                    const parsedJson = JSON.parse(errorText);
+                    if (parsedJson && typeof parsedJson.error === "string") {
+                      return parsedJson.error.trim();
+                    }
+                  } catch {
+                    // Swallow JSON parse errors and fall back to the raw text.
+                  }
+                  return errorText.trim();
+                })();
+
+                if (parsedText) {
+                  detailedMessage = parsedText;
+                }
+              }
+            } catch {
+              // If parsing fails, we'll fall back to the generic message below.
+            }
+          }
+        }
+
+        throw new Error(detailedMessage || fallbackMessage);
       }
 
       if (!result?.ok) {
