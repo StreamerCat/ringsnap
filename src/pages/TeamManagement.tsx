@@ -1,44 +1,40 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2, ArrowLeft, UserPlus, Users as UsersIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, ArrowLeft, UserPlus } from "lucide-react";
+
+type AccountRole = 'owner' | 'admin' | 'member';
 
 interface TeamMember {
   id: string;
   name: string;
   phone: string;
   email: string;
-  role: string;
+  role: AccountRole;
   is_primary: boolean;
   created_at: string;
 }
 
-export default function TeamManagement() {
+const TeamManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isOwner, setIsOwner] = useState(false);
-  const [accountId, setAccountId] = useState<string>("");
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [updatingMember, setUpdatingMember] = useState<string | null>(null);
-  
-  const [inviteForm, setInviteForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    role: "user"
-  });
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteRole, setInviteRole] = useState<AccountRole>('member');
+  const [accountId, setAccountId] = useState<string>('');
 
   useEffect(() => {
     checkAccess();
@@ -48,91 +44,85 @@ export default function TeamManagement() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate("/login");
+        navigate('/login');
         return;
       }
 
-      // Get profile and account
+      // Get user's account
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("account_id")
-        .eq("id", user.id)
+        .from('profiles')
+        .select('account_id')
+        .eq('id', user.id)
         .single();
 
-      if (!profile) {
-        toast({
-          title: "Error",
-          description: "Profile not found",
-          variant: "destructive"
-        });
-        navigate("/dashboard");
+      if (!profile?.account_id) {
+        navigate('/dashboard');
         return;
       }
 
       setAccountId(profile.account_id);
 
       // Check if user is owner
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "owner")
+      const { data: memberRole } = await supabase
+        .from('account_members' as any)
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('account_id', profile.account_id)
         .single();
 
-      setIsOwner(!!roleData);
-
-      await loadTeamMembers(profile.account_id);
+      setIsOwner((memberRole as any)?.role === 'owner');
+      loadTeamMembers(profile.account_id);
     } catch (error) {
-      console.error("Access check failed:", error);
-      navigate("/login");
+      console.error('Error checking access:', error);
+      navigate('/login');
     }
   };
 
   const loadTeamMembers = async (accountId: string) => {
     try {
-      // Get all profiles in this account
+      setLoading(true);
+
+      // Get all members for this account
+      const { data: members, error: membersError } = await supabase
+        .from('account_members' as any)
+        .select('user_id, role, created_at')
+        .eq('account_id', accountId);
+
+      if (membersError) throw membersError;
+
+      // Get profiles for these members
+      const userIds = members?.map((m: any) => m.user_id) || [];
       const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, name, phone, is_primary, created_at")
-        .eq("account_id", accountId);
+        .from('profiles')
+        .select('id, name, phone, is_primary')
+        .in('id', userIds);
 
-      if (!profiles) {
-        setTeamMembers([]);
-        return;
-      }
+      // Get auth users for emails
+      const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
 
-      // Get roles for each user
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("user_id", profiles.map(p => p.id));
-
-      // Get emails from auth
-      const members: TeamMember[] = [];
-      for (const profile of profiles) {
-        const { data: { user } } = await supabase.auth.admin.getUserById(profile.id);
-        const userRole = roles?.find(r => r.user_id === profile.id);
+      // Combine data
+      const teamMembersData: TeamMember[] = (members || []).map((member: any) => {
+        const profile = profiles?.find((p: any) => p.id === member.user_id);
+        const authUser = authUsers.find((u: any) => u.id === member.user_id);
         
-        if (user) {
-          members.push({
-            id: profile.id,
-            name: profile.name,
-            phone: profile.phone,
-            email: user.email || 'No email',
-            role: userRole?.role || 'user',
-            is_primary: profile.is_primary,
-            created_at: profile.created_at
-          });
-        }
-      }
+        return {
+          id: member.user_id,
+          name: profile?.name || 'Unknown',
+          phone: profile?.phone || '',
+          email: authUser?.email || 'Unknown',
+          role: member.role as AccountRole,
+          is_primary: profile?.is_primary || false,
+          created_at: member.created_at
+        };
+      });
 
-      setTeamMembers(members);
+      setTeamMembers(teamMembersData);
     } catch (error) {
-      console.error("Failed to load team members:", error);
+      console.error('Error loading team members:', error);
       toast({
         title: "Error",
         description: "Failed to load team members",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -141,16 +131,15 @@ export default function TeamManagement() {
 
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    setInviting(true);
-
+    
     try {
-      const { data, error } = await supabase.functions.invoke('manage-team-member', {
+      const { error } = await supabase.functions.invoke('manage-team-member', {
         body: {
           action: 'invite',
-          email: inviteForm.email,
-          name: inviteForm.name,
-          phone: inviteForm.phone,
-          role: inviteForm.role
+          email: inviteEmail,
+          name: inviteName,
+          phone: invitePhone,
+          new_role: inviteRole
         }
       });
 
@@ -158,28 +147,28 @@ export default function TeamManagement() {
 
       toast({
         title: "Success",
-        description: "Team member invited successfully"
+        description: "Team member invited successfully",
       });
 
-      setShowInviteDialog(false);
-      setInviteForm({ name: "", email: "", phone: "", role: "user" });
-      await loadTeamMembers(accountId);
-    } catch (error: any) {
-      console.error("Invite failed:", error);
+      setInviteDialogOpen(false);
+      setInviteName('');
+      setInviteEmail('');
+      setInvitePhone('');
+      setInviteRole('member');
+      loadTeamMembers(accountId);
+    } catch (error) {
+      console.error('Error inviting member:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to invite team member",
-        variant: "destructive"
+        description: "Failed to invite team member",
+        variant: "destructive",
       });
-    } finally {
-      setInviting(false);
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    setUpdatingMember(userId);
+  const handleRoleChange = async (userId: string, newRole: AccountRole) => {
     try {
-      const { data, error } = await supabase.functions.invoke('manage-team-member', {
+      const { error } = await supabase.functions.invoke('manage-team-member', {
         body: {
           action: 'update_role',
           target_user_id: userId,
@@ -191,186 +180,170 @@ export default function TeamManagement() {
 
       toast({
         title: "Success",
-        description: "Role updated successfully"
+        description: "Role updated successfully",
       });
 
-      await loadTeamMembers(accountId);
-    } catch (error: any) {
-      console.error("Role update failed:", error);
+      loadTeamMembers(accountId);
+    } catch (error) {
+      console.error('Error updating role:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update role",
-        variant: "destructive"
+        description: "Failed to update role",
+        variant: "destructive",
       });
-    } finally {
-      setUpdatingMember(null);
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
+  const getRoleBadgeVariant = (role: AccountRole) => {
     switch (role) {
-      case 'owner': return 'default';
-      case 'admin': return 'secondary';
-      default: return 'outline';
+      case 'owner': return "default";
+      case 'admin': return "secondary";
+      case 'member': return "outline";
+      default: return "secondary";
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4 max-w-7xl">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold">Team Management</h1>
-            <p className="text-muted-foreground">Manage your team members and their roles</p>
-          </div>
-          {isOwner && (
-            <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Invite Member
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-3xl font-bold">Team Management</h1>
+        {isOwner && (
+          <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="ml-auto">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Invite Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Invite Team Member</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleInviteMember} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    placeholder="John Doe"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="john@example.com"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                    placeholder="+1234567890"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as AccountRole)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="owner">Owner</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full">
+                  Send Invitation
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Invite Team Member</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleInviteMember} className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      value={inviteForm.name}
-                      onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={inviteForm.email}
-                      onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={inviteForm.phone}
-                      onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="role">Role</Label>
-                    <Select
-                      value={inviteForm.role}
-                      onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="owner">Owner</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={inviting}>
-                    {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Invitation"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-
-        {/* Stats Card */}
-        <Card className="mb-8">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Members</CardTitle>
-            <UsersIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{teamMembers.length}</div>
-          </CardContent>
-        </Card>
-
-        {/* Team Members Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Team Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  {isOwner && <TableHead>Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teamMembers.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell>{member.email}</TableCell>
-                    <TableCell>{member.phone}</TableCell>
-                    <TableCell>
-                      <Badge variant={getRoleBadgeVariant(member.role)}>
-                        {member.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {member.is_primary && (
-                        <Badge variant="outline">Primary Contact</Badge>
-                      )}
-                    </TableCell>
-                    {isOwner && (
-                      <TableCell>
-                        <Select
-                          value={member.role}
-                          onValueChange={(value) => handleRoleChange(member.id, value)}
-                          disabled={updatingMember === member.id || member.is_primary}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="owner">Owner</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="user">User</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
+
+      <Card className="p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-2">Team Overview</h2>
+        <p className="text-muted-foreground">Total Members: {teamMembers.length}</p>
+      </Card>
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-4">Name</th>
+                <th className="text-left p-4">Email</th>
+                <th className="text-left p-4">Phone</th>
+                <th className="text-left p-4">Role</th>
+                <th className="text-left p-4">Primary</th>
+                <th className="text-left p-4">Joined</th>
+                {isOwner && <th className="text-left p-4">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {teamMembers.map((member) => (
+                <tr key={member.id} className="border-b last:border-0">
+                  <td className="p-4">{member.name}</td>
+                  <td className="p-4">{member.email}</td>
+                  <td className="p-4">{member.phone}</td>
+                  <td className="p-4">
+                    <Badge variant={getRoleBadgeVariant(member.role)}>
+                      {member.role.toUpperCase()}
+                    </Badge>
+                  </td>
+                  <td className="p-4">{member.is_primary ? 'Yes' : 'No'}</td>
+                  <td className="p-4">
+                    {new Date(member.created_at).toLocaleDateString()}
+                  </td>
+                  {isOwner && (
+                    <td className="p-4">
+                      <Select
+                        value={member.role}
+                        onValueChange={(value) => handleRoleChange(member.id, value as AccountRole)}
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="member">Member</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
-}
+};
+
+export default TeamManagement;

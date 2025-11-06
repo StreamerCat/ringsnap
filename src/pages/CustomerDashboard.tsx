@@ -279,7 +279,7 @@ export default function CustomerDashboard() {
               <Users className="h-4 w-4 mr-2" />
               Assistants
             </TabsTrigger>
-            <TabsTrigger value="team" onClick={() => navigate("/dashboard/team")}>
+            <TabsTrigger value="team">
               <Users className="h-4 w-4 mr-2" />
               Team
             </TabsTrigger>
@@ -296,6 +296,23 @@ export default function CustomerDashboard() {
               Referrals
             </TabsTrigger>
           </TabsList>
+
+          {/* Team Tab */}
+          <TabsContent value="team" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Manage your team members and their access levels.
+                </p>
+                <Button onClick={() => navigate("/dashboard/team")}>
+                  Go to Team Management
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">

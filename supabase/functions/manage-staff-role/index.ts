@@ -32,17 +32,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if requester is owner
+    // Check if requester is platform owner
     const { data: requesterRole } = await supabase
-      .from('user_roles')
+      .from('staff_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('role', 'owner')
+      .eq('role', 'platform_owner')
       .single();
 
     if (!requesterRole) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized - Owner access required' }),
+        JSON.stringify({ error: 'Unauthorized - Platform owner access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
     const { target_user_id, new_role, action } = await req.json();
 
     // Validate input
-    if (!target_user_id || !['owner', 'admin', 'user'].includes(new_role)) {
+    const validRoles = ['platform_owner', 'platform_admin', 'support', 'viewer'];
+    if (!target_user_id || (action !== 'remove' && !validRoles.includes(new_role))) {
       return new Response(
         JSON.stringify({ error: 'Invalid input' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -59,7 +60,7 @@ Deno.serve(async (req) => {
 
     // Get old role
     const { data: oldRoleData } = await supabase
-      .from('user_roles')
+      .from('staff_roles')
       .select('role')
       .eq('user_id', target_user_id)
       .single();
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
     if (action === 'remove') {
       // Remove role
       const { error: deleteError } = await supabase
-        .from('user_roles')
+        .from('staff_roles')
         .delete()
         .eq('user_id', target_user_id);
 
@@ -80,7 +81,7 @@ Deno.serve(async (req) => {
     } else if (oldRoleData) {
       // Update existing role
       const { error: updateError } = await supabase
-        .from('user_roles')
+        .from('staff_roles')
         .update({ role: new_role })
         .eq('user_id', target_user_id);
 
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
     } else {
       // Insert new role
       const { error: insertError } = await supabase
-        .from('user_roles')
+        .from('staff_roles')
         .insert({ user_id: target_user_id, role: new_role });
 
       if (insertError) throw insertError;
@@ -100,14 +101,13 @@ Deno.serve(async (req) => {
 
     // Log the change
     await supabase
-      .from('role_change_audit')
+      .from('role_audit_log')
       .insert({
-        changed_by_user_id: user.id,
-        target_user_id,
+        user_id: target_user_id,
+        changed_by: user.id,
+        role_type: 'staff',
         old_role: oldRoleData?.role || null,
-        new_role: action === 'remove' ? null : new_role,
-        change_type: changeType,
-        context: 'internal_staff'
+        new_role: action === 'remove' ? null : new_role
       });
 
     return new Response(

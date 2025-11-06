@@ -107,17 +107,17 @@ const AdminMonitoring = () => {
           return;
         }
 
-        const { data: roles, error } = await supabase
-          .from("user_roles" as any)
+        const { data: staffRole, error } = await supabase
+          .from("staff_roles" as any)
           .select("role")
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .single();
 
-        if (error) {
+        if (error && error.code !== 'PGRST116') {
           throw error;
         }
 
-        const hasAccess = roles && Array.isArray(roles) && roles.length > 0 && 
-          roles.some((role: any) => role.role === "owner" || role.role === "admin");
+        const hasAccess = staffRole && ((staffRole as any).role === "platform_owner" || (staffRole as any).role === "platform_admin");
 
         if (!hasAccess) {
           setIsAuthorized(false);

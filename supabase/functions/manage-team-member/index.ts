@@ -32,71 +32,76 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get requester's profile and account
+    // Get user's account and verify owner role
     const { data: profile } = await supabase
       .from('profiles')
       .select('account_id')
       .eq('id', user.id)
       .single();
 
-    if (!profile) {
+    if (!profile?.account_id) {
       return new Response(
-        JSON.stringify({ error: 'Profile not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'User not associated with an account' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check if requester is account owner
-    const { data: requesterRole } = await supabase
-      .from('user_roles')
+    const { data: ownerCheck } = await supabase
+      .from('account_members')
       .select('role')
       .eq('user_id', user.id)
+      .eq('account_id', profile.account_id)
       .eq('role', 'owner')
       .single();
 
-    if (!requesterRole) {
+    if (!ownerCheck) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized - Account owner access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const { action, email, name, phone, role } = await req.json();
+    const { action, email, name, phone, new_role, target_user_id } = await req.json();
 
     if (action === 'invite') {
-      // Create auth user and profile
+      // Create new user
       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email,
         email_confirm: true,
-        user_metadata: {
-          name,
-          phone,
-          company_name: profile.account_id
-        }
+        user_metadata: { name, phone }
       });
 
       if (createError) throw createError;
 
-      // Profile should be auto-created by trigger, but let's ensure role is set
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: newUser.user.id,
-          role: role || 'user'
+      // Create profile
+      await supabase
+        .from('profiles')
+        .insert({
+          id: newUser.user.id,
+          account_id: profile.account_id,
+          name,
+          phone,
+          is_primary: false
         });
 
-      if (roleError) throw roleError;
+      // Create account member role
+      await supabase
+        .from('account_members')
+        .insert({
+          user_id: newUser.user.id,
+          account_id: profile.account_id,
+          role: new_role || 'member'
+        });
 
       // Log the change
       await supabase
-        .from('role_change_audit')
+        .from('role_audit_log')
         .insert({
-          changed_by_user_id: user.id,
-          target_user_id: newUser.user.id,
+          user_id: newUser.user.id,
+          changed_by: user.id,
+          role_type: 'account',
           old_role: null,
-          new_role: role || 'user',
-          change_type: 'added',
-          context: 'customer_team',
+          new_role: new_role || 'member',
           account_id: profile.account_id
         });
 
@@ -105,8 +110,6 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'update_role') {
-      const { target_user_id, new_role } = await req.json();
-
       // Verify target user is in same account
       const { data: targetProfile } = await supabase
         .from('profiles')
@@ -114,40 +117,39 @@ Deno.serve(async (req) => {
         .eq('id', target_user_id)
         .single();
 
-      if (!targetProfile || targetProfile.account_id !== profile.account_id) {
+      if (targetProfile?.account_id !== profile.account_id) {
         return new Response(
-          JSON.stringify({ error: 'User not in your account' }),
+          JSON.stringify({ error: 'Target user not in same account' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       // Get old role
       const { data: oldRoleData } = await supabase
-        .from('user_roles')
+        .from('account_members')
         .select('role')
         .eq('user_id', target_user_id)
+        .eq('account_id', profile.account_id)
         .single();
 
       // Update role
       const { error: updateError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: target_user_id,
-          role: new_role
-        });
+        .from('account_members')
+        .update({ role: new_role })
+        .eq('user_id', target_user_id)
+        .eq('account_id', profile.account_id);
 
       if (updateError) throw updateError;
 
       // Log the change
       await supabase
-        .from('role_change_audit')
+        .from('role_audit_log')
         .insert({
-          changed_by_user_id: user.id,
-          target_user_id,
+          user_id: target_user_id,
+          changed_by: user.id,
+          role_type: 'account',
           old_role: oldRoleData?.role || null,
           new_role,
-          change_type: 'updated',
-          context: 'customer_team',
           account_id: profile.account_id
         });
 
@@ -155,12 +157,12 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    } else {
-      return new Response(
-        JSON.stringify({ error: 'Invalid action' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
+
+    return new Response(
+      JSON.stringify({ error: 'Invalid action' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
     console.error('Error managing team member:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
