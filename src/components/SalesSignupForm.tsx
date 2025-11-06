@@ -31,7 +31,9 @@ const salesFormSchema = z.object({
   serviceArea: z.string().trim().min(1, "Service area required").max(200),
   businessHours: z.string().trim().min(1, "Business hours required"),
   emergencyPolicy: z.string().trim().min(10, "Emergency policy required").max(1000),
-  planType: z.enum(['starter', 'professional', 'premium']),
+  planType: z.enum(['starter', 'professional', 'premium'], {
+    required_error: "Select a plan to continue"
+  }),
   salesRepName: z.string().trim().min(1, "Sales rep name required").max(100),
   zipCode: z.string().trim().regex(/^\d{5}$/, "Valid 5-digit ZIP required").optional().or(z.literal('')),
   assistantGender: z.enum(['male', 'female']).default('female'),
@@ -80,6 +82,8 @@ function parseBusinessHours(hoursText: string): object {
 function SalesSignupFormInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [cardComplete, setCardComplete] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const stripe = useStripe();
@@ -96,26 +100,34 @@ function SalesSignupFormInner() {
       serviceArea: "",
       businessHours: "",
       emergencyPolicy: "",
-      planType: "starter",
+      planType: undefined,
       salesRepName: "",
       zipCode: "",
       assistantGender: "female",
       referralCode: ""
-    }
+    } as Partial<FormData>
   });
+  const selectedPlan = form.watch('planType');
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     setError(null);
+    setCardError(null);
 
     try {
       if (!stripe || !elements) {
-        throw new Error("Payment service is unavailable. Please try again.");
+        throw new Error("Payment service not available. Please try again.");
       }
 
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) {
         throw new Error("Card element not found");
+      }
+
+      if (!cardComplete) {
+        setCardError("Enter a complete payment method to continue.");
+        setIsSubmitting(false);
+        return;
       }
 
       const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
@@ -128,13 +140,13 @@ function SalesSignupFormInner() {
         }
       });
 
-      if (stripeError) {
-        throw new Error(stripeError.message);
+      if (stripeError || !paymentMethod) {
+        const message = stripeError?.message ?? "Unable to process payment details.";
+        setCardError(message);
+        setIsSubmitting(false);
+        return;
       }
-
-      if (!paymentMethod) {
-        throw new Error("Payment method could not be created");
-      }
+      const paymentMethodId = paymentMethod.id;
 
       const paymentMethodId = paymentMethod.id;
 
@@ -177,7 +189,7 @@ function SalesSignupFormInner() {
         navigate('/onboarding');
       }, 2000);
 
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Signup error:', err);
       const message = err instanceof Error ? err.message : 'Failed to create account. Please try again.';
       setError(message);
@@ -394,16 +406,20 @@ function SalesSignupFormInner() {
           <CardTitle>Select Plan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
             {plans.map(plan => (
               <button
                 key={plan.value}
                 type="button"
-                onClick={() => form.setValue('planType', plan.value)}
+                onClick={() => {
+                  form.setValue('planType', plan.value, { shouldValidate: true });
+                  form.clearErrors('planType');
+                }}
                 className={cn(
-                  "p-4 sm:p-6 rounded-xl border-2 text-left transition-all touch-manipulation min-h-[44px]",
+                  "p-5 sm:p-6 rounded-2xl border-2 text-left transition-all touch-manipulation min-h-[56px] w-full",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
                   "hover:scale-[1.02] active:scale-95",
-                  form.watch('planType') === plan.value
+                  selectedPlan === plan.value
                     ? "border-primary bg-primary/5 shadow-lg"
                     : "border-slate-200 hover:border-primary/50"
                 )}
@@ -422,6 +438,9 @@ function SalesSignupFormInner() {
               </button>
             ))}
           </div>
+          {form.formState.errors.planType && (
+            <p className="text-sm text-red-500 mt-2">{form.formState.errors.planType.message}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -451,27 +470,36 @@ function SalesSignupFormInner() {
         <CardHeader>
           <CardTitle>Payment Information</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
             <Label>Card Details</Label>
-            <div className="border rounded-lg p-3 bg-white">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm min-h-[56px] flex items-center">
               <CardElement
+                onChange={(event) => {
+                  setCardComplete(event.complete);
+                  setCardError(event.error ? event.error.message ?? "" : null);
+                }}
                 options={{
                   style: {
                     base: {
+                      color: '#0f172a',
                       fontSize: '16px',
-                      color: '#424770',
+                      fontSmoothing: 'antialiased',
                       '::placeholder': {
-                        color: '#aab7c4',
+                        color: '#94a3b8',
                       },
                     },
                     invalid: {
-                      color: '#9e2146',
+                      color: '#ef4444',
                     },
                   },
+                  hidePostalCode: true,
                 }}
               />
             </div>
+            {cardError && (
+              <p className="text-sm text-red-500">{cardError}</p>
+            )}
           </div>
         </CardContent>
       </Card>
