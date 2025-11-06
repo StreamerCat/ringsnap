@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Check, Loader2, Phone, Settings, TestTube, Copy, User, UserCircle2, Clo
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
-import { OnboardingSetupForm } from "@/components/OnboardingSetupForm";
+import { OnboardingForm } from "@/components/OnboardingForm";
 import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -46,6 +46,14 @@ export default function Onboarding() {
   useEffect(() => {
     dlog("Auth status updated", authStatus, statusMessage, lastAuthError);
   }, [authStatus, statusMessage, lastAuthError]);
+
+  const derivedAreaCode = useMemo(() => {
+    const digits = (profile?.phone ?? "").replace(/\D/g, "");
+    if (digits.length >= 10) {
+      return digits.slice(-10, -7);
+    }
+    return digits.slice(0, 3) || null;
+  }, [profile?.phone]);
 
   const checkAuth = useCallback(async () => {
     dlog("Starting auth check");
@@ -355,10 +363,14 @@ export default function Onboarding() {
           </p>
         </div>
 
-        <OnboardingSetupForm
+        <OnboardingForm
           open={showSetupForm}
           onOpenChange={setShowSetupForm}
           onSuccess={handleSetupComplete}
+          initialProfile={profile}
+          initialAccount={account}
+          defaultPhone={profile?.phone ?? null}
+          defaultAreaCode={derivedAreaCode}
         />
       </div>
     );
