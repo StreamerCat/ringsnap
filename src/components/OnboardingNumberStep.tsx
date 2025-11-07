@@ -73,21 +73,32 @@ export function OnboardingNumberStep({
         }
       });
 
-      console.log("[OnboardingNumberStep] Response received:", { data, error });
+      console.log("[OnboardingNumberStep] Response received:", {
+        data,
+        error,
+        dataKeys: data ? Object.keys(data) : null,
+        dataStatus: data?.status,
+        dataNumber: data?.number,
+        dataError: data?.error
+      });
 
       if (error) {
         const errorMsg = error.message || "Failed to provision number";
-        console.error("[OnboardingNumberStep] Function error:", errorMsg);
+        console.error("[OnboardingNumberStep] Function invocation error:", {
+          errorMsg,
+          fullError: error
+        });
         throw new Error(errorMsg);
       }
 
       if (!data) {
+        console.error("[OnboardingNumberStep] No data in response");
         throw new Error("No response from provisioning service");
       }
 
       // Handle success - number is immediately active
       if (data.status === "active" && data.number) {
-        console.log("[OnboardingNumberStep] Number activated:", data.number);
+        console.log("[OnboardingNumberStep] ✓ SUCCESS: Number activated:", data.number);
         setPhoneNumber(data.number);
         setPhoneId(data.phoneId);
         setStatus("success");
@@ -96,7 +107,10 @@ export function OnboardingNumberStep({
       }
       // Handle pending - number will be ready soon
       else if (data.status === "pending") {
-        console.log("[OnboardingNumberStep] Number provisioning in background");
+        console.log("[OnboardingNumberStep] ⏳ PENDING: Number provisioning in background", {
+          number: data.number,
+          phoneId: data.phoneId
+        });
         setPhoneNumber(data.number || null);
         setPhoneId(data.phoneId || null);
         setStatus("pending");
@@ -106,7 +120,11 @@ export function OnboardingNumberStep({
       // Handle error response from the function
       else if (data.status === "failed" || data.error) {
         const errorMsg = data.error || "Phone provisioning failed";
-        console.error("[OnboardingNumberStep] Provisioning failed:", errorMsg);
+        console.error("[OnboardingNumberStep] ✗ FAILED: Provisioning failed:", {
+          status: data.status,
+          error: errorMsg,
+          fullResponse: data
+        });
 
         let friendlyMsg = errorMsg;
         if (errorMsg.includes("Invalid area code")) {
@@ -115,28 +133,42 @@ export function OnboardingNumberStep({
           friendlyMsg = "This area code is not currently available. Try nearby codes like 720, 970, or 719.";
         } else if (errorMsg.includes("VAPI") || errorMsg.includes("api")) {
           friendlyMsg = "Unable to connect to provisioning service. Please try again in a moment.";
+        } else if (errorMsg.includes("configured")) {
+          friendlyMsg = "Provisioning service is not properly configured. Please contact support.";
+        } else if (errorMsg.includes("Database")) {
+          friendlyMsg = "Database error occurred. Please try again.";
         }
 
         setErrorMessage(friendlyMsg);
         setStatus("error");
       } else {
-        console.error("[OnboardingNumberStep] Unexpected response status:", data.status);
-        throw new Error("Unexpected response from provisioning service");
+        console.error("[OnboardingNumberStep] ⚠️ UNEXPECTED: Unexpected response status:", {
+          status: data.status,
+          fullResponse: data
+        });
+        throw new Error(`Unexpected response status: ${data.status}`);
       }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "An unexpected error occurred";
-      console.error("[OnboardingNumberStep] Provisioning error:", message, err);
+      console.error("[OnboardingNumberStep] ✗ CATCH: Provisioning error caught:", {
+        message,
+        errorType: err instanceof Error ? err.constructor.name : typeof err,
+        fullError: err
+      });
 
       let friendlyMsg = message;
       if (message.includes("network") || message.includes("fetch")) {
         friendlyMsg = "Network error. Please check your connection and try again.";
       } else if (message.includes("timeout")) {
         friendlyMsg = "Request timed out. Please try again.";
+      } else if (message.includes("Unexpected response")) {
+        friendlyMsg = "Unexpected response from provisioning service. Please try again.";
       } else if (!message.includes("area code") && message.length > 100) {
         friendlyMsg = "Failed to provision number. Please try again.";
       }
 
+      console.error("[OnboardingNumberStep] ✗ CATCH: Using friendly message:", friendlyMsg);
       setErrorMessage(friendlyMsg);
       setStatus("error");
     }
