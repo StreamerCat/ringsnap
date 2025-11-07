@@ -604,19 +604,28 @@ export function OnboardingWizard({
             {currentStep === 3 && (
               <div className="space-y-6">
                 {initialProfile?.accounts?.id ? (
-                  <OnboardingNumberStep
-                    accountId={initialProfile.accounts.id}
-                    onSuccess={(phoneNumber) => {
-                      setPhoneProvisioned(phoneNumber);
-                      setPhoneProvisioningComplete(true);
-                      // Update form with provisioned number
-                      form.setValue("selectedNumber", phoneNumber);
-                    }}
-                    onPending={() => {
-                      // Phone is provisioning in the background
-                      // User can proceed when notified, but for now we'll require success
-                    }}
-                  />
+                  <>
+                    <Alert className="bg-blue-50 border-blue-200">
+                      <AlertCircle className="h-4 w-4 text-blue-600" />
+                      <AlertTitle className="text-blue-900">Last Step</AlertTitle>
+                      <AlertDescription className="text-blue-700">
+                        Enter an area code to provision your business phone number. You can't go back from here, so make sure your business details above are correct.
+                      </AlertDescription>
+                    </Alert>
+                    <OnboardingNumberStep
+                      accountId={initialProfile.accounts.id}
+                      onSuccess={(phoneNumber) => {
+                        setPhoneProvisioned(phoneNumber);
+                        setPhoneProvisioningComplete(true);
+                        // Update form with provisioned number
+                        form.setValue("selectedNumber", phoneNumber);
+                      }}
+                      onPending={() => {
+                        // Phone is provisioning in the background
+                        // User can proceed when notified, but for now we'll require success
+                      }}
+                    />
+                  </>
                 ) : (
                   <Alert variant="destructive">
                     <TriangleAlert className="h-4 w-4" />
@@ -644,7 +653,8 @@ export function OnboardingWizard({
                     type="button"
                     variant="outline"
                     onClick={handleBack}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || currentStep === 3}
+                    title={currentStep === 3 ? "Complete phone provisioning to proceed" : undefined}
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back

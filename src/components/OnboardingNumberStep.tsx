@@ -5,7 +5,7 @@ import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -46,6 +46,7 @@ export function OnboardingNumberStep({
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [phoneId, setPhoneId] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const form = useForm<AreaCodeFormData>({
     resolver: zodResolver(areaCodeSchema),
@@ -60,8 +61,11 @@ export function OnboardingNumberStep({
 
   const provisionNumber = async (areaCode: string) => {
     setStatus("loading");
+    setErrorMessage(null);
 
     try {
+      console.log("[OnboardingNumberStep] Starting provisioning for area code:", areaCode, "account:", accountId);
+
       const { data, error } = await supabase.functions.invoke("provision_number", {
         body: {
           areaCode,
@@ -69,8 +73,12 @@ export function OnboardingNumberStep({
         }
       });
 
+      console.log("[OnboardingNumberStep] Response received:", { data, error });
+
       if (error) {
-        throw new Error(error.message || "Failed to provision number");
+        const errorMsg = error.message || "Failed to provision number";
+        console.error("[OnboardingNumberStep] Function error:", errorMsg);
+        throw new Error(errorMsg);
       }
 
       if (!data) {
@@ -79,38 +87,57 @@ export function OnboardingNumberStep({
 
       // Handle success - number is immediately active
       if (data.status === "active" && data.number) {
+        console.log("[OnboardingNumberStep] Number activated:", data.number);
         setPhoneNumber(data.number);
         setPhoneId(data.phoneId);
         setStatus("success");
+        setErrorMessage(null);
         onSuccess?.(data.number);
       }
       // Handle pending - number will be ready soon
       else if (data.status === "pending") {
+        console.log("[OnboardingNumberStep] Number provisioning in background");
         setPhoneNumber(data.number || null);
         setPhoneId(data.phoneId || null);
         setStatus("pending");
+        setErrorMessage(null);
         onPending?.();
       }
-      // Handle error response
-      else if (data.error) {
-        const errorMsg = data.error.includes("Invalid area code")
-          ? "The area code is invalid. Please enter a valid 3-digit area code (e.g., 303)."
-          : data.error.includes("not available")
-            ? "This area code is not currently available. Try another area code (nearby codes may work better)."
-            : data.error;
+      // Handle error response from the function
+      else if (data.status === "failed" || data.error) {
+        const errorMsg = data.error || "Phone provisioning failed";
+        console.error("[OnboardingNumberStep] Provisioning failed:", errorMsg);
 
-        throw new Error(errorMsg);
+        let friendlyMsg = errorMsg;
+        if (errorMsg.includes("Invalid area code")) {
+          friendlyMsg = "The area code is invalid. Please enter a valid 3-digit area code (e.g., 303).";
+        } else if (errorMsg.includes("not available") || errorMsg.includes("exhausted")) {
+          friendlyMsg = "This area code is not currently available. Try nearby codes like 720, 970, or 719.";
+        } else if (errorMsg.includes("VAPI") || errorMsg.includes("api")) {
+          friendlyMsg = "Unable to connect to provisioning service. Please try again in a moment.";
+        }
+
+        setErrorMessage(friendlyMsg);
+        setStatus("error");
       } else {
+        console.error("[OnboardingNumberStep] Unexpected response status:", data.status);
         throw new Error("Unexpected response from provisioning service");
       }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "An unexpected error occurred";
-      form.setError("areaCode", {
-        message: message.includes("area code")
-          ? "This area code is not available. Try another."
-          : message
-      });
+      console.error("[OnboardingNumberStep] Provisioning error:", message, err);
+
+      let friendlyMsg = message;
+      if (message.includes("network") || message.includes("fetch")) {
+        friendlyMsg = "Network error. Please check your connection and try again.";
+      } else if (message.includes("timeout")) {
+        friendlyMsg = "Request timed out. Please try again.";
+      } else if (!message.includes("area code") && message.length > 100) {
+        friendlyMsg = "Failed to provision number. Please try again.";
+      }
+
+      setErrorMessage(friendlyMsg);
       setStatus("error");
     }
   };
@@ -125,11 +152,21 @@ export function OnboardingNumberStep({
     setStatus("idle");
     setPhoneNumber(null);
     setPhoneId(null);
+    setErrorMessage(null);
     form.reset();
   };
 
   return (
-    <div className="w-full max-w-md space-y-6">
+    <div className="w-full space-y-6">
+      {/* Error Alert - Show at top on all states except success/pending */}
+      {errorMessage && status !== "success" && status !== "pending" && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Provisioning Failed</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+
       {/* Form - Show when idle or error */}
       {(status === "idle" || status === "error") && (
         <Card>
