@@ -37,6 +37,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Loader2, RefreshCw, TriangleAlert, ArrowLeft, Calendar } from "lucide-react";
 import { searchAvailablePhoneNumbers, type NumberSearchResult } from "@/lib/vapiNumberSearch";
+import { OnboardingNumberStep } from "@/components/OnboardingNumberStep";
 import { cn } from "@/lib/utils";
 
 // Validation schemas for each step
@@ -144,6 +145,8 @@ export function OnboardingWizard({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchAttempt, setSearchAttempt] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phoneProvisioned, setPhoneProvisioned] = useState<string | null>(null);
+  const [phoneProvisioningComplete, setPhoneProvisioningComplete] = useState(false);
 
   const searchAbortRef = useRef<AbortController | null>(null);
 
@@ -302,6 +305,10 @@ export function OnboardingWizard({
           connectCalendar: values.connectCalendar
         });
         return true;
+      } else if (step === 4) {
+        // Step 4 (phone provisioning) is validated by the component itself
+        // Just check that phone has been provisioned
+        return phoneProvisioningComplete;
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -388,12 +395,12 @@ export function OnboardingWizard({
 
   const onSubmit = useCallback(
     async (values: WizardFormData) => {
-      const isValid = await validateStep(3);
+      const isValid = await validateStep(4);
       if (isValid) {
         await handleSubmit(values);
       }
     },
-    [handleSubmit]
+    [handleSubmit, phoneProvisioningComplete]
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -403,7 +410,7 @@ export function OnboardingWizard({
     onOpenChange(nextOpen);
   };
 
-  const progressPercent = (currentStep / 3) * 100;
+  const progressPercent = (currentStep / 4) * 100;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -414,12 +421,13 @@ export function OnboardingWizard({
         <DialogHeader className="space-y-4 text-center">
           <div className="flex items-center justify-between">
             <Badge variant="secondary" className="text-sm">
-              Step {currentStep} of 3
+              Step {currentStep} of 4
             </Badge>
             <Badge variant="outline" className="text-xs">
               {currentStep === 1 && "Phone Number"}
               {currentStep === 2 && "Business Details"}
               {currentStep === 3 && "Availability"}
+              {currentStep === 4 && "Provision Number"}
             </Badge>
           </div>
           <Progress value={progressPercent} className="h-2" />
@@ -427,11 +435,13 @@ export function OnboardingWizard({
             {currentStep === 1 && "Choose Your Business Number"}
             {currentStep === 2 && "Tell Us About Your Business"}
             {currentStep === 3 && "Set Your Availability"}
+            {currentStep === 4 && "Activate Your Phone Number"}
           </DialogTitle>
           <DialogDescription>
             {currentStep === 1 && "Search for available phone numbers in your preferred area code"}
             {currentStep === 2 && "Help us personalize your AI assistant"}
             {currentStep === 3 && "Let customers know when you're available (optional)"}
+            {currentStep === 4 && "Finalize your phone number provisioning"}
           </DialogDescription>
         </DialogHeader>
 
@@ -775,6 +785,35 @@ export function OnboardingWizard({
               </div>
             )}
 
+            {/* STEP 4: Phone Provisioning */}
+            {currentStep === 4 && (
+              <div className="space-y-6">
+                {initialProfile?.accounts?.id ? (
+                  <OnboardingNumberStep
+                    accountId={initialProfile.accounts.id}
+                    onSuccess={(phoneNumber) => {
+                      setPhoneProvisioned(phoneNumber);
+                      setPhoneProvisioningComplete(true);
+                      // Update form with provisioned number
+                      form.setValue("selectedNumber", phoneNumber);
+                    }}
+                    onPending={() => {
+                      // Phone is provisioning in the background
+                      // User can proceed when notified, but for now we'll require success
+                    }}
+                  />
+                ) : (
+                  <Alert variant="destructive">
+                    <TriangleAlert className="h-4 w-4" />
+                    <AlertTitle>Account information missing</AlertTitle>
+                    <AlertDescription>
+                      Unable to provision phone number. Please go back and try again.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
             {errorMessage && (
               <Alert variant="destructive">
                 <TriangleAlert className="h-4 w-4" />
@@ -798,7 +837,7 @@ export function OnboardingWizard({
                 )}
               </div>
               <div className="flex gap-2">
-                {currentStep < 3 ? (
+                {currentStep < 4 ? (
                   <Button
                     type="button"
                     onClick={handleContinue}
@@ -809,7 +848,7 @@ export function OnboardingWizard({
                 ) : (
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !phoneProvisioningComplete}
                     className="min-h-[44px] px-8"
                   >
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
