@@ -37,27 +37,28 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Loader2, RefreshCw, TriangleAlert, ArrowLeft, Calendar } from "lucide-react";
 import { searchAvailablePhoneNumbers, type NumberSearchResult } from "@/lib/vapiNumberSearch";
+import { OnboardingNumberStep } from "@/components/OnboardingNumberStep";
 import { cn } from "@/lib/utils";
 
 // Validation schemas for each step
 const step1Schema = z.object({
-  areaCode: z.string().length(3, "Area code must be 3 digits"),
-  selectedNumber: z.string().min(10, "Please select a phone number")
-});
-
-const step2Schema = z.object({
   companyName: z.string().min(2, "Company name is required"),
   trade: z.string().min(1, "Please select your trade"),
   customTrade: z.string().optional(),
   assistantGender: z.enum(["male", "female"])
 });
 
-const step3Schema = z.object({
+const step2Schema = z.object({
   defaultAvailability: z.string().optional(),
   connectCalendar: z.boolean().optional()
 });
 
-// Combined schema for final submission
+const step3Schema = z.object({
+  areaCode: z.string().length(3, "Area code must be 3 digits"),
+  selectedNumber: z.string().min(10, "Please select a phone number")
+});
+
+// Combined schema for final submission (business details + availability + phone)
 const wizardSchema = step1Schema.merge(step2Schema).merge(step3Schema);
 
 type WizardFormData = z.infer<typeof wizardSchema>;
@@ -144,6 +145,8 @@ export function OnboardingWizard({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchAttempt, setSearchAttempt] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phoneProvisioned, setPhoneProvisioned] = useState<string | null>(null);
+  const [phoneProvisioningComplete, setPhoneProvisioningComplete] = useState(false);
 
   const searchAbortRef = useRef<AbortController | null>(null);
 
@@ -151,14 +154,14 @@ export function OnboardingWizard({
     resolver: zodResolver(wizardSchema),
     mode: "onChange",
     defaultValues: {
-      areaCode: "",
-      selectedNumber: "",
       companyName: "",
       trade: "",
       customTrade: "",
       assistantGender: "female",
       defaultAvailability: "",
-      connectCalendar: false
+      connectCalendar: false,
+      areaCode: "",
+      selectedNumber: ""
     }
   });
 
@@ -272,13 +275,7 @@ export function OnboardingWizard({
 
     try {
       if (step === 1) {
-        await step1Schema.parseAsync({
-          areaCode: values.areaCode,
-          selectedNumber: values.selectedNumber
-        });
-        return true;
-      } else if (step === 2) {
-        const step2Data = {
+        const step1Data = {
           companyName: values.companyName,
           trade: values.trade,
           customTrade: values.customTrade,
@@ -294,14 +291,18 @@ export function OnboardingWizard({
           return false;
         }
 
-        await step2Schema.parseAsync(step2Data);
+        await step1Schema.parseAsync(step1Data);
         return true;
-      } else if (step === 3) {
-        await step3Schema.parseAsync({
+      } else if (step === 2) {
+        await step2Schema.parseAsync({
           defaultAvailability: values.defaultAvailability,
           connectCalendar: values.connectCalendar
         });
         return true;
+      } else if (step === 3) {
+        // Step 3 (phone provisioning) is validated by the component itself
+        // Just check that phone has been provisioned
+        return phoneProvisioningComplete;
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -324,11 +325,6 @@ export function OnboardingWizard({
 
     if (!isValid) {
       return;
-    }
-
-    if (currentStep === 1) {
-      // Reserve the selected number
-      setReservedNumber(form.getValues("selectedNumber"));
     }
 
     setCurrentStep(currentStep + 1);
@@ -393,7 +389,7 @@ export function OnboardingWizard({
         await handleSubmit(values);
       }
     },
-    [handleSubmit]
+    [handleSubmit, phoneProvisioningComplete]
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -417,188 +413,28 @@ export function OnboardingWizard({
               Step {currentStep} of 3
             </Badge>
             <Badge variant="outline" className="text-xs">
-              {currentStep === 1 && "Phone Number"}
-              {currentStep === 2 && "Business Details"}
-              {currentStep === 3 && "Availability"}
+              {currentStep === 1 && "Business Details"}
+              {currentStep === 2 && "Availability"}
+              {currentStep === 3 && "Phone Number"}
             </Badge>
           </div>
           <Progress value={progressPercent} className="h-2" />
           <DialogTitle className="text-2xl font-bold">
-            {currentStep === 1 && "Choose Your Business Number"}
-            {currentStep === 2 && "Tell Us About Your Business"}
-            {currentStep === 3 && "Set Your Availability"}
+            {currentStep === 1 && "Tell Us About Your Business"}
+            {currentStep === 2 && "Set Your Availability"}
+            {currentStep === 3 && "Activate Your Phone Number"}
           </DialogTitle>
           <DialogDescription>
-            {currentStep === 1 && "Search for available phone numbers in your preferred area code"}
-            {currentStep === 2 && "Help us personalize your AI assistant"}
-            {currentStep === 3 && "Let customers know when you're available (optional)"}
+            {currentStep === 1 && "Help us personalize your AI assistant"}
+            {currentStep === 2 && "Let customers know when you're available (optional)"}
+            {currentStep === 3 && "Get your local phone number to start taking calls"}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* STEP 1: Phone Number Selection */}
+            {/* STEP 1: Business Details */}
             {currentStep === 1 && (
-              <div className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="areaCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-lg font-semibold">Area Code</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          inputMode="numeric"
-                          pattern="\d*"
-                          maxLength={3}
-                          onChange={(event) => {
-                            const value = event.target.value.replace(/\D/g, "").slice(0, 3);
-                            field.onChange(value);
-                          }}
-                          placeholder="415"
-                          className="text-2xl h-16 text-center font-bold tracking-widest"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Enter the 3-digit area code where you want your business number
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-3 rounded-lg border bg-muted/40 p-6">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-lg">Available Numbers</h4>
-                    {numberSearchState === "loading" && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                    {numberSearchState === "success" && (
-                      <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600">
-                        Ready
-                      </Badge>
-                    )}
-                  </div>
-
-                  {numberSearchState === "idle" && (
-                    <p className="text-sm text-muted-foreground">
-                      Enter a 3-digit area code to preview available numbers.
-                    </p>
-                  )}
-
-                  {numberSearchState === "debouncing" && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Searching for numbers…
-                    </div>
-                  )}
-
-                  {numberSearchState === "loading" && (
-                    <div className="space-y-2">
-                      <Skeleton className="h-20 rounded-md" />
-                      <Skeleton className="h-20 rounded-md" />
-                      <Skeleton className="h-20 rounded-md" />
-                    </div>
-                  )}
-
-                  {numberSearchState === "success" && numberOptions.length > 0 && (
-                    <FormField
-                      control={form.control}
-                      name="selectedNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <RadioGroup value={field.value} onValueChange={field.onChange}>
-                              <div className="space-y-3">
-                                {numberOptions.map((option) => (
-                                  <label
-                                    key={option.id}
-                                    className={cn(
-                                      "flex cursor-pointer items-center gap-4 rounded-md border p-5 text-sm transition-colors hover:border-primary hover:bg-primary/5",
-                                      option.phoneNumber === field.value && "border-primary bg-primary/10"
-                                    )}
-                                  >
-                                    <RadioGroupItem value={option.phoneNumber} id={option.id} />
-                                    <div className="flex flex-col flex-1">
-                                      <span className="text-2xl font-bold tracking-wide">{option.formatted}</span>
-                                      <span className="text-xs text-muted-foreground mt-1">
-                                        Via {option.source || "Vapi"}
-                                      </span>
-                                    </div>
-                                  </label>
-                                ))}
-                              </div>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  {numberSearchState === "empty" && (
-                    <Alert>
-                      <AlertTitle>No numbers available</AlertTitle>
-                      <AlertDescription>
-                        We couldn't find available numbers for this area code. Try a different one.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {numberSearchState === "error" && (
-                    <div className="space-y-3">
-                      <Alert variant="destructive">
-                        <TriangleAlert className="h-4 w-4" />
-                        <AlertTitle>Search failed</AlertTitle>
-                        <AlertDescription>
-                          {numberSearchError || "Unable to search for phone numbers. Please try again."}
-                        </AlertDescription>
-                      </Alert>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={retrySearch}>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Try again
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => form.setValue("areaCode", "")}
-                        >
-                          Clear area code
-                        </Button>
-                      </div>
-
-                      {suggestedAreaCodes.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium uppercase text-muted-foreground">
-                            Try these nearby area codes
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {suggestedAreaCodes.map((code) => (
-                              <Button
-                                key={code}
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleSelectSuggestion(code)}
-                              >
-                                {sanitizeAreaCode(code)}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2: Business Details */}
-            {currentStep === 2 && (
               <div className="space-y-6">
                 <FormField
                   control={form.control}
@@ -720,20 +556,9 @@ export function OnboardingWizard({
               </div>
             )}
 
-            {/* STEP 3: Availability */}
-            {currentStep === 3 && (
+            {/* STEP 2: Availability */}
+            {currentStep === 2 && (
               <div className="space-y-6">
-                {reservedNumber && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <AlertTitle className="text-green-800 font-semibold">
-                      Your Reserved Number
-                    </AlertTitle>
-                    <AlertDescription className="text-green-700 text-lg font-bold mt-2">
-                      {formatNumberReadable(reservedNumber)}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
                 <FormField
                   control={form.control}
                   name="defaultAvailability"
@@ -775,6 +600,35 @@ export function OnboardingWizard({
               </div>
             )}
 
+            {/* STEP 3: Phone Provisioning */}
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                {initialProfile?.accounts?.id ? (
+                  <OnboardingNumberStep
+                    accountId={initialProfile.accounts.id}
+                    onSuccess={(phoneNumber) => {
+                      setPhoneProvisioned(phoneNumber);
+                      setPhoneProvisioningComplete(true);
+                      // Update form with provisioned number
+                      form.setValue("selectedNumber", phoneNumber);
+                    }}
+                    onPending={() => {
+                      // Phone is provisioning in the background
+                      // User can proceed when notified, but for now we'll require success
+                    }}
+                  />
+                ) : (
+                  <Alert variant="destructive">
+                    <TriangleAlert className="h-4 w-4" />
+                    <AlertTitle>Account information missing</AlertTitle>
+                    <AlertDescription>
+                      Unable to provision phone number. Please go back and try again.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
             {errorMessage && (
               <Alert variant="destructive">
                 <TriangleAlert className="h-4 w-4" />
@@ -809,7 +663,7 @@ export function OnboardingWizard({
                 ) : (
                   <Button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !phoneProvisioningComplete}
                     className="min-h-[44px] px-8"
                   >
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
