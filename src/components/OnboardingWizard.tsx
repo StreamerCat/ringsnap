@@ -55,7 +55,7 @@ const step2Schema = z.object({
 
 const step3Schema = z.object({
   areaCode: z.string().length(3, "Area code must be 3 digits"),
-  selectedNumber: z.string().min(10, "Please select a phone number")
+  selectedNumber: z.string().optional().default("")
 });
 
 // Combined schema for final submission (business details + availability + phone)
@@ -614,15 +614,9 @@ export function OnboardingWizard({
                     </Alert>
                     <OnboardingNumberStep
                       accountId={initialProfile.accounts.id}
-                      onSuccess={(phoneNumber) => {
-                        setPhoneProvisioned(phoneNumber);
+                      onSuccess={() => {
+                        // Provisioning initiated - allow wizard to proceed
                         setPhoneProvisioningComplete(true);
-                        // Update form with provisioned number
-                        form.setValue("selectedNumber", phoneNumber);
-                      }}
-                      onPending={() => {
-                        // Phone is provisioning in the background
-                        // User can proceed when notified, but for now we'll require success
                       }}
                     />
                   </>
