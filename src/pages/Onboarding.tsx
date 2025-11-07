@@ -240,18 +240,18 @@ export default function Onboarding() {
     };
   }, [checkAuth]);
 
-  // Show setup form if provisioning status is pending
+  // Show setup form if account needs provisioning
   useEffect(() => {
-    if (account?.provisioning_status === 'pending') {
+    if (account && (!phoneNumber || account.provisioning_status === 'pending' || account.provisioning_status === 'provisioning')) {
       setShowSetupForm(true);
-      dlog("Provisioning pending - showing setup form");
+      dlog("Showing setup form - account exists and needs provisioning", account.provisioning_status);
     } else {
       setShowSetupForm(false);
       if (account) {
-        dlog("Provisioning status", account.provisioning_status);
+        dlog("Account ready - provisioning status", account.provisioning_status);
       }
     }
-  }, [account]);
+  }, [account, phoneNumber]);
 
   const handleSetupComplete = async () => {
     dlog("Setup completed by user - beginning provisioning poll");
@@ -346,8 +346,8 @@ export default function Onboarding() {
     );
   }
 
-  // Show setup form modal if provisioning is pending
-  if (account?.provisioning_status === 'pending') {
+  // Show setup form modal if account needs provisioning
+  if (account && (!phoneNumber || account.provisioning_status === 'pending' || account.provisioning_status === 'provisioning')) {
     dlog("Rendering provisioning setup form");
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted py-12 px-4">
