@@ -64,14 +64,31 @@ export function OnboardingNumberStep({
     setErrorMessage(null);
 
     try {
+      // Validate inputs upfront
+      if (!areaCode || areaCode.length !== 3) {
+        throw new Error("Invalid area code. Must be exactly 3 digits.");
+      }
+
+      if (!accountId) {
+        console.error("[OnboardingNumberStep] CRITICAL: accountId is missing", { accountId });
+        throw new Error("Account ID not found. Please refresh and try again.");
+      }
+
       console.log("[OnboardingNumberStep] Starting provisioning for area code:", areaCode, "account:", accountId);
 
-      const { data, error } = await supabase.functions.invoke("provision_number", {
+      // Add timeout protection - if function takes more than 30 seconds, fail
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Provisioning request timed out. Please try again.")), 30000)
+      );
+
+      const invocationPromise = supabase.functions.invoke("provision_number", {
         body: {
           areaCode,
           accountId
         }
       });
+
+      const { data, error } = await Promise.race([invocationPromise, timeoutPromise]) as any;
 
       console.log("[OnboardingNumberStep] Response received:", {
         data,
@@ -157,14 +174,20 @@ export function OnboardingNumberStep({
         fullError: err
       });
 
+      // Ensure we always have a user-friendly message
       let friendlyMsg = message;
+
       if (message.includes("network") || message.includes("fetch")) {
         friendlyMsg = "Network error. Please check your connection and try again.";
       } else if (message.includes("timeout")) {
         friendlyMsg = "Request timed out. Please try again.";
+      } else if (message.includes("Account ID")) {
+        friendlyMsg = "Account information not found. Please refresh the page and try again.";
+      } else if (message.includes("area code")) {
+        // Keep as-is, already friendly
       } else if (message.includes("Unexpected response")) {
         friendlyMsg = "Unexpected response from provisioning service. Please try again.";
-      } else if (!message.includes("area code") && message.length > 100) {
+      } else if (message.length > 100) {
         friendlyMsg = "Failed to provision number. Please try again.";
       }
 
