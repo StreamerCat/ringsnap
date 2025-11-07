@@ -1014,7 +1014,12 @@ export type Database = {
     }
     Enums: {
       account_role: "owner" | "admin" | "user"
-      staff_role: "platform_owner" | "platform_admin" | "support" | "viewer"
+      staff_role:
+        | "platform_owner"
+        | "platform_admin"
+        | "support"
+        | "viewer"
+        | "sales"
       subscription_status:
         | "trial"
         | "active"
@@ -1149,7 +1154,13 @@ export const Constants = {
   public: {
     Enums: {
       account_role: ["owner", "admin", "user"],
-      staff_role: ["platform_owner", "platform_admin", "support", "viewer"],
+      staff_role: [
+        "platform_owner",
+        "platform_admin",
+        "support",
+        "viewer",
+        "sales",
+      ],
       subscription_status: [
         "trial",
         "active",

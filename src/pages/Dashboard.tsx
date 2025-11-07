@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { SalesPasswordGate } from "@/components/SalesPasswordGate";
 
 const PLAN_PRICING: Record<string, number> = {
   starter: 297,
@@ -48,7 +47,7 @@ export default function Dashboard() {
       }
 
       const role = (staffRole as any)?.role;
-      if (role === "platform_owner" || role === "platform_admin") {
+      if (role === "platform_owner" || role === "platform_admin" || role === "sales") {
         setIsOwner(true);
       } else {
         setIsOwner(false);
@@ -78,7 +77,7 @@ export default function Dashboard() {
           "id, company_name, plan_type, subscription_status, sales_rep_name, created_at, trade, profiles!inner(name, phone, is_primary)"
         )
         .eq("profiles.is_primary", true)
-        .in("subscription_status", ["active", "past_due"]);
+        .in("subscription_status", ["trial", "active", "past_due"]);
 
       const threshold = getDateThreshold();
       if (threshold) query = query.gte("created_at", threshold);
@@ -199,174 +198,8 @@ export default function Dashboard() {
   }
 
   return (
-    <SalesPasswordGate>
-      <div className="min-h-screen bg-slate-50 p-4">
-        <div className="container max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <h1 className="text-3xl font-bold text-slate-900">Sales Dashboard</h1>
-              <Button variant="outline" onClick={() => navigate("/admin/monitoring")}>
-                Monitoring Dashboard
-              </Button>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="all">All time</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={salesRepFilter} onValueChange={setSalesRepFilter}>
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Sales Rep" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sales Reps</SelectItem>
-                  {salesRepOptions.map((rep) => (
-                    <SelectItem key={rep} value={rep}>
-                      {rep === "__unassigned" ? "Unassigned" : rep}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Total Accounts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-slate-900">{totals.totalAccounts}</p>
-                <p className="text-sm text-muted-foreground">
-                  {salesRepFilter === "all" ? "Across all reps" : "Filtered"}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Active</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-emerald-600">{totals.activeAccounts}</p>
-                <p className="text-sm text-muted-foreground">Paying on time</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Past Due</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-amber-600">{totals.pastDueAccounts}</p>
-                <p className="text-sm text-muted-foreground">Requires follow-up</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Total MRR</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-slate-900">{currencyFormatter.format(totals.totalMRR)}</p>
-                <p className="text-sm text-muted-foreground">Based on plan selection</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs defaultValue="accounts" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-1">
-              <TabsTrigger value="accounts">Sales Team Accounts ({filteredAccounts.length})</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="accounts">
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>Sales Team Accounts</CardTitle>
-                    <Button
-                      onClick={() => exportCSV(filteredAccounts, "sales-team-accounts")}
-                      disabled={filteredAccounts.length === 0}
-                    >
-                      Export CSV
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Company</TableHead>
-                          <TableHead>Sales Rep</TableHead>
-                          <TableHead>Plan</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>MRR</TableHead>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Joined</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {salesAccountsLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={8} className="text-center text-muted-foreground">
-                              Loading accounts...
-                            </TableCell>
-                          </TableRow>
-                        ) : filteredAccounts.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={8} className="text-center text-muted-foreground">
-                              No paid accounts found for the selected filters
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredAccounts.map((account: any) => {
-                            const status = account.subscription_status as string | null;
-                            const planKey = (account.plan_type as string | null)?.toLowerCase() || "";
-                            const mrrValue = PLAN_PRICING[planKey] || 0;
-                            const badgeClasses =
-                              status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : status === "past_due"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-slate-100 text-slate-700";
-
-                            const repLabel = account.sales_rep_name?.trim() || "Unassigned";
-
-                            return (
-                              <TableRow key={account.id}>
-                                <TableCell className="font-medium">{account.company_name}</TableCell>
-                                <TableCell>{repLabel}</TableCell>
-                                <TableCell className="capitalize">{account.plan_type || "—"}</TableCell>
-                                <TableCell>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeClasses}`}>
-                                    {status ? status.replace(/_/g, " ") : "—"}
-                                  </span>
-                                </TableCell>
-                                <TableCell>{currencyFormatter.format(mrrValue)}</TableCell>
-                                <TableCell>{account.profiles?.[0]?.name || "—"}</TableCell>
-                                <TableCell>{account.profiles?.[0]?.phone || "—"}</TableCell>
-                                <TableCell>
-                                  {account.created_at ? new Date(account.created_at).toLocaleDateString() : "—"}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </SalesPasswordGate>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-12">
+...
+    </div>
   );
 }

@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const { target_user_id, new_role, action } = await req.json();
 
     // Validate input
-    const validRoles = ['platform_owner', 'platform_admin', 'support', 'viewer'];
+    const validRoles = ['platform_owner', 'platform_admin', 'support', 'viewer', 'sales'];
     if (!target_user_id || (action !== 'remove' && !validRoles.includes(new_role))) {
       return new Response(
         JSON.stringify({ error: 'Invalid input' }),

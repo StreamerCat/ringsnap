@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Mail, Phone, Clock, AlertCircle, Mic, UserCheck } from "lucide-react";
 import { WizardFormData } from "./types";
 
@@ -167,12 +168,18 @@ export const BusinessDetailsStep = ({ form }: BusinessDetailsStepProps) => {
               <UserCheck className="h-4 w-4 text-primary" />
               Sales Rep Name <span className="text-primary">*</span>
             </Label>
-            <Input
-              id="salesRepName"
-              {...form.register("salesRepName")}
-              placeholder="Your name"
-              className="text-base input-focus h-12"
-            />
+            <Select
+              value={form.watch("salesRepName")}
+              onValueChange={(value) => form.setValue("salesRepName", value)}
+            >
+              <SelectTrigger className="h-12">
+                <SelectValue placeholder="Select sales rep" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Chad">Chad</SelectItem>
+                <SelectItem value="Blake">Blake</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
               This will appear in the sales dashboard
             </p>

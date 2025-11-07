@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type StaffRole = 'platform_owner' | 'platform_admin' | 'support' | 'viewer';
+type StaffRole = 'platform_owner' | 'platform_admin' | 'support' | 'viewer' | 'sales';
 
 interface StaffUser {
   id: string;
@@ -284,12 +284,13 @@ const AdminUsers = () => {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="platform_owner">Platform Owner</SelectItem>
-                    <SelectItem value="platform_admin">Platform Admin</SelectItem>
-                    <SelectItem value="support">Support</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                  </SelectContent>
+                      <SelectContent>
+                        <SelectItem value="platform_owner">Platform Owner</SelectItem>
+                        <SelectItem value="platform_admin">Platform Admin</SelectItem>
+                        <SelectItem value="support">Support</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                        <SelectItem value="sales">Sales</SelectItem>
+                      </SelectContent>
                 </Select>
               </div>
               <Button onClick={handleAddStaff} className="w-full">
@@ -353,12 +354,13 @@ const AdminUsers = () => {
                       <SelectTrigger className="w-[180px]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="platform_owner">Platform Owner</SelectItem>
-                        <SelectItem value="platform_admin">Platform Admin</SelectItem>
-                        <SelectItem value="support">Support</SelectItem>
-                        <SelectItem value="viewer">Viewer</SelectItem>
-                      </SelectContent>
+                          <SelectContent>
+                            <SelectItem value="platform_owner">Platform Owner</SelectItem>
+                            <SelectItem value="platform_admin">Platform Admin</SelectItem>
+                            <SelectItem value="support">Support</SelectItem>
+                            <SelectItem value="viewer">Viewer</SelectItem>
+                            <SelectItem value="sales">Sales</SelectItem>
+                          </SelectContent>
                     </Select>
                   </td>
                 </tr>
