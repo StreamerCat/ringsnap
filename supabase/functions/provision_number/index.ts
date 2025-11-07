@@ -149,12 +149,16 @@ serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const log = withLogContext({ functionName: FUNCTION_NAME, correlationId });
 
+  // Log every request for debugging
+  console.log("[provision_number] Request received:", req.method);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     if (req.method !== "POST") {
+      console.error("[provision_number] Wrong method:", req.method);
       return new Response(JSON.stringify({ status: "failed", error: "Method not allowed" }), {
         status: 405,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -164,8 +168,11 @@ serve(async (req) => {
     const body = await req.json();
     const { areaCode, accountId, assistantId, workflowId } = body as ProvisionRequest;
 
+    console.log("[provision_number] Request body:", { areaCode, accountId });
+
     // Validation
     if (!isValidAreaCode(areaCode)) {
+      console.error("[provision_number] Invalid area code:", areaCode);
       log.info("Invalid area code provided", { areaCode });
       return new Response(JSON.stringify({
         status: "failed",
@@ -177,12 +184,14 @@ serve(async (req) => {
     }
 
     if (!accountId || typeof accountId !== "string") {
+      console.error("[provision_number] Invalid accountId:", accountId);
       return new Response(JSON.stringify({ status: "failed", error: "Missing or invalid accountId" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
+    console.log("[provision_number] Validation passed, starting provisioning");
     log.info("Provisioning request started", { areaCode }, accountId);
 
     // Initialize Supabase client
@@ -190,6 +199,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !supabaseKey) {
+      console.error("[provision_number] Supabase credentials missing");
       log.error("Supabase credentials missing");
       return new Response(JSON.stringify({ status: "failed", error: "Server configuration error" }), {
         status: 500,
@@ -199,19 +209,36 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Check VAPI_API_KEY upfront
+    const vapiKey = Deno.env.get("VAPI_API_KEY");
+    if (!vapiKey) {
+      console.error("[provision_number] VAPI_API_KEY not configured");
+      return new Response(JSON.stringify({
+        status: "failed",
+        error: "VAPI_API_KEY not configured. Please contact support."
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    console.log("[provision_number] VAPI_API_KEY found");
+
     // Mark account as provisioning
+    console.log("[provision_number] Updating account status to provisioning");
     const updateRes = await supabase
       .from("accounts")
       .update({ provisioning_status: "provisioning" })
       .eq("id", accountId);
 
     if (updateRes.error) {
+      console.error("[provision_number] Failed to update account:", updateRes.error);
       log.error("Failed to update account status", updateRes.error, { accountId });
       return new Response(JSON.stringify({ status: "failed", error: "Database error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+    console.log("[provision_number] Account status updated");
 
     // Log provisioning start
     await supabase.from("provisioning_logs").insert({
@@ -221,6 +248,7 @@ serve(async (req) => {
     });
 
     // Create phone number on Vapi
+    console.log("[provision_number] Creating phone number on Vapi");
     const { data: created, error: createError } = await createPhoneNumber(
       areaCode,
       assistantId,
@@ -228,7 +256,10 @@ serve(async (req) => {
       log
     );
 
+    console.log("[provision_number] Vapi creation result:", { created, createError });
+
     if (createError || !created?.id) {
+      console.error("[provision_number] Phone creation failed:", createError);
       log.error("Phone creation failed", undefined, { accountId, error: createError });
 
       // Mark as failed
@@ -250,11 +281,16 @@ serve(async (req) => {
     }
 
     const vapiId = created.id;
+    console.log("[provision_number] Phone created on Vapi:", vapiId);
 
     // Poll for activation
+    console.log("[provision_number] Starting polling for phone activation");
     const { data: finalPhone, error: pollError } = await pollPhoneStatus(vapiId, log);
 
+    console.log("[provision_number] Polling result:", { finalPhone, pollError });
+
     if (pollError) {
+      console.warn("[provision_number] Poll ended with error:", pollError);
       log.warn("Poll ended with error", {
         vapiId,
         error: pollError
@@ -262,8 +298,10 @@ serve(async (req) => {
     }
 
     const finalStatus = finalPhone?.status ?? "pending";
+    console.log("[provision_number] Final status:", finalStatus);
 
     // Upsert phone record
+    console.log("[provision_number] Upserting phone record");
     const phoneRecord = {
       account_id: accountId,
       vapi_id: vapiId,
@@ -283,7 +321,10 @@ serve(async (req) => {
       .select()
       .single();
 
+    console.log("[provision_number] Upsert result:", { inserted, upsertError });
+
     if (upsertError) {
+      console.error("[provision_number] Failed to upsert phone record:", upsertError);
       log.error("Failed to upsert phone record", upsertError, { accountId });
       await supabase.from("accounts").update({ provisioning_status: "failed" }).eq("id", accountId);
       return new Response(JSON.stringify({ status: "failed", error: "Database write failed" }), {
@@ -295,6 +336,7 @@ serve(async (req) => {
     // Update account with phone link
     const accountUpdateStatus = finalStatus === "active" ? "active" : "pending";
 
+    console.log("[provision_number] Updating account with phone info");
     await supabase
       .from("accounts")
       .update({
@@ -320,8 +362,11 @@ serve(async (req) => {
       number: finalPhone?.number
     }, accountId);
 
+    console.log("[provision_number] Provisioning complete, returning response");
+
     // Return response
     if (finalStatus === "active") {
+      console.log("[provision_number] Returning active status with number:", finalPhone?.number);
       return new Response(JSON.stringify({
         status: "active",
         phone: finalPhone,
@@ -332,6 +377,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     } else {
+      console.log("[provision_number] Returning pending status");
       return new Response(JSON.stringify({
         status: "pending",
         phone: finalPhone,
@@ -343,6 +389,7 @@ serve(async (req) => {
       });
     }
   } catch (err) {
+    console.error("[provision_number] Unhandled error:", err);
     log.error("Unhandled error in provision_number", err);
     return new Response(JSON.stringify({
       status: "failed",
