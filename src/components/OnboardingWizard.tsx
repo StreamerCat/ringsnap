@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { Loader2, RefreshCw, TriangleAlert, ArrowLeft, Calendar } from "lucide-react";
+import { Loader2, RefreshCw, TriangleAlert, ArrowLeft, Calendar, AlertCircle } from "lucide-react";
 import { searchAvailablePhoneNumbers, type NumberSearchResult } from "@/lib/vapiNumberSearch";
 import { OnboardingNumberStep } from "@/components/OnboardingNumberStep";
 import { cn } from "@/lib/utils";

@@ -1,94 +1,94 @@
-# Welcome to your Lovable project
+# RingSnap AI Receptionist
 
-## Project info
+Professional AI-powered answering service for contractors.
 
-**URL**: https://lovable.dev/projects/e3bd5ae4-7ca2-46a7-8b88-c20c969a023c
+## Project Setup
 
-## How can I edit this code?
+### Prerequisites
+- Node.js 18+ and npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/e3bd5ae4-7ca2-46a7-8b88-c20c969a023c) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to project directory
+cd ringsnap
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Development Scripts
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build for production
+- `npm run build:dev` - Build in development mode
+- `npm run preview` - Preview production build locally
+- `npm run lint` - Run ESLint
 
-**Use GitHub Codespaces**
+## Technology Stack
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Frontend:** React 18 + TypeScript + Vite
+- **UI Components:** shadcn-ui + Radix UI + Tailwind CSS
+- **Backend:** Supabase (Database, Auth, Edge Functions)
+- **Payment Processing:** Stripe
+- **Voice AI:** Vapi.ai
+- **State Management:** TanStack Query
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
+```
+src/
+├── components/         # React components
+│   ├── ui/            # Reusable UI components
+│   └── wizard/        # Signup wizard components
+├── pages/             # Route pages
+├── integrations/      # Third-party integrations
+├── hooks/             # Custom React hooks
+└── lib/              # Utility functions
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+supabase/
+├── functions/         # Edge functions
+└── migrations/        # Database migrations
+```
 
-## How can I deploy this project?
+## Environment Variables
 
-Simply open [Lovable](https://lovable.dev/projects/e3bd5ae4-7ca2-46a7-8b88-c20c969a023c) and click on Share -> Publish.
+Required environment variables are automatically configured via the Supabase integration:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
 
-## Can I connect a custom domain to my Lovable project?
+## Deployment
 
-Yes, you can!
+The application is deployed via the Netlify platform with automatic deployments on push to main branch.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Build Configuration
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Functions directory: `supabase/functions`
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Testing Checklist
 
-## Testing checklist
+1. Fill the signup form with test data
+2. Verify successful account creation in database
+3. Confirm browser redirects to appropriate dashboard
+4. Test phone provisioning workflow
+5. Verify call handling and recording functionality
 
-1. Fill the signup form with test data.
-2. Expect a 200 response containing `{ ok: true, accountId }` from `/.netlify/functions/signup`.
-3. Confirm the browser redirects to `/app` after submission.
-4. Verify in Supabase that the `accounts` and `users` tables include the new trial records with the expected fields.
-5. Ensure Lovable's native database does not contain a duplicate record for the submission.
+## Admin Dashboard
 
-## Admin monitoring dashboard
+Operations and admin users can access the monitoring dashboard at `/admin/monitoring` to review:
+- Provisioning status and failures
+- Call volume and minutes
+- Edge function errors
+- Flagged accounts requiring attention
 
-Operations leads and admins can access a consolidated health dashboard at `/admin/monitoring` (link available from the Sales dashboard header once authenticated as an owner or admin). The page surfaces provisioning health, usage trends, and risk signals pulled from Supabase views optimised for this workflow.
+## Support
 
-### Daily health check routine
-
-1. **Provisioning status cards** – Confirm new accounts are progressing to a `provisioned` state and review any recent failures surfaced in the "Recent provisioning failures" table.
-2. **Call volume & minutes** – Use the time range filter (7/30/90 days or all-time) to ensure total calls and minutes align with expectations. Investigate spikes in cost or average call duration.
-3. **Edge function error feed** – Scan the most recent errors for repeated failures. Escalate critical or high severity issues and capture request IDs for debugging.
-4. **Flagged accounts** – Review accounts with active alerts, provisioning issues, or manual flags. Coordinate follow-up actions with support or sales depending on the flagged reason.
-
-All datasets are powered by the new `admin_*` Supabase views, so downstream teams can also build reports directly against those views if deeper analysis is required.
+For technical issues or questions, contact the development team.
