@@ -178,7 +178,7 @@ serve(async (req) => {
         status: "failed",
         error: "Invalid area code. Must be 3 digits (e.g., 303)."
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -186,7 +186,7 @@ serve(async (req) => {
     if (!accountId || typeof accountId !== "string") {
       console.error("[provision_number] Invalid accountId:", accountId);
       return new Response(JSON.stringify({ status: "failed", error: "Missing or invalid accountId" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -202,7 +202,7 @@ serve(async (req) => {
       console.error("[provision_number] Supabase credentials missing");
       log.error("Supabase credentials missing");
       return new Response(JSON.stringify({ status: "failed", error: "Server configuration error" }), {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -217,7 +217,7 @@ serve(async (req) => {
         status: "failed",
         error: "VAPI_API_KEY not configured. Please contact support."
       }), {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -234,7 +234,7 @@ serve(async (req) => {
       console.error("[provision_number] Failed to update account:", updateRes.error);
       log.error("Failed to update account status", updateRes.error, { accountId });
       return new Response(JSON.stringify({ status: "failed", error: "Database error" }), {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -275,7 +275,7 @@ serve(async (req) => {
         status: "failed",
         error: createError || "Failed to create phone number"
       }), {
-        status: 502,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -328,7 +328,7 @@ serve(async (req) => {
       log.error("Failed to upsert phone record", upsertError, { accountId });
       await supabase.from("accounts").update({ provisioning_status: "failed" }).eq("id", accountId);
       return new Response(JSON.stringify({ status: "failed", error: "Database write failed" }), {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -396,7 +396,7 @@ serve(async (req) => {
       error: "Internal server error",
       details: String(err)
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
