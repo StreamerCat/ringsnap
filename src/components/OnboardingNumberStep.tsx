@@ -16,8 +16,7 @@ import {
   FormMessage
 } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 // Validation schema
 const areaCodeSchema = z.object({
@@ -29,23 +28,16 @@ const areaCodeSchema = z.object({
 
 type AreaCodeFormData = z.infer<typeof areaCodeSchema>;
 
-type ProvisionStatus = "idle" | "loading" | "success" | "pending" | "error";
-
 interface OnboardingNumberStepProps {
   accountId: string;
   onSuccess?: (phoneNumber: string) => void;
-  onPending?: () => void;
 }
 
 export function OnboardingNumberStep({
   accountId,
-  onSuccess,
-  onPending
+  onSuccess
 }: OnboardingNumberStepProps) {
-  const [status, setStatus] = useState<ProvisionStatus>("idle");
-  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
-  const [phoneId, setPhoneId] = useState<string | null>(null);
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const form = useForm<AreaCodeFormData>({
@@ -56,15 +48,12 @@ export function OnboardingNumberStep({
   });
 
   const handleSubmit = async (data: AreaCodeFormData) => {
-    await provisionNumber(data.areaCode);
-  };
-
-  const provisionNumber = async (areaCode: string) => {
     setStatus("loading");
     setErrorMessage(null);
 
     try {
-      // Validate inputs upfront
+      const areaCode = data.areaCode;
+
       if (!areaCode || areaCode.length !== 3) {
         throw new Error("Invalid area code. Must be exactly 3 digits.");
       }
@@ -74,161 +63,65 @@ export function OnboardingNumberStep({
         throw new Error("Account ID not found. Please refresh and try again.");
       }
 
-      console.log("[OnboardingNumberStep] Starting provisioning for area code:", areaCode, "account:", accountId);
+      console.log("[OnboardingNumberStep] Submitting provisioning request for area code:", areaCode, "account:", accountId);
 
-      // Add timeout protection - if function takes more than 30 seconds, fail
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Provisioning request timed out. Please try again.")), 30000)
-      );
-
-      const invocationPromise = supabase.functions.invoke("provision_number", {
+      // Fire off the provisioning request without waiting for completion
+      // It will run in the background and notify via email/SMS when done
+      supabase.functions.invoke("provision_number", {
         body: {
           areaCode,
           accountId
         }
+      }).catch((err) => {
+        console.error("[OnboardingNumberStep] Background provisioning error:", err);
+        // Log but don't fail - provisioning is happening in background anyway
       });
 
-      const { data, error } = await Promise.race([invocationPromise, timeoutPromise]) as any;
+      console.log("[OnboardingNumberStep] ✓ Provisioning initiated in background");
+      setStatus("success");
 
-      console.log("[OnboardingNumberStep] Response received:", {
-        data,
-        error,
-        dataKeys: data ? Object.keys(data) : null,
-        dataStatus: data?.status,
-        dataNumber: data?.number,
-        dataError: data?.error
-      });
+      // Trigger success callback so wizard can complete
+      onSuccess?.("provisioning");
 
-      if (error) {
-        const errorMsg = error.message || "Failed to provision number";
-        console.error("[OnboardingNumberStep] Function invocation error:", {
-          errorMsg,
-          fullError: error
-        });
-        throw new Error(errorMsg);
-      }
-
-      if (!data) {
-        console.error("[OnboardingNumberStep] No data in response");
-        throw new Error("No response from provisioning service");
-      }
-
-      // Handle success - number is immediately active
-      if (data.status === "active" && data.number) {
-        console.log("[OnboardingNumberStep] ✓ SUCCESS: Number activated:", data.number);
-        setPhoneNumber(data.number);
-        setPhoneId(data.phoneId);
-        setStatus("success");
-        setErrorMessage(null);
-        onSuccess?.(data.number);
-      }
-      // Handle pending - number will be ready soon
-      else if (data.status === "pending") {
-        console.log("[OnboardingNumberStep] ⏳ PENDING: Number provisioning in background", {
-          number: data.number,
-          phoneId: data.phoneId
-        });
-        setPhoneNumber(data.number || null);
-        setPhoneId(data.phoneId || null);
-        setStatus("pending");
-        setErrorMessage(null);
-        onPending?.();
-      }
-      // Handle error response from the function
-      else if (data.status === "failed" || data.error) {
-        const errorMsg = data.error || "Phone provisioning failed";
-        console.error("[OnboardingNumberStep] ✗ FAILED: Provisioning failed:", {
-          status: data.status,
-          error: errorMsg,
-          fullResponse: data
-        });
-
-        let friendlyMsg = errorMsg;
-        if (errorMsg.includes("Invalid area code")) {
-          friendlyMsg = "The area code is invalid. Please enter a valid 3-digit area code (e.g., 303).";
-        } else if (errorMsg.includes("not available") || errorMsg.includes("exhausted")) {
-          friendlyMsg = "This area code is not currently available. Try nearby codes like 720, 970, or 719.";
-        } else if (errorMsg.includes("VAPI") || errorMsg.includes("api")) {
-          friendlyMsg = "Unable to connect to provisioning service. Please try again in a moment.";
-        } else if (errorMsg.includes("configured")) {
-          friendlyMsg = "Provisioning service is not properly configured. Please contact support.";
-        } else if (errorMsg.includes("Database")) {
-          friendlyMsg = "Database error occurred. Please try again.";
-        }
-
-        setErrorMessage(friendlyMsg);
-        setStatus("error");
-      } else {
-        console.error("[OnboardingNumberStep] ⚠️ UNEXPECTED: Unexpected response status:", {
-          status: data.status,
-          fullResponse: data
-        });
-        throw new Error(`Unexpected response status: ${data.status}`);
-      }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "An unexpected error occurred";
-      console.error("[OnboardingNumberStep] ✗ CATCH: Provisioning error caught:", {
-        message,
-        errorType: err instanceof Error ? err.constructor.name : typeof err,
-        fullError: err
-      });
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
+      console.error("[OnboardingNumberStep] ✗ Error:", { message, fullError: err });
 
-      // Ensure we always have a user-friendly message
       let friendlyMsg = message;
-
       if (message.includes("network") || message.includes("fetch")) {
         friendlyMsg = "Network error. Please check your connection and try again.";
-      } else if (message.includes("timeout")) {
-        friendlyMsg = "Request timed out. Please try again.";
       } else if (message.includes("Account ID")) {
         friendlyMsg = "Account information not found. Please refresh the page and try again.";
       } else if (message.includes("area code")) {
-        // Keep as-is, already friendly
-      } else if (message.includes("Unexpected response")) {
-        friendlyMsg = "Unexpected response from provisioning service. Please try again.";
+        friendlyMsg = "Area code format is invalid. Please enter a valid 3-digit code.";
       } else if (message.length > 100) {
-        friendlyMsg = "Failed to provision number. Please try again.";
+        friendlyMsg = "Failed to submit provisioning request. Please try again.";
       }
 
-      console.error("[OnboardingNumberStep] ✗ CATCH: Using friendly message:", friendlyMsg);
+      console.error("[OnboardingNumberStep] Using friendly message:", friendlyMsg);
       setErrorMessage(friendlyMsg);
       setStatus("error");
     }
   };
 
-  const handleRetry = async () => {
-    setIsRetrying(true);
-    await provisionNumber(form.getValues("areaCode"));
-    setIsRetrying(false);
-  };
-
-  const handleReset = () => {
-    setStatus("idle");
-    setPhoneNumber(null);
-    setPhoneId(null);
-    setErrorMessage(null);
-    form.reset();
-  };
-
   return (
     <div className="w-full space-y-6">
-      {/* Error Alert - Show at top on all states except success/pending */}
-      {errorMessage && status !== "success" && status !== "pending" && (
+      {/* Error Alert */}
+      {errorMessage && status === "error" && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Provisioning Failed</AlertTitle>
+          <AlertTitle>Error</AlertTitle>
           <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
       )}
 
-      {/* Form - Show when idle or error */}
-      {(status === "idle" || status === "error") && (
+      {/* Form */}
+      {status !== "success" && (
         <Card>
           <CardHeader>
-            <CardTitle>Get your local phone number</CardTitle>
+            <CardTitle>Your Business Phone Number</CardTitle>
             <CardDescription>
-              Enter your preferred area code to provision a number for RingSnap.
+              Enter your preferred area code. We'll provision your number and notify you when it's ready.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -251,7 +144,7 @@ export function OnboardingNumberStep({
                             const value = e.target.value.replace(/\D/g, "").slice(0, 3);
                             field.onChange(value);
                           }}
-                          disabled={form.formState.isSubmitting}
+                          disabled={form.formState.isSubmitting || status === "loading"}
                           className="font-mono text-lg text-center"
                         />
                       </FormControl>
@@ -265,103 +158,46 @@ export function OnboardingNumberStep({
 
                 <Button
                   type="submit"
-                  disabled={form.formState.isSubmitting || form.getValues("areaCode").length !== 3}
+                  disabled={form.formState.isSubmitting || status === "loading" || form.getValues("areaCode").length !== 3}
                   className="w-full"
                 >
-                  {form.formState.isSubmitting ? (
+                  {status === "loading" ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Provisioning...
+                      Submitting...
                     </>
                   ) : (
-                    "Get Number"
+                    "Get My Number"
                   )}
                 </Button>
-
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    💡 Tip: If your preferred area code is not available, try nearby codes like 720,
-                    970, or 719 (for Colorado).
-                  </AlertDescription>
-                </Alert>
               </form>
             </Form>
           </CardContent>
         </Card>
       )}
 
-      {/* Loading State */}
-      {status === "loading" && (
-        <Card>
-          <CardContent className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
-      )}
-
       {/* Success State */}
-      {status === "success" && phoneNumber && (
+      {status === "success" && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-900">Number Ready!</span>
+                <span className="font-medium text-green-900">Number Provisioning Started!</span>
               </div>
-              <div className="space-y-1">
-                <p className="text-sm text-green-700">Your new RingSnap number:</p>
-                <p className="font-mono text-2xl font-bold text-green-900">{phoneNumber}</p>
-              </div>
-              <p className="text-sm text-green-700">
-                You can now forward calls to your RingSnap workspace. Check your email for
-                setup instructions.
-              </p>
-              <Button onClick={handleReset} variant="outline" className="w-full">
-                Provision Another Number
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pending State */}
-      {status === "pending" && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-blue-600 animate-pulse" />
-                <span className="font-medium text-blue-900">Number Provisioning</span>
-              </div>
-              <p className="text-sm text-blue-700">
-                Your phone number is being set up. This usually takes a few minutes. We're
-                finishing the setup in the background.
-              </p>
-              <div className="space-y-2 rounded border border-blue-100 bg-white p-3">
-                <p className="text-xs font-medium text-blue-900">What happens next:</p>
-                <ul className="ml-4 space-y-1 text-xs text-blue-700 list-disc">
-                  <li>We'll send you an email and SMS when your number is ready</li>
-                  <li>
-                    You can close this page and return when you receive the notification
-                  </li>
-                  <li>Set up call forwarding in your workspace settings</li>
-                </ul>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleRetry} disabled={isRetrying} variant="outline" className="flex-1">
-                  {isRetrying ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    "Check Status"
-                  )}
-                </Button>
-                <Button onClick={handleReset} variant="outline" className="flex-1">
-                  Continue Later
-                </Button>
+              <div className="space-y-3 text-sm text-green-700">
+                <p>
+                  We're setting up your business phone number in the background. This usually takes a few minutes.
+                </p>
+                <div className="space-y-2 rounded border border-green-200 bg-white p-3">
+                  <p className="font-medium text-green-900">What happens next:</p>
+                  <ul className="ml-4 space-y-1 list-disc text-green-700">
+                    <li>You'll receive an email with your new phone number</li>
+                    <li>You can also expect an SMS to the number on file</li>
+                    <li>Your dashboard will automatically update with the number</li>
+                    <li>Set up call forwarding from your business line</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </CardContent>
