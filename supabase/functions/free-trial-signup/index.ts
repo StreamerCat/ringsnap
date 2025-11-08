@@ -288,6 +288,32 @@ serve(async (req) => {
       context: { userId: authData.user.id, accountId: accountData.id }
     });
 
+    // Create profile record
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        account_id: accountData.id,
+        name: validatedData.name,
+        phone: validatedData.phone,
+        is_primary: true, // First user is primary
+        source: validatedData.source || 'website',
+      });
+
+    if (profileError) {
+      logError('Profile creation error', {
+        ...baseLogOptions,
+        error: profileError,
+        context: { userId: authData.user.id, accountId: accountData.id }
+      });
+      throw profileError;
+    }
+
+    logInfo('Profile created successfully', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId: accountData.id }
+    });
+
     // Call provision-resources function for VAPI setup
     try {
       const provisionResponse = await supabase.functions.invoke('provision-resources', {
