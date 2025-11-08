@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, Calculator } from "lucide-react";
-import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
+import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
 
 export const MobileFooterCTA = () => {
   const [showCTA, setShowCTA] = useState(false);
@@ -51,8 +51,9 @@ export const MobileFooterCTA = () => {
         </Button>
       </div>
 
-      <FreeTrialSignupForm 
-        open={showSignupForm} 
+      <UnifiedSignupRouter
+        mode="trial"
+        open={showSignupForm}
         onOpenChange={setShowSignupForm}
         source="mobile-footer"
       />

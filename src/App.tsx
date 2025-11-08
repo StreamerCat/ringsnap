@@ -14,6 +14,7 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminUsers from "./pages/AdminUsers";
 import TeamManagement from "./pages/TeamManagement";
+import TrialConfirmation from "./pages/TrialConfirmation";
 // New auth pages
 import AuthLogin from "./pages/AuthLogin";
 import MagicCallback from "./pages/MagicCallback";
@@ -47,6 +48,7 @@ const App = () => (
           <Route path="/salesdash" element={<Dashboard />} />
           <Route path="/dashboard" element={<CustomerDashboard />} />
           <Route path="/dashboard/team" element={<TeamManagement />} />
+          <Route path="/trial-confirmation" element={<TrialConfirmation />} />
           <Route path="/admin/monitoring" element={<AdminMonitoring />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
