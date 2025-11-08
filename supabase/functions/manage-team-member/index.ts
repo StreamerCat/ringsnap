@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { Resend } from 'npm:resend@4.0.0';
 import { corsHeaders } from '../_shared/cors.ts';
+import { buildTeamInviteEmail } from '../_shared/email-templates.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -64,9 +66,13 @@ Deno.serve(async (req) => {
     const { action, email, name, phone, new_role, target_user_id } = await req.json();
 
     if (action === 'invite') {
-      // Create new user
+      // Generate temporary password
+      const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+
+      // Create new user with temp password
       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email,
+        password: tempPassword,
         email_confirm: true,
         user_metadata: { name, phone }
       });
@@ -104,6 +110,45 @@ Deno.serve(async (req) => {
           new_role: new_role || 'member',
           account_id: profile.account_id
         });
+
+      // Get inviter's name
+      const { data: inviterProfile } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+
+      // Get company name
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('company_name')
+        .eq('id', profile.account_id)
+        .single();
+
+      // Send custom invite email
+      try {
+        const inviteEmail = buildTeamInviteEmail({
+          recipientName: name,
+          invitedBy: inviterProfile?.name || 'Your team',
+          companyName: account?.company_name || 'your team',
+          loginLink: `${Deno.env.get("VITE_SUPABASE_URL") || "https://getringsnap.com"}/login`,
+          tempPassword
+        });
+
+        const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+        await resend.emails.send({
+          from: "RingSnap <support@getringsnap.com>",
+          to: email,
+          subject: inviteEmail.subject,
+          html: inviteEmail.html,
+          text: inviteEmail.text
+        });
+
+        console.log(`Team invite email sent to ${email}`);
+      } catch (emailError) {
+        console.error('Error sending invite email:', emailError);
+        // Don't fail the whole request if email fails
+      }
 
       return new Response(
         JSON.stringify({ success: true, user_id: newUser.user.id }),

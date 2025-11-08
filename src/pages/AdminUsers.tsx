@@ -184,8 +184,8 @@ const AdminUsers = () => {
       }
 
       // Send password reset email
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(newStaffEmail, {
-        redirectTo: `${window.location.origin}/onboarding`
+      const { error: resetError } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: newStaffEmail }
       });
 
       if (resetError) {
