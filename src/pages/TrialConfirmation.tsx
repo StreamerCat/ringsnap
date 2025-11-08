@@ -8,7 +8,9 @@ export default function TrialConfirmation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const email = searchParams.get("email");
+  const password = searchParams.get("password");
   const [countdown, setCountdown] = useState(15);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -108,6 +110,39 @@ export default function TrialConfirmation() {
                 </div>
               </div>
             </div>
+
+            {/* Login Credentials (if available) */}
+            {password && (
+              <div className="border-t pt-6 bg-green-50 rounded-lg p-4">
+                <h3 className="font-semibold mb-3 text-gray-900">Your Login Credentials</h3>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-gray-600">Email:</span>
+                    <p className="font-mono font-medium text-gray-900 bg-white px-3 py-2 rounded mt-1">
+                      {email}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Temporary Password:</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="font-mono font-medium text-gray-900 bg-white px-3 py-2 rounded flex-1">
+                        {showPassword ? password : '••••••••••••••••'}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? 'Hide' : 'Show'}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 pt-2 border-t">
+                    💡 Save these credentials! You'll need them to log in. We recommend changing your password after logging in.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Trial Info */}
             <div className="border-t pt-6 bg-blue-50 rounded-lg p-4">
