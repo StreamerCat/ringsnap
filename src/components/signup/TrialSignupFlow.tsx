@@ -119,8 +119,11 @@ export const TrialSignupFlow = ({
   };
 
   const handleSubmit = async () => {
+    console.log("🚀 Starting trial signup submission...");
+
     if (!stripe || !elements || !cardComplete) {
       toast.error("Payment information incomplete");
+      console.error("❌ Missing Stripe elements or card incomplete");
       return;
     }
 
@@ -129,6 +132,8 @@ export const TrialSignupFlow = ({
     try {
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) throw new Error("Card element not found");
+
+      console.log("💳 Creating Stripe payment method...");
 
       // Create payment method
       const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
@@ -142,10 +147,18 @@ export const TrialSignupFlow = ({
       });
 
       if (stripeError) {
+        console.error("❌ Stripe error:", stripeError);
         setCardError(stripeError.message || "Payment method creation failed");
         toast.error(stripeError.message || "Payment failed");
         return;
       }
+
+      console.log("✅ Payment method created:", paymentMethod.id);
+      console.log("📞 Calling edge function with data:", {
+        email: form.getValues("email"),
+        planType: form.getValues("planType"),
+        source
+      });
 
       // Call edge function
       const { data, error } = await supabase.functions.invoke('free-trial-signup', {
@@ -156,33 +169,73 @@ export const TrialSignupFlow = ({
         },
       });
 
-      if (error) throw error;
+      console.log("📦 Edge function response:", { data, error });
 
-      toast.success("Trial started successfully!");
+      // Handle error response
+      if (error) {
+        console.error("❌ Edge function error:", error);
 
-      if (onSuccess) {
-        onSuccess(data);
-      } else {
-        // Redirect to confirmation page
-        window.location.href = `/trial-confirmation?email=${encodeURIComponent(data.email)}`;
+        // Extract error message from various possible formats
+        let errorMessage = "Signup failed. Please try again.";
+
+        // Try to parse error from context
+        if (error.context?.body) {
+          try {
+            const errorBody = JSON.parse(error.context.body);
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // If parsing fails, try to use the body as string
+            if (typeof error.context.body === 'string' && error.context.body.length < 200) {
+              errorMessage = error.context.body;
+            }
+          }
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        // Customize messages based on error content
+        if (errorMessage.includes("Trial limit") || errorMessage.includes("rate limit")) {
+          errorMessage = "Trial limit reached. You can only create 3 trials per location in 30 days. Contact support@getringsnap.com for assistance.";
+        } else if (errorMessage.includes("phone number")) {
+          errorMessage = "This phone number was recently used for a trial. Please use a different number or contact support.";
+        } else if (errorMessage.includes("disposable") || errorMessage.includes("valid business or personal email")) {
+          errorMessage = "Please use a valid business or personal email address.";
+        }
+
+        toast.error(errorMessage, { duration: 6000 });
+        throw new Error(errorMessage);
       }
+
+      // Success - validate we have data
+      if (!data || !data.email) {
+        console.error("❌ Missing data from signup:", data);
+        toast.error("Signup completed but missing confirmation data. Please contact support.");
+        throw new Error("Invalid response from server");
+      }
+
+      console.log("✅ Trial signup successful! User:", data.email);
+      toast.success("Trial started successfully! Redirecting...", { duration: 3000 });
+
+      // Redirect to confirmation page
+      console.log("🔄 Redirecting to confirmation page in 1 second...");
+      setTimeout(() => {
+        const redirectUrl = `/trial-confirmation?email=${encodeURIComponent(data.email)}`;
+        console.log("🔄 Redirecting to:", redirectUrl);
+
+        if (onSuccess) {
+          console.log("✅ Calling onSuccess callback");
+          onSuccess(data);
+        } else {
+          console.log("✅ Navigating to confirmation page");
+          window.location.href = redirectUrl;
+        }
+      }, 1000);
+
     } catch (error: any) {
-      console.error("Trial signup error:", error);
-
-      // Handle specific error types
-      let errorMessage = "Signup failed. Please try again.";
-
-      if (error.message?.includes("429") || error.message?.includes("rate limit") || error.message?.includes("Trial limit")) {
-        errorMessage = "Trial limit reached for this location. Please contact support at support@getringsnap.com";
-      } else if (error.message?.includes("phone number")) {
-        errorMessage = "This phone number was recently used. Please use a different number or contact support.";
-      } else if (error.message?.includes("email")) {
-        errorMessage = "Please use a valid business or personal email address.";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      toast.error(errorMessage);
+      console.error("❌ Trial signup error:", error);
+      // Error already displayed via toast above
     } finally {
       setIsSubmitting(false);
     }
@@ -348,16 +401,17 @@ export const TrialSignupFlow = ({
               <SignupButton
                 onClick={handleSubmit}
                 isLoading={isSubmitting}
-                disabled={!cardComplete || !form.watch("acceptTerms")}
+                disabled={isSubmitting || !cardComplete || !form.watch("acceptTerms")}
                 className="w-full"
               >
-                Start My Free Trial
+                {isSubmitting ? "Processing..." : "Start My Free Trial"}
               </SignupButton>
               <SignupButton
                 type="button"
                 onClick={handleBack}
                 variant="outline"
                 className="w-full"
+                disabled={isSubmitting}
               >
                 Back
               </SignupButton>
