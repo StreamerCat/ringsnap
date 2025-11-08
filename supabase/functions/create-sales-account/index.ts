@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { getAreaCodeFromZip, getStateFromZip } from "../_shared/area-code-lookup.ts";
 
 const FUNCTION_NAME = "create-sales-account";
 
@@ -48,6 +49,7 @@ serve(async (req) => {
       assistantGender: z.enum(['female', 'male']).optional(),
       salesRepName: z.string().max(100).optional(),
       planType: z.string(),
+      referralCode: z.string().length(8).optional().or(z.literal('')),
     });
 
     const salesAccountSchema = z.object({
@@ -202,6 +204,11 @@ serve(async (req) => {
 
     if (profile?.account_id) {
       currentAccountId = profile.account_id;
+
+      // Convert ZIP code to area code and extract state
+      const areaCode = customerInfo.zipCode ? getAreaCodeFromZip(customerInfo.zipCode) : null;
+      const billingState = customerInfo.zipCode ? getStateFromZip(customerInfo.zipCode) : null;
+
       await supabaseAdmin
         .from('accounts')
         .update({
@@ -213,7 +220,8 @@ serve(async (req) => {
           emergency_policy: customerInfo.emergencyPolicy,
           plan_type: customerInfo.planType,
           subscription_status: 'active',
-          phone_number_area_code: customerInfo.zipCode || null
+          phone_number_area_code: areaCode,
+          billing_state: billingState
         })
         .eq('id', profile.account_id);
 
@@ -230,6 +238,55 @@ serve(async (req) => {
 
     if (!profile?.account_id) {
       throw new Error('Account record not found after user creation');
+    }
+
+    // Step 5.5: Handle referral code if provided
+    if (customerInfo.referralCode && customerInfo.referralCode.length === 8) {
+      try {
+        // Look up the referral code to find the referrer
+        const { data: referralCodeData } = await supabaseAdmin
+          .from('referral_codes')
+          .select('account_id, code')
+          .eq('code', customerInfo.referralCode)
+          .single();
+
+        if (referralCodeData) {
+          // Create referral tracking record
+          await supabaseAdmin
+            .from('referrals')
+            .insert({
+              referrer_account_id: referralCodeData.account_id,
+              referee_account_id: profile.account_id,
+              referral_code: customerInfo.referralCode,
+              referee_email: customerInfo.email,
+              referee_phone: customerInfo.phone,
+              status: 'converted', // Sales signups are immediately converted
+              converted_at: new Date().toISOString()
+            });
+
+          logInfo('Referral tracked', {
+            ...baseLogOptions,
+            accountId: profile.account_id,
+            context: {
+              referralCode: customerInfo.referralCode,
+              referrerAccountId: referralCodeData.account_id
+            }
+          });
+        } else {
+          logInfo('Referral code not found, skipping tracking', {
+            ...baseLogOptions,
+            accountId: profile.account_id,
+            context: { referralCode: customerInfo.referralCode }
+          });
+        }
+      } catch (referralError) {
+        // Log but don't fail the signup
+        logError('Referral tracking failed (non-critical)', {
+          ...baseLogOptions,
+          accountId: profile.account_id,
+          error: referralError
+        });
+      }
     }
 
     // Step 6: Provision resources immediately (phone number + assistant)
@@ -305,7 +362,7 @@ serve(async (req) => {
         subscriptionId,
         tempPassword,
         subscriptionStatus: 'active',
-        vapiPhoneNumber,
+        ringSnapNumber: vapiPhoneNumber,
         vapiAssistantId,
         provisioned: provisioningSucceeded && !!vapiPhoneNumber
       }),
