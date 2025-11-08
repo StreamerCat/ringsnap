@@ -30,10 +30,7 @@ export const UnifiedSignupRouter = ({
           onSuccess={onSuccess}
         />
       ) : (
-        <SalesSignupWizard
-          open={open}
-          onOpenChange={onOpenChange || (() => {})}
-        />
+        <SalesSignupWizard />
       )}
     </Elements>
   );
