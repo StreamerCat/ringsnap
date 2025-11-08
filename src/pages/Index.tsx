@@ -56,7 +56,7 @@ const Index = () => {
       "worstRating": "1"
     },
     
-    "image": "https://aivoiceagent.com/og-image.jpg",
+    "image": "https://www.getringsnap.com/assets/social/ringsnap-og.jpg",
     "featureList": [
       "Answers in under 1 second",
       "Books appointments automatically",
@@ -73,10 +73,10 @@ const Index = () => {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "RingSnap",
-    "alternateName": "AI Voice Agent",
+    "alternateName": "RingSnap AI Answering Service",
     "description": "AI answering service that sounds human. Made for contractors who never want to miss a call.",
-    "url": "https://aivoiceagent.com",
-    "logo": "https://aivoiceagent.com/logo.png",
+    "url": "https://www.getringsnap.com",
+    "logo": "https://www.getringsnap.com/assets/RS_logo_color.svg",
     "slogan": "Made to sound human",
     "contactPoint": {
       "@type": "ContactPoint",
@@ -89,11 +89,11 @@ const Index = () => {
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "AI Voice Agent",
-    "url": "https://aivoiceagent.com",
+    "name": "RingSnap",
+    "url": "https://www.getringsnap.com",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://aivoiceagent.com/search?q={search_term_string}",
+      "target": "https://www.getringsnap.com/search?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };
@@ -149,20 +149,20 @@ const Index = () => {
           name="keywords" 
           content="AI answering service, contractor receptionist, human-sounding AI, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, AI voice agent, warm AI assistant" 
         />
-        <link rel="canonical" href="https://aivoiceagent.com/" />
+        <link rel="canonical" href="https://www.getringsnap.com/" />
         
         {/* Open Graph */}
         <meta property="og:title" content="RingSnap: AI that Answers Like a Human" />
         <meta property="og:description" content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://aivoiceagent.com/" />
-        <meta property="og:image" content="https://aivoiceagent.com/og-image.jpg" />
+        <meta property="og:url" content="https://www.getringsnap.com/" />
+        <meta property="og:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
         
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="RingSnap: AI that Answers Like a Human" />
         <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. AI that sounds warm and human." />
-        <meta name="twitter:image" content="https://aivoiceagent.com/og-image.jpg" />
+        <meta name="twitter:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
         
         {/* Structured Data */}
         <script type="application/ld+json">
