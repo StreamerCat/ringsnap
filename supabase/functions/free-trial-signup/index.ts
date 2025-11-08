@@ -4,6 +4,7 @@ import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber, isValidZipCode } from "../_shared/validators.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 
 const FUNCTION_NAME = "free-trial-signup";
 
@@ -38,6 +39,8 @@ serve(async (req) => {
       assistantGender: z.enum(['female', 'male']).optional(),
       referralCode: z.string().max(50).optional(),
       source: z.string().max(100).optional(),
+      planType: z.enum(['starter', 'professional', 'premium']),
+      paymentMethodId: z.string().min(1, 'Payment method required'),
     });
 
     const rawData = await req.json();
@@ -193,6 +196,134 @@ serve(async (req) => {
       context: { userId: authData.user.id, email }
     });
 
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+      apiVersion: '2023-10-16',
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+
+    // Create Stripe customer
+    const customer = await stripe.customers.create({
+      email: validatedData.email,
+      name: validatedData.name,
+      phone: validatedData.phone,
+      payment_method: validatedData.paymentMethodId,
+      invoice_settings: {
+        default_payment_method: validatedData.paymentMethodId,
+      },
+      metadata: {
+        company_name: finalCompanyName,
+        source: validatedData.source || 'website',
+        trade: validatedData.trade || '',
+        user_id: authData.user.id,
+      },
+    });
+
+    logInfo('Stripe customer created', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, customerId: customer.id }
+    });
+
+    // Get price ID for selected plan
+    const priceIds = {
+      starter: Deno.env.get('STRIPE_PRICE_STARTER'),
+      professional: Deno.env.get('STRIPE_PRICE_PROFESSIONAL'),
+      premium: Deno.env.get('STRIPE_PRICE_PREMIUM'),
+    };
+
+    const selectedPriceId = priceIds[validatedData.planType];
+    if (!selectedPriceId) {
+      throw new Error(`Price ID not configured for plan: ${validatedData.planType}`);
+    }
+
+    // Create subscription with 3-day trial
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: selectedPriceId }],
+      trial_period_days: 3,
+      payment_behavior: 'default_incomplete',
+      metadata: {
+        user_id: authData.user.id,
+        trial_signup: 'true',
+        source: validatedData.source || 'website',
+      },
+    });
+
+    logInfo('Stripe subscription created', {
+      ...baseLogOptions,
+      context: {
+        userId: authData.user.id,
+        subscriptionId: subscription.id,
+        planType: validatedData.planType
+      }
+    });
+
+    // Create account record
+    const { data: accountData, error: accountError } = await supabase
+      .from('accounts')
+      .insert({
+        name: finalCompanyName,
+        owner_id: authData.user.id,
+        stripe_customer_id: customer.id,
+        stripe_subscription_id: subscription.id,
+        plan_type: validatedData.planType,
+        subscription_status: 'trialing',
+        trial_start_date: new Date().toISOString(),
+        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select()
+      .single();
+
+    if (accountError) {
+      logError('Account creation error', {
+        ...baseLogOptions,
+        error: accountError,
+        context: { userId: authData.user.id }
+      });
+      throw accountError;
+    }
+
+    logInfo('Account created successfully', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId: accountData.id }
+    });
+
+    // Call provision-resources function for VAPI setup
+    try {
+      const provisionResponse = await supabase.functions.invoke('provision-resources', {
+        body: {
+          account_id: accountData.id,
+          user_id: authData.user.id,
+          email: validatedData.email,
+          name: validatedData.name,
+          phone: validatedData.phone,
+          company_name: finalCompanyName,
+          trade: validatedData.trade,
+          assistant_gender: validatedData.assistantGender || 'female',
+          wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
+        },
+      });
+
+      if (provisionResponse.error) {
+        logWarn('VAPI provisioning failed but signup completed', {
+          ...baseLogOptions,
+          error: provisionResponse.error,
+          context: { accountId: accountData.id }
+        });
+      } else {
+        logInfo('VAPI resources provisioned successfully', {
+          ...baseLogOptions,
+          context: { accountId: accountData.id }
+        });
+      }
+    } catch (provisionError) {
+      logWarn('VAPI provisioning error but signup completed', {
+        ...baseLogOptions,
+        error: provisionError,
+        context: { accountId: accountData.id }
+      });
+    }
+
     // Log successful signup
     await supabase.from('signup_attempts').insert({
       email,
@@ -203,12 +334,17 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         ok: true,
         user_id: authData.user.id,
+        account_id: accountData.id,
         email: email,
-        password: password, // Return password for instant login
-        message: 'Trial signup successful. Redirecting to onboarding...'
+        password: password,
+        stripe_customer_id: customer.id,
+        subscription_id: subscription.id,
+        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        plan_type: validatedData.planType,
+        message: "Trial started! No charge for 3 days."
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

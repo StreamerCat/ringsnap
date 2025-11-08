@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import logo from "@/assets/RS_logo_color.svg";
-import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
+import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
 
 export const ContractorHero = () => {
   const [showSignupForm, setShowSignupForm] = useState(false);
@@ -141,8 +141,9 @@ export const ContractorHero = () => {
           
         </div>
 
-        <FreeTrialSignupForm 
-          open={showSignupForm} 
+        <UnifiedSignupRouter
+          mode="trial"
+          open={showSignupForm}
           onOpenChange={setShowSignupForm}
           source="hero"
         />

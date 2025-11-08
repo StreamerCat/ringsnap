@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Check, Zap, Phone, Crown, Calculator, CheckCircle, Clock, Lock, Star, PhoneCall } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
+import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
 
 export const ContractorPricing = () => {
   const [showSignupForm, setShowSignupForm] = useState(false);
@@ -371,8 +371,9 @@ export const ContractorPricing = () => {
           </div>
         </div>
 
-        <FreeTrialSignupForm 
-          open={showSignupForm} 
+        <UnifiedSignupRouter
+          mode="trial"
+          open={showSignupForm}
           onOpenChange={setShowSignupForm}
           source="pricing"
         />

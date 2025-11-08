@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign } from "lucide-react";
 import Vapi from "@vapi-ai/web";
 import { useEffect, useRef, useState } from "react";
-import { FreeTrialSignupForm } from "./FreeTrialSignupForm";
+import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
   const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
@@ -287,7 +287,7 @@ export const SolutionDemo = () => {
           </Button>
         </div>
 
-        <FreeTrialSignupForm open={showSignupForm} onOpenChange={setShowSignupForm} source="solution-demo" />
+        <UnifiedSignupRouter mode="trial" open={showSignupForm} onOpenChange={setShowSignupForm} source="solution-demo" />
 
         {/* Outcome Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
