@@ -16,9 +16,10 @@ type StaffRole = 'platform_owner' | 'platform_admin' | 'support' | 'viewer' | 's
 interface StaffUser {
   id: string;
   email: string;
-  role: StaffRole | null;
+  role: StaffRole;
+  name: string;
+  phone: string;
   created_at: string;
-  profile_name?: string;
 }
 
 const AdminUsers = () => {
@@ -68,39 +69,12 @@ const AdminUsers = () => {
     try {
       setLoading(true);
 
-      // Get all staff roles with user info
-      const { data: staffRoles, error: rolesError } = await supabase
-        .from('staff_roles' as any)
-        .select('user_id, role, created_at');
+      // Call edge function to get staff users
+      const { data, error } = await supabase.functions.invoke('list-staff-users');
 
-      if (rolesError) throw rolesError;
+      if (error) throw error;
 
-      // Get auth users and profiles for these staff members
-      const userIds = staffRoles?.map((r: any) => r.user_id) || [];
-      
-      const { data: { users: authUsers }, error: usersError } = await supabase.auth.admin.listUsers();
-      if (usersError) throw usersError;
-
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .in('id', userIds);
-
-      // Combine data
-      const staffUsers: StaffUser[] = (staffRoles || []).map((staffRole: any) => {
-        const authUser = authUsers.find((u: any) => u.id === staffRole.user_id);
-        const profile = profiles?.find((p: any) => p.id === staffRole.user_id);
-        
-        return {
-          id: staffRole.user_id,
-          email: authUser?.email || 'Unknown',
-          role: staffRole.role as StaffRole,
-          created_at: staffRole.created_at,
-          profile_name: profile?.name
-        };
-      });
-
-      setUsers(staffUsers);
+      setUsers(data.users || []);
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -152,55 +126,21 @@ const AdminUsers = () => {
         return;
       }
 
-      // Create auth user
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email: newStaffEmail,
-        email_confirm: true,
-        user_metadata: { name: newStaffName }
-      });
-
-      if (createError) throw createError;
-
-      // Create staff role
-      const { error: roleError } = await supabase
-        .from('staff_roles' as any)
-        .insert({
-          user_id: newUser.user.id,
+      // Call edge function to create staff user
+      const { data, error } = await supabase.functions.invoke('create-staff-user', {
+        body: {
+          email: newStaffEmail,
+          name: newStaffName || newStaffEmail.split('@')[0],
           role: newStaffRole
-        });
-
-      if (roleError) throw roleError;
-
-      // Optionally create profile (without account_id)
-      if (newStaffName) {
-        await supabase
-          .from('profiles')
-          .insert({
-            id: newUser.user.id,
-            name: newStaffName,
-            phone: '',
-            account_id: null
-          });
-      }
-
-      // Send password reset email
-      const { error: resetError } = await supabase.functions.invoke('send-password-reset', {
-        body: { email: newStaffEmail }
+        }
       });
 
-      if (resetError) {
-        console.error("Failed to send password reset email:", resetError);
-        toast({
-          title: "Warning",
-          description: `Staff member added, but failed to send password reset email. Please send manually.`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: `Staff member ${newStaffName || newStaffEmail} added. Password reset email sent to ${newStaffEmail}`,
-        });
-      }
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Staff member ${newStaffName || newStaffEmail} added. Password reset email sent to ${newStaffEmail}`,
+      });
 
       setAddDialogOpen(false);
       setNewStaffEmail('');
@@ -217,8 +157,7 @@ const AdminUsers = () => {
     }
   };
 
-  const getRoleBadgeVariant = (role: StaffRole | null) => {
-    if (!role) return "secondary";
+  const getRoleBadgeVariant = (role: StaffRole) => {
     switch (role) {
       case 'platform_owner': return "default";
       case 'platform_admin': return "default";
@@ -335,11 +274,11 @@ const AdminUsers = () => {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-b last:border-0">
-                  <td className="p-4">{user.profile_name || '-'}</td>
+                  <td className="p-4">{user.name || '-'}</td>
                   <td className="p-4">{user.email}</td>
                   <td className="p-4">
                     <Badge variant={getRoleBadgeVariant(user.role)}>
-                      {user.role?.replace('_', ' ').toUpperCase() || 'No Role'}
+                      {user.role.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </td>
                   <td className="p-4">
@@ -347,7 +286,7 @@ const AdminUsers = () => {
                   </td>
                   <td className="p-4">
                     <Select
-                      value={user.role || 'viewer'}
+                      value={user.role}
                       onValueChange={(value) => handleRoleChange(user.id, value as StaffRole)}
                       disabled={updatingUser === user.id}
                     >

@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { Resend } from 'npm:resend@4.0.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { buildTeamInviteEmail } from '../_shared/email-templates.ts';
+import { sendEmail } from '../_shared/resend-client.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -135,8 +135,7 @@ Deno.serve(async (req) => {
           tempPassword
         });
 
-        const resend = new Resend(Deno.env.get("RESEND_PROD_KEY"));
-        await resend.emails.send({
+        await sendEmail(Deno.env.get("RESEND_PROD_KEY")!, {
           from: "RingSnap <support@getringsnap.com>",
           to: email,
           subject: inviteEmail.subject,

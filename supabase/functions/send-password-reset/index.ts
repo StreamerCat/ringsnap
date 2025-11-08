@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@4.0.0";
 import { buildPasswordResetEmail } from "../_shared/email-templates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendEmail } from "../_shared/resend-client.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -49,8 +49,7 @@ serve(async (req) => {
     });
 
     // Send via Resend
-    const resend = new Resend(Deno.env.get("RESEND_PROD_KEY"));
-    await resend.emails.send({
+    await sendEmail(Deno.env.get("RESEND_PROD_KEY")!, {
       from: "RingSnap <support@getringsnap.com>",
       to: email,
       subject: emailContent.subject,
