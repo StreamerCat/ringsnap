@@ -89,13 +89,25 @@ export const TrialSignupFlow = ({
     }
   }, [phone, setValue]);
 
+  // Watch for planType changes
+  useEffect(() => {
+    const subscription = watch((value, { name }) => {
+      if (name === 'planType') {
+        console.log("📋 planType changed to:", value.planType);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
       case 1:
         const leadResult = await form.trigger(['name', 'email', 'phone', 'companyName']);
         return leadResult;
       case 2:
-        return !!planType;
+        const currentPlanType = form.getValues("planType");
+        console.log("📋 Validating step 2 - planType:", currentPlanType);
+        return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
       case 3:
         return cardComplete && form.getValues("acceptTerms");
       default:
@@ -120,6 +132,15 @@ export const TrialSignupFlow = ({
 
   const handleSubmit = async () => {
     console.log("🚀 Starting trial signup submission...");
+
+    // Validate required fields before proceeding
+    const formValues = form.getValues();
+    if (!formValues.planType) {
+      toast.error("Please select a plan");
+      console.error("❌ Missing planType");
+      setCurrentStep(2); // Go back to plan selection
+      return;
+    }
 
     if (!stripe || !elements || !cardComplete) {
       toast.error("Payment information incomplete");
@@ -162,8 +183,16 @@ export const TrialSignupFlow = ({
         source,
       };
 
-      console.log("📞 Calling edge function with full body:", requestBody);
-      console.log("📞 Form values:", form.getValues());
+      // DETAILED LOGGING FOR DEBUGGING
+      console.log("📞 Calling edge function with request body:");
+      console.log("  - name:", requestBody.name);
+      console.log("  - email:", requestBody.email);
+      console.log("  - phone:", requestBody.phone);
+      console.log("  - companyName:", requestBody.companyName);
+      console.log("  - planType:", requestBody.planType, "(type:", typeof requestBody.planType, ")");
+      console.log("  - paymentMethodId:", requestBody.paymentMethodId);
+      console.log("  - acceptTerms:", requestBody.acceptTerms);
+      console.log("  - source:", requestBody.source);
 
       // Call edge function
       const { data, error } = await supabase.functions.invoke('free-trial-signup', {
@@ -226,24 +255,45 @@ export const TrialSignupFlow = ({
         // For 400 errors (validation)
         else if (statusCode === 400 && error.context?.body) {
           try {
-            const errorBody = typeof error.context.body === 'string'
-              ? JSON.parse(error.context.body)
-              : error.context.body;
+            let errorBody;
+
+            // Handle ReadableStream
+            if (error.context.body instanceof ReadableStream) {
+              const reader = error.context.body.getReader();
+              const decoder = new TextDecoder();
+              let bodyText = '';
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                bodyText += decoder.decode(value, { stream: true });
+              }
+
+              errorBody = JSON.parse(bodyText);
+            }
+            // Handle string
+            else if (typeof error.context.body === 'string') {
+              errorBody = JSON.parse(error.context.body);
+            }
+            // Handle already parsed object
+            else {
+              errorBody = error.context.body;
+            }
 
             console.error("❌ Parsed 400 error body:", errorBody);
 
             if (errorBody.error) {
               errorMessage = errorBody.error;
             } else if (errorBody.details) {
-              errorMessage = `Validation error: ${JSON.stringify(errorBody.details)}`;
-            } else if (typeof errorBody === 'string') {
-              errorMessage = errorBody;
+              // Format Zod validation errors
+              const details = Array.isArray(errorBody.details)
+                ? errorBody.details.map((d: any) => `${d.path?.join('.')}: ${d.message}`).join(', ')
+                : JSON.stringify(errorBody.details);
+              errorMessage = `Validation error: ${details}`;
             }
           } catch (e) {
             console.error("Failed to parse 400 error body:", e);
-            if (typeof error.context.body === 'string') {
-              errorMessage = error.context.body;
-            }
+            errorMessage = "Invalid form data. Please check all fields and try again.";
           }
         }
         // Try to parse error from response body for other status codes
@@ -274,7 +324,14 @@ export const TrialSignupFlow = ({
         }
 
         // Additional customization based on error content
-        if (errorMessage.includes("email") && (errorMessage.includes("already") || errorMessage.includes("registered") || errorMessage.includes("exists"))) {
+        if (errorMessage.includes("planType") || errorMessage.includes("plan")) {
+          errorMessage = "Please select a valid plan. Go back to step 2 and choose your plan.";
+          setCurrentStep(2); // Navigate back to plan selection
+        }
+        else if (errorMessage.includes("paymentMethodId") || errorMessage.includes("payment method")) {
+          errorMessage = "Payment method is missing. Please re-enter your card details.";
+        }
+        else if (errorMessage.includes("email") && (errorMessage.includes("already") || errorMessage.includes("registered") || errorMessage.includes("exists"))) {
           errorMessage = "An account with this email already exists. Please sign in or use a different email address.";
         }
         else if (errorMessage.includes("phone number") || errorMessage.includes("Phone number")) {
@@ -291,6 +348,9 @@ export const TrialSignupFlow = ({
         }
         else if (errorMessage.includes("timeout") || errorMessage.includes("network")) {
           errorMessage = "Connection timeout. Please check your internet and try again.";
+        }
+        else if (errorMessage.includes("Invalid input data")) {
+          errorMessage = "Some form fields are invalid. Please review and try again.";
         }
 
 
@@ -427,8 +487,17 @@ export const TrialSignupFlow = ({
           <PlanSelectionStep
             selectedPlan={planType || null}
             onSelectPlan={(plan) => {
+              console.log("✅ Plan selected:", plan);
               setValue("planType", plan as any);
-              setTimeout(() => handleNext(true), 300);
+              // Give setValue time to update, then validate
+              setTimeout(async () => {
+                const isValid = await validateStep(2);
+                if (isValid) {
+                  handleNext();
+                } else {
+                  toast.error("Failed to set plan. Please try again.");
+                }
+              }, 100);
             }}
             isTrial={true}
           />
