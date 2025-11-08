@@ -16,7 +16,7 @@ import { buildMagicLinkEmail } from '../_shared/auth-email-templates.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!;
+const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY')!;
 const SITE_URL = Deno.env.get('SITE_URL') || 'http://localhost:5173';
 const MAGIC_LINK_TTL_MINUTES = parseInt(Deno.env.get('AUTH_MAGIC_LINK_TTL_MINUTES') || '20');
 

@@ -116,7 +116,7 @@ async function sendEmailResend(
   body: string,
   log: ReturnType<typeof withLogContext>
 ): Promise<boolean> {
-  const apiKey = Deno.env.get("RESEND_API_KEY");
+  const apiKey = Deno.env.get("RESEND_PROD_KEY");
   const fromEmail = Deno.env.get("NOTIFY_EMAIL_FROM") || "noreply@getringsnap.com";
 
   if (!apiKey) {

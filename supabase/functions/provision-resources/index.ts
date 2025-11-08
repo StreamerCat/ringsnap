@@ -14,7 +14,7 @@ const corsHeaders = {
 
 const VAPI_API_KEY = Deno.env.get('VAPI_API_KEY');
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);

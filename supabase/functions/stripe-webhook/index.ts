@@ -280,7 +280,7 @@ async function sendInvoiceEmail({
 const FUNCTION_NAME = "stripe-webhook";
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET');
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);

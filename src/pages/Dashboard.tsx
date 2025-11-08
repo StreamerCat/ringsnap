@@ -74,9 +74,8 @@ export default function Dashboard() {
       let query = supabase
         .from("accounts" as any)
         .select(
-          "id, company_name, plan_type, subscription_status, sales_rep_name, created_at, trade, profiles!inner(name, phone, is_primary)"
+          "id, company_name, plan_type, subscription_status, sales_rep_name, created_at, trade, profiles!left(name, phone, is_primary)"
         )
-        .eq("profiles.is_primary", true)
         .in("subscription_status", ["trial", "active", "past_due"]);
 
       const threshold = getDateThreshold();

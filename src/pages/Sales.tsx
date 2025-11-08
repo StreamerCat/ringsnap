@@ -151,7 +151,7 @@ export default function Sales() {
   };
 
   return (
-    <SalesPasswordGate>
+    <>
       <Helmet>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
@@ -244,6 +244,6 @@ export default function Sales() {
       {/* Bottom Padding for Mobile */}
       <div className="pb-20"></div>
       </div>
-    </SalesPasswordGate>
+    </>
   );
 }
