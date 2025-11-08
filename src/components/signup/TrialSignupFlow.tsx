@@ -174,36 +174,54 @@ export const TrialSignupFlow = ({
       // Handle error response
       if (error) {
         console.error("❌ Edge function error:", error);
+        console.error("❌ Error details:", {
+          message: error.message,
+          context: error.context,
+          status: error.context?.status,
+          body: error.context?.body
+        });
 
         // Extract error message from various possible formats
         let errorMessage = "Signup failed. Please try again.";
 
-        // Try to parse error from context
-        if (error.context?.body) {
+        // Check HTTP status code
+        const statusCode = error.context?.status;
+
+        // For 429 errors (rate limiting)
+        if (statusCode === 429) {
+          errorMessage = "Trial limit reached. You can only create 3 trials per location in 30 days. Contact support@getringsnap.com for assistance.";
+        }
+        // Try to parse error from response body
+        else if (error.context?.body) {
           try {
-            const errorBody = JSON.parse(error.context.body);
+            const errorBody = typeof error.context.body === 'string'
+              ? JSON.parse(error.context.body)
+              : error.context.body;
+
             if (errorBody.error) {
               errorMessage = errorBody.error;
             }
           } catch (e) {
-            // If parsing fails, try to use the body as string
+            console.warn("Failed to parse error body:", e);
+            // If parsing fails, check if body is a string
             if (typeof error.context.body === 'string' && error.context.body.length < 200) {
               errorMessage = error.context.body;
             }
           }
-        } else if (error.message) {
+        }
+        // Fallback to error message
+        else if (error.message && !error.message.includes("non-2xx")) {
           errorMessage = error.message;
         }
 
-        // Customize messages based on error content
-        if (errorMessage.includes("Trial limit") || errorMessage.includes("rate limit")) {
-          errorMessage = "Trial limit reached. You can only create 3 trials per location in 30 days. Contact support@getringsnap.com for assistance.";
-        } else if (errorMessage.includes("phone number")) {
+        // Additional customization based on error content
+        if (errorMessage.includes("phone number") || errorMessage.includes("Phone number")) {
           errorMessage = "This phone number was recently used for a trial. Please use a different number or contact support.";
         } else if (errorMessage.includes("disposable") || errorMessage.includes("valid business or personal email")) {
           errorMessage = "Please use a valid business or personal email address.";
         }
 
+        console.error("❌ Final error message:", errorMessage);
         toast.error(errorMessage, { duration: 6000 });
         throw new Error(errorMessage);
       }
