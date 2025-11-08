@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import { toast } from "sonner";
@@ -103,11 +103,13 @@ export const TrialSignupFlow = ({
     }
   };
 
-  const handleNext = async () => {
-    const isValid = await validateStep(currentStep);
-    if (!isValid) {
-      toast.error("Please complete all required fields");
-      return;
+  const handleNext = async (skipValidation = false) => {
+    if (!skipValidation) {
+      const isValid = await validateStep(currentStep);
+      if (!isValid) {
+        toast.error("Please complete all required fields");
+        return;
+      }
     }
     setCurrentStep(prev => prev + 1);
   };
@@ -166,7 +168,21 @@ export const TrialSignupFlow = ({
       }
     } catch (error: any) {
       console.error("Trial signup error:", error);
-      toast.error(error.message || "Signup failed. Please try again.");
+
+      // Handle specific error types
+      let errorMessage = "Signup failed. Please try again.";
+
+      if (error.message?.includes("429") || error.message?.includes("rate limit") || error.message?.includes("Trial limit")) {
+        errorMessage = "Trial limit reached for this location. Please contact support at support@getringsnap.com";
+      } else if (error.message?.includes("phone number")) {
+        errorMessage = "This phone number was recently used. Please use a different number or contact support.";
+      } else if (error.message?.includes("email")) {
+        errorMessage = "Please use a valid business or personal email address.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -237,7 +253,7 @@ export const TrialSignupFlow = ({
             selectedPlan={planType || null}
             onSelectPlan={(plan) => {
               setValue("planType", plan as any);
-              setTimeout(handleNext, 300);
+              setTimeout(() => handleNext(true), 300);
             }}
             isTrial={true}
           />
@@ -359,6 +375,9 @@ export const TrialSignupFlow = ({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Sign Up for Free Trial</DialogTitle>
+          <DialogDescription>
+            Complete the {currentStep === 1 ? "contact information" : currentStep === 2 ? "plan selection" : "payment details"} to start your 3-day free trial
+          </DialogDescription>
         </DialogHeader>
 
         {/* Progress Bar */}
