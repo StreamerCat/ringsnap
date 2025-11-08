@@ -49,7 +49,7 @@ serve(async (req) => {
     });
 
     // Send via Resend
-    const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+    const resend = new Resend(Deno.env.get("RESEND_PROD_KEY"));
     await resend.emails.send({
       from: "RingSnap <support@getringsnap.com>",
       to: email,
