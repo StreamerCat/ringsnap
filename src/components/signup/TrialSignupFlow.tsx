@@ -234,22 +234,53 @@ export const TrialSignupFlow = ({
       }
 
       console.log("✅ Trial signup successful! User:", data.email);
-      toast.success("Trial started successfully! Redirecting...", { duration: 3000 });
+      console.log("📦 Signup response data:", {
+        email: data.email,
+        hasPassword: !!data.password,
+        accountId: data.account_id,
+        stripeCustomerId: data.stripe_customer_id
+      });
 
-      // Redirect to confirmation page
-      console.log("🔄 Redirecting to confirmation page in 1 second...");
+      // Auto-login the user with the returned credentials
+      if (data.password) {
+        console.log("🔐 Auto-logging in user...");
+        try {
+          const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
+            email: data.email,
+            password: data.password,
+          });
+
+          if (loginError) {
+            console.error("❌ Auto-login failed:", loginError);
+            toast.warning("Account created! Please check your email for login instructions.", { duration: 6000 });
+          } else {
+            console.log("✅ Auto-login successful! Session:", authData.session ? "active" : "none");
+            toast.success("Welcome! Redirecting to your dashboard...", { duration: 3000 });
+          }
+        } catch (loginErr) {
+          console.error("❌ Login error:", loginErr);
+          toast.warning("Account created! Please check your email for login instructions.", { duration: 6000 });
+        }
+      } else {
+        console.warn("⚠️ No password in response - cannot auto-login");
+        toast.warning("Account created! Please check your email for login instructions.", { duration: 6000 });
+      }
+
+      // Redirect to dashboard or confirmation page
+      console.log("🔄 Redirecting in 1.5 seconds...");
       setTimeout(() => {
-        const redirectUrl = `/trial-confirmation?email=${encodeURIComponent(data.email)}`;
-        console.log("🔄 Redirecting to:", redirectUrl);
-
         if (onSuccess) {
           console.log("✅ Calling onSuccess callback");
           onSuccess(data);
         } else {
-          console.log("✅ Navigating to confirmation page");
+          // If logged in, go to dashboard; otherwise go to confirmation page
+          const redirectUrl = data.password
+            ? `/dashboard`
+            : `/trial-confirmation?email=${encodeURIComponent(data.email)}&password=${encodeURIComponent(data.password || '')}`;
+          console.log("✅ Navigating to:", redirectUrl);
           window.location.href = redirectUrl;
         }
-      }, 1000);
+      }, 1500);
 
     } catch (error: any) {
       console.error("❌ Trial signup error:", error);
