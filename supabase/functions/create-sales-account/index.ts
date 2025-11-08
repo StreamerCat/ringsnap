@@ -49,7 +49,7 @@ serve(async (req) => {
       assistantGender: z.enum(['female', 'male']).optional(),
       salesRepName: z.string().max(100).optional(),
       planType: z.string(),
-      referralCode: z.string().length(8).optional().or(z.literal('')),
+      referralCode: z.string().max(8).optional(),
     });
 
     const salesAccountSchema = z.object({
@@ -206,8 +206,13 @@ serve(async (req) => {
       currentAccountId = profile.account_id;
 
       // Convert ZIP code to area code and extract state
-      const areaCode = customerInfo.zipCode ? getAreaCodeFromZip(customerInfo.zipCode) : null;
-      const billingState = customerInfo.zipCode ? getStateFromZip(customerInfo.zipCode) : null;
+      // Use a default area code (212 - New York) if ZIP not provided
+      const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
+        ? getAreaCodeFromZip(customerInfo.zipCode.trim())
+        : '212';
+      const billingState = (customerInfo.zipCode && customerInfo.zipCode.trim())
+        ? getStateFromZip(customerInfo.zipCode.trim())
+        : null;
 
       await supabaseAdmin
         .from('accounts')
@@ -241,7 +246,7 @@ serve(async (req) => {
     }
 
     // Step 5.5: Handle referral code if provided
-    if (customerInfo.referralCode && customerInfo.referralCode.length === 8) {
+    if (customerInfo.referralCode && customerInfo.referralCode.trim().length === 8) {
       try {
         // Look up the referral code to find the referrer
         const { data: referralCodeData } = await supabaseAdmin
