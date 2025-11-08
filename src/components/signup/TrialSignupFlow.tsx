@@ -154,19 +154,20 @@ export const TrialSignupFlow = ({
       }
 
       console.log("✅ Payment method created:", paymentMethod.id);
-      console.log("📞 Calling edge function with data:", {
-        email: form.getValues("email"),
-        planType: form.getValues("planType"),
-        source
-      });
+
+      // Prepare request body
+      const requestBody = {
+        ...form.getValues(),
+        paymentMethodId: paymentMethod.id,
+        source,
+      };
+
+      console.log("📞 Calling edge function with full body:", requestBody);
+      console.log("📞 Form values:", form.getValues());
 
       // Call edge function
       const { data, error } = await supabase.functions.invoke('free-trial-signup', {
-        body: {
-          ...form.getValues(),
-          paymentMethodId: paymentMethod.id,
-          source,
-        },
+        body: requestBody,
       });
 
       console.log("📦 Edge function response:", { data, error });
@@ -174,6 +175,14 @@ export const TrialSignupFlow = ({
       // Handle error response
       if (error) {
         console.error("❌ Edge function error:", error);
+
+        // Log full error object for debugging
+        try {
+          console.error("❌ Error stringified:", JSON.stringify(error, null, 2));
+        } catch (e) {
+          console.error("❌ Could not stringify error");
+        }
+
         console.error("❌ Error details:", {
           message: error.message,
           context: error.context,
@@ -191,20 +200,47 @@ export const TrialSignupFlow = ({
         if (statusCode === 429) {
           errorMessage = "Trial limit reached. You can only create 3 trials per location in 30 days. Contact support@getringsnap.com for assistance.";
         }
-        // Try to parse error from response body
+        // For 400 errors (validation)
+        else if (statusCode === 400 && error.context?.body) {
+          try {
+            const errorBody = typeof error.context.body === 'string'
+              ? JSON.parse(error.context.body)
+              : error.context.body;
+
+            console.error("❌ Parsed 400 error body:", errorBody);
+
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            } else if (errorBody.details) {
+              errorMessage = `Validation error: ${JSON.stringify(errorBody.details)}`;
+            } else if (typeof errorBody === 'string') {
+              errorMessage = errorBody;
+            }
+          } catch (e) {
+            console.error("Failed to parse 400 error body:", e);
+            if (typeof error.context.body === 'string') {
+              errorMessage = error.context.body;
+            }
+          }
+        }
+        // Try to parse error from response body for other status codes
         else if (error.context?.body) {
           try {
             const errorBody = typeof error.context.body === 'string'
               ? JSON.parse(error.context.body)
               : error.context.body;
 
+            console.error("❌ Parsed error body:", errorBody);
+
             if (errorBody.error) {
               errorMessage = errorBody.error;
+            } else if (typeof errorBody === 'string') {
+              errorMessage = errorBody;
             }
           } catch (e) {
             console.warn("Failed to parse error body:", e);
             // If parsing fails, check if body is a string
-            if (typeof error.context.body === 'string' && error.context.body.length < 200) {
+            if (typeof error.context.body === 'string' && error.context.body.length < 500) {
               errorMessage = error.context.body;
             }
           }
