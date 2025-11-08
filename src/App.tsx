@@ -14,6 +14,12 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminUsers from "./pages/AdminUsers";
 import TeamManagement from "./pages/TeamManagement";
+// New auth pages
+import AuthLogin from "./pages/AuthLogin";
+import MagicCallback from "./pages/MagicCallback";
+import StaffInvite from "./pages/StaffInvite";
+import PasswordReset from "./pages/PasswordReset";
+import SecuritySettings from "./pages/SecuritySettings";
 
 const queryClient = new QueryClient();
 
@@ -26,8 +32,17 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          {/* Legacy login routes (keep for backward compatibility) */}
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          {/* New auth routes */}
+          <Route path="/auth/login" element={<AuthLogin />} />
+          <Route path="/auth/magic-callback" element={<MagicCallback />} />
+          <Route path="/auth/staff-invite" element={<StaffInvite />} />
+          <Route path="/auth/password" element={<PasswordReset />} />
+          {/* Settings */}
+          <Route path="/settings/security" element={<SecuritySettings />} />
+          {/* App routes */}
           <Route path="/sales" element={<Sales />} />
           <Route path="/salesdash" element={<Dashboard />} />
           <Route path="/dashboard" element={<CustomerDashboard />} />
