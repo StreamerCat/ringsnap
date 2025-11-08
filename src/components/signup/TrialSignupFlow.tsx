@@ -200,6 +200,29 @@ export const TrialSignupFlow = ({
         if (statusCode === 429) {
           errorMessage = "Trial limit reached. You can only create 3 trials per location in 30 days. Contact support@getringsnap.com for assistance.";
         }
+        // For 422 errors (email/data already exists)
+        else if (statusCode === 422) {
+          // Try to get specific error from body
+          if (error.context?.body) {
+            try {
+              const errorBody = typeof error.context.body === 'string'
+                ? JSON.parse(error.context.body)
+                : error.context.body;
+
+              if (errorBody.error) {
+                errorMessage = errorBody.error;
+              }
+            } catch (e) {
+              // Parsing failed, use default message
+            }
+          }
+          // Customize message for email already registered
+          if (errorMessage.includes("email") || errorMessage.includes("already been registered")) {
+            errorMessage = "An account with this email already exists. Please sign in or use a different email address.";
+          } else {
+            errorMessage = "This information is already registered. Please try different details or contact support.";
+          }
+        }
         // For 400 errors (validation)
         else if (statusCode === 400 && error.context?.body) {
           try {
@@ -251,11 +274,25 @@ export const TrialSignupFlow = ({
         }
 
         // Additional customization based on error content
-        if (errorMessage.includes("phone number") || errorMessage.includes("Phone number")) {
+        if (errorMessage.includes("email") && (errorMessage.includes("already") || errorMessage.includes("registered") || errorMessage.includes("exists"))) {
+          errorMessage = "An account with this email already exists. Please sign in or use a different email address.";
+        }
+        else if (errorMessage.includes("phone number") || errorMessage.includes("Phone number")) {
           errorMessage = "This phone number was recently used for a trial. Please use a different number or contact support.";
-        } else if (errorMessage.includes("disposable") || errorMessage.includes("valid business or personal email")) {
+        }
+        else if (errorMessage.includes("disposable") || errorMessage.includes("valid business or personal email")) {
           errorMessage = "Please use a valid business or personal email address.";
         }
+        else if (errorMessage.includes("payment") || errorMessage.includes("card")) {
+          errorMessage = "Payment method validation failed. Please check your card details and try again.";
+        }
+        else if (errorMessage.includes("subscription")) {
+          errorMessage = "Failed to create your subscription. Please try again or contact support.";
+        }
+        else if (errorMessage.includes("timeout") || errorMessage.includes("network")) {
+          errorMessage = "Connection timeout. Please check your internet and try again.";
+        }
+
 
         console.error("❌ Final error message:", errorMessage);
         toast.error(errorMessage, { duration: 6000 });
