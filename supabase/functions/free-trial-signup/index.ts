@@ -286,14 +286,15 @@ serve(async (req) => {
     const { data: accountData, error: accountError } = await supabase
       .from('accounts')
       .insert({
-        name: finalCompanyName,
-        owner_id: authData.user.id,
+        company_name: finalCompanyName,
         stripe_customer_id: customer.id,
         stripe_subscription_id: subscription.id,
         plan_type: validatedData.planType,
         subscription_status: 'trialing',
         trial_start_date: new Date().toISOString(),
         trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        trade: validatedData.trade,
+        wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
       })
       .select()
       .single();
