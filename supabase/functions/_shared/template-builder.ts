@@ -12,7 +12,7 @@ NEVER say you're AI. You ARE {company_name}.
 Key Info:
 - Services: {services}
 - Hours: {business_hours}
-- Emergency: {emergency_policy}
+- Emergency: {emergency_policy}{website_info}
 {recording_notice}
 
 Tasks:
@@ -130,7 +130,8 @@ export async function buildVapiPrompt(
     .replace(/{service_area}/g, accountData.service_area || 'your local area')
     .replace(/{services}/g, accountData.service_specialties || getDefaultServices(accountData.trade))
     .replace(/{business_hours}/g, formatBusinessHours(accountData.business_hours))
-    .replace(/{emergency_policy}/g, accountData.emergency_policy || 'Transfer immediately to on-call team');
+    .replace(/{emergency_policy}/g, accountData.emergency_policy || 'Transfer immediately to on-call team')
+    .replace(/{website_info}/g, accountData.company_website ? `\n- Website: ${accountData.company_website}` : '');
 
   // Add recording notice if enabled and required by state
   let recordingNotice = '';

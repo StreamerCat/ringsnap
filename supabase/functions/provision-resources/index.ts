@@ -30,7 +30,7 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { accountId, email, name, phone } = await req.json();
+    const { accountId, email, name, phone, company_website } = await req.json();
     currentAccountId = accountId;
 
     if (!accountId) {
@@ -153,6 +153,7 @@ serve(async (req) => {
 
       const prompt = await buildVapiPrompt({
         company_name: account.company_name,
+        company_website: company_website || account.company_domain,
         trade: account.trade,
         service_area: account.service_area,
         business_hours: account.business_hours,

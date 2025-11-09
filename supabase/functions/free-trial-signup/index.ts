@@ -32,6 +32,7 @@ serve(async (req) => {
       email: z.string().email('Invalid email').max(255, 'Email too long'),
       phone: z.string().min(1, 'Phone required'),
       companyName: z.string().max(200).optional(),
+      companyWebsite: z.string().url().max(255).optional().or(z.literal('')),
       deviceFingerprint: z.string().max(500).optional(),
       trade: z.string().max(100).optional(),
       wantsAdvancedVoice: z.boolean().optional(),
@@ -202,9 +203,23 @@ serve(async (req) => {
       context: { userId: authData.user.id }
     });
 
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')!;
+    const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16',
       httpClient: Stripe.createFetchHttpClient(),
+    });
+
+    // Validate Stripe mode consistency
+    const isTestMode = stripeSecretKey.startsWith('sk_test_');
+    const isLiveMode = stripeSecretKey.startsWith('sk_live_');
+
+    if (!isTestMode && !isLiveMode) {
+      throw new Error('Invalid STRIPE_SECRET_KEY format - must start with sk_test_ or sk_live_');
+    }
+
+    logInfo('Stripe initialized in ' + (isTestMode ? 'test' : 'live') + ' mode', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, mode: isTestMode ? 'test' : 'live' }
     });
 
     // Create Stripe customer
@@ -360,6 +375,7 @@ serve(async (req) => {
         name: validatedData.name,
         phone: validatedData.phone,
         company_name: finalCompanyName,
+        company_website: validatedData.companyWebsite,
         trade: validatedData.trade,
         assistant_gender: validatedData.assistantGender || 'female',
         wants_advanced_voice: validatedData.wantsAdvancedVoice || false,

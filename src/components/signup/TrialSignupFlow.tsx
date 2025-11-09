@@ -12,6 +12,7 @@ import { SignupButton } from "./shared/SignupButton";
 import { PlanSelectionStep } from "./shared/PlanSelectionStep";
 import {
   leadCaptureSchema,
+  businessDetailsSchema,
   planSelectionSchema,
   paymentSchema,
   trialSignupSchema
@@ -58,6 +59,8 @@ export const TrialSignupFlow = ({
       email: "",
       phone: "",
       companyName: "",
+      trade: "",
+      companyWebsite: "",
       planType: undefined,
       acceptTerms: false,
     },
@@ -105,10 +108,13 @@ export const TrialSignupFlow = ({
         const leadResult = await form.trigger(['name', 'email', 'phone', 'companyName']);
         return leadResult;
       case 2:
-        const currentPlanType = form.getValues("planType");
-        console.log("📋 Validating step 2 - planType:", currentPlanType);
-        return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
+        const businessResult = await form.trigger(['trade', 'companyWebsite']);
+        return businessResult;
       case 3:
+        const currentPlanType = form.getValues("planType");
+        console.log("📋 Validating step 3 - planType:", currentPlanType);
+        return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
+      case 4:
         return cardComplete && form.getValues("acceptTerms");
       default:
         return false;
@@ -138,7 +144,7 @@ export const TrialSignupFlow = ({
     if (!formValues.planType) {
       toast.error("Please select a plan");
       console.error("❌ Missing planType");
-      setCurrentStep(2); // Go back to plan selection
+      setCurrentStep(3); // Go back to plan selection
       return;
     }
 
@@ -325,8 +331,8 @@ export const TrialSignupFlow = ({
 
         // Additional customization based on error content
         if (errorMessage.includes("planType") || errorMessage.includes("plan")) {
-          errorMessage = "Please select a valid plan. Go back to step 2 and choose your plan.";
-          setCurrentStep(2); // Navigate back to plan selection
+          errorMessage = "Please select a valid plan. Go back to step 3 and choose your plan.";
+          setCurrentStep(3); // Navigate back to plan selection
         }
         else if (errorMessage.includes("paymentMethodId") || errorMessage.includes("payment method")) {
           errorMessage = "Payment method is missing. Please re-enter your card details.";
@@ -484,6 +490,52 @@ export const TrialSignupFlow = ({
 
       case 2:
         return (
+          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold">Business Details</h2>
+              <p className="text-sm text-muted-foreground">
+                Help us customize your experience
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <SignupInput
+                label="Trade or Industry (Optional)"
+                id="trade"
+                placeholder="e.g., Plumber, Electrician, HVAC"
+                {...form.register("trade")}
+                error={errors.trade?.message}
+              />
+
+              <SignupInput
+                label="Company Website (Optional)"
+                id="companyWebsite"
+                type="url"
+                placeholder="https://yourcompany.com"
+                {...form.register("companyWebsite")}
+                error={errors.companyWebsite?.message}
+                isValid={!!watch("companyWebsite") && !errors.companyWebsite}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <SignupButton type="submit" className="w-full">
+                Continue
+              </SignupButton>
+              <SignupButton
+                type="button"
+                onClick={handleBack}
+                variant="outline"
+                className="w-full"
+              >
+                Back
+              </SignupButton>
+            </div>
+          </form>
+        );
+
+      case 3:
+        return (
           <PlanSelectionStep
             selectedPlan={planType || null}
             onSelectPlan={(plan) => {
@@ -491,7 +543,7 @@ export const TrialSignupFlow = ({
               setValue("planType", plan as any);
               // Give setValue time to update, then validate
               setTimeout(async () => {
-                const isValid = await validateStep(2);
+                const isValid = await validateStep(3);
                 if (isValid) {
                   handleNext();
                 } else {
@@ -503,7 +555,7 @@ export const TrialSignupFlow = ({
           />
         );
 
-      case 3:
+      case 4:
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
@@ -621,17 +673,22 @@ export const TrialSignupFlow = ({
         <DialogHeader>
           <DialogTitle>Sign Up for Free Trial</DialogTitle>
           <DialogDescription>
-            Complete the {currentStep === 1 ? "contact information" : currentStep === 2 ? "plan selection" : "payment details"} to start your 3-day free trial
+            Complete the {
+              currentStep === 1 ? "contact information" :
+              currentStep === 2 ? "business details" :
+              currentStep === 3 ? "plan selection" :
+              "payment details"
+            } to start your 3-day free trial
           </DialogDescription>
         </DialogHeader>
 
         {/* Progress Bar */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Step {currentStep} of 3</span>
-            <span>{Math.round((currentStep / 3) * 100)}%</span>
+            <span>Step {currentStep} of 4</span>
+            <span>{Math.round((currentStep / 4) * 100)}%</span>
           </div>
-          <Progress value={(currentStep / 3) * 100} />
+          <Progress value={(currentStep / 4) * 100} />
         </div>
 
         {renderStep()}

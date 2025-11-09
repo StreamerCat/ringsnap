@@ -8,6 +8,17 @@ export const leadCaptureSchema = z.object({
   companyName: z.string().trim().max(200, "Company name too long").optional(),
 });
 
+// Step 2: Business Details (trial flow)
+export const businessDetailsSchema = z.object({
+  trade: z.string().trim().max(100, "Trade too long").optional(),
+  companyWebsite: z.string()
+    .trim()
+    .url("Please enter a valid website URL (e.g., https://example.com)")
+    .max(255, "Website URL too long")
+    .optional()
+    .or(z.literal('')),
+});
+
 // Step 2: Plan Selection (both flows)
 export const planSelectionSchema = z.object({
   planType: z.enum(['starter', 'professional', 'premium'], {
@@ -36,6 +47,7 @@ export const salesDetailsSchema = z.object({
 
 // Combined schemas
 export const trialSignupSchema = leadCaptureSchema
+  .merge(businessDetailsSchema)
   .merge(planSelectionSchema)
   .merge(paymentSchema);
 
