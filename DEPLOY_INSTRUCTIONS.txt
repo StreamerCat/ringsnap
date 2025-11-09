@@ -1,0 +1,138 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                  🚨 URGENT: DEPLOY EDGE FUNCTION 🚨                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+THE ISSUE:
+----------
+You're testing the signup flow but the edge function with the FIX 
+hasn't been deployed to Supabase yet. You're running the OLD version
+that doesn't create profiles.
+
+That's why you get "Profile or account not found" every time.
+
+
+THE SOLUTION:
+-------------
+Deploy the edge function to Supabase. This takes 3 minutes.
+
+
+HOW TO DEPLOY (Choose ONE method):
+-----------------------------------
+
+METHOD 1 - Supabase Dashboard (Recommended - 3 mins)
+================================================================================
+1. Open: https://supabase.com/dashboard
+2. Select your RingSnap project
+3. Click "Edge Functions" in left sidebar
+4. Click on "free-trial-signup"
+5. Click "Deploy new version" or "Edit function"
+6. COPY the entire file contents from:
+   
+   /home/user/ringsnap/supabase/functions/free-trial-signup/index.ts
+
+7. PASTE into the Supabase editor (replace ALL existing code)
+8. Click "Deploy"
+9. Wait for "Deployed successfully" message
+10. Verify the timestamp shows "Deployed X seconds ago"
+
+DONE! Now test signup again.
+
+
+METHOD 2 - Using Supabase CLI (If you have it installed)
+================================================================================
+cd /home/user/ringsnap
+supabase functions deploy free-trial-signup
+
+
+BEFORE YOU TEST AGAIN:
+----------------------
+1. Delete the test users from failed signups:
+   
+   Go to: Supabase Dashboard → SQL Editor → New query
+   
+   Run this:
+   DELETE FROM auth.users WHERE email LIKE '%josh.sturgeon%';
+
+2. Use a FRESH email: josh.sturgeon+test99@gmail.com
+
+
+WHAT TO EXPECT AFTER DEPLOYMENT:
+---------------------------------
+✅ Edge function logs will show "Profile created successfully"
+✅ Stripe customer will be created
+✅ Stripe subscription will be created
+✅ Dashboard will load without errors
+✅ No "Profile or account not found" error
+
+
+HOW TO VERIFY IT WORKED:
+-------------------------
+After deploying, check Edge Function logs in Supabase Dashboard:
+
+You MUST see these logs (in order):
+  • Trial user created successfully
+  • Stripe customer created           ← NEW!
+  • Stripe subscription created       ← NEW!
+  • Account created successfully
+  • Profile created successfully      ← NEW! CRITICAL!
+  • VAPI resources provisioned
+
+If you DON'T see "Profile created successfully", the deployment failed.
+Try deploying again.
+
+
+FILE LOCATION:
+--------------
+The edge function file you need to deploy is here:
+
+/home/user/ringsnap/supabase/functions/free-trial-signup/index.ts
+
+Copy the ENTIRE contents of this file and paste it into Supabase Dashboard.
+
+
+ENVIRONMENT VARIABLES (Check these are set):
+---------------------------------------------
+Go to: Supabase Dashboard → Settings → Edge Functions → Secrets
+
+You MUST have these set:
+  • STRIPE_SECRET_KEY
+  • STRIPE_PRICE_STARTER
+  • STRIPE_PRICE_PROFESSIONAL
+  • STRIPE_PRICE_PREMIUM
+
+If they're missing, the signup will fail with "Price ID not configured".
+
+
+ESTIMATED TIME:
+---------------
+• Deploy edge function: 3 minutes
+• Delete test users: 1 minute
+• Test signup: 2 minutes
+• Verify it works: 2 minutes
+------------------------
+TOTAL: 8 minutes to working signup
+
+
+NEED HELP?
+----------
+If it STILL doesn't work after deployment:
+
+1. Check edge function logs (copy last 50 lines)
+2. Check browser console (copy all errors)
+3. Run this SQL to see what was created:
+
+   SELECT 'auth.users' as table, count(*) FROM auth.users 
+   WHERE email = 'josh.sturgeon+test99@gmail.com'
+   UNION ALL
+   SELECT 'profiles', count(*) FROM profiles 
+   WHERE id IN (SELECT id FROM auth.users WHERE email = 'josh.sturgeon+test99@gmail.com')
+   UNION ALL
+   SELECT 'accounts', count(*) FROM accounts 
+   WHERE owner_id IN (SELECT id FROM auth.users WHERE email = 'josh.sturgeon+test99@gmail.com');
+
+4. Share the edge function logs and SQL results
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  THE FIX IS READY - IT JUST NEEDS TO BE DEPLOYED TO SUPABASE  ║
+╚══════════════════════════════════════════════════════════════════╝
