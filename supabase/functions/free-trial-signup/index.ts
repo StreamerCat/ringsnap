@@ -191,6 +191,31 @@ serve(async (req) => {
       context: { userId: authData.user.id, email },
     });
 
+    const { data: profileData, error: profileLookupError } = await supabase
+      .from("profiles")
+      .select("id, account_id")
+      .eq("id", authData.user.id)
+      .single();
+
+    if (profileLookupError || !profileData) {
+      logError("Failed to load profile after signup", {
+        ...baseLogOptions,
+        error: profileLookupError,
+        context: { userId: authData.user.id },
+      });
+      throw profileLookupError || new Error("Profile not found after signup");
+    }
+
+    const accountId = profileData.account_id;
+
+    if (!accountId) {
+      logError("Profile missing account_id after signup", {
+        ...baseLogOptions,
+        context: { userId: authData.user.id },
+      });
+      throw new Error("Account not linked to profile after signup");
+    }
+
     logInfo("Initializing Stripe", {
       ...baseLogOptions,
       context: { userId: authData.user.id },
@@ -268,78 +293,53 @@ serve(async (req) => {
       },
     });
 
-    logInfo("Creating account record", {
+    logInfo("Updating account record", {
       ...baseLogOptions,
-      context: { userId: authData.user.id, subscriptionId: subscription.id },
+      context: { userId: authData.user.id, accountId, subscriptionId: subscription.id },
     });
 
-    const { data: accountData, error: accountError } = await supabase
+    const trialStartDate = new Date().toISOString();
+    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: accountData, error: accountUpdateError } = await supabase
       .from("accounts")
-      .insert({
-        company_name: finalCompanyName,
+      .update({
         stripe_customer_id: customer.id,
         stripe_subscription_id: subscription.id,
         plan_type: validatedData.planType,
         subscription_status: "trial",
-        trial_start_date: new Date().toISOString(),
-        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_start_date: trialStartDate,
+        trial_end_date: trialEndDate,
         trade: validatedData.trade,
         wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
       })
+      .eq("id", accountId)
       .select()
       .single();
 
-    if (accountError) {
-      logError("Account creation error", {
+    if (accountUpdateError || !accountData) {
+      logError("Account update error", {
         ...baseLogOptions,
-        error: accountError,
-        context: { userId: authData.user.id },
+        error: accountUpdateError,
+        context: { userId: authData.user.id, accountId },
       });
-      throw accountError;
+      throw accountUpdateError || new Error("Account not found for update");
     }
 
-    logInfo("Account created successfully", {
+    logInfo("Account updated successfully", {
       ...baseLogOptions,
-      context: { userId: authData.user.id, accountId: accountData.id },
-    });
-
-    logInfo("Creating profile record", {
-      ...baseLogOptions,
-      context: { userId: authData.user.id, accountId: accountData.id },
-    });
-
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      account_id: accountData.id,
-      name: validatedData.name,
-      phone: validatedData.phone,
-      is_primary: true,
-      source: validatedData.source || "website",
-    });
-
-    if (profileError) {
-      logError("Profile creation error", {
-        ...baseLogOptions,
-        error: profileError,
-        context: { userId: authData.user.id, accountId: accountData.id },
-      });
-      throw profileError;
-    }
-
-    logInfo("Profile created successfully", {
-      ...baseLogOptions,
-      context: { userId: authData.user.id, accountId: accountData.id },
+      context: { userId: authData.user.id, accountId },
     });
 
     logInfo("Starting VAPI provisioning in background", {
       ...baseLogOptions,
-      context: { accountId: accountData.id },
+      context: { accountId },
     });
 
     const vapiProvisioningTask = supabase.functions
       .invoke("provision-resources", {
         body: {
-          account_id: accountData.id,
+          account_id: accountId,
           user_id: authData.user.id,
           email: validatedData.email,
           name: validatedData.name,
@@ -355,12 +355,12 @@ serve(async (req) => {
           logError("VAPI provisioning failed (async)", {
             ...baseLogOptions,
             error: provisionResponse.error,
-            context: { accountId: accountData.id },
+            context: { accountId },
           });
         } else {
           logInfo("VAPI resources provisioned successfully (async)", {
             ...baseLogOptions,
-            context: { accountId: accountData.id },
+            context: { accountId },
           });
         }
       })
@@ -368,7 +368,7 @@ serve(async (req) => {
         logError("VAPI provisioning error (async)", {
           ...baseLogOptions,
           error: provisionError,
-          context: { accountId: accountData.id },
+          context: { accountId },
         });
       });
 
@@ -388,7 +388,7 @@ serve(async (req) => {
       ...baseLogOptions,
       context: {
         userId: authData.user.id,
-        accountId: accountData.id,
+        accountId,
         subscriptionId: subscription.id,
       },
     });
@@ -397,12 +397,12 @@ serve(async (req) => {
       JSON.stringify({
         ok: true,
         user_id: authData.user.id,
-        account_id: accountData.id,
+        account_id: accountId,
         email: email,
         password: password,
         stripe_customer_id: customer.id,
         subscription_id: subscription.id,
-        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_end_date: trialEndDate,
         plan_type: validatedData.planType,
         message: "Trial started! No charge for 3 days.",
       }),
