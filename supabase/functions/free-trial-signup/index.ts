@@ -16,7 +16,6 @@ const corsHeaders = {
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -26,7 +25,6 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // Define validation schema
     const signupSchema = z.object({
       name: z.string().trim().min(1, "Name required").max(100, "Name too long"),
       email: z.string().email("Invalid email").max(255, "Email too long"),
@@ -45,7 +43,6 @@ serve(async (req) => {
 
     const rawData = await req.json();
 
-    // Validate input
     let validatedData;
     try {
       validatedData = signupSchema.parse(rawData);
@@ -58,7 +55,6 @@ serve(async (req) => {
 
     const { name, email, phone, companyName } = validatedData;
 
-    // Validate phone format
     if (!isValidPhoneNumber(phone)) {
       return new Response(JSON.stringify({ error: "Invalid phone number format" }), {
         status: 400,
@@ -66,7 +62,6 @@ serve(async (req) => {
       });
     }
 
-    // Block disposable emails
     if (isDisposableEmail(email)) {
       logWarn("Blocked disposable email", {
         ...baseLogOptions,
@@ -78,11 +73,9 @@ serve(async (req) => {
       });
     }
 
-    // Get client IP
     const clientIP =
       req.headers.get("x-forwarded-for")?.split(",")[0] || req.headers.get("cf-connecting-ip") || "unknown";
 
-    // Check IP rate limiting (max 3 trials per IP in 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -112,7 +105,6 @@ serve(async (req) => {
       });
     }
 
-    // Check phone uniqueness (not used in last 30 days)
     const { data: recentPhoneUse } = await supabase
       .from("profiles")
       .select("created_at")
@@ -139,7 +131,6 @@ serve(async (req) => {
       });
     }
 
-    // Extract email domain and determine company name
     const emailDomain = email.split("@")[1].toLowerCase();
     const genericDomains = [
       "gmail.com",
@@ -155,22 +146,18 @@ serve(async (req) => {
 
     let finalCompanyName: string;
     if (isGeneric) {
-      // Use provided company name, or fallback to email prefix
       finalCompanyName = companyName || email.split("@")[0];
     } else {
-      // Business email - use domain
       finalCompanyName = emailDomain;
     }
 
-    // Generate secure random password
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
     const password = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 
-    // Create auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm for trial signups
+      email_confirm: true,
       user_metadata: {
         company_name: finalCompanyName,
         name,
@@ -204,7 +191,6 @@ serve(async (req) => {
       context: { userId: authData.user.id, email },
     });
 
-    // Initialize Stripe
     logInfo("Initializing Stripe", {
       ...baseLogOptions,
       context: { userId: authData.user.id },
@@ -215,7 +201,6 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // Create Stripe customer
     logInfo("Creating Stripe customer", {
       ...baseLogOptions,
       context: { userId: authData.user.id, email: validatedData.email },
@@ -242,7 +227,6 @@ serve(async (req) => {
       context: { userId: authData.user.id, customerId: customer.id },
     });
 
-    // Get price ID for selected plan
     const priceIds = {
       starter: Deno.env.get("STRIPE_PRICE_STARTER"),
       professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
@@ -254,7 +238,6 @@ serve(async (req) => {
       throw new Error(`Price ID not configured for plan: ${validatedData.planType}`);
     }
 
-    // Create subscription with 3-day trial
     logInfo("Creating Stripe subscription", {
       ...baseLogOptions,
       context: {
@@ -285,7 +268,6 @@ serve(async (req) => {
       },
     });
 
-    // Create account record
     logInfo("Creating account record", {
       ...baseLogOptions,
       context: { userId: authData.user.id, subscriptionId: subscription.id },
@@ -294,14 +276,15 @@ serve(async (req) => {
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
       .insert({
-        name: finalCompanyName,
-        owner_id: authData.user.id,
+        company_name: finalCompanyName,
         stripe_customer_id: customer.id,
         stripe_subscription_id: subscription.id,
         plan_type: validatedData.planType,
         subscription_status: "trialing",
         trial_start_date: new Date().toISOString(),
         trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        trade: validatedData.trade,
+        wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
       })
       .select()
       .single();
@@ -320,7 +303,6 @@ serve(async (req) => {
       context: { userId: authData.user.id, accountId: accountData.id },
     });
 
-    // Create profile record
     logInfo("Creating profile record", {
       ...baseLogOptions,
       context: { userId: authData.user.id, accountId: accountData.id },
@@ -331,7 +313,7 @@ serve(async (req) => {
       account_id: accountData.id,
       name: validatedData.name,
       phone: validatedData.phone,
-      is_primary: true, // First user is primary
+      is_primary: true,
       source: validatedData.source || "website",
     });
 
@@ -349,14 +331,11 @@ serve(async (req) => {
       context: { userId: authData.user.id, accountId: accountData.id },
     });
 
-    // Trigger VAPI provisioning asynchronously (fire-and-forget - don't wait)
-    // This prevents timeout since VAPI provisioning takes 1-2 minutes
     logInfo("Starting VAPI provisioning in background", {
       ...baseLogOptions,
       context: { accountId: accountData.id },
     });
 
-    // Create the provisioning task (won't block response)
     const vapiProvisioningTask = supabase.functions
       .invoke("provision-resources", {
         body: {
@@ -393,13 +372,10 @@ serve(async (req) => {
         });
       });
 
-    // Ensure provisioning continues in background even after response is sent
-    // This is critical for true fire-and-forget behavior
-    if (typeof (globalThis as any).EdgeRuntime !== "undefined" && (globalThis as any).EdgeRuntime?.waitUntil) {
-      (globalThis as any).EdgeRuntime.waitUntil(vapiProvisioningTask);
+    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+      (EdgeRuntime as any).waitUntil(vapiProvisioningTask);
     }
 
-    // Log successful signup
     await supabase.from("signup_attempts").insert({
       email,
       phone,
