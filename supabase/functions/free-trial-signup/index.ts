@@ -197,12 +197,22 @@ serve(async (req) => {
     });
 
     // Initialize Stripe
+    logInfo('Initializing Stripe', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id }
+    });
+
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2023-10-16',
       httpClient: Stripe.createFetchHttpClient(),
     });
 
     // Create Stripe customer
+    logInfo('Creating Stripe customer', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, email: validatedData.email }
+    });
+
     const customer = await stripe.customers.create({
       email: validatedData.email,
       name: validatedData.name,
@@ -237,6 +247,15 @@ serve(async (req) => {
     }
 
     // Create subscription with 3-day trial
+    logInfo('Creating Stripe subscription', {
+      ...baseLogOptions,
+      context: {
+        userId: authData.user.id,
+        customerId: customer.id,
+        planType: validatedData.planType
+      }
+    });
+
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: selectedPriceId }],
@@ -259,6 +278,11 @@ serve(async (req) => {
     });
 
     // Create account record
+    logInfo('Creating account record', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, subscriptionId: subscription.id }
+    });
+
     const { data: accountData, error: accountError } = await supabase
       .from('accounts')
       .insert({
@@ -289,6 +313,11 @@ serve(async (req) => {
     });
 
     // Create profile record
+    logInfo('Creating profile record', {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId: accountData.id }
+    });
+
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
@@ -361,6 +390,15 @@ serve(async (req) => {
       ip_address: clientIP,
       device_fingerprint: validatedData.deviceFingerprint,
       success: true,
+    });
+
+    logInfo('Returning success response', {
+      ...baseLogOptions,
+      context: {
+        userId: authData.user.id,
+        accountId: accountData.id,
+        subscriptionId: subscription.id
+      }
     });
 
     return new Response(
