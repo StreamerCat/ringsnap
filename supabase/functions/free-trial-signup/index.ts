@@ -372,8 +372,8 @@ serve(async (req) => {
         });
       });
 
-    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
-      (EdgeRuntime as any).waitUntil(vapiProvisioningTask);
+    if (typeof (globalThis as any).EdgeRuntime !== "undefined" && (globalThis as any).EdgeRuntime.waitUntil) {
+      (globalThis as any).EdgeRuntime.waitUntil(vapiProvisioningTask);
     }
 
     await supabase.from("signup_attempts").insert({
