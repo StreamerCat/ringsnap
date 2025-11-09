@@ -226,6 +226,18 @@ export default function CustomerDashboard() {
     );
   }
 
+  if (!account || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold">Account Setup in Progress</h2>
+          <p className="text-muted-foreground">Your account is being set up. This usually takes a few seconds.</p>
+          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+        </div>
+      </div>
+    );
+  }
+
   const usagePercent = calculateUsagePercent();
   const remainingMinutes = calculateRemainingMinutes();
   const trialDaysRemaining = calculateTrialDaysRemaining();
