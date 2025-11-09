@@ -49,7 +49,7 @@ export const ContractorHero = () => {
                   onClick={() => setShowSignupForm(true)}
                 >
                   <PhoneCall className="mr-2" />
-                  Try RingSnap free
+                  Start Free
                 </Button>
                 <Button
                   size="lg"
