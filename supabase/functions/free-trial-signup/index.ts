@@ -314,41 +314,45 @@ serve(async (req) => {
       context: { userId: authData.user.id, accountId: accountData.id }
     });
 
-    // Call provision-resources function for VAPI setup
-    try {
-      const provisionResponse = await supabase.functions.invoke('provision-resources', {
-        body: {
-          account_id: accountData.id,
-          user_id: authData.user.id,
-          email: validatedData.email,
-          name: validatedData.name,
-          phone: validatedData.phone,
-          company_name: finalCompanyName,
-          trade: validatedData.trade,
-          assistant_gender: validatedData.assistantGender || 'female',
-          wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
-        },
-      });
+    // Trigger VAPI provisioning asynchronously (fire-and-forget - don't wait)
+    // This prevents timeout since VAPI provisioning takes 1-2 minutes
+    logInfo('Starting VAPI provisioning in background', {
+      ...baseLogOptions,
+      context: { accountId: accountData.id }
+    });
 
+    supabase.functions.invoke('provision-resources', {
+      body: {
+        account_id: accountData.id,
+        user_id: authData.user.id,
+        email: validatedData.email,
+        name: validatedData.name,
+        phone: validatedData.phone,
+        company_name: finalCompanyName,
+        trade: validatedData.trade,
+        assistant_gender: validatedData.assistantGender || 'female',
+        wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
+      },
+    }).then((provisionResponse) => {
       if (provisionResponse.error) {
-        logWarn('VAPI provisioning failed but signup completed', {
+        logWarn('VAPI provisioning failed (async)', {
           ...baseLogOptions,
           error: provisionResponse.error,
           context: { accountId: accountData.id }
         });
       } else {
-        logInfo('VAPI resources provisioned successfully', {
+        logInfo('VAPI resources provisioned successfully (async)', {
           ...baseLogOptions,
           context: { accountId: accountData.id }
         });
       }
-    } catch (provisionError) {
-      logWarn('VAPI provisioning error but signup completed', {
+    }).catch((provisionError) => {
+      logWarn('VAPI provisioning error (async)', {
         ...baseLogOptions,
         error: provisionError,
         context: { accountId: accountData.id }
       });
-    }
+    });
 
     // Log successful signup
     await supabase.from('signup_attempts').insert({
