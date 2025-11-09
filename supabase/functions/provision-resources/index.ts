@@ -158,6 +158,7 @@ serve(async (req) => {
         business_hours: account.business_hours,
         custom_instructions: account.custom_instructions,
         service_specialties: account.service_specialties,
+        company_website: account.company_website,
       }, recordingLaw);
 
       const assistantResponse = await fetch('https://api.vapi.ai/assistant', {

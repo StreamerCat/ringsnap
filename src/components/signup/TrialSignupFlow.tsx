@@ -22,7 +22,9 @@ import {
   validatePhoneNumber,
   extractCompanyNameFromEmail
 } from "./shared/utils";
-import { Lock, CreditCard, Shield, Check } from "lucide-react";
+import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -58,6 +60,8 @@ export const TrialSignupFlow = ({
       email: "",
       phone: "",
       companyName: "",
+      companyWebsite: "",
+      trade: "",
       planType: undefined,
       acceptTerms: false,
     },
@@ -102,13 +106,16 @@ export const TrialSignupFlow = ({
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
       case 1:
-        const leadResult = await form.trigger(['name', 'email', 'phone', 'companyName']);
+        const leadResult = await form.trigger(['name', 'email', 'phone']);
         return leadResult;
       case 2:
-        const currentPlanType = form.getValues("planType");
-        console.log("📋 Validating step 2 - planType:", currentPlanType);
-        return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
+        const businessResult = await form.trigger(['companyName', 'companyWebsite', 'trade']);
+        return businessResult;
       case 3:
+        const currentPlanType = form.getValues("planType");
+        console.log("📋 Validating step 3 - planType:", currentPlanType);
+        return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
+      case 4:
         return cardComplete && form.getValues("acceptTerms");
       default:
         return false;
@@ -434,7 +441,7 @@ export const TrialSignupFlow = ({
                 Join 500+ contractors catching every call
               </p>
               <p className="text-xs text-green-600">
-                ✓ No credit card required yet • ✓ 3-day free trial
+                ✓ 3-day free trial • ✓ No setup fees
               </p>
             </div>
 
@@ -465,15 +472,6 @@ export const TrialSignupFlow = ({
                 error={errors.phone?.message}
                 isValid={!!watch("phone") && !errors.phone}
               />
-
-              {showCompanyName && (
-                <SignupInput
-                  label="Company Name"
-                  id="companyName"
-                  {...form.register("companyName")}
-                  error={errors.companyName?.message}
-                />
-              )}
             </div>
 
             <SignupButton type="submit" className="w-full">
@@ -484,6 +482,103 @@ export const TrialSignupFlow = ({
 
       case 2:
         return (
+          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold">Tell Us About Your Business</h2>
+              <p className="text-sm text-muted-foreground">
+                This helps personalize your AI assistant
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName" className="flex items-center gap-2 text-sm font-medium">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Company Name
+                </Label>
+                <SignupInput
+                  label=""
+                  id="companyName"
+                  placeholder="ABC Plumbing"
+                  {...form.register("companyName")}
+                  error={errors.companyName?.message}
+                  isValid={!!watch("companyName") && !errors.companyName}
+                  showValidation={false}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyWebsite" className="flex items-center gap-2 text-sm font-medium">
+                  <Globe className="h-4 w-4 text-primary" />
+                  Company Website <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <SignupInput
+                  label=""
+                  id="companyWebsite"
+                  type="url"
+                  placeholder="https://yourcompany.com"
+                  {...form.register("companyWebsite")}
+                  error={errors.companyWebsite?.message}
+                  showValidation={false}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Helps your assistant provide accurate service information
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="trade" className="flex items-center gap-2 text-sm font-medium">
+                  <Briefcase className="h-4 w-4 text-primary" />
+                  Trade/Industry
+                </Label>
+                <Select
+                  value={watch("trade")}
+                  onValueChange={(value) => setValue("trade", value)}
+                >
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select your trade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="plumbing">Plumbing</SelectItem>
+                    <SelectItem value="hvac">HVAC</SelectItem>
+                    <SelectItem value="electrical">Electrical</SelectItem>
+                    <SelectItem value="roofing">Roofing</SelectItem>
+                    <SelectItem value="general_contractor">General Contractor</SelectItem>
+                    <SelectItem value="carpentry">Carpentry</SelectItem>
+                    <SelectItem value="painting">Painting</SelectItem>
+                    <SelectItem value="landscaping">Landscaping</SelectItem>
+                    <SelectItem value="pest_control">Pest Control</SelectItem>
+                    <SelectItem value="garage_door">Garage Door Repair</SelectItem>
+                    <SelectItem value="appliance_repair">Appliance Repair</SelectItem>
+                    <SelectItem value="restaurant">Restaurant</SelectItem>
+                    <SelectItem value="local_services">Local Services</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.trade && (
+                  <p className="text-sm text-red-500">{errors.trade.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <SignupButton type="submit" className="w-full">
+                Continue
+              </SignupButton>
+              <SignupButton
+                type="button"
+                onClick={handleBack}
+                variant="outline"
+                className="w-full"
+              >
+                Back
+              </SignupButton>
+            </div>
+          </form>
+        );
+
+      case 3:
+        return (
           <PlanSelectionStep
             selectedPlan={planType || null}
             onSelectPlan={(plan) => {
@@ -491,7 +586,7 @@ export const TrialSignupFlow = ({
               setValue("planType", plan as any);
               // Give setValue time to update, then validate
               setTimeout(async () => {
-                const isValid = await validateStep(2);
+                const isValid = await validateStep(3);
                 if (isValid) {
                   handleNext();
                 } else {
@@ -503,7 +598,7 @@ export const TrialSignupFlow = ({
           />
         );
 
-      case 3:
+      case 4:
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
@@ -621,17 +716,17 @@ export const TrialSignupFlow = ({
         <DialogHeader>
           <DialogTitle>Sign Up for Free Trial</DialogTitle>
           <DialogDescription>
-            Complete the {currentStep === 1 ? "contact information" : currentStep === 2 ? "plan selection" : "payment details"} to start your 3-day free trial
+            Complete the {currentStep === 1 ? "contact information" : currentStep === 2 ? "business details" : currentStep === 3 ? "plan selection" : "payment details"} to start your 3-day free trial
           </DialogDescription>
         </DialogHeader>
 
         {/* Progress Bar */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Step {currentStep} of 3</span>
-            <span>{Math.round((currentStep / 3) * 100)}%</span>
+            <span>Step {currentStep} of 4</span>
+            <span>{Math.round((currentStep / 4) * 100)}%</span>
           </div>
-          <Progress value={(currentStep / 3) * 100} />
+          <Progress value={(currentStep / 4) * 100} />
         </div>
 
         {renderStep()}

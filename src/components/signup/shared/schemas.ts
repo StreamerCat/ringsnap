@@ -6,6 +6,13 @@ export const leadCaptureSchema = z.object({
   email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
   phone: z.string().trim().min(10, "Valid phone number required").max(20, "Phone too long"),
   companyName: z.string().trim().max(200, "Company name too long").optional(),
+  companyWebsite: z.string()
+    .trim()
+    .url("Please enter a valid website URL (e.g., https://example.com)")
+    .max(255, "Website URL too long")
+    .optional()
+    .or(z.literal('')),
+  trade: z.string().max(100).optional(),
 });
 
 // Step 2: Plan Selection (both flows)

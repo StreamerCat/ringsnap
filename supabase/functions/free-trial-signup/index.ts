@@ -30,6 +30,7 @@ serve(async (req) => {
       email: z.string().email("Invalid email").max(255, "Email too long"),
       phone: z.string().min(1, "Phone required"),
       companyName: z.string().max(200).optional(),
+      companyWebsite: z.string().max(255).optional(),
       deviceFingerprint: z.string().max(500).optional(),
       trade: z.string().max(100).optional(),
       wantsAdvancedVoice: z.boolean().optional(),
@@ -311,6 +312,7 @@ serve(async (req) => {
         trial_start_date: trialStartDate,
         trial_end_date: trialEndDate,
         trade: validatedData.trade,
+        company_website: validatedData.companyWebsite,
         wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
       })
       .eq("id", accountId)
