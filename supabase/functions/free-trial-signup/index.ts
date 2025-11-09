@@ -163,11 +163,26 @@ serve(async (req) => {
         company_name: finalCompanyName,
         name,
         phone,
-        source: "website",
+        trade: validatedData.trade || "",
+        company_website: validatedData.companyWebsite || "",
+        wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
+        source: validatedData.source || "website",
       },
     });
 
     if (authError) {
+      // Check if it's a duplicate email error
+      if (authError.message?.toLowerCase().includes("already") || authError.message?.toLowerCase().includes("duplicate")) {
+        logWarn("Email already registered", {
+          ...baseLogOptions,
+          context: { email },
+        });
+        return new Response(JSON.stringify({ error: "This email is already registered. Please sign in instead." }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
       logError("Auth error during free trial signup", {
         ...baseLogOptions,
         error: authError,
@@ -347,6 +362,7 @@ serve(async (req) => {
           name: validatedData.name,
           phone: validatedData.phone,
           company_name: finalCompanyName,
+          company_website: validatedData.companyWebsite || "",
           trade: validatedData.trade,
           assistant_gender: validatedData.assistantGender || "female",
           wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
