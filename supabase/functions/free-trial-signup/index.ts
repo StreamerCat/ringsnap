@@ -395,8 +395,8 @@ serve(async (req) => {
 
     // Ensure provisioning continues in background even after response is sent
     // This is critical for true fire-and-forget behavior
-    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
-      (EdgeRuntime as any).waitUntil(vapiProvisioningTask);
+    if (typeof (globalThis as any).EdgeRuntime !== "undefined" && (globalThis as any).EdgeRuntime?.waitUntil) {
+      (globalThis as any).EdgeRuntime.waitUntil(vapiProvisioningTask);
     }
 
     // Log successful signup
