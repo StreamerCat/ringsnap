@@ -172,7 +172,7 @@ export const ContractorFooter = () => {
               <p className="text-sm text-muted-foreground">© 2025 RingSnap • All rights reserved</p>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Shield className="w-4 h-4 text-primary" />
+                <Shield className="w-4 h-4 text-primary" />
                   SOC 2 Compliant
                 </span>
                 <span className="flex items-center gap-1">
