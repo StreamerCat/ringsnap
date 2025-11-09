@@ -54,21 +54,24 @@ async function notifyUserPhoneReady(
   userPhone?: string
 ) {
   try {
-    // Get user contact info if not provided
+    // Get user contact info if not provided via profiles table
     if (!userEmail && !userPhone) {
-      const { data: account } = await supabase
-        .from("accounts")
-        .select("user_id")
-        .eq("id", accountId)
-        .single();
+      const { data: profile } = (await supabase
+        .from("profiles")
+        .select("id")
+        .eq("account_id", accountId)
+        .eq("is_primary", true)
+        .maybeSingle()) as { data: { id: string } | null };
 
-      if (account?.user_id) {
+      if (profile?.id) {
         try {
-          const { data: user } = await supabase.auth.admin.getUserById(account.user_id);
-          userEmail = user?.email;
-          userPhone = user?.user_metadata?.phone;
+          const { data: userData } = await supabase.auth.admin.getUserById(profile.id);
+          if (userData?.user) {
+            userEmail = userData.user.email;
+            userPhone = userData.user.user_metadata?.phone;
+          }
         } catch (err) {
-          log.warn("Could not fetch user details", err, { accountId });
+          log.error("Could not fetch user details", err, { accountId });
         }
       }
     }
@@ -102,26 +105,11 @@ async function notifyUserPhoneReady(
           });
         }
       } catch (err) {
-        log.warn("Webhook notification error", err, { accountId });
+        log.error("Webhook notification error", err, { accountId });
       }
     }
 
-    // Mark notifications as sent
-    if (userEmail) {
-      await supabase
-        .from("phone_number_notifications")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("recipient", userEmail)
-        .eq("notification_type", "email");
-    }
-
-    if (userPhone) {
-      await supabase
-        .from("phone_number_notifications")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("recipient", userPhone)
-        .eq("notification_type", "sms");
-    }
+    // Notifications tracking removed - not needed for core functionality
   } catch (err) {
     log.error("Error notifying user", err, { accountId });
   }
@@ -238,7 +226,7 @@ serve(async (req) => {
           });
 
           await notifyUserPhoneReady(
-            supabase,
+            supabase as any,
             phone.account_id,
             vapiPhone.number ?? "unknown",
             log

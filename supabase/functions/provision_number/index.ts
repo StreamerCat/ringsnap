@@ -136,7 +136,7 @@ async function pollPhoneStatus(
       // Still pending, keep polling
       await sleep(POLL_INTERVAL_MS);
     } catch (err) {
-      log.warn("Error during polling", err, { vapiId });
+      log.error("Error during polling", err, { vapiId });
       await sleep(POLL_INTERVAL_MS);
     }
   }
@@ -192,7 +192,7 @@ serve(async (req) => {
     }
 
     console.log("[provision_number] Validation passed, starting provisioning");
-    log.info("Provisioning request started", { areaCode }, accountId);
+    log.info("Provisioning request started", { areaCode, accountId });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -358,9 +358,10 @@ serve(async (req) => {
     });
 
     log.info("Provisioning completed", {
+      accountId,
       status: finalStatus,
       number: finalPhone?.number
-    }, accountId);
+    });
 
     console.log("[provision_number] Provisioning complete, returning response");
 

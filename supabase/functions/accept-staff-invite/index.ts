@@ -185,19 +185,6 @@ serve(async (req) => {
       }
     }
 
-    // Create session
-    const { data: sessionData, error: sessionError } = await supabase.auth.admin.createSession({
-      user_id: userId
-    });
-
-    if (sessionError || !sessionData) {
-      console.error('Failed to create session:', sessionError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create session' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Log successful invite acceptance
     await logAuthEvent(
       supabase,
@@ -210,11 +197,11 @@ serve(async (req) => {
       true
     );
 
+    // Return success - client will handle login with the password they just set
     return new Response(
       JSON.stringify({
         success: true,
-        session: sessionData.session,
-        requires2FA: true,
+        message: 'Staff invite accepted. You can now sign in with your password.',
         user: {
           id: userId,
           email,
