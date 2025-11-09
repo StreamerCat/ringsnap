@@ -356,7 +356,8 @@ serve(async (req) => {
       context: { accountId: accountData.id },
     });
 
-    supabase.functions
+    // Create the provisioning task (won't block response)
+    const vapiProvisioningTask = supabase.functions
       .invoke("provision-resources", {
         body: {
           account_id: accountData.id,
@@ -372,7 +373,7 @@ serve(async (req) => {
       })
       .then((provisionResponse) => {
         if (provisionResponse.error) {
-          logWarn("VAPI provisioning failed (async)", {
+          logError("VAPI provisioning failed (async)", {
             ...baseLogOptions,
             error: provisionResponse.error,
             context: { accountId: accountData.id },
@@ -385,12 +386,18 @@ serve(async (req) => {
         }
       })
       .catch((provisionError) => {
-        logWarn("VAPI provisioning error (async)", {
+        logError("VAPI provisioning error (async)", {
           ...baseLogOptions,
           error: provisionError,
           context: { accountId: accountData.id },
         });
       });
+
+    // Ensure provisioning continues in background even after response is sent
+    // This is critical for true fire-and-forget behavior
+    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+      (EdgeRuntime as any).waitUntil(vapiProvisioningTask);
+    }
 
     // Log successful signup
     await supabase.from("signup_attempts").insert({
@@ -437,4 +444,3 @@ serve(async (req) => {
     });
   }
 });
-supabase / functions / free - trial - signup / index.ts;
