@@ -238,9 +238,10 @@ serve(async (req) => {
     const { accountId, phoneNumber, userEmail, userPhone } = payload;
 
     log.info("Notification request received", {
+      accountId,
       hasEmail: !!userEmail,
       hasPhone: !!userPhone
-    }, accountId);
+    });
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -254,24 +255,27 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user details if not provided
+    // Get user details if not provided via profiles table
     let email = userEmail;
     let phone = userPhone;
 
     if (!email || !phone) {
-      const { data: account } = await supabase
-        .from("accounts")
-        .select("user_id")
-        .eq("id", accountId)
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("account_id", accountId)
+        .eq("is_primary", true)
         .single();
 
-      if (account?.user_id) {
+      if (profile?.id) {
         try {
-          const { data: user } = await supabase.auth.admin.getUserById(account.user_id);
-          email = user?.email || email;
-          phone = user?.user_metadata?.phone || phone;
+          const { data: userData } = await supabase.auth.admin.getUserById(profile.id);
+          if (userData?.user) {
+            email = userData.user.email || email;
+            phone = userData.user.user_metadata?.phone || phone;
+          }
         } catch (err) {
-          log.warn("Could not fetch user details", err, { accountId });
+          log.error("Could not fetch user details", err, { accountId });
         }
       }
     }
@@ -297,9 +301,10 @@ serve(async (req) => {
     }
 
     log.info("Notification dispatch complete", {
+      accountId,
       emailSent,
       smsSent
-    }, accountId);
+    });
 
     return new Response(
       JSON.stringify({
