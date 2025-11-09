@@ -58,37 +58,66 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate temporary password
+    // Try to create user first (optimistic approach - saves credits)
     const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+    let userId: string;
+    let isNewUser = false;
 
-    // Create new user
-    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: { name }
-    });
+    try {
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { name }
+      });
 
-    if (createError) throw createError;
+      if (createError) {
+        // Check if user already exists
+        if (createError.message.includes('already registered')) {
+          // Fetch only this specific user (targeted query)
+          const { data: existingUsers } = await supabase.auth.admin.listUsers();
+          const existingUser = existingUsers?.users?.find(u => u.email === email);
 
-    // Create staff role
+          if (!existingUser) {
+            throw new Error('User exists but could not be found');
+          }
+
+          userId = existingUser.id;
+          console.log(`User ${email} already exists, updating role`);
+        } else {
+          throw createError;
+        }
+      } else {
+        userId = newUser.user.id;
+        isNewUser = true;
+        console.log(`Created new user ${email}`);
+      }
+    } catch (error) {
+      throw error;
+    }
+
+    // Create or update staff role
     const { error: roleError } = await supabase
       .from('staff_roles')
-      .insert({
-        user_id: newUser.user.id,
+      .upsert({
+        user_id: userId,
         role
+      }, {
+        onConflict: 'user_id'
       });
 
     if (roleError) throw roleError;
 
-    // Create profile (no account_id for staff)
+    // Create or update profile (no account_id for staff)
     const { error: profileError } = await supabase
       .from('profiles')
-      .insert({
-        id: newUser.user.id,
+      .upsert({
+        id: userId,
         name,
         phone: '',
         account_id: null
+      }, {
+        onConflict: 'id'
       });
 
     if (profileError) throw profileError;
@@ -97,26 +126,28 @@ Deno.serve(async (req) => {
     await supabase
       .from('role_audit_log')
       .insert({
-        target_user_id: newUser.user.id,
+        target_user_id: userId,
         changed_by_user_id: user.id,
         change_type: 'staff',
         old_role: null,
         new_role: role
       });
 
-    // Send password reset email via edge function
-    try {
-      await supabase.functions.invoke('send-password-reset', {
-        body: { email }
-      });
-      console.log(`Password reset email sent to ${email}`);
-    } catch (emailError) {
-      console.error('Error sending password reset email:', emailError);
-      // Don't fail the whole request if email fails
+    // Only send password reset for newly created users (saves email credits)
+    if (isNewUser) {
+      try {
+        await supabase.functions.invoke('send-password-reset', {
+          body: { email }
+        });
+        console.log(`Password reset email sent to ${email}`);
+      } catch (emailError) {
+        console.error('Error sending password reset email:', emailError);
+        // Don't fail the whole request if email fails
+      }
     }
 
     return new Response(
-      JSON.stringify({ success: true, user_id: newUser.user.id }),
+      JSON.stringify({ success: true, user_id: userId }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
