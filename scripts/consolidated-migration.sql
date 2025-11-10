@@ -95,18 +95,21 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 -- Helper function: Extract domain from email
+DROP FUNCTION IF EXISTS public.extract_email_domain(text);
 CREATE OR REPLACE FUNCTION public.extract_email_domain(email TEXT)
 RETURNS TEXT AS $$
   SELECT lower(split_part(email, '@', 2));
 $$ LANGUAGE SQL IMMUTABLE;
 
 -- Helper function: Check if email domain is generic
+DROP FUNCTION IF EXISTS public.is_generic_email_domain(text);
 CREATE OR REPLACE FUNCTION public.is_generic_email_domain(domain TEXT)
 RETURNS BOOLEAN AS $$
   SELECT domain IN ('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com');
 $$ LANGUAGE SQL IMMUTABLE;
 
 -- Security definer function: Check if user has specific role
+DROP FUNCTION IF EXISTS public.has_role(uuid, public.app_role);
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role public.app_role)
 RETURNS BOOLEAN
 LANGUAGE SQL
@@ -123,6 +126,7 @@ AS $$
 $$;
 
 -- Security definer function: Get user's account_id
+DROP FUNCTION IF EXISTS public.get_user_account_id(uuid);
 CREATE OR REPLACE FUNCTION public.get_user_account_id(_user_id UUID)
 RETURNS UUID
 LANGUAGE SQL
@@ -136,6 +140,7 @@ AS $$
 $$;
 
 -- Main trigger function: Handle new user signup
+DROP FUNCTION IF EXISTS public.handle_new_user_signup();
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -277,6 +282,7 @@ CREATE POLICY "Owners can view all roles in their account"
   );
 
 -- Create updated_at trigger function
+DROP FUNCTION IF EXISTS public.update_updated_at_column();
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -300,6 +306,7 @@ CREATE TRIGGER update_profiles_updated_at
 -- =====================================================
 
 -- Fix type casting in handle_new_user_signup trigger function
+DROP FUNCTION IF EXISTS public.handle_new_user_signup();
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -389,6 +396,7 @@ $function$;
 -- =====================================================
 
 -- Fix type casting in handle_new_user_signup trigger function
+DROP FUNCTION IF EXISTS public.handle_new_user_signup();
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -480,6 +488,7 @@ $function$;
 -- Fix search_path for security on utility functions
 
 -- Update extract_email_domain function
+DROP FUNCTION IF EXISTS public.extract_email_domain(text);
 CREATE OR REPLACE FUNCTION public.extract_email_domain(email text)
 RETURNS text
 LANGUAGE sql
@@ -491,6 +500,7 @@ AS $function$
 $function$;
 
 -- Update is_generic_email_domain function
+DROP FUNCTION IF EXISTS public.is_generic_email_domain(text);
 CREATE OR REPLACE FUNCTION public.is_generic_email_domain(domain text)
 RETURNS boolean
 LANGUAGE sql
@@ -502,6 +512,7 @@ AS $function$
 $function$;
 
 -- Update update_updated_at_column function
+DROP FUNCTION IF EXISTS public.update_updated_at_column();
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -868,6 +879,7 @@ CREATE TRIGGER update_assistants_updated_at
 DROP FUNCTION IF EXISTS public.handle_new_user_signup() CASCADE;
 
 -- Recreate with provisioning_status set to 'pending'
+DROP FUNCTION IF EXISTS public.handle_new_user_signup();
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -1230,6 +1242,7 @@ ALTER TABLE public.profiles ALTER COLUMN name DROP NOT NULL;
 ALTER TABLE public.profiles ALTER COLUMN phone DROP NOT NULL;
 
 -- Update handle_new_user_signup trigger to work with new structure
+DROP FUNCTION IF EXISTS public.handle_new_user_signup();
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1961,6 +1974,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Function to get user's account_id
+DROP FUNCTION IF EXISTS public.get_user_account_id(uuid);
 CREATE OR REPLACE FUNCTION public.get_user_account_id(p_user_id uuid)
 RETURNS uuid AS $$
 DECLARE
@@ -2027,6 +2041,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Helper function to check if user has role
+DROP FUNCTION IF EXISTS public.has_role(uuid, public.app_role);
 CREATE OR REPLACE FUNCTION public.has_role(p_user_id uuid, p_role text)
 RETURNS boolean AS $$
 BEGIN

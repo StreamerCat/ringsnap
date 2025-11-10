@@ -69,6 +69,15 @@ echo "Adding IF NOT EXISTS to CREATE INDEX..."
 sed -i 's/^CREATE INDEX \([^I]\)/CREATE INDEX IF NOT EXISTS \1/g' "$OUTPUT_FILE"
 sed -i 's/^CREATE INDEX$/CREATE INDEX IF NOT EXISTS/g' "$OUTPUT_FILE"
 
+# Add DROP FUNCTION IF EXISTS before CREATE OR REPLACE FUNCTION (handles parameter name changes)
+echo "Adding DROP FUNCTION IF EXISTS..."
+sed -i '/^CREATE OR REPLACE FUNCTION public\.extract_email_domain/i DROP FUNCTION IF EXISTS public.extract_email_domain(text);' "$OUTPUT_FILE"
+sed -i '/^CREATE OR REPLACE FUNCTION public\.is_generic_email_domain/i DROP FUNCTION IF EXISTS public.is_generic_email_domain(text);' "$OUTPUT_FILE"
+sed -i '/^CREATE OR REPLACE FUNCTION public\.has_role/i DROP FUNCTION IF EXISTS public.has_role(uuid, public.app_role);' "$OUTPUT_FILE"
+sed -i '/^CREATE OR REPLACE FUNCTION public\.get_user_account_id/i DROP FUNCTION IF EXISTS public.get_user_account_id(uuid);' "$OUTPUT_FILE"
+sed -i '/^CREATE OR REPLACE FUNCTION public\.handle_new_user_signup/i DROP FUNCTION IF EXISTS public.handle_new_user_signup();' "$OUTPUT_FILE"
+sed -i '/^CREATE OR REPLACE FUNCTION public\.update_updated_at_column/i DROP FUNCTION IF EXISTS public.update_updated_at_column();' "$OUTPUT_FILE"
+
 echo "" >> "$OUTPUT_FILE"
 echo "-- =====================================================" >> "$OUTPUT_FILE"
 echo "-- MIGRATION COMPLETE" >> "$OUTPUT_FILE"
