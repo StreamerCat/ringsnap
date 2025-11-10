@@ -1,0 +1,46 @@
+name: Deploy Supabase Functions
+
+on:
+  push:
+    branches:
+      - main
+      - claude/investigate-supabase-migration-011CUzW8XaWHtuYnPks1rFv9
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy functions
+        run: |
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+          # Set all secrets
+          supabase secrets set SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+          supabase secrets set SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          supabase secrets set STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}"
+          supabase secrets set STRIPE_PRICE_STARTER="${{ secrets.STRIPE_PRICE_STARTER }}"
+          supabase secrets set STRIPE_PRICE_PROFESSIONAL="${{ secrets.STRIPE_PRICE_PROFESSIONAL }}"
+          supabase secrets set STRIPE_PRICE_PREMIUM="${{ secrets.STRIPE_PRICE_PREMIUM }}"
+          supabase secrets set VAPI_API_KEY="${{ secrets.VAPI_API_KEY }}"
+          supabase secrets set VAPI_BASE_URL="${{ secrets.VAPI_BASE_URL }}"
+          supabase secrets set RESEND_PROD_KEY="${{ secrets.RESEND_PROD_KEY }}"
+          supabase secrets set APP_URL="${{ secrets.APP_URL }}"
+          supabase secrets set NOTIFY_EMAIL_FROM="${{ secrets.NOTIFY_EMAIL_FROM }}"
+
+          # Deploy all functions
+          supabase functions deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
