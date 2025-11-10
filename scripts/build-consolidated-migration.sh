@@ -48,6 +48,10 @@ sed -i '/^-- 3. EXTEND TRIAL SIGNUPS TABLE/,/ADD COLUMN referral_code TEXT;/ {
   s/^  ADD COLUMN/--   ADD COLUMN/
 }' "$OUTPUT_FILE"
 
+# Fix RLS policies that reference a.user_id (accounts table has no user_id column)
+echo "Fixing RLS policy user_id references..."
+sed -i 's/AND a\.user_id = auth\.uid()/AND EXISTS (SELECT 1 FROM public.profiles p WHERE p.account_id = a.id AND p.id = auth.uid())/g' "$OUTPUT_FILE"
+
 echo "" >> "$OUTPUT_FILE"
 echo "-- =====================================================" >> "$OUTPUT_FILE"
 echo "-- MIGRATION COMPLETE" >> "$OUTPUT_FILE"
