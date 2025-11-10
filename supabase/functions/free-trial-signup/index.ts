@@ -309,13 +309,14 @@ serve(async (req) => {
       },
     });
 
-    logInfo("Updating account record", {
-      ...baseLogOptions,
-      context: { userId: authData.user.id, accountId, subscriptionId: subscription.id },
-    });
-
+    // Define trial dates EARLY to ensure they're always available
     const trialStartDate = new Date().toISOString();
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    logInfo("Updating account record", {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId, subscriptionId: subscription.id, trialEndDate },
+    });
 
     const { data: accountData, error: accountUpdateError } = await supabase
       .from("accounts")
