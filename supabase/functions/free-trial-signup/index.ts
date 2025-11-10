@@ -207,29 +207,99 @@ serve(async (req) => {
       context: { userId: authData.user.id, email },
     });
 
-    const { data: profileData, error: profileLookupError } = await supabase
-      .from("profiles")
-      .select("id, account_id")
-      .eq("id", authData.user.id)
+    // Create account record (don't rely on trigger)
+    logInfo("Creating account record", {
+      ...baseLogOptions,
+      context: { userId: authData.user.id },
+    });
+
+    const { data: accountData, error: accountInsertError } = await supabase
+      .from("accounts")
+      .insert({
+        company_name: finalCompanyName,
+        company_domain: isGeneric ? null : emailDomain,
+        trade: validatedData.trade,
+        company_website: validatedData.companyWebsite,
+        wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
+        subscription_status: "trial",
+        trial_start_date: new Date().toISOString(),
+        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select()
       .single();
 
-    if (profileLookupError || !profileData) {
-      logError("Failed to load profile after signup", {
+    if (accountInsertError || !accountData) {
+      logError("Account creation error", {
         ...baseLogOptions,
-        error: profileLookupError,
+        error: accountInsertError,
         context: { userId: authData.user.id },
       });
-      throw profileLookupError || new Error("Profile not found after signup");
+      throw accountInsertError || new Error("Failed to create account");
     }
 
-    const accountId = profileData.account_id;
+    const accountId = accountData.id;
 
-    if (!accountId) {
-      logError("Profile missing account_id after signup", {
+    logInfo("Account created successfully", {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId },
+    });
+
+    // Create profile record (don't rely on trigger)
+    logInfo("Creating profile record", {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId },
+    });
+
+    const { error: profileInsertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: authData.user.id,
+        account_id: accountId,
+        name: validatedData.name,
+        phone: validatedData.phone,
+        is_primary: true,
+        source: validatedData.source || "website",
+      });
+
+    if (profileInsertError) {
+      logError("Profile creation error", {
+        ...baseLogOptions,
+        error: profileInsertError,
+        context: { userId: authData.user.id, accountId },
+      });
+      throw profileInsertError;
+    }
+
+    logInfo("Profile created successfully", {
+      ...baseLogOptions,
+      context: { userId: authData.user.id, accountId },
+    });
+
+    // Assign owner role to user
+    logInfo("Assigning owner role to user", {
+      ...baseLogOptions,
+      context: { userId: authData.user.id },
+    });
+
+    const { error: roleInsertError } = await supabase
+      .from("user_roles")
+      .insert({
+        user_id: authData.user.id,
+        role: "owner",
+      });
+
+    if (roleInsertError) {
+      logError("User role assignment error", {
+        ...baseLogOptions,
+        error: roleInsertError,
+        context: { userId: authData.user.id },
+      });
+      // Don't throw - this is not critical for signup to succeed
+    } else {
+      logInfo("Owner role assigned successfully", {
         ...baseLogOptions,
         context: { userId: authData.user.id },
       });
-      throw new Error("Account not linked to profile after signup");
     }
 
     logInfo("Initializing Stripe", {
@@ -309,33 +379,23 @@ serve(async (req) => {
       },
     });
 
-    // Define trial dates EARLY to ensure they're always available
-    const trialStartDate = new Date().toISOString();
-    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-
-    logInfo("Updating account record", {
+    logInfo("Updating account with Stripe subscription info", {
       ...baseLogOptions,
       context: { userId: authData.user.id, accountId, subscriptionId: subscription.id, trialEndDate },
     });
 
-    const { data: accountData, error: accountUpdateError } = await supabase
+    const { data: updatedAccountData, error: accountUpdateError } = await supabase
       .from("accounts")
       .update({
         stripe_customer_id: customer.id,
         stripe_subscription_id: subscription.id,
         plan_type: validatedData.planType,
-        subscription_status: "trial",
-        trial_start_date: trialStartDate,
-        trial_end_date: trialEndDate,
-        trade: validatedData.trade,
-        company_website: validatedData.companyWebsite,
-        wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
       })
       .eq("id", accountId)
       .select()
       .single();
 
-    if (accountUpdateError || !accountData) {
+    if (accountUpdateError || !updatedAccountData) {
       logError("Account update error", {
         ...baseLogOptions,
         error: accountUpdateError,
@@ -344,7 +404,7 @@ serve(async (req) => {
       throw accountUpdateError || new Error("Account not found for update");
     }
 
-    logInfo("Account updated successfully", {
+    logInfo("Account updated with Stripe info successfully", {
       ...baseLogOptions,
       context: { userId: authData.user.id, accountId },
     });
