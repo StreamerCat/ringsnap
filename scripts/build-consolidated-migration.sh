@@ -40,6 +40,14 @@ done
 echo "Fixing CREATE POLICY statements..."
 sed -i 's/CREATE POLICY IF NOT EXISTS/CREATE POLICY/g' "$OUTPUT_FILE"
 
+# Fix trial_signups ALTER TABLE (table doesn't exist in base schema)
+echo "Commenting out trial_signups ALTER TABLE..."
+sed -i '/^-- 3. EXTEND TRIAL SIGNUPS TABLE/,/ADD COLUMN referral_code TEXT;/ {
+  s/^-- 3. EXTEND TRIAL SIGNUPS TABLE/-- 3. EXTEND TRIAL SIGNUPS TABLE (SKIPPED - table does not exist in base schema)\n-- The trial_signups table was from an earlier Lovable iteration\n-- Commenting out to avoid migration errors\n--/
+  s/^ALTER TABLE trial_signups/-- ALTER TABLE trial_signups/
+  s/^  ADD COLUMN/--   ADD COLUMN/
+}' "$OUTPUT_FILE"
+
 echo "" >> "$OUTPUT_FILE"
 echo "-- =====================================================" >> "$OUTPUT_FILE"
 echo "-- MIGRATION COMPLETE" >> "$OUTPUT_FILE"
