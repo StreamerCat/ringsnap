@@ -23,7 +23,7 @@
 -- =====================================================
 
 -- Create revenue_report_leads table to store calculator form submissions
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.revenue_report_leads (
+CREATE TABLE public.revenue_report_leads (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   name text NOT NULL,
@@ -56,7 +56,7 @@ CREATE TYPE public.app_role AS ENUM ('owner', 'admin', 'user');
 CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'cancelled', 'expired');
 
 -- Create accounts table (company/organization level)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.accounts (
+CREATE TABLE public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_name TEXT NOT NULL,
   company_domain TEXT UNIQUE,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.accounts (
 );
 
 -- Create profiles table (user level - linked to auth.users)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.profiles (
+CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id UUID NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.profiles (
 );
 
 -- Create user_roles table (separate for security - prevents privilege escalation)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.user_roles (
+CREATE TABLE public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role public.app_role NOT NULL DEFAULT 'user',
@@ -568,7 +568,7 @@ EXCEPTION
 END $$;
 
 -- Create usage tracking table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS usage_logs (
+CREATE TABLE IF NOT EXISTS usage_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   call_id TEXT,
@@ -603,7 +603,7 @@ CREATE INDEX IF NOT EXISTS idx_accounts_vapi_assistant ON accounts(vapi_assistan
 -- =====================================================
 
 -- 1. PLAN DEFINITIONS TABLE
-CREATE TABLE IF NOT EXISTS plan_definitions (
+CREATE TABLE plan_definitions (
   plan_type TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   monthly_minutes_limit INTEGER NOT NULL,
@@ -668,7 +668,7 @@ ALTER TABLE accounts
 --   ADD COLUMN referral_code TEXT;
 
 -- 4. PHONE NUMBERS TABLE (Multi-phone support)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS phone_numbers (
+CREATE TABLE phone_numbers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
   phone_number TEXT NOT NULL UNIQUE,
@@ -686,7 +686,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS phone_numbers (
 CREATE UNIQUE INDEX idx_phone_numbers_primary ON phone_numbers(account_id, is_primary) WHERE is_primary = true;
 
 -- 5. ASSISTANTS TABLE (Multi-assistant support)
-CREATE TABLE IF NOT EXISTS assistants (
+CREATE TABLE assistants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
   phone_number_id UUID REFERENCES phone_numbers(id) ON DELETE SET NULL,
@@ -705,7 +705,7 @@ CREATE TABLE IF NOT EXISTS assistants (
 CREATE UNIQUE INDEX idx_assistants_primary ON assistants(account_id, is_primary) WHERE is_primary = true;
 
 -- 6. VOICE LIBRARY TABLE
-CREATE TABLE IF NOT EXISTS voice_library (
+CREATE TABLE voice_library (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider TEXT NOT NULL DEFAULT 'elevenlabs',
   voice_id TEXT NOT NULL UNIQUE,
@@ -724,7 +724,7 @@ INSERT INTO voice_library (voice_id, voice_name, gender, accent, tone) VALUES
   ('michael-professional', 'Michael', 'male', 'american', 'professional');
 
 -- 7. STATE RECORDING LAWS TABLE
-CREATE TABLE IF NOT EXISTS state_recording_laws (
+CREATE TABLE state_recording_laws (
   state_code TEXT PRIMARY KEY,
   state_name TEXT NOT NULL,
   consent_type TEXT NOT NULL CHECK (consent_type IN ('one-party', 'two-party', 'all-party')),
@@ -747,7 +747,7 @@ INSERT INTO state_recording_laws VALUES
   ('HI', 'Hawaii', 'two-party', true, 'This call may be recorded for quality and training purposes.');
 
 -- 8. ANTI-ABUSE: SIGNUP ATTEMPTS TABLE
-CREATE TABLE IF NOT EXISTS signup_attempts (
+CREATE TABLE signup_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL,
   phone TEXT,
@@ -758,11 +758,11 @@ CREATE TABLE IF NOT EXISTS signup_attempts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_signup_attempts_ip ON signup_attempts(ip_address, created_at);
-CREATE INDEX IF NOT EXISTS idx_signup_attempts_email ON signup_attempts(email, created_at);
+CREATE INDEX idx_signup_attempts_ip ON signup_attempts(ip_address, created_at);
+CREATE INDEX idx_signup_attempts_email ON signup_attempts(email, created_at);
 
 -- 9. ANTI-ABUSE: CALL PATTERN ALERTS TABLE
-CREATE TABLE IF NOT EXISTS call_pattern_alerts (
+CREATE TABLE call_pattern_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id),
   alert_type TEXT NOT NULL,
@@ -773,10 +773,10 @@ CREATE TABLE IF NOT EXISTS call_pattern_alerts (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_call_pattern_alerts_account ON call_pattern_alerts(account_id, created_at);
+CREATE INDEX idx_call_pattern_alerts_account ON call_pattern_alerts(account_id, created_at);
 
 -- 10. REFERRAL CODES TABLE
-CREATE TABLE IF NOT EXISTS referral_codes (
+CREATE TABLE referral_codes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
   code TEXT NOT NULL UNIQUE,
@@ -786,7 +786,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
 CREATE UNIQUE INDEX idx_referral_codes_account ON referral_codes(account_id);
 
 -- 11. REFERRALS TABLE
-CREATE TABLE IF NOT EXISTS referrals (
+CREATE TABLE referrals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   referrer_account_id UUID REFERENCES accounts(id),
   referee_account_id UUID REFERENCES accounts(id),
@@ -803,11 +803,11 @@ CREATE TABLE IF NOT EXISTS referrals (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_account_id);
-CREATE INDEX IF NOT EXISTS idx_referrals_referee ON referrals(referee_account_id);
+CREATE INDEX idx_referrals_referrer ON referrals(referrer_account_id);
+CREATE INDEX idx_referrals_referee ON referrals(referee_account_id);
 
 -- 12. ACCOUNT CREDITS TABLE
-CREATE TABLE IF NOT EXISTS account_credits (
+CREATE TABLE account_credits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id),
   amount_cents INTEGER NOT NULL,
@@ -819,10 +819,10 @@ CREATE TABLE IF NOT EXISTS account_credits (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_account_credits_account ON account_credits(account_id, status);
+CREATE INDEX idx_account_credits_account ON account_credits(account_id, status);
 
 -- 13. SMS MESSAGES TABLE
-CREATE TABLE IF NOT EXISTS sms_messages (
+CREATE TABLE sms_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id),
   phone_number_id UUID REFERENCES phone_numbers(id),
@@ -836,7 +836,7 @@ CREATE TABLE IF NOT EXISTS sms_messages (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_sms_messages_account ON sms_messages(account_id, created_at);
+CREATE INDEX idx_sms_messages_account ON sms_messages(account_id, created_at);
 
 -- 14. EXTEND USAGE LOGS TABLE
 ALTER TABLE usage_logs
@@ -1060,7 +1060,7 @@ grant select on admin_flagged_accounts to authenticated, service_role;
 -- =====================================================
 
 -- Create audit log table for tracking role changes
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.role_change_audit (
+CREATE TABLE public.role_change_audit (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   changed_by_user_id UUID NOT NULL,
   target_user_id UUID NOT NULL,
@@ -1091,9 +1091,9 @@ USING (
 );
 
 -- Create index for better query performance
-CREATE INDEX IF NOT EXISTS idx_role_audit_target_user ON public.role_change_audit(target_user_id);
-CREATE INDEX IF NOT EXISTS idx_role_audit_changed_by ON public.role_change_audit(changed_by_user_id);
-CREATE INDEX IF NOT EXISTS idx_role_audit_account ON public.role_change_audit(account_id);
+CREATE INDEX idx_role_audit_target_user ON public.role_change_audit(target_user_id);
+CREATE INDEX idx_role_audit_changed_by ON public.role_change_audit(changed_by_user_id);
+CREATE INDEX idx_role_audit_account ON public.role_change_audit(account_id);
 -- =====================================================
 -- MIGRATION 12: 20251106163142_53bd04d2-c541-4c79-9f0f-c2798e99487e.sql
 -- =====================================================
@@ -1110,7 +1110,7 @@ CREATE TYPE public.staff_role AS ENUM ('platform_owner', 'platform_admin', 'supp
 CREATE TYPE public.account_role AS ENUM ('owner', 'admin', 'user');
 
 -- Create staff_roles table (for RingSnap platform staff)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.staff_roles (
+CREATE TABLE public.staff_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   role staff_role NOT NULL,
@@ -1119,7 +1119,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.staff_roles (
 );
 
 -- Create account_members table (for customer account teams)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.account_members (
+CREATE TABLE public.account_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   account_id UUID REFERENCES public.accounts(id) ON DELETE CASCADE NOT NULL,
@@ -1129,7 +1129,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.account_members (
 );
 
 -- Create role audit log
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.role_audit_log (
+CREATE TABLE public.role_audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   target_user_id UUID NOT NULL,
   changed_by_user_id UUID NOT NULL,
@@ -1477,7 +1477,7 @@ ALTER TABLE public.phone_numbers
   ADD COLUMN IF NOT EXISTS raw jsonb;
 
 -- Create phone_number_notifications table for tracking notifications
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.phone_number_notifications (
+CREATE TABLE IF NOT EXISTS public.phone_number_notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   phone_number_id uuid NOT NULL REFERENCES public.phone_numbers(id) ON DELETE CASCADE,
   notification_type text NOT NULL, -- 'sms' | 'email'
@@ -1492,7 +1492,7 @@ CREATE INDEX IF NOT EXISTS idx_phone_notifications_status ON public.phone_number
 CREATE INDEX IF NOT EXISTS idx_phone_notifications_phone_id ON public.phone_number_notifications(phone_number_id);
 
 -- Create provisioning_logs table for audit trail
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.provisioning_logs (
+CREATE TABLE IF NOT EXISTS public.provisioning_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
   operation text NOT NULL, -- 'create_started' | 'create_success' | 'create_failed' | 'poll_success' | 'poll_failed' | 'notification_sent'
@@ -1599,7 +1599,7 @@ USING (
 -- Creates tables for magic links, tokens, sessions, passkeys, and audit logging
 
 -- Auth tokens table for magic links, invites, and one-time tokens
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.auth_tokens (
+CREATE TABLE IF NOT EXISTS public.auth_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   token_type text NOT NULL CHECK (token_type IN ('magic_link', 'invite', 'password_reset', 'finish_setup')),
   token_hash text NOT NULL UNIQUE,
@@ -1614,13 +1614,13 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.auth_tokens (
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_token_hash ON public.auth_tokens(token_hash);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_email ON public.auth_tokens(email);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON public.auth_tokens(expires_at);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens(user_id);
+CREATE INDEX idx_auth_tokens_token_hash ON public.auth_tokens(token_hash);
+CREATE INDEX idx_auth_tokens_email ON public.auth_tokens(email);
+CREATE INDEX idx_auth_tokens_expires_at ON public.auth_tokens(expires_at);
+CREATE INDEX idx_auth_tokens_user_id ON public.auth_tokens(user_id);
 
 -- Auth events table for security audit logging
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.auth_events (
+CREATE TABLE IF NOT EXISTS public.auth_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id uuid REFERENCES public.accounts(id) ON DELETE CASCADE,
@@ -1632,13 +1632,13 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.auth_events (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_events_user_id ON public.auth_events(user_id);
-CREATE INDEX IF NOT EXISTS idx_auth_events_account_id ON public.auth_events(account_id);
-CREATE INDEX IF NOT EXISTS idx_auth_events_created_at ON public.auth_events(created_at);
-CREATE INDEX IF NOT EXISTS idx_auth_events_event_type ON public.auth_events(event_type);
+CREATE INDEX idx_auth_events_user_id ON public.auth_events(user_id);
+CREATE INDEX idx_auth_events_account_id ON public.auth_events(account_id);
+CREATE INDEX idx_auth_events_created_at ON public.auth_events(created_at);
+CREATE INDEX idx_auth_events_event_type ON public.auth_events(event_type);
 
 -- Email events table for tracking deliverability via Resend webhooks
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.email_events (
+CREATE TABLE IF NOT EXISTS public.email_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email_id text,
   email_type text NOT NULL,
@@ -1649,13 +1649,13 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.email_events (
   created_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_email_events_email_id ON public.email_events(email_id);
-CREATE INDEX IF NOT EXISTS idx_email_events_recipient ON public.email_events(recipient);
-CREATE INDEX IF NOT EXISTS idx_email_events_user_id ON public.email_events(user_id);
-CREATE INDEX IF NOT EXISTS idx_email_events_created_at ON public.email_events(created_at);
+CREATE INDEX idx_email_events_email_id ON public.email_events(email_id);
+CREATE INDEX idx_email_events_recipient ON public.email_events(recipient);
+CREATE INDEX idx_email_events_user_id ON public.email_events(user_id);
+CREATE INDEX idx_email_events_created_at ON public.email_events(created_at);
 
 -- Passkeys/WebAuthn credentials table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.passkeys (
+CREATE TABLE IF NOT EXISTS public.passkeys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   credential_id text NOT NULL UNIQUE,
@@ -1668,11 +1668,11 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.passkeys (
   updated_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON public.passkeys(user_id);
-CREATE INDEX IF NOT EXISTS idx_passkeys_credential_id ON public.passkeys(credential_id);
+CREATE INDEX idx_passkeys_user_id ON public.passkeys(user_id);
+CREATE INDEX idx_passkeys_credential_id ON public.passkeys(credential_id);
 
 -- Extended sessions table for tracking active sessions with device info
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.user_sessions (
+CREATE TABLE IF NOT EXISTS public.user_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   session_token text NOT NULL UNIQUE,
@@ -1685,12 +1685,12 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.user_sessions (
   revoked_at timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON public.user_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_sessions_session_token ON public.user_sessions(session_token);
-CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON public.user_sessions(expires_at);
+CREATE INDEX idx_user_sessions_user_id ON public.user_sessions(user_id);
+CREATE INDEX idx_user_sessions_session_token ON public.user_sessions(session_token);
+CREATE INDEX idx_user_sessions_expires_at ON public.user_sessions(expires_at);
 
 -- Rate limiting table for abuse prevention
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.rate_limits (
+CREATE TABLE IF NOT EXISTS public.rate_limits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identifier text NOT NULL,
   action text NOT NULL,
@@ -1700,7 +1700,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.rate_limits (
 );
 
 CREATE UNIQUE INDEX idx_rate_limits_identifier_action ON public.rate_limits(identifier, action, window_start);
-CREATE INDEX IF NOT EXISTS idx_rate_limits_window_start ON public.rate_limits(window_start);
+CREATE INDEX idx_rate_limits_window_start ON public.rate_limits(window_start);
 
 -- Add 2FA fields to profiles table if not exists
 DO $$ BEGIN
@@ -1842,7 +1842,7 @@ CREATE POLICY "Admins can view all auth events"
   USING (
     EXISTS (
       SELECT 1 FROM public.staff_roles
-      WHERE user_id = auth.uid() AND role IN ('platform_admin', 'support')
+      WHERE user_id = auth.uid() AND role IN ('admin', 'support')
     )
   );
 
@@ -2061,7 +2061,7 @@ BEGIN
   -- Check if user is staff (staff can access multiple accounts)
   IF EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role IN ('platform_admin', 'support', 'sales')
+    WHERE user_id = p_user_id AND role IN ('admin', 'support', 'sales')
   ) THEN
     RETURN true;
   END IF;
@@ -2126,7 +2126,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('platform_admin', 'support', 'sales')
+    AND role IN ('admin', 'support', 'sales')
   )
 );
 
@@ -2158,7 +2158,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('platform_admin', 'support')
+    AND role IN ('admin', 'support', 'billing')
   )
   OR
   -- Sales reps can view their assigned accounts
@@ -2189,7 +2189,7 @@ USING (
   -- Staff admins
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 )
 WITH CHECK (
@@ -2205,7 +2205,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 );
 
@@ -2230,7 +2230,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('platform_admin', 'support', 'sales')
+    AND role IN ('admin', 'support', 'sales')
   )
 );
 
@@ -2252,7 +2252,7 @@ USING (
   -- Staff admin
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 )
 WITH CHECK (
@@ -2267,7 +2267,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 );
 
@@ -2290,7 +2290,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('platform_admin', 'support')
+    AND role IN ('admin', 'support')
   )
 );
 
@@ -2309,7 +2309,7 @@ USING (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 )
 WITH CHECK (
@@ -2324,7 +2324,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 );
 
@@ -2347,7 +2347,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('platform_admin', 'support')
+    AND role IN ('admin', 'support')
   )
 );
 
@@ -2366,7 +2366,7 @@ USING (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 )
 WITH CHECK (
@@ -2381,7 +2381,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 );
 
@@ -2397,7 +2397,7 @@ USING (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 );
 
@@ -2407,13 +2407,13 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'platform_admin'
+    WHERE user_id = auth.uid() AND role = 'admin'
   )
 );
 
@@ -2437,7 +2437,7 @@ DO $$ BEGIN
       EXISTS (
         SELECT 1 FROM public.staff_roles
         WHERE user_id = auth.uid()
-        AND role IN ('platform_admin', 'support')
+        AND role IN ('admin', 'support', 'billing')
       )
     );
   END IF;

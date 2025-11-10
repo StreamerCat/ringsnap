@@ -52,6 +52,23 @@ sed -i '/^-- 3. EXTEND TRIAL SIGNUPS TABLE/,/ADD COLUMN referral_code TEXT;/ {
 echo "Fixing RLS policy user_id references..."
 sed -i 's/AND a\.user_id = auth\.uid()/AND EXISTS (SELECT 1 FROM public.profiles p WHERE p.account_id = a.id AND p.id = auth.uid())/g' "$OUTPUT_FILE"
 
+# Fix staff_role enum - 'admin' should be 'platform_admin'
+echo "Fixing staff_role enum value mismatches..."
+sed -i "s/role IN ('admin', 'support')/role IN ('platform_admin', 'support')/g" "$OUTPUT_FILE"
+sed -i "s/role IN ('admin', 'support', 'sales')/role IN ('platform_admin', 'support', 'sales')/g" "$OUTPUT_FILE"
+sed -i "s/role IN ('admin', 'support', 'billing')/role IN ('platform_admin', 'support')/g" "$OUTPUT_FILE"
+sed -i "s/role = 'admin'/role = 'platform_admin'/g" "$OUTPUT_FILE"
+
+# Add IF NOT EXISTS to all CREATE TABLE statements
+echo "Adding IF NOT EXISTS to CREATE TABLE..."
+sed -i 's/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /g' "$OUTPUT_FILE"
+sed -i 's/^CREATE TABLE IF NOT EXISTS IF NOT EXISTS /CREATE TABLE IF NOT EXISTS /g' "$OUTPUT_FILE"
+
+# Add IF NOT EXISTS to all CREATE INDEX statements
+echo "Adding IF NOT EXISTS to CREATE INDEX..."
+sed -i 's/^CREATE INDEX /CREATE INDEX IF NOT EXISTS /g' "$OUTPUT_FILE"
+sed -i 's/^CREATE INDEX IF NOT EXISTS IF NOT EXISTS /CREATE INDEX IF NOT EXISTS /g' "$OUTPUT_FILE"
+
 echo "" >> "$OUTPUT_FILE"
 echo "-- =====================================================" >> "$OUTPUT_FILE"
 echo "-- MIGRATION COMPLETE" >> "$OUTPUT_FILE"
