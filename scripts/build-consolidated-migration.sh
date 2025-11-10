@@ -36,6 +36,10 @@ for file in /home/user/ringsnap/supabase/migrations/*.sql; do
   count=$((count + 1))
 done
 
+# Fix CREATE POLICY IF NOT EXISTS (not supported in older PostgreSQL)
+echo "Fixing CREATE POLICY statements..."
+sed -i 's/CREATE POLICY IF NOT EXISTS/CREATE POLICY/g' "$OUTPUT_FILE"
+
 echo "" >> "$OUTPUT_FILE"
 echo "-- =====================================================" >> "$OUTPUT_FILE"
 echo "-- MIGRATION COMPLETE" >> "$OUTPUT_FILE"
