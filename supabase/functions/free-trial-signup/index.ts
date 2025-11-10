@@ -381,7 +381,7 @@ serve(async (req) => {
 
     logInfo("Updating account with Stripe subscription info", {
       ...baseLogOptions,
-      context: { userId: authData.user.id, accountId, subscriptionId: subscription.id },
+      context: { userId: authData.user.id, accountId, subscriptionId: subscription.id, trialEndDate },
     });
 
     const { data: updatedAccountData, error: accountUpdateError } = await supabase
