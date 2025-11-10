@@ -1,4 +1,7 @@
-project_id = "lytnlrkdccqmxgdmdxef"
+# New Supabase Project (migrated from Lovable.ai)
+project_id = "rmyvvbqnccpfeyowidrq"
+
+# Old Lovable.ai project: lytnlrkdccqmxgdmdxef
 
 [functions.test-vapi-integration]
 verify_jwt = false
