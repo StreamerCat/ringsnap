@@ -23,7 +23,7 @@
 -- =====================================================
 
 -- Create revenue_report_leads table to store calculator form submissions
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.revenue_report_leads (
+CREATE TABLE IF NOT EXISTS public.revenue_report_leads (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   name text NOT NULL,
@@ -56,7 +56,7 @@ CREATE TYPE public.app_role AS ENUM ('owner', 'admin', 'user');
 CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'cancelled', 'expired');
 
 -- Create accounts table (company/organization level)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.accounts (
+CREATE TABLE IF NOT EXISTS public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_name TEXT NOT NULL,
   company_domain TEXT UNIQUE,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.accounts (
 );
 
 -- Create profiles table (user level - linked to auth.users)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id UUID NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.profiles (
 );
 
 -- Create user_roles table (separate for security - prevents privilege escalation)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role public.app_role NOT NULL DEFAULT 'user',
@@ -568,7 +568,7 @@ EXCEPTION
 END $$;
 
 -- Create usage tracking table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS usage_logs (
+CREATE TABLE IF NOT EXISTS usage_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   call_id TEXT,
@@ -668,7 +668,7 @@ ALTER TABLE accounts
 --   ADD COLUMN referral_code TEXT;
 
 -- 4. PHONE NUMBERS TABLE (Multi-phone support)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS phone_numbers (
+CREATE TABLE IF NOT EXISTS phone_numbers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID REFERENCES accounts(id) ON DELETE CASCADE,
   phone_number TEXT NOT NULL UNIQUE,
@@ -1060,7 +1060,7 @@ grant select on admin_flagged_accounts to authenticated, service_role;
 -- =====================================================
 
 -- Create audit log table for tracking role changes
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.role_change_audit (
+CREATE TABLE IF NOT EXISTS public.role_change_audit (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   changed_by_user_id UUID NOT NULL,
   target_user_id UUID NOT NULL,
@@ -1110,7 +1110,7 @@ CREATE TYPE public.staff_role AS ENUM ('platform_owner', 'platform_admin', 'supp
 CREATE TYPE public.account_role AS ENUM ('owner', 'admin', 'user');
 
 -- Create staff_roles table (for RingSnap platform staff)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.staff_roles (
+CREATE TABLE IF NOT EXISTS public.staff_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   role staff_role NOT NULL,
@@ -1119,7 +1119,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.staff_roles (
 );
 
 -- Create account_members table (for customer account teams)
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.account_members (
+CREATE TABLE IF NOT EXISTS public.account_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   account_id UUID REFERENCES public.accounts(id) ON DELETE CASCADE NOT NULL,
@@ -1129,7 +1129,7 @@ CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.account_members (
 );
 
 -- Create role audit log
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.role_audit_log (
+CREATE TABLE IF NOT EXISTS public.role_audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   target_user_id UUID NOT NULL,
   changed_by_user_id UUID NOT NULL,
@@ -1477,7 +1477,7 @@ ALTER TABLE public.phone_numbers
   ADD COLUMN IF NOT EXISTS raw jsonb;
 
 -- Create phone_number_notifications table for tracking notifications
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.phone_number_notifications (
+CREATE TABLE IF NOT EXISTS public.phone_number_notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   phone_number_id uuid NOT NULL REFERENCES public.phone_numbers(id) ON DELETE CASCADE,
   notification_type text NOT NULL, -- 'sms' | 'email'
@@ -1492,7 +1492,7 @@ CREATE INDEX IF NOT EXISTS idx_phone_notifications_status ON public.phone_number
 CREATE INDEX IF NOT EXISTS idx_phone_notifications_phone_id ON public.phone_number_notifications(phone_number_id);
 
 -- Create provisioning_logs table for audit trail
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.provisioning_logs (
+CREATE TABLE IF NOT EXISTS public.provisioning_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id uuid NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
   operation text NOT NULL, -- 'create_started' | 'create_success' | 'create_failed' | 'poll_success' | 'poll_failed' | 'notification_sent'
@@ -1599,7 +1599,7 @@ USING (
 -- Creates tables for magic links, tokens, sessions, passkeys, and audit logging
 
 -- Auth tokens table for magic links, invites, and one-time tokens
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.auth_tokens (
+CREATE TABLE IF NOT EXISTS public.auth_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   token_type text NOT NULL CHECK (token_type IN ('magic_link', 'invite', 'password_reset', 'finish_setup')),
   token_hash text NOT NULL UNIQUE,
@@ -1620,7 +1620,7 @@ CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON public.auth_tokens(expi
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON public.auth_tokens(user_id);
 
 -- Auth events table for security audit logging
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.auth_events (
+CREATE TABLE IF NOT EXISTS public.auth_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id uuid REFERENCES public.accounts(id) ON DELETE CASCADE,
@@ -1638,7 +1638,7 @@ CREATE INDEX IF NOT EXISTS idx_auth_events_created_at ON public.auth_events(crea
 CREATE INDEX IF NOT EXISTS idx_auth_events_event_type ON public.auth_events(event_type);
 
 -- Email events table for tracking deliverability via Resend webhooks
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.email_events (
+CREATE TABLE IF NOT EXISTS public.email_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email_id text,
   email_type text NOT NULL,
@@ -1655,7 +1655,7 @@ CREATE INDEX IF NOT EXISTS idx_email_events_user_id ON public.email_events(user_
 CREATE INDEX IF NOT EXISTS idx_email_events_created_at ON public.email_events(created_at);
 
 -- Passkeys/WebAuthn credentials table
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.passkeys (
+CREATE TABLE IF NOT EXISTS public.passkeys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   credential_id text NOT NULL UNIQUE,
@@ -1672,7 +1672,7 @@ CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON public.passkeys(user_id);
 CREATE INDEX IF NOT EXISTS idx_passkeys_credential_id ON public.passkeys(credential_id);
 
 -- Extended sessions table for tracking active sessions with device info
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.user_sessions (
+CREATE TABLE IF NOT EXISTS public.user_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   session_token text NOT NULL UNIQUE,
@@ -1690,7 +1690,7 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_session_token ON public.user_sessio
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON public.user_sessions(expires_at);
 
 -- Rate limiting table for abuse prevention
-CREATE TABLE IF NOT EXISTS IF NOT EXISTS public.rate_limits (
+CREATE TABLE IF NOT EXISTS public.rate_limits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   identifier text NOT NULL,
   action text NOT NULL,

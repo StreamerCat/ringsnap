@@ -59,15 +59,15 @@ sed -i "s/role IN ('admin', 'support', 'sales')/role IN ('platform_admin', 'supp
 sed -i "s/role IN ('admin', 'support', 'billing')/role IN ('platform_admin', 'support')/g" "$OUTPUT_FILE"
 sed -i "s/role = 'admin'/role = 'platform_admin'/g" "$OUTPUT_FILE"
 
-# Add IF NOT EXISTS to all CREATE TABLE statements
+# Add IF NOT EXISTS to CREATE TABLE statements (only if not already present)
 echo "Adding IF NOT EXISTS to CREATE TABLE..."
-sed -i 's/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /g' "$OUTPUT_FILE"
-sed -i 's/^CREATE TABLE IF NOT EXISTS IF NOT EXISTS /CREATE TABLE IF NOT EXISTS /g' "$OUTPUT_FILE"
+sed -i 's/^CREATE TABLE \([^I]\)/CREATE TABLE IF NOT EXISTS \1/g' "$OUTPUT_FILE"
+sed -i 's/^CREATE TABLE$/CREATE TABLE IF NOT EXISTS/g' "$OUTPUT_FILE"
 
-# Add IF NOT EXISTS to all CREATE INDEX statements
+# Add IF NOT EXISTS to CREATE INDEX statements (only if not already present)
 echo "Adding IF NOT EXISTS to CREATE INDEX..."
-sed -i 's/^CREATE INDEX /CREATE INDEX IF NOT EXISTS /g' "$OUTPUT_FILE"
-sed -i 's/^CREATE INDEX IF NOT EXISTS IF NOT EXISTS /CREATE INDEX IF NOT EXISTS /g' "$OUTPUT_FILE"
+sed -i 's/^CREATE INDEX \([^I]\)/CREATE INDEX IF NOT EXISTS \1/g' "$OUTPUT_FILE"
+sed -i 's/^CREATE INDEX$/CREATE INDEX IF NOT EXISTS/g' "$OUTPUT_FILE"
 
 echo "" >> "$OUTPUT_FILE"
 echo "-- =====================================================" >> "$OUTPUT_FILE"
