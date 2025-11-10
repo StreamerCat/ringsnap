@@ -1504,7 +1504,7 @@ ALTER TABLE public.phone_number_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provisioning_logs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can read their own notifications
-CREATE POLICY IF NOT EXISTS "users_can_read_own_notifications"
+CREATE POLICY "users_can_read_own_notifications"
 ON public.phone_number_notifications FOR SELECT
 USING (
   EXISTS (
@@ -1516,7 +1516,7 @@ USING (
 );
 
 -- RLS Policy: Users can read their own provisioning logs
-CREATE POLICY IF NOT EXISTS "users_can_read_own_provisioning_logs"
+CREATE POLICY "users_can_read_own_provisioning_logs"
 ON public.provisioning_logs FOR SELECT
 USING (
   EXISTS (
