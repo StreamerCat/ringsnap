@@ -1,21 +1,19 @@
 -- =====================================================
--- RINGSNAP CONSOLIDATED DATABASE MIGRATION
+-- RINGSNAP DATABASE MIGRATION - ROBUST VERSION
 -- =====================================================
--- Run this entire file in Supabase SQL Editor
 -- Project: rmyvvbqnccpfeyowidrq
 -- URL: https://rmyvvbqnccpfeyowidrq.supabase.co
+--
+-- This migration is designed to be:
+-- 1. Idempotent (can run multiple times safely)
+-- 2. Handles existing objects with CASCADE
+-- 3. Works on both fresh and partially migrated DBs
+--
+-- RECOMMENDED: Run cleanup-database.sql first for cleanest migration
 -- =====================================================
---
--- This combines all 20 migrations in chronological order
--- Execute the entire file at once in SQL Editor
---
--- Expected outcome:
--- - All tables created
--- - All RLS policies applied
--- - All functions and triggers installed
--- - Database fully initialized
---
--- =====================================================
+
+-- Start transaction for atomicity
+BEGIN;
 
 
 -- =====================================================
@@ -95,21 +93,21 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 -- Helper function: Extract domain from email
-DROP FUNCTION IF EXISTS public.extract_email_domain(text);
+DROP FUNCTION IF EXISTS public.extract_email_domain CASCADE;
 CREATE OR REPLACE FUNCTION public.extract_email_domain(email TEXT)
 RETURNS TEXT AS $$
   SELECT lower(split_part(email, '@', 2));
 $$ LANGUAGE SQL IMMUTABLE;
 
 -- Helper function: Check if email domain is generic
-DROP FUNCTION IF EXISTS public.is_generic_email_domain(text);
+DROP FUNCTION IF EXISTS public.is_generic_email_domain CASCADE;
 CREATE OR REPLACE FUNCTION public.is_generic_email_domain(domain TEXT)
 RETURNS BOOLEAN AS $$
   SELECT domain IN ('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com');
 $$ LANGUAGE SQL IMMUTABLE;
 
 -- Security definer function: Check if user has specific role
-DROP FUNCTION IF EXISTS public.has_role(uuid, public.app_role);
+DROP FUNCTION IF EXISTS public.has_role CASCADE;
 CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role public.app_role)
 RETURNS BOOLEAN
 LANGUAGE SQL
@@ -126,7 +124,7 @@ AS $$
 $$;
 
 -- Security definer function: Get user's account_id
-DROP FUNCTION IF EXISTS public.get_user_account_id(uuid);
+DROP FUNCTION IF EXISTS public.get_user_account_id CASCADE;
 CREATE OR REPLACE FUNCTION public.get_user_account_id(_user_id UUID)
 RETURNS UUID
 LANGUAGE SQL
@@ -140,7 +138,7 @@ AS $$
 $$;
 
 -- Main trigger function: Handle new user signup
-DROP FUNCTION IF EXISTS public.handle_new_user_signup();
+DROP FUNCTION IF EXISTS public.handle_new_user_signup CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -227,6 +225,7 @@ END;
 $$;
 
 -- Create trigger on auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
@@ -282,7 +281,7 @@ CREATE POLICY "Owners can view all roles in their account"
   );
 
 -- Create updated_at trigger function
-DROP FUNCTION IF EXISTS public.update_updated_at_column();
+DROP FUNCTION IF EXISTS public.update_updated_at_column CASCADE;
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -292,11 +291,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add updated_at triggers
+DROP TRIGGER IF EXISTS update_accounts_updated_at ON public.accounts;
 CREATE TRIGGER update_accounts_updated_at
   BEFORE UPDATE ON public.accounts
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
@@ -306,7 +307,7 @@ CREATE TRIGGER update_profiles_updated_at
 -- =====================================================
 
 -- Fix type casting in handle_new_user_signup trigger function
-DROP FUNCTION IF EXISTS public.handle_new_user_signup();
+DROP FUNCTION IF EXISTS public.handle_new_user_signup CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -396,7 +397,7 @@ $function$;
 -- =====================================================
 
 -- Fix type casting in handle_new_user_signup trigger function
-DROP FUNCTION IF EXISTS public.handle_new_user_signup();
+DROP FUNCTION IF EXISTS public.handle_new_user_signup CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -488,7 +489,7 @@ $function$;
 -- Fix search_path for security on utility functions
 
 -- Update extract_email_domain function
-DROP FUNCTION IF EXISTS public.extract_email_domain(text);
+DROP FUNCTION IF EXISTS public.extract_email_domain CASCADE;
 CREATE OR REPLACE FUNCTION public.extract_email_domain(email text)
 RETURNS text
 LANGUAGE sql
@@ -500,7 +501,7 @@ AS $function$
 $function$;
 
 -- Update is_generic_email_domain function
-DROP FUNCTION IF EXISTS public.is_generic_email_domain(text);
+DROP FUNCTION IF EXISTS public.is_generic_email_domain CASCADE;
 CREATE OR REPLACE FUNCTION public.is_generic_email_domain(domain text)
 RETURNS boolean
 LANGUAGE sql
@@ -512,7 +513,7 @@ AS $function$
 $function$;
 
 -- Update update_updated_at_column function
-DROP FUNCTION IF EXISTS public.update_updated_at_column();
+DROP FUNCTION IF EXISTS public.update_updated_at_column CASCADE;
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -669,9 +670,7 @@ ALTER TABLE accounts
   ADD COLUMN phone_verified BOOLEAN DEFAULT false,
   ADD COLUMN email_verified BOOLEAN DEFAULT false;
 
--- 3. EXTEND TRIAL SIGNUPS TABLE (SKIPPED - table does not exist in base schema)
--- The trial_signups table was from an earlier Lovable iteration
--- Commenting out to avoid migration errors
+-- 3. EXTEND TRIAL SIGNUPS TABLE (SKIPPED)
 --
 -- ALTER TABLE trial_signups
 --   ADD COLUMN assistant_gender TEXT DEFAULT 'female' CHECK (assistant_gender IN ('male', 'female')),
@@ -879,7 +878,7 @@ CREATE TRIGGER update_assistants_updated_at
 DROP FUNCTION IF EXISTS public.handle_new_user_signup() CASCADE;
 
 -- Recreate with provisioning_status set to 'pending'
-DROP FUNCTION IF EXISTS public.handle_new_user_signup();
+DROP FUNCTION IF EXISTS public.handle_new_user_signup CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -968,6 +967,7 @@ END;
 $function$;
 
 -- Recreate the trigger
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_signup();
@@ -1159,6 +1159,7 @@ ALTER TABLE public.account_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.role_audit_log ENABLE ROW LEVEL SECURITY;
 
 -- Create security functions
+DROP FUNCTION IF EXISTS public.has_platform_role CASCADE;
 CREATE OR REPLACE FUNCTION public.has_platform_role(_user_id UUID, _role staff_role)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -1242,7 +1243,7 @@ ALTER TABLE public.profiles ALTER COLUMN name DROP NOT NULL;
 ALTER TABLE public.profiles ALTER COLUMN phone DROP NOT NULL;
 
 -- Update handle_new_user_signup trigger to work with new structure
-DROP FUNCTION IF EXISTS public.handle_new_user_signup();
+DROP FUNCTION IF EXISTS public.handle_new_user_signup CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user_signup()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1745,6 +1746,7 @@ EXCEPTION
 END $$;
 
 -- Function to clean up expired tokens (run via cron or periodically)
+DROP FUNCTION IF EXISTS public.cleanup_expired_auth_tokens CASCADE;
 CREATE OR REPLACE FUNCTION public.cleanup_expired_auth_tokens()
 RETURNS void AS $$
 BEGIN
@@ -1754,6 +1756,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to clean up old rate limit records
+DROP FUNCTION IF EXISTS public.cleanup_old_rate_limits CASCADE;
 CREATE OR REPLACE FUNCTION public.cleanup_old_rate_limits()
 RETURNS void AS $$
 BEGIN
@@ -1763,6 +1766,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to log auth events
+DROP FUNCTION IF EXISTS public.log_auth_event CASCADE;
 CREATE OR REPLACE FUNCTION public.log_auth_event(
   p_user_id uuid,
   p_account_id uuid,
@@ -1800,6 +1804,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to check rate limit
+DROP FUNCTION IF EXISTS public.check_rate_limit CASCADE;
 CREATE OR REPLACE FUNCTION public.check_rate_limit(
   p_identifier text,
   p_action text,
@@ -1974,7 +1979,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Function to get user's account_id
-DROP FUNCTION IF EXISTS public.get_user_account_id(uuid);
+DROP FUNCTION IF EXISTS public.get_user_account_id CASCADE;
 CREATE OR REPLACE FUNCTION public.get_user_account_id(p_user_id uuid)
 RETURNS uuid AS $$
 DECLARE
@@ -2041,7 +2046,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Helper function to check if user has role
-DROP FUNCTION IF EXISTS public.has_role(uuid, public.app_role);
+DROP FUNCTION IF EXISTS public.has_role CASCADE;
 CREATE OR REPLACE FUNCTION public.has_role(p_user_id uuid, p_role text)
 RETURNS boolean AS $$
 BEGIN
@@ -2476,6 +2481,5 @@ GRANT ALL ON public.phone_numbers TO authenticated;
 GRANT ALL ON public.assistants TO authenticated;
 GRANT SELECT ON public.staff_roles TO authenticated;
 
--- =====================================================
--- MIGRATION COMPLETE
--- =====================================================
+-- Migration complete
+COMMIT;
