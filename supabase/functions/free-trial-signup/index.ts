@@ -207,6 +207,10 @@ serve(async (req) => {
       context: { userId: authData.user.id, email },
     });
 
+    // Define trial dates upfront
+    const trialStartDate = new Date().toISOString();
+    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
     // Create account record (don't rely on trigger)
     logInfo("Creating account record", {
       ...baseLogOptions,
@@ -222,8 +226,8 @@ serve(async (req) => {
         company_website: validatedData.companyWebsite,
         wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
         subscription_status: "trial",
-        trial_start_date: new Date().toISOString(),
-        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_start_date: trialStartDate,
+        trial_end_date: trialEndDate,
       })
       .select()
       .single();
@@ -417,16 +421,16 @@ serve(async (req) => {
     const vapiProvisioningTask = supabase.functions
       .invoke("provision-resources", {
         body: {
-          account_id: accountId,
-          user_id: authData.user.id,
+          accountId: accountId,
+          userId: authData.user.id,
           email: validatedData.email,
           name: validatedData.name,
           phone: validatedData.phone,
-          company_name: finalCompanyName,
-          company_website: validatedData.companyWebsite || "",
+          companyName: finalCompanyName,
+          companyWebsite: validatedData.companyWebsite || "",
           trade: validatedData.trade,
-          assistant_gender: validatedData.assistantGender || "female",
-          wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
+          assistantGender: validatedData.assistantGender || "female",
+          wantsAdvancedVoice: validatedData.wantsAdvancedVoice || false,
         },
       })
       .then((provisionResponse) => {
