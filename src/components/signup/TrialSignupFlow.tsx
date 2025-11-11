@@ -176,7 +176,7 @@ export const TrialSignupFlow = ({
     if (!formValues.planType) {
       toast.error("Please select a plan");
       console.error("❌ Missing planType");
-      setCurrentStep(2); // Go back to plan selection
+      setCurrentStep(3); // Go back to plan selection
       return;
     }
 
@@ -364,8 +364,8 @@ export const TrialSignupFlow = ({
 
         // Additional customization based on error content
         if (errorMessage.includes("planType") || errorMessage.includes("plan")) {
-          errorMessage = "Please select a valid plan. Go back to step 2 and choose your plan.";
-          setCurrentStep(2); // Navigate back to plan selection
+          errorMessage = "Please select a valid plan. Go back to step 3 and choose your plan.";
+          setCurrentStep(3); // Navigate back to plan selection
         }
         else if (errorMessage.includes("paymentMethodId") || errorMessage.includes("payment method")) {
           errorMessage = "Payment method is missing. Please re-enter your card details.";
