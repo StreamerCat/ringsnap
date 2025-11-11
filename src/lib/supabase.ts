@@ -13,19 +13,29 @@ const supabaseAnonKey =
   env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Supabase environment variables are not configured. Set NEXT_PUBLIC_SUPABASE_URL or VITE_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY, VITE_SUPABASE_ANON_KEY, or VITE_SUPABASE_PUBLISHABLE_KEY."
+  console.error(
+    "❌ Supabase environment variables are not configured!\n" +
+    "Required variables:\n" +
+    "  - VITE_SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)\n" +
+    "  - VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)\n" +
+    "Current values:\n" +
+    `  - supabaseUrl: ${supabaseUrl || 'undefined'}\n` +
+    `  - supabaseAnonKey: ${supabaseAnonKey ? '[REDACTED - exists]' : 'undefined'}`
   );
 }
 
 const storage = typeof window === "undefined" ? undefined : window.localStorage;
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage,
-    persistSession: storage !== undefined,
-    autoRefreshToken: true,
-  },
-});
+export const supabase = createClient<Database>(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseAnonKey || "placeholder-anon-key",
+  {
+    auth: {
+      storage,
+      persistSession: storage !== undefined,
+      autoRefreshToken: true,
+    },
+  }
+);
 
 export default supabase;
