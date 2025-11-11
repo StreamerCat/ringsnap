@@ -67,14 +67,25 @@ export default function CustomerDashboard() {
   const loadDashboardData = async (userId: string) => {
     try {
       // Load profile
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*, accounts(*)")
         .eq("id", userId)
         .single();
 
-      if (!profileData || !profileData.accounts) {
-        throw new Error("Profile or account not found");
+      if (profileError) {
+        console.error("Profile query error:", profileError);
+        throw new Error(`Failed to load profile: ${profileError.message}`);
+      }
+
+      if (!profileData) {
+        console.error("Profile not found for user:", userId);
+        throw new Error("Profile not found. Your account may still be setting up. Please wait a moment and refresh the page.");
+      }
+
+      if (!profileData.accounts) {
+        console.error("Account not found for profile:", profileData);
+        throw new Error("Account not found. Your account may still be setting up. Please wait a moment and refresh the page.");
       }
 
       setProfile(profileData);
@@ -149,10 +160,12 @@ export default function CustomerDashboard() {
 
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to load dashboard data";
       toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive"
+        title: "Error Loading Dashboard",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 10000,
       });
     } finally {
       setLoading(false);

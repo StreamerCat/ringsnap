@@ -400,6 +400,7 @@ export const TrialSignupFlow = ({
       });
 
       // Auto-login the user with the returned credentials
+      let loginSuccessful = false;
       if (data.password) {
         console.log("🔐 Auto-logging in user...");
         try {
@@ -413,7 +414,13 @@ export const TrialSignupFlow = ({
             toast.warning("Account created! Please check your email for login instructions.", { duration: 6000 });
           } else {
             console.log("✅ Auto-login successful! Session:", authData.session ? "active" : "none");
-            toast.success("Welcome! Redirecting to your dashboard...", { duration: 3000 });
+            loginSuccessful = !!authData.session;
+            if (loginSuccessful) {
+              toast.success("Welcome! Redirecting to your dashboard...", { duration: 3000 });
+            } else {
+              console.warn("⚠️ Session not established after login");
+              toast.warning("Account created! Please check your email for login instructions.", { duration: 6000 });
+            }
           }
         } catch (loginErr) {
           console.error("❌ Login error:", loginErr);
@@ -425,20 +432,20 @@ export const TrialSignupFlow = ({
       }
 
       // Redirect to dashboard or confirmation page
-      console.log("🔄 Redirecting in 1.5 seconds...");
+      console.log("🔄 Redirecting in 2 seconds...");
       setTimeout(() => {
         if (onSuccess) {
           console.log("✅ Calling onSuccess callback");
           onSuccess(data);
         } else {
-          // If logged in, go to dashboard; otherwise go to confirmation page
-          const redirectUrl = data.password
+          // Only redirect to dashboard if login was successful
+          const redirectUrl = loginSuccessful
             ? `/dashboard`
             : `/trial-confirmation?email=${encodeURIComponent(data.email)}&password=${encodeURIComponent(data.password || '')}`;
           console.log("✅ Navigating to:", redirectUrl);
           window.location.href = redirectUrl;
         }
-      }, 1500);
+      }, 2000);
 
     } catch (error: any) {
       console.error("❌ Trial signup error:", error);
