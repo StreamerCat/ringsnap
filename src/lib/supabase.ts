@@ -7,10 +7,15 @@ import type { Database } from "@/integrations/supabase/types";
 
 const env = import.meta.env as Record<string, string | undefined>;
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? env.VITE_SUPABASE_URL;
-const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseAnonKey =
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  env.VITE_SUPABASE_ANON_KEY ??
+  env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Supabase environment variables are not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+  throw new Error(
+    "Supabase environment variables are not configured. Set NEXT_PUBLIC_SUPABASE_URL or VITE_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY, VITE_SUPABASE_ANON_KEY, or VITE_SUPABASE_PUBLISHABLE_KEY."
+  );
 }
 
 const storage = typeof window === "undefined" ? undefined : window.localStorage;

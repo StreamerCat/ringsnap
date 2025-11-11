@@ -61,7 +61,7 @@ supabase/
 
 Required environment variables are automatically configured via the Supabase integration:
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_ANON_KEY` (or `VITE_SUPABASE_PUBLISHABLE_KEY`)
 - `VITE_SUPABASE_PROJECT_ID`
 
 ## Deployment
@@ -111,7 +111,7 @@ Follow these steps to enable Google OAuth for RingSnap across all environments.
 ### Supabase Settings
 - In Supabase **Auth → URL Configuration**, add the same callback URLs listed above.
 - Enable the Google provider with the Client ID and Client Secret from Google Cloud.
-- Ensure the environment variables `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or their `VITE_` fallbacks) are available in Netlify and local `.env` files.
+- Ensure the environment variables `NEXT_PUBLIC_SUPABASE_URL`/`VITE_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`/`VITE_SUPABASE_ANON_KEY` (or `VITE_SUPABASE_PUBLISHABLE_KEY`) are available in Netlify and local `.env` files.
 
 ### App Usage
 - Render the `<GoogleButton />` component on the sign-in page to start OAuth.
