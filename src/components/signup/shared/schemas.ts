@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { businessDetailsSchema } from "@/components/wizard/types";
 
 const areaCodeSchema = z
   .string()
