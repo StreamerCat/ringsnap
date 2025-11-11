@@ -1,37 +1,73 @@
 /**
  * Handles Supabase OAuth callback by exchanging the authorization code for a session.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const SUCCESS_REDIRECT = "/dashboard";
 const ERROR_REDIRECT = "/signin";
+const EXCHANGE_TIMEOUT_MS = 10000; // 10 second timeout
 
 export default function AuthCallback() {
   const location = useLocation();
   const navigate = useNavigate();
   const [message, setMessage] = useState("Signing you in...");
+  const hasRun = useRef(false);
 
-  const { code, next } = useMemo(() => {
+  const { code, next, error: urlError } = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return {
       code: params.get("code"),
       next: params.get("next"),
+      error: params.get("error"),
     };
   }, [location.search]);
 
   useEffect(() => {
+    // Prevent double execution in StrictMode
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     const exchange = async () => {
+      // Check for OAuth errors in URL
+      if (urlError) {
+        console.error("OAuth error from provider:", urlError);
+        setMessage("Authentication was cancelled or failed.");
+        setTimeout(() => {
+          navigate(`${ERROR_REDIRECT}?error=${encodeURIComponent(urlError)}`, { replace: true });
+        }, 1500);
+        return;
+      }
+
+      // Check if we have a code
       if (!code) {
+        console.error("No authorization code in callback URL");
         navigate(`${ERROR_REDIRECT}?error=missing_code`, { replace: true });
         return;
       }
 
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured) {
+        console.error("Cannot complete OAuth: Supabase is not configured");
+        setMessage("Configuration error. Please contact support.");
+        setTimeout(() => {
+          navigate(`${ERROR_REDIRECT}?error=not_configured`, { replace: true });
+        }, 2000);
+        return;
+      }
+
       try {
-        const { error } = await supabase.auth.exchangeCodeForSession({ code });
+        // Add timeout to prevent infinite hanging
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Authentication timeout")), EXCHANGE_TIMEOUT_MS)
+        );
+
+        const exchangePromise = supabase.auth.exchangeCodeForSession({ code });
+        const { error } = await Promise.race([exchangePromise, timeoutPromise]) as Awaited<typeof exchangePromise>;
+
         if (error) {
           throw error;
         }
@@ -49,7 +85,7 @@ export default function AuthCallback() {
     };
 
     exchange();
-  }, [code, navigate, next]);
+  }, [code, navigate, next, urlError]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background to-muted px-4 text-center">

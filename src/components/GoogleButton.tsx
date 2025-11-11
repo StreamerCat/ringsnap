@@ -5,11 +5,13 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 type GoogleButtonProps = {
   onError?: (message: string) => void;
 };
+
+const OAUTH_TIMEOUT_MS = 10000; // 10 second timeout
 
 export function GoogleButton({ onError }: GoogleButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,21 +19,36 @@ export function GoogleButton({ onError }: GoogleButtonProps) {
   const handleClick = async () => {
     try {
       setIsLoading(true);
+
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured) {
+        throw new Error("Authentication is not configured. Please contact support.");
+      }
+
       const origin = typeof window !== "undefined" && window.location.origin
         ? window.location.origin
         : "https://getringsnap.com";
       const redirectTo = `${origin}/auth/callback`;
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Google sign-in timeout. Please try again.")), OAUTH_TIMEOUT_MS)
+      );
+
+      const oauthPromise = supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
         },
       });
 
+      const { error } = await Promise.race([oauthPromise, timeoutPromise]) as Awaited<typeof oauthPromise>;
+
       if (error) {
         throw error;
       }
+
+      // Note: If successful, user will be redirected to Google, so no need to reset loading state
     } catch (error: unknown) {
       console.error("Google OAuth sign-in failed:", error);
       const message = error instanceof Error ? error.message : "Unable to start Google sign-in";
