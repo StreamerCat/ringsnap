@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -23,22 +23,20 @@ import {
   validatePhoneNumber,
   extractCompanyNameFromEmail
 } from "./shared/utils";
-import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle, Loader2 } from "lucide-react";
+import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { COMMON_AREA_CODES } from "./shared/areaCodeOptions";
 
 type TrialFormData = z.infer<typeof trialSignupSchema>;
 
-type AreaCodeAvailabilityState = 'idle' | 'debouncing' | 'loading' | 'available' | 'unavailable' | 'error';
-
-const sanitizeAreaCode = (value: string | null | undefined) =>
-  (value ?? '').replace(/\D/g, '').slice(0, 3);
+// Extract area code from phone number (e.g., "(555) 123-4567" -> "555")
+const extractAreaCodeFromPhone = (phoneNumber: string): string => {
+  const digits = phoneNumber.replace(/\D/g, '');
+  return digits.slice(0, 3);
+};
 
 interface TrialSignupFlowProps {
   open: boolean;
@@ -58,10 +56,6 @@ export const TrialSignupFlow = ({
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [showCompanyName, setShowCompanyName] = useState(false);
-  const [showCustomAreaCode, setShowCustomAreaCode] = useState(false);
-  const [areaCodeStatus, setAreaCodeStatus] = useState<AreaCodeAvailabilityState>('idle');
-  const [areaCodeStatusMessage, setAreaCodeStatusMessage] = useState<string>('');
-  const [areaCodeSuggestions, setAreaCodeSuggestions] = useState<string[]>([]);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -85,7 +79,6 @@ export const TrialSignupFlow = ({
   const { watch, setValue, formState: { errors } } = form;
   const email = watch("email");
   const phone = watch("phone");
-  const areaCode = watch("areaCode");
   const planType = watch("planType");
 
   // Auto-detect company name from email
@@ -109,23 +102,6 @@ export const TrialSignupFlow = ({
     }
   }, [phone, setValue]);
 
-  useEffect(() => {
-    if (!areaCode) {
-      return;
-    }
-
-    const matchesPreset = COMMON_AREA_CODES.some((option) => option.code === areaCode);
-    if (matchesPreset && showCustomAreaCode) {
-      setShowCustomAreaCode(false);
-    }
-  }, [areaCode, showCustomAreaCode]);
-
-  useEffect(() => {
-    if (!open) {
-      setShowCustomAreaCode(false);
-    }
-  }, [open]);
-
   // Watch for planType changes
   useEffect(() => {
     const subscription = watch((value, { name }) => {
@@ -139,7 +115,7 @@ export const TrialSignupFlow = ({
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
       case 1: {
-        const leadResult = await form.trigger(['name', 'email', 'phone', 'areaCode']);
+        const leadResult = await form.trigger(['name', 'email', 'phone']);
         return leadResult;
       }
       case 2: {
@@ -219,9 +195,14 @@ export const TrialSignupFlow = ({
 
       console.log("✅ Payment method created:", paymentMethod.id);
 
+      // Extract area code from phone number
+      const phoneNumber = form.getValues("phone");
+      const extractedAreaCode = extractAreaCodeFromPhone(phoneNumber);
+
       // Prepare request body
       const requestBody = {
         ...form.getValues(),
+        areaCode: extractedAreaCode, // Use extracted area code from phone number
         paymentMethodId: paymentMethod.id,
         source,
       };
@@ -509,73 +490,6 @@ export const TrialSignupFlow = ({
                 error={errors.phone?.message}
                 isValid={!!watch("phone") && !errors.phone}
               />
-
-              <Controller
-                name="areaCode"
-                control={form.control}
-                render={({ field }) => (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="areaCode" className="text-sm font-medium">
-                        Preferred Area Code
-                      </Label>
-                      {errors.areaCode ? (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      ) : field.value && field.value.length === 3 ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : null}
-                    </div>
-                    <Select
-                      value={showCustomAreaCode ? 'custom' : field.value || undefined}
-                      onValueChange={(value) => {
-                        if (value === 'custom') {
-                          setShowCustomAreaCode(true);
-                          field.onChange('');
-                        } else {
-                          setShowCustomAreaCode(false);
-                          field.onChange(value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger id="areaCode" className="h-12">
-                        <SelectValue placeholder="Select an area code" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMON_AREA_CODES.map(({ code, label }) => (
-                          <SelectItem key={code} value={code}>
-                            {code} — {label}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="custom">Other area code…</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {showCustomAreaCode && (
-                      <Input
-                        value={field.value}
-                        onChange={(event) => {
-                          const digits = event.target.value.replace(/\D/g, '').slice(0, 3);
-                          field.onChange(digits);
-                        }}
-                        inputMode="numeric"
-                        maxLength={3}
-                        placeholder="Enter 3 digits"
-                        aria-label="Custom area code"
-                        className="h-12 text-base"
-                      />
-                    )}
-                    {errors.areaCode ? (
-                      <p className="text-sm text-red-500 flex items-start gap-1">
-                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        {errors.areaCode.message}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        We’ll match you with a business number in this area code when provisioning your assistant.
-                      </p>
-                    )}
-                  </div>
-                )}
-              />
             </div>
 
             <SignupButton type="submit" className="w-full">
@@ -595,108 +509,6 @@ export const TrialSignupFlow = ({
             </div>
 
             <div className="space-y-4">
-              <Controller
-                name="areaCode"
-                control={form.control}
-                render={({ field }) => (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="areaCode" className="text-sm font-medium">
-                        Desired area code for your RingSnap number
-                      </Label>
-                      {errors.areaCode ? (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      ) : areaCodeStatus === 'loading' || areaCodeStatus === 'debouncing' ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : areaCodeStatus === 'available' ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : areaCodeStatus === 'unavailable' ? (
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                      ) : areaCodeStatus === 'error' ? (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      ) : null}
-                    </div>
-                    <Input
-                      id="areaCode"
-                      value={field.value}
-                      onChange={(event) => {
-                        const nextValue = sanitizeAreaCode(event.target.value);
-                        field.onChange(nextValue);
-                      }}
-                      inputMode="numeric"
-                      maxLength={3}
-                      placeholder="e.g. 415"
-                      className="h-12 text-base"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      We’ll search Vapi for available numbers in this area code while you complete the next steps.
-                    </p>
-
-                    {errors.areaCode && (
-                      <p className="flex items-start gap-1 text-sm text-red-500">
-                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        {errors.areaCode.message}
-                      </p>
-                    )}
-
-                    {(areaCodeStatus === 'loading' || areaCodeStatus === 'debouncing') && (
-                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {areaCodeStatus === 'debouncing' ? 'Preparing availability check…' : 'Checking availability…'}
-                      </p>
-                    )}
-
-                    {areaCodeStatus === 'available' && areaCodeStatusMessage && (
-                      <p className="flex items-start gap-2 text-sm text-emerald-600">
-                        <Check className="h-4 w-4 mt-0.5" />
-                        {areaCodeStatusMessage}
-                      </p>
-                    )}
-
-                    {areaCodeStatus === 'unavailable' && (
-                      <div className="space-y-3">
-                        <Alert>
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            {areaCodeStatusMessage ?? `We couldn’t find numbers in area code ${field.value}.`}
-                          </AlertDescription>
-                        </Alert>
-
-                        {areaCodeSuggestions.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium uppercase text-muted-foreground">
-                              Suggested nearby area codes
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {areaCodeSuggestions.map((code) => (
-                                <Button
-                                  key={code}
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => field.onChange(sanitizeAreaCode(code))}
-                                >
-                                  {code}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {areaCodeStatus === 'error' && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          {areaCodeStatusMessage ?? "We couldn’t verify that area code. You can continue or try again."}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                )}
-              />
-
               <div className="space-y-2">
                 <Label htmlFor="companyName" className="flex items-center gap-2 text-sm font-medium">
                   <Building2 className="h-4 w-4 text-primary" />
