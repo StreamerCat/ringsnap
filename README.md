@@ -92,3 +92,32 @@ Operations and admin users can access the monitoring dashboard at `/admin/monito
 ## Support
 
 For technical issues or questions, contact the development team.
+
+## Google Sign in with Supabase
+
+Follow these steps to enable Google OAuth for RingSnap across all environments.
+
+### Google Cloud Console
+1. Create or select a project in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Configure the OAuth consent screen as **External**. Add test users until the app is published.
+3. Create OAuth client credentials of type **Web application**.
+4. Add the following Authorized redirect URIs for each environment:
+   - https://getringsnap.com/auth/callback
+   - https://www.getringsnap.com/auth/callback (if applicable)
+   - https://<your-netlify-preview-domain>/auth/callback
+   - http://localhost:3000/auth/callback (local development)
+5. Copy the generated Client ID and Client Secret into Supabase → Authentication → Providers → Google.
+
+### Supabase Settings
+- In Supabase **Auth → URL Configuration**, add the same callback URLs listed above.
+- Enable the Google provider with the Client ID and Client Secret from Google Cloud.
+- Ensure the environment variables `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or their `VITE_` fallbacks) are available in Netlify and local `.env` files.
+
+### App Usage
+- Render the `<GoogleButton />` component on the sign-in page to start OAuth.
+- Supabase will redirect back to `/auth/callback`, where the authorization code is exchanged for a session before sending the user to the dashboard.
+
+### Troubleshooting
+- **redirect_uri_mismatch**: The callback URL must match exactly, including protocol and path.
+- **Unpublished consent screen**: Add test users or publish the consent screen before going live.
+- **Session not sticking**: Confirm cookie settings and that all callback URLs use the same domain (avoid mixing `www` and apex).

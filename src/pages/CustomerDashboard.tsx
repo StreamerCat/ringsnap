@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { signOutUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -258,8 +259,13 @@ export default function CustomerDashboard() {
               Home
             </Button>
             <Button variant="outline" onClick={async () => {
-              await supabase.auth.signOut();
-              navigate("/");
+              try {
+                await signOutUser();
+              } catch (error) {
+                console.error("Failed to sign out:", error);
+              } finally {
+                navigate("/signin");
+              }
             }}>
               Sign Out
             </Button>

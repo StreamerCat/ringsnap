@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2, Mail, Lock, ArrowLeft } from "lucide-react";
+
+import GoogleButton from "@/components/GoogleButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-import { Loader2, Mail, Lock, ArrowLeft } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function AuthLogin() {
   const navigate = useNavigate();
@@ -127,6 +129,10 @@ export default function AuthLogin() {
     navigate(`/auth/password?email=${encodeURIComponent(email)}&mode=reset`);
   };
 
+  const handleOAuthError = (message: string) => {
+    toast.error(message);
+  };
+
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
@@ -178,7 +184,19 @@ export default function AuthLogin() {
             Sign in to access your RingSnap account
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <GoogleButton onError={handleOAuthError} />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+              </div>
+            </div>
+          </div>
+
           {!showPasswordInput ? (
             <form onSubmit={handleContinueWithEmail} className="space-y-4">
               <div className="space-y-2">
@@ -286,7 +304,7 @@ export default function AuthLogin() {
             </form>
           )}
 
-          <div className="mt-6 text-center">
+          <div className="text-center">
             <Button variant="link" onClick={() => navigate("/")}>
               Back to Homepage
             </Button>
