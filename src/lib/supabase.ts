@@ -12,7 +12,10 @@ const supabaseAnonKey =
   env.VITE_SUPABASE_ANON_KEY ??
   env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+// Export configuration status for components to check
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+if (!isSupabaseConfigured) {
   console.error(
     "❌ Supabase environment variables are not configured!\n" +
     "Required variables:\n" +
@@ -26,14 +29,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const storage = typeof window === "undefined" ? undefined : window.localStorage;
 
+// Create client with valid values or safe fallbacks
+// Note: Fallback values will cause API calls to fail, but won't crash during initialization
 export const supabase = createClient<Database>(
   supabaseUrl || "https://placeholder.supabase.co",
-  supabaseAnonKey || "placeholder-anon-key",
+  supabaseAnonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MTY3MjMyMDAsImV4cCI6MTk2NzI5OTIwMH0.placeholder",
   {
     auth: {
       storage,
       persistSession: storage !== undefined,
       autoRefreshToken: true,
+      flowType: 'pkce',
     },
   }
 );

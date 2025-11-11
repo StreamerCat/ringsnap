@@ -20,10 +20,20 @@ export function useUser(): UseUserResult {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const fetchUser = async () => {
       try {
-        const { data, error } = await supabase.auth.getUser();
+        // Add timeout to prevent infinite loading if API never responds
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("User fetch timeout")), 5000);
+        });
+
+        const getUserPromise = supabase.auth.getUser();
+        const { data, error } = await Promise.race([getUserPromise, timeoutPromise]) as Awaited<typeof getUserPromise>;
+
+        clearTimeout(timeoutId);
+
         if (error) {
           console.error("Failed to fetch Supabase user:", error);
         }
@@ -53,6 +63,7 @@ export function useUser(): UseUserResult {
 
     return () => {
       isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       data.subscription.unsubscribe();
     };
   }, []);
