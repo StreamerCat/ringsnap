@@ -29,6 +29,7 @@ serve(async (req) => {
       name: z.string().trim().min(1, "Name required").max(100, "Name too long"),
       email: z.string().email("Invalid email").max(255, "Email too long"),
       phone: z.string().min(1, "Phone required"),
+      areaCode: z.string().trim().regex(/^\d{3}$/, "Area code must be exactly 3 digits"),
       companyName: z.string().max(200).optional(),
       companyWebsite: z.string().max(255).optional(),
       deviceFingerprint: z.string().max(500).optional(),
@@ -54,7 +55,8 @@ serve(async (req) => {
       });
     }
 
-    const { name, email, phone, companyName } = validatedData;
+    const { name, email, phone, companyName, areaCode: rawAreaCode } = validatedData;
+    const areaCode = rawAreaCode.trim();
 
     if (!isValidPhoneNumber(phone)) {
       return new Response(JSON.stringify({ error: "Invalid phone number format" }), {
@@ -226,6 +228,7 @@ serve(async (req) => {
         subscription_status: "trial",
         trial_start_date: new Date().toISOString(),
         trial_end_date: trialEndDate,
+        phone_number_area_code: areaCode,
       })
       .select()
       .single();
@@ -424,6 +427,7 @@ serve(async (req) => {
           email: validatedData.email,
           name: validatedData.name,
           phone: validatedData.phone,
+          areaCode,
           company_name: finalCompanyName,
           company_website: validatedData.companyWebsite || "",
           trade: validatedData.trade,

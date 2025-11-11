@@ -30,7 +30,8 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { accountId, email, name, phone } = await req.json();
+    const requestPayload = await req.json();
+    const { accountId, email, name, phone, areaCode: requestedAreaCode } = requestPayload;
     currentAccountId = accountId;
 
     if (!accountId) {
@@ -64,14 +65,41 @@ serve(async (req) => {
       throw new Error(`Account not found: ${accountError?.message}`);
     }
 
-    const areaCode = account.phone_number_area_code;
-    if (!areaCode) {
+    const normalizedRequestAreaCode = typeof requestedAreaCode === 'string'
+      ? requestedAreaCode.replace(/\D/g, '').slice(0, 3)
+      : null;
+
+    let areaCode = account.phone_number_area_code;
+
+    if ((!areaCode || areaCode.length !== 3) && normalizedRequestAreaCode && normalizedRequestAreaCode.length === 3) {
+      const { error: updateError } = await supabase
+        .from('accounts')
+        .update({ phone_number_area_code: normalizedRequestAreaCode })
+        .eq('id', accountId);
+
+      if (updateError) {
+        logWarn('Failed to backfill account area code from request payload', {
+          ...baseLogOptions,
+          accountId,
+          context: { requestedAreaCode: normalizedRequestAreaCode, error: updateError.message },
+        });
+      } else {
+        areaCode = normalizedRequestAreaCode;
+      }
+    }
+
+    const sanitizedAreaCode = areaCode?.replace(/\D/g, '').slice(0, 3) || null;
+
+    if (!sanitizedAreaCode || sanitizedAreaCode.length !== 3) {
       throw new Error('No area code selected for account');
     }
+
+    areaCode = sanitizedAreaCode;
+
     logInfo('Using selected area code', {
       ...baseLogOptions,
       accountId,
-      context: { areaCode }
+      context: { areaCode: sanitizedAreaCode, requestedAreaCode: normalizedRequestAreaCode }
     });
 
     // Get plan limits
