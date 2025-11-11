@@ -24,14 +24,14 @@ export const leadCaptureSchema = z.object({
   trade: z.string().max(100).optional(),
 });
 
-// Step 2: Plan Selection (both flows)
+// Step 3: Plan Selection (both flows)
 export const planSelectionSchema = z.object({
   planType: z.enum(['starter', 'professional', 'premium'], {
     required_error: "Please select a plan",
   }),
 });
 
-// Step 3: Payment (both flows)
+// Step 4: Payment (both flows)
 export const paymentSchema = z.object({
   acceptTerms: z.boolean().refine(val => val === true, {
     message: "You must accept the terms to continue",
@@ -52,10 +52,12 @@ export const salesDetailsSchema = z.object({
 
 // Combined schemas
 export const trialSignupSchema = leadCaptureSchema
+  .merge(businessDetailsSchema)
   .merge(planSelectionSchema)
   .merge(paymentSchema);
 
 export const salesSignupSchema = leadCaptureSchema
+  .merge(businessDetailsSchema)
   .merge(salesDetailsSchema)
   .merge(planSelectionSchema)
   .merge(paymentSchema);

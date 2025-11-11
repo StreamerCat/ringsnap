@@ -12,6 +12,7 @@ import { SignupButton } from "./shared/SignupButton";
 import { PlanSelectionStep } from "./shared/PlanSelectionStep";
 import {
   leadCaptureSchema,
+  businessDetailsSchema,
   planSelectionSchema,
   paymentSchema,
   trialSignupSchema
@@ -31,6 +32,11 @@ import { Input } from "@/components/ui/input";
 import { COMMON_AREA_CODES } from "./shared/areaCodeOptions";
 
 type TrialFormData = z.infer<typeof trialSignupSchema>;
+
+type AreaCodeAvailabilityState = 'idle' | 'debouncing' | 'loading' | 'available' | 'unavailable' | 'error';
+
+const sanitizeAreaCode = (value: string | null | undefined) =>
+  (value ?? '').replace(/\D/g, '').slice(0, 3);
 
 interface TrialSignupFlowProps {
   open: boolean;
@@ -584,6 +590,108 @@ export const TrialSignupFlow = ({
             </div>
 
             <div className="space-y-4">
+              <Controller
+                name="areaCode"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="areaCode" className="text-sm font-medium">
+                        Desired area code for your RingSnap number
+                      </Label>
+                      {errors.areaCode ? (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      ) : areaCodeStatus === 'loading' || areaCodeStatus === 'debouncing' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : areaCodeStatus === 'available' ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : areaCodeStatus === 'unavailable' ? (
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                      ) : areaCodeStatus === 'error' ? (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      ) : null}
+                    </div>
+                    <Input
+                      id="areaCode"
+                      value={field.value}
+                      onChange={(event) => {
+                        const nextValue = sanitizeAreaCode(event.target.value);
+                        field.onChange(nextValue);
+                      }}
+                      inputMode="numeric"
+                      maxLength={3}
+                      placeholder="e.g. 415"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      We’ll search Vapi for available numbers in this area code while you complete the next steps.
+                    </p>
+
+                    {errors.areaCode && (
+                      <p className="flex items-start gap-1 text-sm text-red-500">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        {errors.areaCode.message}
+                      </p>
+                    )}
+
+                    {(areaCodeStatus === 'loading' || areaCodeStatus === 'debouncing') && (
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {areaCodeStatus === 'debouncing' ? 'Preparing availability check…' : 'Checking availability…'}
+                      </p>
+                    )}
+
+                    {areaCodeStatus === 'available' && areaCodeStatusMessage && (
+                      <p className="flex items-start gap-2 text-sm text-emerald-600">
+                        <Check className="h-4 w-4 mt-0.5" />
+                        {areaCodeStatusMessage}
+                      </p>
+                    )}
+
+                    {areaCodeStatus === 'unavailable' && (
+                      <div className="space-y-3">
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {areaCodeStatusMessage ?? `We couldn’t find numbers in area code ${field.value}.`}
+                          </AlertDescription>
+                        </Alert>
+
+                        {areaCodeSuggestions.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium uppercase text-muted-foreground">
+                              Suggested nearby area codes
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {areaCodeSuggestions.map((code) => (
+                                <Button
+                                  key={code}
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => field.onChange(sanitizeAreaCode(code))}
+                                >
+                                  {code}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {areaCodeStatus === 'error' && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {areaCodeStatusMessage ?? "We couldn’t verify that area code. You can continue or try again."}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+              />
+
               <div className="space-y-2">
                 <Label htmlFor="companyName" className="flex items-center gap-2 text-sm font-medium">
                   <Building2 className="h-4 w-4 text-primary" />
