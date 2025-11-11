@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -23,15 +23,13 @@ import {
   validatePhoneNumber,
   extractCompanyNameFromEmail
 } from "./shared/utils";
-import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle, Loader2 } from "lucide-react";
+import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { searchAvailablePhoneNumbers } from "@/lib/vapiNumberSearch";
+import { COMMON_AREA_CODES } from "./shared/areaCodeOptions";
 
 type TrialFormData = z.infer<typeof trialSignupSchema>;
 
@@ -58,12 +56,7 @@ export const TrialSignupFlow = ({
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [showCompanyName, setShowCompanyName] = useState(false);
-  const [areaCodeStatus, setAreaCodeStatus] = useState<AreaCodeAvailabilityState>('idle');
-  const [areaCodeStatusMessage, setAreaCodeStatusMessage] = useState<string | null>(null);
-  const [areaCodeSuggestions, setAreaCodeSuggestions] = useState<string[]>([]);
-
-  const areaCodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const areaCodeSearchAbortRef = useRef<AbortController | null>(null);
+  const [showCustomAreaCode, setShowCustomAreaCode] = useState(false);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -112,104 +105,19 @@ export const TrialSignupFlow = ({
   }, [phone, setValue]);
 
   useEffect(() => {
-    const normalized = sanitizeAreaCode(areaCode);
-
-    if (areaCodeDebounceRef.current) {
-      clearTimeout(areaCodeDebounceRef.current);
-      areaCodeDebounceRef.current = null;
-    }
-
-    if (areaCodeSearchAbortRef.current) {
-      areaCodeSearchAbortRef.current.abort();
-      areaCodeSearchAbortRef.current = null;
-    }
-
-    if (normalized.length !== 3) {
-      setAreaCodeStatus('idle');
-      setAreaCodeStatusMessage(null);
-      setAreaCodeSuggestions([]);
+    if (!areaCode) {
       return;
     }
 
-    setAreaCodeStatus('debouncing');
-    areaCodeDebounceRef.current = setTimeout(() => {
-      setAreaCodeStatus('loading');
-      setAreaCodeStatusMessage(null);
-      setAreaCodeSuggestions([]);
-
-      const controller = new AbortController();
-      areaCodeSearchAbortRef.current = controller;
-
-      searchAvailablePhoneNumbers({ areaCode: normalized, limit: 5, signal: controller.signal })
-        .then((result) => {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          if (result.numbers.length > 0) {
-            setAreaCodeStatus('available');
-            setAreaCodeStatusMessage(`Great news! We found numbers in area code ${normalized}.`);
-            setAreaCodeSuggestions([]);
-            return;
-          }
-
-          const suggestionSet = Array.from(
-            new Set(
-              (result.suggestions ?? [])
-                .map((code) => sanitizeAreaCode(code))
-                .filter((code) => code.length === 3 && code !== normalized)
-            )
-          );
-
-          setAreaCodeStatus('unavailable');
-          const fallbackMessage = result.error
-            ? result.error
-            : `We couldn't find numbers in area code ${normalized} right now.`;
-          setAreaCodeStatusMessage(fallbackMessage);
-          setAreaCodeSuggestions(suggestionSet.slice(0, 2));
-        })
-        .catch((error) => {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          console.error('[TrialSignupFlow] Failed to search Vapi area codes', error);
-          setAreaCodeStatus('error');
-          setAreaCodeStatusMessage("We couldn't verify that area code right now. You can continue or try again.");
-          setAreaCodeSuggestions([]);
-        })
-        .finally(() => {
-          if (areaCodeSearchAbortRef.current === controller) {
-            areaCodeSearchAbortRef.current = null;
-          }
-        });
-    }, 400);
-
-    return () => {
-      if (areaCodeDebounceRef.current) {
-        clearTimeout(areaCodeDebounceRef.current);
-        areaCodeDebounceRef.current = null;
-      }
-      if (areaCodeSearchAbortRef.current) {
-        areaCodeSearchAbortRef.current.abort();
-        areaCodeSearchAbortRef.current = null;
-      }
-    };
-  }, [areaCode]);
+    const matchesPreset = COMMON_AREA_CODES.some((option) => option.code === areaCode);
+    if (matchesPreset && showCustomAreaCode) {
+      setShowCustomAreaCode(false);
+    }
+  }, [areaCode, showCustomAreaCode]);
 
   useEffect(() => {
     if (!open) {
-      if (areaCodeDebounceRef.current) {
-        clearTimeout(areaCodeDebounceRef.current);
-        areaCodeDebounceRef.current = null;
-      }
-      if (areaCodeSearchAbortRef.current) {
-        areaCodeSearchAbortRef.current.abort();
-        areaCodeSearchAbortRef.current = null;
-      }
-      setAreaCodeStatus('idle');
-      setAreaCodeStatusMessage(null);
-      setAreaCodeSuggestions([]);
+      setShowCustomAreaCode(false);
     }
   }, [open]);
 
@@ -226,27 +134,12 @@ export const TrialSignupFlow = ({
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
       case 1: {
-        const leadFields: (keyof TrialFormData)[] = ['name', 'email', 'phone'];
-        return form.trigger(leadFields);
+        const leadResult = await form.trigger(['name', 'email', 'phone', 'areaCode']);
+        return leadResult;
       }
       case 2: {
-        const businessFields: (keyof TrialFormData)[] = ['areaCode', 'companyName', 'companyWebsite', 'trade'];
-        const baseValid = await form.trigger(businessFields);
-        if (!baseValid) {
-          return false;
-        }
-
-        const businessPayload = businessFields.reduce<Record<string, unknown>>((acc, key) => {
-          acc[key] = form.getValues(key as keyof TrialFormData);
-          return acc;
-        }, {});
-
-        const parsed = businessDetailsSchema.safeParse(businessPayload);
-        if (!parsed.success) {
-          return false;
-        }
-
-        return true;
+        const businessResult = await form.trigger(['companyName', 'companyWebsite', 'trade']);
+        return businessResult;
       }
       case 3: {
         const currentPlanType = form.getValues("planType");
@@ -612,6 +505,72 @@ export const TrialSignupFlow = ({
                 isValid={!!watch("phone") && !errors.phone}
               />
 
+              <Controller
+                name="areaCode"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="areaCode" className="text-sm font-medium">
+                        Preferred Area Code
+                      </Label>
+                      {errors.areaCode ? (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      ) : field.value && field.value.length === 3 ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : null}
+                    </div>
+                    <Select
+                      value={showCustomAreaCode ? 'custom' : field.value || undefined}
+                      onValueChange={(value) => {
+                        if (value === 'custom') {
+                          setShowCustomAreaCode(true);
+                          field.onChange('');
+                        } else {
+                          setShowCustomAreaCode(false);
+                          field.onChange(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="areaCode" className="h-12">
+                        <SelectValue placeholder="Select an area code" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMMON_AREA_CODES.map(({ code, label }) => (
+                          <SelectItem key={code} value={code}>
+                            {code} — {label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Other area code…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {showCustomAreaCode && (
+                      <Input
+                        value={field.value}
+                        onChange={(event) => {
+                          const digits = event.target.value.replace(/\D/g, '').slice(0, 3);
+                          field.onChange(digits);
+                        }}
+                        inputMode="numeric"
+                        maxLength={3}
+                        placeholder="Enter 3 digits"
+                        aria-label="Custom area code"
+                        className="h-12 text-base"
+                      />
+                    )}
+                    {errors.areaCode ? (
+                      <p className="text-sm text-red-500 flex items-start gap-1">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        {errors.areaCode.message}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        We’ll match you with a business number in this area code when provisioning your assistant.
+                      </p>
+                    )}
+                  </div>
+                )}
+              />
             </div>
 
             <SignupButton type="submit" className="w-full">

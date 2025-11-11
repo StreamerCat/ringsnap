@@ -13,10 +13,6 @@ export const leadCaptureSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
   email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
   phone: z.string().trim().min(10, "Valid phone number required").max(20, "Phone too long"),
-});
-
-// Step 2: Business Details
-export const businessDetailsSchema = z.object({
   areaCode: areaCodeSchema,
   companyName: z.string().trim().max(200, "Company name too long").optional(),
   companyWebsite: z.string()
