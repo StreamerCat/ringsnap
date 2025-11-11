@@ -152,6 +152,8 @@ serve(async (req) => {
       finalCompanyName = emailDomain;
     }
 
+    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
     const password = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 
@@ -223,7 +225,7 @@ serve(async (req) => {
         wants_advanced_voice: validatedData.wantsAdvancedVoice || false,
         subscription_status: "trial",
         trial_start_date: new Date().toISOString(),
-        trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_end_date: trialEndDate,
       })
       .select()
       .single();
