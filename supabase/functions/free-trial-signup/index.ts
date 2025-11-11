@@ -417,7 +417,7 @@ serve(async (req) => {
     const vapiProvisioningTask = supabase.functions
       .invoke("provision-resources", {
         body: {
-          account_id: accountId,
+          accountId: accountId,
           user_id: authData.user.id,
           email: validatedData.email,
           name: validatedData.name,
