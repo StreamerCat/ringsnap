@@ -23,12 +23,14 @@ import {
   validatePhoneNumber,
   extractCompanyNameFromEmail
 } from "./shared/utils";
-import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle } from "lucide-react";
+import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { COMMON_AREA_CODES } from "./shared/areaCodeOptions";
 
 type TrialFormData = z.infer<typeof trialSignupSchema>;
@@ -57,6 +59,9 @@ export const TrialSignupFlow = ({
   const [cardError, setCardError] = useState<string | null>(null);
   const [showCompanyName, setShowCompanyName] = useState(false);
   const [showCustomAreaCode, setShowCustomAreaCode] = useState(false);
+  const [areaCodeStatus, setAreaCodeStatus] = useState<AreaCodeAvailabilityState>('idle');
+  const [areaCodeStatusMessage, setAreaCodeStatusMessage] = useState<string>('');
+  const [areaCodeSuggestions, setAreaCodeSuggestions] = useState<string[]>([]);
 
   const stripe = useStripe();
   const elements = useElements();
