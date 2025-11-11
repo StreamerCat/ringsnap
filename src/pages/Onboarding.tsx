@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { signOutUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Loader2, Phone, Settings, TestTube, Copy, User, UserCircle2, Clock, TrendingUp } from "lucide-react";
@@ -285,7 +286,11 @@ export default function Onboarding() {
 
   const handleLogout = async () => {
     dlog("User initiated logout");
-    await supabase.auth.signOut();
+    try {
+      await signOutUser();
+    } catch (error) {
+      console.error("Failed to sign out:", error);
+    }
     dlog("Logout complete, navigating to home");
     navigate("/");
   };

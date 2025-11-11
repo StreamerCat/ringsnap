@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { signOutUser } from "@/lib/auth/session";
 import { useToast } from "@/hooks/use-toast";
 
 export const SalesPasswordGate = ({
@@ -35,7 +36,7 @@ export const SalesPasswordGate = ({
         setHasAccess(!!staffRole);
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.error("Auth check error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +70,11 @@ export const SalesPasswordGate = ({
             description: "Welcome to the Sales Command Center",
           });
         } else {
-          await supabase.auth.signOut();
+          try {
+            await signOutUser();
+          } catch (error) {
+            console.error("Failed to sign out:", error);
+          }
           toast({
             title: "Access Denied",
             description: "You don't have permission to access this page",
