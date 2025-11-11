@@ -6,11 +6,11 @@ import * as z from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { COMMON_AREA_CODES } from "./signup/shared/areaCodeOptions";
 const formSchema = z.object({
   name: z
     .string()
@@ -27,6 +27,10 @@ const formSchema = z.object({
     .trim()
     .min(10, "Please enter a valid phone number")
     .max(20, "Phone number is too long"),
+  areaCode: z
+    .string()
+    .trim()
+    .regex(/^\d{3}$/, "Area code must be exactly 3 digits"),
   companyName: z.string().optional()
 });
 
@@ -44,6 +48,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [provisionedNumber, setProvisionedNumber] = useState<string | null>(null);
   const [provisionJobId, setProvisionJobId] = useState<string | null>(null);
+  const [showCustomAreaCode, setShowCustomAreaCode] = useState(false);
   const isMountedRef = useRef(false);
 
   useEffect(() => {
@@ -85,6 +90,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       name: "",
       email: "",
       phone: "",
+      areaCode: "",
       companyName: ""
     }
   });
@@ -94,6 +100,16 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
   const emailDomain = emailValue?.split('@')[1]?.toLowerCase();
   const genericDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'aol.com', 'protonmail.com', 'mail.com'];
   const isGenericEmail = emailDomain ? genericDomains.includes(emailDomain) : false;
+  const areaCodeValue = form.watch('areaCode');
+
+  useEffect(() => {
+    if (!areaCodeValue) {
+      return;
+    }
+
+    const matchesPreset = COMMON_AREA_CODES.some((option) => option.code === areaCodeValue);
+    setShowCustomAreaCode(!matchesPreset);
+  }, [areaCodeValue]);
 
   const onSubmit = async (data: FormData) => {
     runIfMounted(() => setErrorMessage(null));
@@ -105,6 +121,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       name: data.name.trim(),
       email: data.email.trim(),
       phone: data.phone.trim(),
+      areaCode: data.areaCode.trim(),
       companyName: data.companyName?.trim() ?? ""
     };
 
@@ -221,6 +238,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
       }
 
       form.reset();
+      setShowCustomAreaCode(false);
       setErrorMessage(null);
       onOpenChange(false);
       navigate("/onboarding");
@@ -240,6 +258,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
 
     if (!nextOpen) {
       form.reset();
+      setShowCustomAreaCode(false);
       setErrorMessage(null);
       setProvisionedNumber(null);
       setProvisionJobId(null);
@@ -352,6 +371,63 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
                       className="px-3 sm:px-4"
                     />
                   </FormControl>
+                  <FormMessage className="text-xs flex items-start gap-1" />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="areaCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preferred Area Code</FormLabel>
+                  <FormControl>
+                    <div className="space-y-2">
+                      <Select
+                        value={showCustomAreaCode ? 'custom' : field.value || undefined}
+                        onValueChange={(value) => {
+                          if (value === 'custom') {
+                            setShowCustomAreaCode(true);
+                            field.onChange('');
+                          } else {
+                            setShowCustomAreaCode(false);
+                            field.onChange(value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Select an area code" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMMON_AREA_CODES.map(({ code, label }) => (
+                            <SelectItem key={code} value={code}>
+                              {code} — {label}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="custom">Other area code…</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {showCustomAreaCode && (
+                        <Input
+                          value={field.value}
+                          onChange={(event) => {
+                            const digits = event.target.value.replace(/\D/g, '').slice(0, 3);
+                            field.onChange(digits);
+                          }}
+                          inputMode="numeric"
+                          maxLength={3}
+                          placeholder="Enter 3 digits"
+                          aria-label="Custom area code"
+                          className="px-3 sm:px-4"
+                        />
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    We’ll secure a number in this area code when provisioning your trial account.
+                  </FormDescription>
                   <FormMessage className="text-xs flex items-start gap-1" />
                 </FormItem>
               )}
