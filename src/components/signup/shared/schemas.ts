@@ -1,19 +1,10 @@
 import { z } from "zod";
 
-const areaCodeSchema = z
-  .string()
-  .trim()
-  .transform((value) => value.replace(/\D/g, ""))
-  .refine((value) => /^\d{3}$/.test(value), {
-    message: "Area code must be exactly 3 digits",
-  });
-
 // Step 1: Lead Capture (both flows)
 export const leadCaptureSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
   email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
   phone: z.string().trim().min(10, "Valid phone number required").max(20, "Phone too long"),
-  areaCode: areaCodeSchema,
   companyName: z.string().trim().max(200, "Company name too long").optional(),
   companyWebsite: z.string()
     .trim()

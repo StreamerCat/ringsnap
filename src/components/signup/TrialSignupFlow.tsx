@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -23,13 +23,11 @@ import {
   validatePhoneNumber,
   extractCompanyNameFromEmail
 } from "./shared/utils";
-import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle } from "lucide-react";
+import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { COMMON_AREA_CODES } from "./shared/areaCodeOptions";
 
 type TrialFormData = z.infer<typeof trialSignupSchema>;
 
@@ -56,7 +54,6 @@ export const TrialSignupFlow = ({
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [showCompanyName, setShowCompanyName] = useState(false);
-  const [showCustomAreaCode, setShowCustomAreaCode] = useState(false);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -68,7 +65,6 @@ export const TrialSignupFlow = ({
       name: "",
       email: "",
       phone: "",
-      areaCode: "",
       companyName: "",
       companyWebsite: "",
       trade: "",
@@ -80,7 +76,6 @@ export const TrialSignupFlow = ({
   const { watch, setValue, formState: { errors } } = form;
   const email = watch("email");
   const phone = watch("phone");
-  const areaCode = watch("areaCode");
   const planType = watch("planType");
 
   // Auto-detect company name from email
@@ -104,23 +99,6 @@ export const TrialSignupFlow = ({
     }
   }, [phone, setValue]);
 
-  useEffect(() => {
-    if (!areaCode) {
-      return;
-    }
-
-    const matchesPreset = COMMON_AREA_CODES.some((option) => option.code === areaCode);
-    if (matchesPreset && showCustomAreaCode) {
-      setShowCustomAreaCode(false);
-    }
-  }, [areaCode, showCustomAreaCode]);
-
-  useEffect(() => {
-    if (!open) {
-      setShowCustomAreaCode(false);
-    }
-  }, [open]);
-
   // Watch for planType changes
   useEffect(() => {
     const subscription = watch((value, { name }) => {
@@ -133,19 +111,16 @@ export const TrialSignupFlow = ({
 
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
-      case 1: {
-        const leadResult = await form.trigger(['name', 'email', 'phone', 'areaCode']);
+      case 1:
+        const leadResult = await form.trigger(['name', 'email', 'phone']);
         return leadResult;
-      }
-      case 2: {
+      case 2:
         const businessResult = await form.trigger(['companyName', 'companyWebsite', 'trade']);
         return businessResult;
-      }
-      case 3: {
+      case 3:
         const currentPlanType = form.getValues("planType");
         console.log("📋 Validating step 3 - planType:", currentPlanType);
         return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
-      }
       case 4:
         return cardComplete && form.getValues("acceptTerms");
       default:
@@ -226,7 +201,6 @@ export const TrialSignupFlow = ({
       console.log("  - name:", requestBody.name);
       console.log("  - email:", requestBody.email);
       console.log("  - phone:", requestBody.phone);
-      console.log("  - areaCode:", requestBody.areaCode);
       console.log("  - companyName:", requestBody.companyName);
       console.log("  - planType:", requestBody.planType, "(type:", typeof requestBody.planType, ")");
       console.log("  - paymentMethodId:", requestBody.paymentMethodId);
@@ -503,73 +477,6 @@ export const TrialSignupFlow = ({
                 {...form.register("phone")}
                 error={errors.phone?.message}
                 isValid={!!watch("phone") && !errors.phone}
-              />
-
-              <Controller
-                name="areaCode"
-                control={form.control}
-                render={({ field }) => (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="areaCode" className="text-sm font-medium">
-                        Preferred Area Code
-                      </Label>
-                      {errors.areaCode ? (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      ) : field.value && field.value.length === 3 ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : null}
-                    </div>
-                    <Select
-                      value={showCustomAreaCode ? 'custom' : field.value || undefined}
-                      onValueChange={(value) => {
-                        if (value === 'custom') {
-                          setShowCustomAreaCode(true);
-                          field.onChange('');
-                        } else {
-                          setShowCustomAreaCode(false);
-                          field.onChange(value);
-                        }
-                      }}
-                    >
-                      <SelectTrigger id="areaCode" className="h-12">
-                        <SelectValue placeholder="Select an area code" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMON_AREA_CODES.map(({ code, label }) => (
-                          <SelectItem key={code} value={code}>
-                            {code} — {label}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="custom">Other area code…</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {showCustomAreaCode && (
-                      <Input
-                        value={field.value}
-                        onChange={(event) => {
-                          const digits = event.target.value.replace(/\D/g, '').slice(0, 3);
-                          field.onChange(digits);
-                        }}
-                        inputMode="numeric"
-                        maxLength={3}
-                        placeholder="Enter 3 digits"
-                        aria-label="Custom area code"
-                        className="h-12 text-base"
-                      />
-                    )}
-                    {errors.areaCode ? (
-                      <p className="text-sm text-red-500 flex items-start gap-1">
-                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        {errors.areaCode.message}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        We’ll match you with a business number in this area code when provisioning your assistant.
-                      </p>
-                    )}
-                  </div>
-                )}
               />
             </div>
 
