@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useRef } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -12,6 +12,7 @@ import { SignupButton } from "./shared/SignupButton";
 import { PlanSelectionStep } from "./shared/PlanSelectionStep";
 import {
   leadCaptureSchema,
+  businessDetailsSchema,
   planSelectionSchema,
   paymentSchema,
   trialSignupSchema
@@ -22,13 +23,22 @@ import {
   validatePhoneNumber,
   extractCompanyNameFromEmail
 } from "./shared/utils";
-import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase } from "lucide-react";
+import { Lock, CreditCard, Shield, Check, Building2, Globe, Briefcase, AlertCircle, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { searchAvailablePhoneNumbers } from "@/lib/vapiNumberSearch";
 
 type TrialFormData = z.infer<typeof trialSignupSchema>;
+
+type AreaCodeAvailabilityState = 'idle' | 'debouncing' | 'loading' | 'available' | 'unavailable' | 'error';
+
+const sanitizeAreaCode = (value: string | null | undefined) =>
+  (value ?? '').replace(/\D/g, '').slice(0, 3);
 
 interface TrialSignupFlowProps {
   open: boolean;
@@ -48,6 +58,12 @@ export const TrialSignupFlow = ({
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [showCompanyName, setShowCompanyName] = useState(false);
+  const [areaCodeStatus, setAreaCodeStatus] = useState<AreaCodeAvailabilityState>('idle');
+  const [areaCodeStatusMessage, setAreaCodeStatusMessage] = useState<string | null>(null);
+  const [areaCodeSuggestions, setAreaCodeSuggestions] = useState<string[]>([]);
+
+  const areaCodeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const areaCodeSearchAbortRef = useRef<AbortController | null>(null);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -59,6 +75,7 @@ export const TrialSignupFlow = ({
       name: "",
       email: "",
       phone: "",
+      areaCode: "",
       companyName: "",
       companyWebsite: "",
       trade: "",
@@ -70,6 +87,7 @@ export const TrialSignupFlow = ({
   const { watch, setValue, formState: { errors } } = form;
   const email = watch("email");
   const phone = watch("phone");
+  const areaCode = watch("areaCode");
   const planType = watch("planType");
 
   // Auto-detect company name from email
@@ -93,6 +111,108 @@ export const TrialSignupFlow = ({
     }
   }, [phone, setValue]);
 
+  useEffect(() => {
+    const normalized = sanitizeAreaCode(areaCode);
+
+    if (areaCodeDebounceRef.current) {
+      clearTimeout(areaCodeDebounceRef.current);
+      areaCodeDebounceRef.current = null;
+    }
+
+    if (areaCodeSearchAbortRef.current) {
+      areaCodeSearchAbortRef.current.abort();
+      areaCodeSearchAbortRef.current = null;
+    }
+
+    if (normalized.length !== 3) {
+      setAreaCodeStatus('idle');
+      setAreaCodeStatusMessage(null);
+      setAreaCodeSuggestions([]);
+      return;
+    }
+
+    setAreaCodeStatus('debouncing');
+    areaCodeDebounceRef.current = setTimeout(() => {
+      setAreaCodeStatus('loading');
+      setAreaCodeStatusMessage(null);
+      setAreaCodeSuggestions([]);
+
+      const controller = new AbortController();
+      areaCodeSearchAbortRef.current = controller;
+
+      searchAvailablePhoneNumbers({ areaCode: normalized, limit: 5, signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          if (result.numbers.length > 0) {
+            setAreaCodeStatus('available');
+            setAreaCodeStatusMessage(`Great news! We found numbers in area code ${normalized}.`);
+            setAreaCodeSuggestions([]);
+            return;
+          }
+
+          const suggestionSet = Array.from(
+            new Set(
+              (result.suggestions ?? [])
+                .map((code) => sanitizeAreaCode(code))
+                .filter((code) => code.length === 3 && code !== normalized)
+            )
+          );
+
+          setAreaCodeStatus('unavailable');
+          const fallbackMessage = result.error
+            ? result.error
+            : `We couldn't find numbers in area code ${normalized} right now.`;
+          setAreaCodeStatusMessage(fallbackMessage);
+          setAreaCodeSuggestions(suggestionSet.slice(0, 2));
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          console.error('[TrialSignupFlow] Failed to search Vapi area codes', error);
+          setAreaCodeStatus('error');
+          setAreaCodeStatusMessage("We couldn't verify that area code right now. You can continue or try again.");
+          setAreaCodeSuggestions([]);
+        })
+        .finally(() => {
+          if (areaCodeSearchAbortRef.current === controller) {
+            areaCodeSearchAbortRef.current = null;
+          }
+        });
+    }, 400);
+
+    return () => {
+      if (areaCodeDebounceRef.current) {
+        clearTimeout(areaCodeDebounceRef.current);
+        areaCodeDebounceRef.current = null;
+      }
+      if (areaCodeSearchAbortRef.current) {
+        areaCodeSearchAbortRef.current.abort();
+        areaCodeSearchAbortRef.current = null;
+      }
+    };
+  }, [areaCode]);
+
+  useEffect(() => {
+    if (!open) {
+      if (areaCodeDebounceRef.current) {
+        clearTimeout(areaCodeDebounceRef.current);
+        areaCodeDebounceRef.current = null;
+      }
+      if (areaCodeSearchAbortRef.current) {
+        areaCodeSearchAbortRef.current.abort();
+        areaCodeSearchAbortRef.current = null;
+      }
+      setAreaCodeStatus('idle');
+      setAreaCodeStatusMessage(null);
+      setAreaCodeSuggestions([]);
+    }
+  }, [open]);
+
   // Watch for planType changes
   useEffect(() => {
     const subscription = watch((value, { name }) => {
@@ -105,16 +225,34 @@ export const TrialSignupFlow = ({
 
   const validateStep = async (step: number): Promise<boolean> => {
     switch (step) {
-      case 1:
-        const leadResult = await form.trigger(['name', 'email', 'phone']);
-        return leadResult;
-      case 2:
-        const businessResult = await form.trigger(['companyName', 'companyWebsite', 'trade']);
-        return businessResult;
-      case 3:
+      case 1: {
+        const leadFields: (keyof TrialFormData)[] = ['name', 'email', 'phone'];
+        return form.trigger(leadFields);
+      }
+      case 2: {
+        const businessFields: (keyof TrialFormData)[] = ['areaCode', 'companyName', 'companyWebsite', 'trade'];
+        const baseValid = await form.trigger(businessFields);
+        if (!baseValid) {
+          return false;
+        }
+
+        const businessPayload = businessFields.reduce<Record<string, unknown>>((acc, key) => {
+          acc[key] = form.getValues(key as keyof TrialFormData);
+          return acc;
+        }, {});
+
+        const parsed = businessDetailsSchema.safeParse(businessPayload);
+        if (!parsed.success) {
+          return false;
+        }
+
+        return true;
+      }
+      case 3: {
         const currentPlanType = form.getValues("planType");
         console.log("📋 Validating step 3 - planType:", currentPlanType);
         return !!currentPlanType && ['starter', 'professional', 'premium'].includes(currentPlanType);
+      }
       case 4:
         return cardComplete && form.getValues("acceptTerms");
       default:
@@ -145,7 +283,7 @@ export const TrialSignupFlow = ({
     if (!formValues.planType) {
       toast.error("Please select a plan");
       console.error("❌ Missing planType");
-      setCurrentStep(2); // Go back to plan selection
+      setCurrentStep(3); // Go back to plan selection
       return;
     }
 
@@ -195,6 +333,7 @@ export const TrialSignupFlow = ({
       console.log("  - name:", requestBody.name);
       console.log("  - email:", requestBody.email);
       console.log("  - phone:", requestBody.phone);
+      console.log("  - areaCode:", requestBody.areaCode);
       console.log("  - companyName:", requestBody.companyName);
       console.log("  - planType:", requestBody.planType, "(type:", typeof requestBody.planType, ")");
       console.log("  - paymentMethodId:", requestBody.paymentMethodId);
@@ -332,8 +471,8 @@ export const TrialSignupFlow = ({
 
         // Additional customization based on error content
         if (errorMessage.includes("planType") || errorMessage.includes("plan")) {
-          errorMessage = "Please select a valid plan. Go back to step 2 and choose your plan.";
-          setCurrentStep(2); // Navigate back to plan selection
+          errorMessage = "Please select a valid plan. Go back to step 3 and choose your plan.";
+          setCurrentStep(3); // Navigate back to plan selection
         }
         else if (errorMessage.includes("paymentMethodId") || errorMessage.includes("payment method")) {
           errorMessage = "Payment method is missing. Please re-enter your card details.";
@@ -472,6 +611,7 @@ export const TrialSignupFlow = ({
                 error={errors.phone?.message}
                 isValid={!!watch("phone") && !errors.phone}
               />
+
             </div>
 
             <SignupButton type="submit" className="w-full">
@@ -491,6 +631,108 @@ export const TrialSignupFlow = ({
             </div>
 
             <div className="space-y-4">
+              <Controller
+                name="areaCode"
+                control={form.control}
+                render={({ field }) => (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="areaCode" className="text-sm font-medium">
+                        Desired area code for your RingSnap number
+                      </Label>
+                      {errors.areaCode ? (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      ) : areaCodeStatus === 'loading' || areaCodeStatus === 'debouncing' ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : areaCodeStatus === 'available' ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : areaCodeStatus === 'unavailable' ? (
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                      ) : areaCodeStatus === 'error' ? (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      ) : null}
+                    </div>
+                    <Input
+                      id="areaCode"
+                      value={field.value}
+                      onChange={(event) => {
+                        const nextValue = sanitizeAreaCode(event.target.value);
+                        field.onChange(nextValue);
+                      }}
+                      inputMode="numeric"
+                      maxLength={3}
+                      placeholder="e.g. 415"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      We’ll search Vapi for available numbers in this area code while you complete the next steps.
+                    </p>
+
+                    {errors.areaCode && (
+                      <p className="flex items-start gap-1 text-sm text-red-500">
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        {errors.areaCode.message}
+                      </p>
+                    )}
+
+                    {(areaCodeStatus === 'loading' || areaCodeStatus === 'debouncing') && (
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {areaCodeStatus === 'debouncing' ? 'Preparing availability check…' : 'Checking availability…'}
+                      </p>
+                    )}
+
+                    {areaCodeStatus === 'available' && areaCodeStatusMessage && (
+                      <p className="flex items-start gap-2 text-sm text-emerald-600">
+                        <Check className="h-4 w-4 mt-0.5" />
+                        {areaCodeStatusMessage}
+                      </p>
+                    )}
+
+                    {areaCodeStatus === 'unavailable' && (
+                      <div className="space-y-3">
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {areaCodeStatusMessage ?? `We couldn’t find numbers in area code ${field.value}.`}
+                          </AlertDescription>
+                        </Alert>
+
+                        {areaCodeSuggestions.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium uppercase text-muted-foreground">
+                              Suggested nearby area codes
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {areaCodeSuggestions.map((code) => (
+                                <Button
+                                  key={code}
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => field.onChange(sanitizeAreaCode(code))}
+                                >
+                                  {code}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {areaCodeStatus === 'error' && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {areaCodeStatusMessage ?? "We couldn’t verify that area code. You can continue or try again."}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+              />
+
               <div className="space-y-2">
                 <Label htmlFor="companyName" className="flex items-center gap-2 text-sm font-medium">
                   <Building2 className="h-4 w-4 text-primary" />

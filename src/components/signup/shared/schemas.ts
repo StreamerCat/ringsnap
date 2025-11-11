@@ -1,10 +1,23 @@
 import { z } from "zod";
 
+const areaCodeSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/\D/g, ""))
+  .refine((value) => /^\d{3}$/.test(value), {
+    message: "Area code must be exactly 3 digits",
+  });
+
 // Step 1: Lead Capture (both flows)
 export const leadCaptureSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name too long"),
   email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
   phone: z.string().trim().min(10, "Valid phone number required").max(20, "Phone too long"),
+});
+
+// Step 2: Business Details
+export const businessDetailsSchema = z.object({
+  areaCode: areaCodeSchema,
   companyName: z.string().trim().max(200, "Company name too long").optional(),
   companyWebsite: z.string()
     .trim()
@@ -15,14 +28,14 @@ export const leadCaptureSchema = z.object({
   trade: z.string().max(100).optional(),
 });
 
-// Step 2: Plan Selection (both flows)
+// Step 3: Plan Selection (both flows)
 export const planSelectionSchema = z.object({
   planType: z.enum(['starter', 'professional', 'premium'], {
     required_error: "Please select a plan",
   }),
 });
 
-// Step 3: Payment (both flows)
+// Step 4: Payment (both flows)
 export const paymentSchema = z.object({
   acceptTerms: z.boolean().refine(val => val === true, {
     message: "You must accept the terms to continue",
@@ -43,10 +56,12 @@ export const salesDetailsSchema = z.object({
 
 // Combined schemas
 export const trialSignupSchema = leadCaptureSchema
+  .merge(businessDetailsSchema)
   .merge(planSelectionSchema)
   .merge(paymentSchema);
 
 export const salesSignupSchema = leadCaptureSchema
+  .merge(businessDetailsSchema)
   .merge(salesDetailsSchema)
   .merge(planSelectionSchema)
   .merge(paymentSchema);
