@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
-import ContractorFooter from '../components/ContractorFooter';
+import { ContractorFooter } from '../components/ContractorFooter';
 
 export default function Privacy() {
   const sections = [
