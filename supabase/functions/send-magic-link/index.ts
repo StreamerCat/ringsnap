@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   createMagicLinkToken,
@@ -16,7 +15,14 @@ import { buildMagicLinkEmail } from '../_shared/auth-email-templates.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
+const RESEND_PROD_KEY = Deno.env.get('RESEND_PROD_KEY');
+const RESEND_LEGACY_KEY = Deno.env.get('RESEND_API_KEY');
+
+if (!RESEND_PROD_KEY && RESEND_LEGACY_KEY) {
+  console.warn('[send-magic-link] RESEND_PROD_KEY not set; falling back to RESEND_API_KEY');
+}
+
+const RESEND_API_KEY = RESEND_PROD_KEY ?? RESEND_LEGACY_KEY;
 const SITE_URL = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
 const MAGIC_LINK_TTL_MINUTES = parseInt(Deno.env.get('AUTH_MAGIC_LINK_TTL_MINUTES') || '20');
 
@@ -43,7 +49,9 @@ serve(async (req) => {
     }
 
     if (!RESEND_API_KEY) {
-      console.error('[send-magic-link] Missing RESEND_PROD_KEY environment variable');
+      console.error(
+        '[send-magic-link] Missing RESEND_PROD_KEY and RESEND_API_KEY environment variables'
+      );
       return new Response(
         JSON.stringify({ error: 'Server configuration error: Email service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

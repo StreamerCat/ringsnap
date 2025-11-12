@@ -173,11 +173,16 @@ After merging:
    SUPABASE_SERVICE_ROLE_KEY=...
    NOTIFY_EMAIL_FROM=noreply@getringsnap.com
    APP_URL=https://app.getringsnap.com
-   SENDGRID_API_KEY= or RESEND_API_KEY=
+   SENDGRID_API_KEY= or RESEND_PROD_KEY= (preferred)
+   RESEND_PROD_KEY=
+   # Legacy fallback only when necessary
+   RESEND_API_KEY=
    TWILIO_ACCOUNT_SID= (optional)
    TWILIO_AUTH_TOKEN= (optional)
    NOTIFY_SMS_FROM= (optional)
    ```
+
+   > ℹ️ After updating dashboard secrets, run `supabase secrets set RESEND_PROD_KEY=...` so the new key is synced to every deployment.
 
 4. **Enable scheduled function**
    - Supabase Dashboard → Functions → provision_number_retry
