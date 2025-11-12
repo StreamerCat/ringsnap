@@ -228,18 +228,32 @@ export default function AuthLogin() {
                 )}
               </Button>
 
-              {hasPassword && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowPasswordInput(true)}
-                  disabled={isLoading}
-                >
-                  <Lock className="mr-2 h-4 w-4" />
-                  Use password instead
-                </Button>
-              )}
+              <div className="space-y-2">
+                {hasPassword && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowPasswordInput(true)}
+                    disabled={isLoading}
+                  >
+                    <Lock className="mr-2 h-4 w-4" />
+                    Use password instead
+                  </Button>
+                )}
+
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm"
+                    onClick={handleForgotPassword}
+                    disabled={isLoading}
+                  >
+                    Need to set or reset your password?
+                  </Button>
+                </div>
+              </div>
             </form>
           ) : (
             <form onSubmit={handlePasswordLogin} className="space-y-4">
