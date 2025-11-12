@@ -64,11 +64,14 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('send-password-reset', {
+      const { data, error } = await supabase.functions.invoke('send-password-reset', {
         body: { email }
       });
 
       if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to send reset link");
+      }
 
       toast.success("Password reset link sent! Check your email.");
       setShowResetPassword(false);
