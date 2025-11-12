@@ -20,6 +20,7 @@ export default function AuthLogin() {
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [emailSentType, setEmailSentType] = useState<'magic' | 'reset'>('magic');
 
   const redirectTo = searchParams.get("redirect") || "/onboarding";
 
@@ -97,6 +98,7 @@ export default function AuthLogin() {
       if (error) throw error;
 
       if (data?.success) {
+        setEmailSentType('magic');
         setMagicLinkSent(true);
         toast.success("Magic link sent! Check your email to sign in.");
       } else {
@@ -140,7 +142,24 @@ export default function AuthLogin() {
       return;
     }
 
-    navigate(`/auth/password?email=${encodeURIComponent(email)}&mode=reset`);
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: email.toLowerCase().trim() }
+      });
+
+      if (error) throw error;
+
+      setEmailSentType('reset');
+      setMagicLinkSent(true); // Reuse the "check your email" UI
+      toast.success("Password reset link sent! Check your email.");
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      const message = error?.message || "Failed to send reset link";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOAuthError = (message: string) => {
@@ -165,12 +184,14 @@ export default function AuthLogin() {
             </div>
             <CardTitle className="text-2xl font-bold text-center">Check your email</CardTitle>
             <CardDescription className="text-center">
-              We sent a magic link to <strong>{email}</strong>
+              We sent a {emailSentType === 'magic' ? 'magic link' : 'password reset link'} to <strong>{email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-center text-muted-foreground">
-              Click the link in the email to sign in. The link expires in 20 minutes.
+              {emailSentType === 'magic'
+                ? 'Click the link in the email to sign in. The link expires in 20 minutes.'
+                : 'Click the link in the email to reset your password. The link expires in 60 minutes.'}
             </p>
             <Button
               variant="outline"
