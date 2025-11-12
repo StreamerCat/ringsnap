@@ -24,10 +24,24 @@ serve(async (req) => {
   }
 
   try {
+    console.log('[verify-magic-link] Starting verification', {
+      hasUrl: !!SUPABASE_URL,
+      hasKey: !!SUPABASE_SERVICE_ROLE_KEY,
+      urlPrefix: SUPABASE_URL?.substring(0, 8)
+    });
+
     const supabase = createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { token, deviceNonce }: RequestBody = await req.json();
 
+    console.log('[verify-magic-link] Request data', {
+      hasToken: !!token,
+      tokenPrefix: token?.substring(0, 10),
+      hasDeviceNonce: !!deviceNonce,
+      deviceNoncePrefix: deviceNonce?.substring(0, 10)
+    });
+
     if (!token) {
+      console.error('[verify-magic-link] No token provided');
       return new Response(
         JSON.stringify({ error: 'Token is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -38,6 +52,7 @@ serve(async (req) => {
     const userAgent = getUserAgent(req);
 
     // Validate and consume token
+    console.log('[verify-magic-link] Validating token...');
     const result = await validateAndConsumeToken(
       supabase,
       token,
@@ -45,7 +60,14 @@ serve(async (req) => {
       deviceNonce
     );
 
+    console.log('[verify-magic-link] Validation result', {
+      valid: result.valid,
+      hasData: !!result.data,
+      error: result.error
+    });
+
     if (!result.valid || !result.data) {
+      console.error('[verify-magic-link] Token validation failed', { error: result.error });
       await logAuthEvent(
         supabase,
         null,
@@ -66,6 +88,8 @@ serve(async (req) => {
     const tokenData = result.data;
     const email = tokenData.email;
 
+    console.log('[verify-magic-link] Token valid, checking user', { email });
+
     // Check if user exists
     const { data: existingUser, error: userError } = await supabase
       .from('profiles')
@@ -73,12 +97,19 @@ serve(async (req) => {
       .eq('email', email)
       .single();
 
+    console.log('[verify-magic-link] User lookup result', {
+      found: !!existingUser,
+      error: userError?.message,
+      errorCode: userError?.code
+    });
+
     let userId: string;
     let accountId: string | null = null;
     let isNewUser = false;
 
     if (userError || !existingUser) {
       // Create new user via Supabase Auth (passwordless)
+      console.log('[verify-magic-link] Creating new user for email:', email);
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email,
         email_confirm: true,
@@ -88,15 +119,19 @@ serve(async (req) => {
       });
 
       if (authError || !authData.user) {
-        console.error('Failed to create user:', authError);
+        console.error('[verify-magic-link] Failed to create user:', authError);
         return new Response(
-          JSON.stringify({ error: 'Failed to create user account' }),
+          JSON.stringify({
+            error: 'Failed to create user account',
+            details: authError?.message
+          }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       userId = authData.user.id;
       isNewUser = true;
+      console.log('[verify-magic-link] New user created:', userId);
 
       // The trigger should create profile automatically, but let's verify
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -104,6 +139,7 @@ serve(async (req) => {
     } else {
       userId = existingUser.id;
       accountId = existingUser.account_id;
+      console.log('[verify-magic-link] Existing user found:', { userId, accountId });
 
       // Mark email as verified if not already
       if (!existingUser.email_verified) {
@@ -111,10 +147,12 @@ serve(async (req) => {
           .from('profiles')
           .update({ email_verified: true })
           .eq('id', userId);
+        console.log('[verify-magic-link] Marked email as verified');
       }
     }
 
     // Generate session for the user
+    console.log('[verify-magic-link] Generating session for user:', userId);
     const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email,
@@ -126,9 +164,12 @@ serve(async (req) => {
     });
 
     if (sessionError || !sessionData) {
-      console.error('Failed to generate session:', sessionError);
+      console.error('[verify-magic-link] Failed to generate session:', sessionError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create session' }),
+        JSON.stringify({
+          error: 'Failed to create session',
+          details: sessionError?.message
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -139,12 +180,14 @@ serve(async (req) => {
     const refreshToken = sessionData.properties.refresh_token;
 
     if (!accessToken || !refreshToken) {
-      console.error('Session tokens missing from generated link');
+      console.error('[verify-magic-link] Session tokens missing from generated link');
       return new Response(
         JSON.stringify({ error: 'Failed to create session tokens' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('[verify-magic-link] Session generated successfully');
 
     // Log successful login
     await logAuthEvent(
@@ -177,9 +220,12 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in verify-magic-link:', error);
+    console.error('[verify-magic-link] Uncaught error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error)
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
