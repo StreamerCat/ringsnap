@@ -45,6 +45,16 @@ export default function CustomerDashboard() {
   const [customInstructions, setCustomInstructions] = useState("");
   const [savingInstructions, setSavingInstructions] = useState(false);
 
+  // SMS Settings state
+  const [smsAppointmentConfirmations, setSmsAppointmentConfirmations] = useState(false);
+  const [smsReminders, setSmsReminders] = useState(false);
+  const [savingSmsSettings, setSavingSmsSettings] = useState(false);
+
+  // Business Details state
+  const [serviceArea, setServiceArea] = useState("");
+  const [emergencyPolicy, setEmergencyPolicy] = useState("");
+  const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -148,6 +158,14 @@ export default function CustomerDashboard() {
         setCustomInstructions(profileData.accounts.custom_instructions);
       }
 
+      // Initialize SMS settings
+      setSmsAppointmentConfirmations(profileData.accounts.sms_appointment_confirmations || false);
+      setSmsReminders(profileData.accounts.sms_reminders || false);
+
+      // Initialize business details
+      setServiceArea(profileData.accounts.service_area || "");
+      setEmergencyPolicy(profileData.accounts.emergency_policy || "");
+
       // Load state recording laws if billing_state exists
       if (profileData.accounts.billing_state) {
         const { data: stateData } = await supabase
@@ -196,6 +214,72 @@ export default function CustomerDashboard() {
         description: error.message,
         variant: "destructive"
       });
+    }
+  };
+
+  const handleSaveSmsSettings = async () => {
+    setSavingSmsSettings(true);
+    try {
+      const { error } = await supabase
+        .from("accounts")
+        .update({
+          sms_appointment_confirmations: smsAppointmentConfirmations,
+          sms_reminders: smsReminders
+        })
+        .eq("id", account.id);
+
+      if (error) throw error;
+
+      setAccount({
+        ...account,
+        sms_appointment_confirmations: smsAppointmentConfirmations,
+        sms_reminders: smsReminders
+      });
+      toast({
+        title: "Success",
+        description: "SMS settings updated successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSavingSmsSettings(false);
+    }
+  };
+
+  const handleSaveBusinessDetails = async () => {
+    setSavingBusinessDetails(true);
+    try {
+      const { error } = await supabase
+        .from("accounts")
+        .update({
+          service_area: serviceArea,
+          emergency_policy: emergencyPolicy
+        })
+        .eq("id", account.id);
+
+      if (error) throw error;
+
+      setAccount({
+        ...account,
+        service_area: serviceArea,
+        emergency_policy: emergencyPolicy
+      });
+      toast({
+        title: "Success",
+        description: "Business details updated successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSavingBusinessDetails(false);
     }
   };
 
@@ -640,21 +724,41 @@ export default function CustomerDashboard() {
                   <>
                     <div className="flex items-center justify-between">
                       <Label>Appointment Confirmations</Label>
-                      <Switch checked={account.sms_appointment_confirmations} />
+                      <Switch
+                        checked={smsAppointmentConfirmations}
+                        onCheckedChange={setSmsAppointmentConfirmations}
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <Label>Reminder Messages</Label>
-                      <Switch checked={account.sms_reminders} />
+                      <Switch
+                        checked={smsReminders}
+                        onCheckedChange={setSmsReminders}
+                      />
                     </div>
                     <div className="bg-muted/50 p-3 rounded">
                       <p className="text-sm">
                         Daily Quota: {account.daily_sms_sent} / {account.daily_sms_quota}
                       </p>
-                      <Progress 
-                        value={(account.daily_sms_sent / account.daily_sms_quota) * 100} 
+                      <Progress
+                        value={(account.daily_sms_sent / account.daily_sms_quota) * 100}
                         className="mt-2"
                       />
                     </div>
+                    <Button
+                      onClick={handleSaveSmsSettings}
+                      disabled={savingSmsSettings}
+                      className="w-full"
+                    >
+                      {savingSmsSettings ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save SMS Settings"
+                      )}
+                    </Button>
                   </>
                 )}
               </CardContent>
@@ -667,13 +771,35 @@ export default function CustomerDashboard() {
               <CardContent className="space-y-4">
                 <div>
                   <Label>Service Area</Label>
-                  <Input defaultValue={account.service_area} />
+                  <Input
+                    value={serviceArea}
+                    onChange={(e) => setServiceArea(e.target.value)}
+                    placeholder="e.g., Greater Boston Area"
+                  />
                 </div>
                 <div>
                   <Label>Emergency Policy</Label>
-                  <Textarea defaultValue={account.emergency_policy} rows={4} />
+                  <Textarea
+                    value={emergencyPolicy}
+                    onChange={(e) => setEmergencyPolicy(e.target.value)}
+                    rows={4}
+                    placeholder="Describe your emergency call handling policy..."
+                  />
                 </div>
-                <Button>Save Changes</Button>
+                <Button
+                  onClick={handleSaveBusinessDetails}
+                  disabled={savingBusinessDetails}
+                  className="w-full"
+                >
+                  {savingBusinessDetails ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

@@ -114,6 +114,38 @@ serve(async (req) => {
       }
     }
 
+    // Generate session for the user
+    const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+      options: {
+        data: {
+          email_verified: true
+        }
+      }
+    });
+
+    if (sessionError || !sessionData) {
+      console.error('Failed to generate session:', sessionError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create session' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Extract the session tokens from the generated link
+    // The admin.generateLink returns properties with access_token and refresh_token
+    const accessToken = sessionData.properties.access_token;
+    const refreshToken = sessionData.properties.refresh_token;
+
+    if (!accessToken || !refreshToken) {
+      console.error('Session tokens missing from generated link');
+      return new Response(
+        JSON.stringify({ error: 'Failed to create session tokens' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Log successful login
     await logAuthEvent(
       supabase,
@@ -126,17 +158,20 @@ serve(async (req) => {
       true
     );
 
-    // Generate a temporary token instead of session (client handles actual login)
+    // Return session to client
     return new Response(
       JSON.stringify({
         success: true,
         isNewUser,
+        session: {
+          access_token: accessToken,
+          refresh_token: refreshToken
+        },
         user: {
           id: userId,
           email: email,
           accountId: accountId
-        },
-        message: 'Magic link verified. Please complete login.'
+        }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

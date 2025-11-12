@@ -11,18 +11,42 @@ import { useEffect, useRef } from "react";
 // Reused VapiWidget component
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
+  const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
 
   useEffect(() => {
-    // Initialize Vapi instance
-    // TODO: Legacy client-side Vapi demo usage. Provisioning now happens server-side; migrate this sales demo when backend tokens are available.
-    vapiRef.current = new Vapi("9159dfe3-b11f-457c-b41b-e296872027a0");
+    // Fetch Vapi configuration from server
+    const loadVapiConfig = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-    // Event listeners
-    const handleCallStart = () => setIsCallActive(true);
-    const handleCallEnd = () => setIsCallActive(false);
-    vapiRef.current.on("call-start", handleCallStart);
-    vapiRef.current.on("call-end", handleCallEnd);
+        if (!response.ok) {
+          console.error('Failed to load Vapi config');
+          return;
+        }
+
+        const data = await response.json();
+        setVapiConfig(data);
+
+        // Initialize Vapi instance with server-provided key
+        vapiRef.current = new Vapi(data.publicKey);
+
+        // Event listeners
+        const handleCallStart = () => setIsCallActive(true);
+        const handleCallEnd = () => setIsCallActive(false);
+        vapiRef.current.on("call-start", handleCallStart);
+        vapiRef.current.on("call-end", handleCallEnd);
+      } catch (error) {
+        console.error('Error loading Vapi config:', error);
+      }
+    };
+
+    loadVapiConfig();
 
     return () => {
       vapiRef.current?.stop();
@@ -30,7 +54,9 @@ const VapiWidget = () => {
   }, []);
 
   const startCall = () => {
-    vapiRef.current?.start("db066c6c-e2e3-424e-9fd1-1473f2ac3b01");
+    if (vapiConfig) {
+      vapiRef.current?.start(vapiConfig.assistantId);
+    }
   };
 
   const endCall = () => {

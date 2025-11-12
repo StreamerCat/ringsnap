@@ -45,11 +45,25 @@ export default function AuthLogin() {
     if (!emailToCheck || !emailToCheck.includes("@")) return;
 
     try {
-      // Try to get user metadata (this is a workaround since we can't directly check)
-      // In production, you might want to add an endpoint to check this
-      setHasPassword(true); // Assume password exists for now
+      // Check if user has a password by attempting a sign-in with an invalid password
+      // This is a safe way to check without exposing user data
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailToCheck.toLowerCase().trim(),
+        password: crypto.randomUUID() // Random password that will fail
+      });
+
+      // If error is "Invalid login credentials", user exists and has a password
+      // If error is "Email not confirmed", user exists but may not have password
+      // Any other error or no error (unlikely) means we can't determine
+      if (error?.message?.includes("Invalid login credentials") ||
+          error?.message?.includes("Email not confirmed")) {
+        setHasPassword(true);
+      } else {
+        setHasPassword(false);
+      }
     } catch (error) {
-      setHasPassword(false);
+      // On any error, default to showing password option
+      setHasPassword(true);
     }
   };
 

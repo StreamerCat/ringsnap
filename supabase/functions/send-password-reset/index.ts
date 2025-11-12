@@ -25,11 +25,12 @@ serve(async (req) => {
     );
 
     // Generate password reset link
+    const siteUrl = Deno.env.get("SITE_URL") || Deno.env.get("VITE_SUPABASE_URL") || "https://getringsnap.com";
     const { data, error } = await supabase.auth.admin.generateLink({
       type: "recovery",
       email,
       options: {
-        redirectTo: `${Deno.env.get("VITE_SUPABASE_URL") || "https://getringsnap.com"}/reset-password`
+        redirectTo: `${siteUrl}/auth/password?mode=reset`
       }
     });
 
