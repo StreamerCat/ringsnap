@@ -14,10 +14,10 @@ import {
 import { sendEmail } from '../_shared/resend-client.ts';
 import { buildMagicLinkEmail } from '../_shared/auth-email-templates.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY')!;
-const SITE_URL = Deno.env.get('SITE_URL') || 'http://localhost:5173';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
+const SITE_URL = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
 const MAGIC_LINK_TTL_MINUTES = parseInt(Deno.env.get('AUTH_MAGIC_LINK_TTL_MINUTES') || '20');
 
 interface RequestBody {
@@ -33,6 +33,23 @@ serve(async (req) => {
   }
 
   try {
+    // Check required environment variables
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('[send-magic-link] Missing Supabase configuration');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error: Missing Supabase credentials' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!RESEND_API_KEY) {
+      console.error('[send-magic-link] Missing RESEND_PROD_KEY environment variable');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error: Email service not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { email, deviceNonce, redirectTo }: RequestBody = await req.json();
 
@@ -185,8 +202,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in send-magic-link:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
