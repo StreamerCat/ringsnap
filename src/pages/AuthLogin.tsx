@@ -162,6 +162,9 @@ export default function AuthLogin() {
       });
 
       if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to send reset link");
+      }
 
       setEmailSentType('reset');
       setMagicLinkSent(true); // Reuse the "check your email" UI

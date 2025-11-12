@@ -162,6 +162,23 @@ supabase functions logs send-password-reset
 
 ---
 
+### Regression Test: Missing Resend API Key Surfaces Error
+
+**Goal:** Ensure configuration issues with Resend keys are reported to the user instead of showing a success state.
+
+**Steps:**
+1. Temporarily remove or invalidate the `RESEND_PROD_KEY` (and `RESEND_API_KEY` fallback) in the Supabase project secrets.
+2. Navigate to https://getringsnap.com/auth/login.
+3. Enter any valid email address.
+4. Click "Need to set or reset your password?" to trigger the password reset flow.
+
+**Expected Result:**
+- ✅ No success toast is shown.
+- ✅ Error toast appears with the Resend failure message returned by the edge function.
+- ✅ Supabase function logs show the `send-password-reset` invocation failing with the Resend configuration error.
+
+---
+
 ### Test 4: Google OAuth Flow
 
 **Steps:**

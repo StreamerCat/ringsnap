@@ -95,7 +95,7 @@ serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ error: "Failed to send password reset email" }),
+        JSON.stringify({ error: emailResult.error ?? "Failed to send password reset email" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
