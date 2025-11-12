@@ -156,7 +156,7 @@ export const SetupCompleteStep = ({ formData }: SetupCompleteStepProps) => {
               </div>
 
               <Button
-                onClick={() => navigate("/login")}
+                onClick={() => navigate("/auth/login")}
                 variant="default"
                 size="lg"
                 className="w-full"
