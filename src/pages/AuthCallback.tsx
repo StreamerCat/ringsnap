@@ -65,7 +65,7 @@ export default function AuthCallback() {
           setTimeout(() => reject(new Error("Authentication timeout")), EXCHANGE_TIMEOUT_MS)
         );
 
-        const exchangePromise = supabase.auth.exchangeCodeForSession({ code });
+        const exchangePromise = supabase.auth.exchangeCodeForSession(code);
         const { data, error } = await Promise.race([exchangePromise, timeoutPromise]) as Awaited<typeof exchangePromise>;
 
         if (error) {

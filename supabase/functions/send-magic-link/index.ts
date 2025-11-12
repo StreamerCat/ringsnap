@@ -128,19 +128,20 @@ serve(async (req) => {
     }
 
     // Check if user exists via auth admin API
-    const { data: userData, error: getUserError } = await supabase.auth.admin.getUserByEmail(
-      normalizedEmail
-    );
+    const { data: usersData, error: getUserError } = await supabase.auth.admin.listUsers();
 
-    if (getUserError && getUserError?.status !== 404) {
-      console.error('[send-magic-link] Failed to lookup user by email:', getUserError);
+    if (getUserError) {
+      console.error('[send-magic-link] Failed to list users:', getUserError);
       return new Response(
         JSON.stringify({ error: 'Failed to lookup user' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = userData?.user?.id ?? null;
+    const existingUser = usersData?.users?.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    );
+    const userId = existingUser?.id ?? null;
 
     let userName: string | undefined;
     let emailVerified: boolean | undefined;

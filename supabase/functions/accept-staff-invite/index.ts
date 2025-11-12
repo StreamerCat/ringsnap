@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { randomBytes } from 'node:crypto';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   validateAndConsumeToken,
@@ -185,35 +186,40 @@ serve(async (req) => {
       }
     }
 
-    // Generate session for the user
-    const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-      options: {
-        data: {
-          email_verified: true
-        }
-      }
+    // Generate session for the user using temporary password
+    const tempPassword = randomBytes(32).toString('base64url');
+    const { error: setPasswordError } = await supabase.auth.admin.updateUserById(userId, {
+      password: tempPassword
     });
 
-    if (sessionError || !sessionData) {
-      console.error('Failed to generate session:', sessionError);
+    if (setPasswordError) {
+      console.error('Failed to set temporary password:', setPasswordError);
       return new Response(
         JSON.stringify({ error: 'Failed to create session' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const accessToken = sessionData.properties.access_token;
-    const refreshToken = sessionData.properties.refresh_token;
+    const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+      email,
+      password: tempPassword
+    });
 
-    if (!accessToken || !refreshToken) {
-      console.error('Session tokens missing from generated link');
+    if (sessionError || !sessionData.session) {
+      console.error('Failed to create session:', sessionError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create session tokens' }),
+        JSON.stringify({ error: 'Failed to create session' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const accessToken = sessionData.session.access_token;
+    const refreshToken = sessionData.session.refresh_token;
+
+    setTimeout(async () => {
+      const newRandomPassword = randomBytes(32).toString('base64url');
+      await supabase.auth.admin.updateUserById(userId, { password: newRandomPassword });
+    }, 100);
 
     // Log successful invite acceptance
     await logAuthEvent(

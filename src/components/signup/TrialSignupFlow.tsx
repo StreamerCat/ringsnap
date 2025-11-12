@@ -12,7 +12,6 @@ import { SignupButton } from "./shared/SignupButton";
 import { PlanSelectionStep } from "./shared/PlanSelectionStep";
 import {
   leadCaptureSchema,
-  businessDetailsSchema,
   planSelectionSchema,
   paymentSchema,
   trialSignupSchema
