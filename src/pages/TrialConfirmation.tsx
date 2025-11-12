@@ -174,7 +174,7 @@ export default function TrialConfirmation() {
           <Button
             size="lg"
             className="px-8"
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/auth/login")}
           >
             Go to Dashboard
           </Button>

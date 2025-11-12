@@ -28,7 +28,7 @@ export default function Dashboard() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        navigate("/login");
+        navigate("/auth/login");
         return;
       }
 

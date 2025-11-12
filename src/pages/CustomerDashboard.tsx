@@ -63,14 +63,14 @@ export default function CustomerDashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        navigate("/login");
+        navigate("/auth/login");
         return;
       }
 
       await loadDashboardData(user.id);
     } catch (error) {
       console.error("Auth check failed:", error);
-      navigate("/login");
+      navigate("/auth/login");
     }
   };
 

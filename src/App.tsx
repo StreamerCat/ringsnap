@@ -2,14 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { withAuthGuard } from "@/lib/auth/useUser";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
-import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales";
 import Dashboard from "./pages/Dashboard";
@@ -18,7 +17,7 @@ import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminUsers from "./pages/AdminUsers";
 import TeamManagement from "./pages/TeamManagement";
 import TrialConfirmation from "./pages/TrialConfirmation";
-// New auth pages
+// Auth pages
 import AuthLogin from "./pages/AuthLogin";
 import MagicCallback from "./pages/MagicCallback";
 import StaffInvite from "./pages/StaffInvite";
@@ -40,10 +39,10 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          {/* Legacy login routes (keep for backward compatibility) */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          {/* New auth routes */}
+          {/* Redirect legacy login routes to unified auth */}
+          <Route path="/login" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/reset-password" element={<Navigate to="/auth/login" replace />} />
+          {/* Auth routes */}
           <Route path="/auth/login" element={<AuthLogin />} />
           <Route path="/signin" element={<AuthLogin />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

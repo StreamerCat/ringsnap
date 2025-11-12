@@ -103,7 +103,7 @@ const AdminMonitoring = () => {
         const { data } = await supabase.auth.getUser();
         const user = data?.user;
         if (!user) {
-          navigate("/login");
+          navigate("/auth/login");
           return;
         }
 
@@ -131,7 +131,7 @@ const AdminMonitoring = () => {
           description: err.message || "Unable to verify your access rights.",
           variant: "destructive",
         });
-        navigate("/login");
+        navigate("/auth/login");
       } finally {
         setLoading(false);
       }
