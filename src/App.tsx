@@ -25,6 +25,8 @@ import StaffInvite from "./pages/StaffInvite";
 import PasswordReset from "./pages/PasswordReset";
 import SecuritySettings from "./pages/SecuritySettings";
 import AuthCallback from "./pages/AuthCallback";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 const queryClient = new QueryClient();
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
@@ -58,6 +60,9 @@ const App = () => (
           <Route path="/trial-confirmation" element={<TrialConfirmation />} />
           <Route path="/admin/monitoring" element={<AdminMonitoring />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          {/* Legal pages */}
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
