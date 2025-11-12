@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
+import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 export default function AuthLogin() {
   const navigate = useNavigate();
@@ -28,14 +29,17 @@ export default function AuthLogin() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        navigate(redirectTo);
+        // Use role-based redirect
+        const customRedirect = searchParams.get("redirect");
+        const finalRedirect = customRedirect || await redirectToRoleDashboard(user.id);
+        navigate(finalRedirect);
       }
     } catch (error) {
       console.error("Auth check error:", error);
     } finally {
       setIsCheckingAuth(false);
     }
-  }, [navigate, redirectTo]);
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     checkIfAlreadyLoggedIn();
@@ -118,15 +122,24 @@ export default function AuthLogin() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
       });
 
       if (error) throw error;
 
+      if (!data.user) {
+        throw new Error("Login succeeded but user not found");
+      }
+
       toast.success("Logged in successfully!");
-      navigate(redirectTo);
+
+      // Use role-based redirect or custom redirect
+      const customRedirect = searchParams.get("redirect");
+      const finalRedirect = customRedirect || await redirectToRoleDashboard(data.user.id);
+
+      navigate(finalRedirect);
     } catch (error: any) {
       console.error("Login error:", error);
       const message = error?.message || "Failed to sign in";
