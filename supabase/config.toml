@@ -66,5 +66,17 @@ verify_jwt = false
 [functions.send-password-reset]
 verify_jwt = false
 
+[functions.send-magic-link]
+verify_jwt = false
+
+[functions.verify-magic-link]
+verify_jwt = false
+
+[functions.accept-staff-invite]
+verify_jwt = false
+
+[functions.validate-staff-invite]
+verify_jwt = false
+
 [functions.sync-usage]
 verify_jwt = true
