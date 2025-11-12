@@ -217,8 +217,12 @@ APP_URL=https://app.getringsnap.com
 ```
 SENDGRID_API_KEY=SG...
 # OR
+RESEND_PROD_KEY=re_...
+# Legacy fallback
 RESEND_API_KEY=re_...
 ```
+
+> ⚠️ Make sure to run `supabase secrets set RESEND_PROD_KEY=...` after updating values so the key is synced to every environment.
 
 ### SMS (optional)
 

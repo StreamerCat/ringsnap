@@ -84,11 +84,12 @@ Execute full QA test plan before launch, particularly:
 - `STRIPE_PRICE_PROFESSIONAL`
 - `STRIPE_PRICE_PREMIUM`
 - `VAPI_API_KEY` (production, not demo)
-- `SENDGRID_API_KEY` or `RESEND_API_KEY`
+- `SENDGRID_API_KEY` or `RESEND_PROD_KEY` (preferred) / legacy `RESEND_API_KEY`
 - `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` (if SMS enabled)
 
 **ACTION REQUIRED**:
-Audit and verify all environment variables are set with production values
+Audit and verify all environment variables are set with production values.
+Coordinate with DevOps to run `supabase secrets set RESEND_PROD_KEY=...` so the new email secret is available in every environment.
 
 ---
 

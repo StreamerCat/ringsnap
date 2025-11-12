@@ -85,7 +85,7 @@ import { OnboardingNumberStep } from "@/components/OnboardingNumberStep";
 - `APP_URL` - your app's base URL
 
 **Optional:**
-- `SENDGRID_API_KEY` or `RESEND_API_KEY` (choose one for email)
+- `SENDGRID_API_KEY` or `RESEND_PROD_KEY` (preferred) / legacy `RESEND_API_KEY` (email delivery)
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `NOTIFY_SMS_FROM` (for SMS)
 - `NOTIFY_WEBHOOK_URL` (for custom notification handling)
 
@@ -137,11 +137,13 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 NOTIFY_EMAIL_FROM=noreply@getringsnap.com
 APP_URL=https://app.getringsnap.com
-SENDGRID_API_KEY=SG.xxx  # or RESEND_API_KEY
+SENDGRID_API_KEY=SG.xxx  # or RESEND_PROD_KEY
 TWILIO_ACCOUNT_SID=AC...  # optional
 TWILIO_AUTH_TOKEN=...  # optional
 NOTIFY_SMS_FROM=+1...  # optional
 ```
+
+> ℹ️ After updating the dashboard values, run `supabase secrets set RESEND_PROD_KEY=...` from your CLI so the secret is available to deployed edge functions.
 
 ### Step 4: Enable Scheduled Function
 ```bash
