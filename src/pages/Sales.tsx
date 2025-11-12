@@ -12,6 +12,7 @@ import { useEffect, useRef } from "react";
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
   const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
 
   useEffect(() => {
@@ -26,11 +27,19 @@ const VapiWidget = () => {
         });
 
         if (!response.ok) {
-          console.error('Failed to load Vapi config');
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Failed to load Vapi config:', errorData);
+          setConfigError(errorData.error || 'Failed to load demo configuration');
           return;
         }
 
         const data = await response.json();
+
+        if (!data.publicKey || !data.assistantId) {
+          setConfigError('Demo not configured - missing credentials');
+          return;
+        }
+
         setVapiConfig(data);
 
         // Initialize Vapi instance with server-provided key
@@ -43,6 +52,7 @@ const VapiWidget = () => {
         vapiRef.current.on("call-end", handleCallEnd);
       } catch (error) {
         console.error('Error loading Vapi config:', error);
+        setConfigError('Failed to initialize demo');
       }
     };
 
@@ -54,8 +64,8 @@ const VapiWidget = () => {
   }, []);
 
   const startCall = () => {
-    if (vapiConfig) {
-      vapiRef.current?.start(vapiConfig.assistantId);
+    if (vapiConfig && vapiRef.current) {
+      vapiRef.current.start(vapiConfig.assistantId);
     }
   };
 
@@ -65,7 +75,15 @@ const VapiWidget = () => {
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-      {!isCallActive ? (
+      {configError ? (
+        <div className="space-y-4 max-w-md mx-auto">
+          <div className="text-red-600 text-lg font-semibold">Demo Unavailable</div>
+          <p className="text-muted-foreground">{configError}</p>
+          <p className="text-sm text-muted-foreground">
+            Please contact support to configure the demo environment.
+          </p>
+        </div>
+      ) : !isCallActive ? (
         <div className="space-y-6 max-w-2xl mx-auto">
           <div className="text-center space-y-3">
             <h3 className="text-3xl sm:text-4xl font-bold leading-tight text-[#2C3639]">
@@ -79,7 +97,8 @@ const VapiWidget = () => {
           <div className="space-y-4">
             <button
               onClick={startCall}
-              className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group"
+              disabled={!vapiConfig}
+              className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
