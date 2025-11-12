@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { randomBytes } from 'node:crypto';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
@@ -91,12 +92,10 @@ serve(async (req) => {
     console.log('[verify-magic-link] Token valid, checking user', { email });
 
     // Check if auth user exists via admin lookup
-    const { data: authLookup, error: authLookupError } = await supabase.auth.admin.getUserByEmail(
-      email
-    );
+    const { data: usersData, error: authLookupError } = await supabase.auth.admin.listUsers();
 
     if (authLookupError) {
-      console.error('[verify-magic-link] Failed to lookup auth user', authLookupError);
+      console.error('[verify-magic-link] Failed to lookup auth users', authLookupError);
       return new Response(
         JSON.stringify({
           error: 'Failed to verify user account',
@@ -106,7 +105,9 @@ serve(async (req) => {
       );
     }
 
-    const existingAuthUser = authLookup?.user ?? null;
+    const existingAuthUser = usersData?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    ) ?? null;
 
     console.log('[verify-magic-link] Auth lookup result', {
       found: !!existingAuthUser
@@ -175,20 +176,32 @@ serve(async (req) => {
       }
     }
 
-    // Generate session for the user
-    console.log('[verify-magic-link] Generating session for user:', userId);
-    const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-      options: {
-        data: {
-          email_verified: true
-        }
-      }
+    // Generate a temporary password to create a session
+    console.log('[verify-magic-link] Creating session for user:', userId);
+    const tempPassword = randomBytes(32).toString('base64url');
+
+    const { error: setPasswordError } = await supabase.auth.admin.updateUserById(userId, {
+      password: tempPassword
     });
 
-    if (sessionError || !sessionData) {
-      console.error('[verify-magic-link] Failed to generate session:', sessionError);
+    if (setPasswordError) {
+      console.error('[verify-magic-link] Failed to set temporary password:', setPasswordError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to create session',
+          details: setPasswordError.message
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+      email,
+      password: tempPassword
+    });
+
+    if (sessionError || !sessionData.session) {
+      console.error('[verify-magic-link] Failed to create session:', sessionError);
       return new Response(
         JSON.stringify({
           error: 'Failed to create session',
@@ -198,20 +211,15 @@ serve(async (req) => {
       );
     }
 
-    // Extract the session tokens from the generated link
-    // The admin.generateLink returns properties with access_token and refresh_token
-    const accessToken = sessionData.properties.access_token;
-    const refreshToken = sessionData.properties.refresh_token;
-
-    if (!accessToken || !refreshToken) {
-      console.error('[verify-magic-link] Session tokens missing from generated link');
-      return new Response(
-        JSON.stringify({ error: 'Failed to create session tokens' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const accessToken = sessionData.session.access_token;
+    const refreshToken = sessionData.session.refresh_token;
 
     console.log('[verify-magic-link] Session generated successfully');
+
+    setTimeout(async () => {
+      const newRandomPassword = randomBytes(32).toString('base64url');
+      await supabase.auth.admin.updateUserById(userId, { password: newRandomPassword });
+    }, 100);
 
     // Log successful login
     await logAuthEvent(
