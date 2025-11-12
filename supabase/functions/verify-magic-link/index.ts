@@ -90,24 +90,33 @@ serve(async (req) => {
 
     console.log('[verify-magic-link] Token valid, checking user', { email });
 
-    // Check if user exists
-    const { data: existingUser, error: userError } = await supabase
-      .from('profiles')
-      .select('id, account_id, email_verified')
-      .eq('email', email)
-      .single();
+    // Check if auth user exists via admin lookup
+    const { data: authLookup, error: authLookupError } = await supabase.auth.admin.getUserByEmail(
+      email
+    );
 
-    console.log('[verify-magic-link] User lookup result', {
-      found: !!existingUser,
-      error: userError?.message,
-      errorCode: userError?.code
+    if (authLookupError) {
+      console.error('[verify-magic-link] Failed to lookup auth user', authLookupError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to verify user account',
+          details: authLookupError.message
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const existingAuthUser = authLookup?.user ?? null;
+
+    console.log('[verify-magic-link] Auth lookup result', {
+      found: !!existingAuthUser
     });
 
     let userId: string;
     let accountId: string | null = null;
     let isNewUser = false;
 
-    if (userError || !existingUser) {
+    if (!existingAuthUser) {
       // Create new user via Supabase Auth (passwordless)
       console.log('[verify-magic-link] Creating new user for email:', email);
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -137,12 +146,27 @@ serve(async (req) => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
     } else {
-      userId = existingUser.id;
-      accountId = existingUser.account_id;
+      userId = existingAuthUser.id;
+
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, account_id, email_verified')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.warn('[verify-magic-link] Failed to fetch profile for existing user', {
+          userId,
+          error: profileError.message,
+          errorCode: profileError.code
+        });
+      }
+
+      accountId = existingProfile?.account_id ?? null;
       console.log('[verify-magic-link] Existing user found:', { userId, accountId });
 
       // Mark email as verified if not already
-      if (!existingUser.email_verified) {
+      if (existingProfile && !existingProfile.email_verified) {
         await supabase
           .from('profiles')
           .update({ email_verified: true })
