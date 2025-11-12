@@ -185,6 +185,36 @@ serve(async (req) => {
       }
     }
 
+    // Generate session for the user
+    const { data: sessionData, error: sessionError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+      options: {
+        data: {
+          email_verified: true
+        }
+      }
+    });
+
+    if (sessionError || !sessionData) {
+      console.error('Failed to generate session:', sessionError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create session' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const accessToken = sessionData.properties.access_token;
+    const refreshToken = sessionData.properties.refresh_token;
+
+    if (!accessToken || !refreshToken) {
+      console.error('Session tokens missing from generated link');
+      return new Response(
+        JSON.stringify({ error: 'Failed to create session tokens' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Log successful invite acceptance
     await logAuthEvent(
       supabase,
@@ -197,11 +227,14 @@ serve(async (req) => {
       true
     );
 
-    // Return success - client will handle login with the password they just set
+    // Return success with session
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Staff invite accepted. You can now sign in with your password.',
+        session: {
+          access_token: accessToken,
+          refresh_token: refreshToken
+        },
         user: {
           id: userId,
           email,

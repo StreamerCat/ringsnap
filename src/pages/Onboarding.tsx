@@ -18,7 +18,7 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type AssistantRow = Database["public"]["Tables"]["assistants"]["Row"];
 type ProfileWithAccount = ProfileRow & { accounts?: AccountRow | null };
 
-const DEBUG_ONBOARDING = true;
+const DEBUG_ONBOARDING = import.meta.env.DEV || import.meta.env.VITE_DEBUG === 'true';
 const dlog = (...args: unknown[]) => {
   if (DEBUG_ONBOARDING) {
     console.debug("[Onboarding]", ...args);

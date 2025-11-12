@@ -30,13 +30,27 @@ export default function StaffInvite() {
       }
 
       try {
-        // Note: In production, you'd want to validate the token on the server first
-        // For now, we'll just check if it exists
-        setIsValid(true);
-        setInviteData({ role: "Staff" }); // Placeholder
-      } catch (error) {
+        // Validate token on server
+        const { data, error } = await supabase.functions.invoke("validate-staff-invite", {
+          body: { token }
+        });
+
+        if (error) throw error;
+
+        if (data?.valid) {
+          setIsValid(true);
+          setInviteData({
+            role: data.role,
+            email: data.email
+          });
+        } else {
+          setIsValid(false);
+          toast.error(data?.error || "Invalid invitation");
+        }
+      } catch (error: any) {
         console.error("Invite validation error:", error);
         setIsValid(false);
+        toast.error(error?.message || "Failed to validate invitation");
       } finally {
         setIsValidating(false);
       }
