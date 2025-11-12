@@ -127,15 +127,42 @@ serve(async (req) => {
       }
     }
 
-    // Check if user exists
-    const { data: existingUser } = await supabase
-      .from('profiles')
-      .select('id, name, email_verified')
-      .eq('email', normalizedEmail)
-      .single();
+    // Check if user exists via auth admin API
+    const { data: userData, error: getUserError } = await supabase.auth.admin.getUserByEmail(
+      normalizedEmail
+    );
 
-    const userId = existingUser?.id || null;
-    const userName = existingUser?.name || undefined;
+    if (getUserError && getUserError?.status !== 404) {
+      console.error('[send-magic-link] Failed to lookup user by email:', getUserError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to lookup user' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = userData?.user?.id ?? null;
+
+    let userName: string | undefined;
+    let emailVerified: boolean | undefined;
+
+    if (userId) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, name, email_verified')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('[send-magic-link] Failed to load user profile:', profileError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to load user profile' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      userName = profile?.name ?? undefined;
+      emailVerified = profile?.email_verified ?? undefined;
+    }
 
     // Create magic link token
     const { token, expiresAt } = await createMagicLinkToken(
@@ -165,7 +192,10 @@ serve(async (req) => {
       text: emailTemplate.text,
       tags: [
         { name: 'type', value: 'magic_link' },
-        { name: 'user_exists', value: existingUser ? 'true' : 'false' }
+        { name: 'user_exists', value: userId ? 'true' : 'false' },
+        ...(typeof emailVerified === 'boolean'
+          ? [{ name: 'email_verified', value: emailVerified ? 'true' : 'false' }]
+          : [])
       ]
     });
 
