@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 export default function MagicCallback() {
   const navigate = useNavigate();
@@ -14,19 +15,23 @@ export default function MagicCallback() {
   useEffect(() => {
     const verifyMagicLink = async () => {
       const token = searchParams.get("token");
-      const redirectTo = searchParams.get("redirect") || "/onboarding";
+      const customRedirect = searchParams.get("redirect");
+
+      console.log('[MagicCallback] Starting verification', { token: token?.substring(0, 10), customRedirect });
 
       if (!token) {
         setStatus("error");
-        setErrorMessage("No verification token found");
+        setErrorMessage("No verification token found in URL");
         return;
       }
 
       try {
         // Get device nonce
         const deviceNonce = localStorage.getItem("device_nonce");
+        console.log('[MagicCallback] Device nonce:', deviceNonce?.substring(0, 10));
 
         // Verify the magic link token
+        console.log('[MagicCallback] Calling verify-magic-link...');
         const { data, error } = await supabase.functions.invoke("verify-magic-link", {
           body: {
             token,
@@ -34,29 +39,51 @@ export default function MagicCallback() {
           }
         });
 
-        if (error) throw error;
+        console.log('[MagicCallback] Edge function response:', { success: data?.success, error });
+
+        if (error) {
+          console.error('[MagicCallback] Edge function error:', error);
+          throw error;
+        }
 
         if (!data?.success || !data?.session) {
+          console.error('[MagicCallback] Invalid response:', data);
           throw new Error(data?.error || "Failed to verify magic link");
         }
 
+        console.log('[MagicCallback] Setting session...');
         // Set the session
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token
         });
 
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          console.error('[MagicCallback] Session error:', sessionError);
+          throw sessionError;
+        }
+
+        // Verify session was set
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('[MagicCallback] Session set, user:', user?.id);
+
+        if (!user) {
+          throw new Error("Session was set but user not found");
+        }
 
         setStatus("success");
 
+        // Determine redirect URL based on role
+        const redirectUrl = customRedirect || await redirectToRoleDashboard(user.id);
+        console.log('[MagicCallback] Redirecting to:', redirectUrl);
+
         // Redirect after a short delay
         setTimeout(() => {
-          navigate(redirectTo, { replace: true });
+          navigate(redirectUrl, { replace: true });
         }, 1500);
 
       } catch (error: any) {
-        console.error("Magic link verification error:", error);
+        console.error("[MagicCallback] Verification error:", error);
         setStatus("error");
         setErrorMessage(error?.message || "Failed to verify magic link");
       }
@@ -87,7 +114,7 @@ export default function MagicCallback() {
           </CardTitle>
           <CardDescription className="text-center">
             {status === "loading" && "Please wait while we sign you in"}
-            {status === "success" && "Redirecting you to your account..."}
+            {status === "success" && "Redirecting you to your dashboard..."}
             {status === "error" && "We couldn't verify your magic link"}
           </CardDescription>
         </CardHeader>

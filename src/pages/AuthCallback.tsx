@@ -6,8 +6,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
-const SUCCESS_REDIRECT = "/dashboard";
 const ERROR_REDIRECT = "/signin";
 const EXCHANGE_TIMEOUT_MS = 10000; // 10 second timeout
 
@@ -66,14 +66,24 @@ export default function AuthCallback() {
         );
 
         const exchangePromise = supabase.auth.exchangeCodeForSession({ code });
-        const { error } = await Promise.race([exchangePromise, timeoutPromise]) as Awaited<typeof exchangePromise>;
+        const { data, error } = await Promise.race([exchangePromise, timeoutPromise]) as Awaited<typeof exchangePromise>;
 
         if (error) {
           throw error;
         }
 
+        // Get user and determine role-based redirect
+        const user = data.user;
+        if (!user) {
+          throw new Error("User not found after OAuth exchange");
+        }
+
+        // Use custom redirect if provided, otherwise use role-based redirect
         const normalizedNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
-        navigate(normalizedNext ?? SUCCESS_REDIRECT, { replace: true });
+        const redirectUrl = normalizedNext ?? await redirectToRoleDashboard(user.id);
+
+        console.log('[AuthCallback] Redirecting user to:', redirectUrl);
+        navigate(redirectUrl, { replace: true });
       } catch (error: unknown) {
         console.error("Supabase OAuth callback failed:", error);
         const errorSlug = error instanceof Error ? error.message.replace(/\s+/g, "_").toLowerCase() : "exchange_failed";
