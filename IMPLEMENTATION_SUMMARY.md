@@ -138,6 +138,9 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 NOTIFY_EMAIL_FROM=noreply@getringsnap.com
 APP_URL=https://app.getringsnap.com
 SENDGRID_API_KEY=SG.xxx  # or RESEND_PROD_KEY
+RESEND_PROD_KEY=re_...
+# Legacy fallback only if migrating older environments
+# RESEND_API_KEY=re_...
 TWILIO_ACCOUNT_SID=AC...  # optional
 TWILIO_AUTH_TOKEN=...  # optional
 NOTIFY_SMS_FROM=+1...  # optional
