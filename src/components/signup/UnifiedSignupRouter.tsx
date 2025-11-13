@@ -1,6 +1,5 @@
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SelfServeTrialFlow } from "../onboarding/SelfServeTrialFlow";
 import { SalesGuidedTrialFlow } from "../onboarding/SalesGuidedTrialFlow";
 
@@ -31,16 +30,20 @@ export const UnifiedSignupRouter = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-        <Elements stripe={stripePromise}>
-          {mode === 'trial' ? (
-            <SelfServeTrialFlow onSuccess={handleSuccess} />
-          ) : (
-            <SalesGuidedTrialFlow onSuccess={handleSuccess} />
-          )}
-        </Elements>
-      </DialogContent>
-    </Dialog>
+    <Elements stripe={stripePromise}>
+      {mode === 'trial' ? (
+        <SelfServeTrialFlow
+          open={open}
+          onOpenChange={onOpenChange || (() => {})}
+          onSuccess={handleSuccess}
+        />
+      ) : (
+        <SalesGuidedTrialFlow
+          open={open}
+          onOpenChange={onOpenChange || (() => {})}
+          onSuccess={handleSuccess}
+        />
+      )}
+    </Elements>
   );
 };
