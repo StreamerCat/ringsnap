@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ArrowLeft, Phone } from "lucide-react";
 
 // Import shared atomic components
@@ -48,6 +49,8 @@ const salesSchema = z.object({
 type SalesFormData = z.infer<typeof salesSchema>;
 
 interface SalesGuidedTrialFlowProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
@@ -62,7 +65,11 @@ interface SalesGuidedTrialFlowProps {
  * 4. Provisioning (rep uses this time to pitch)
  * 5. Phone Ready (demo time!)
  */
-export function SalesGuidedTrialFlow({ onSuccess }: SalesGuidedTrialFlowProps) {
+export function SalesGuidedTrialFlow({
+  open,
+  onOpenChange,
+  onSuccess
+}: SalesGuidedTrialFlowProps) {
   const navigate = useNavigate();
   const stripe = useStripe();
   const elements = useElements();
@@ -195,7 +202,9 @@ export function SalesGuidedTrialFlow({ onSuccess }: SalesGuidedTrialFlowProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="space-y-6">
       {/* Step 1: Combined Form */}
       {currentStep === 1 && (
         <Card>
@@ -394,6 +403,8 @@ export function SalesGuidedTrialFlow({ onSuccess }: SalesGuidedTrialFlowProps) {
           </CardContent>
         </Card>
       )}
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
