@@ -1,7 +1,8 @@
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { TrialSignupFlow } from "./TrialSignupFlow";
-import { SalesSignupWizard } from "../wizard/SalesSignupWizard";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { SelfServeTrialFlow } from "../onboarding/SelfServeTrialFlow";
+import { SalesGuidedTrialFlow } from "../onboarding/SalesGuidedTrialFlow";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
@@ -20,18 +21,26 @@ export const UnifiedSignupRouter = ({
   source,
   onSuccess
 }: UnifiedSignupRouterProps) => {
+  const handleSuccess = () => {
+    if (onSuccess) {
+      onSuccess({});
+    }
+    if (onOpenChange) {
+      onOpenChange(false);
+    }
+  };
+
   return (
-    <Elements stripe={stripePromise}>
-      {mode === 'trial' ? (
-        <TrialSignupFlow
-          open={open}
-          onOpenChange={onOpenChange || (() => {})}
-          source={source}
-          onSuccess={onSuccess}
-        />
-      ) : (
-        <SalesSignupWizard />
-      )}
-    </Elements>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+        <Elements stripe={stripePromise}>
+          {mode === 'trial' ? (
+            <SelfServeTrialFlow onSuccess={handleSuccess} />
+          ) : (
+            <SalesGuidedTrialFlow onSuccess={handleSuccess} />
+          )}
+        </Elements>
+      </DialogContent>
+    </Dialog>
   );
 };
