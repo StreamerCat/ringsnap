@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { buildPasswordResetEmail } from "../_shared/email-templates.ts";
+import { buildPasswordSetResetEmail } from "../_shared/auth-email-templates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendEmail } from "../_shared/resend-client.ts";
 import { createAdminClient } from "../_shared/auth-utils.ts";
@@ -69,11 +69,13 @@ serve(async (req) => {
       .eq("id", data.user.id)
       .single();
 
-    // Build email template
-    const emailContent = buildPasswordResetEmail({
-      recipientName: profile?.name,
-      resetLink: data.properties.action_link
-    });
+    // Build email template using consolidated auth-email-templates
+    const emailContent = buildPasswordSetResetEmail(
+      data.properties.action_link,
+      profile?.name || 'there',
+      false, // isFirstTime = false (this is a reset, not initial password set)
+      60 // expiresInMinutes
+    );
 
     // Send via Resend
     const emailResult = await sendEmail(RESEND_API_KEY, {

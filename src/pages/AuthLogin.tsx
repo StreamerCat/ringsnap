@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
+import { getOrCreateDeviceNonce } from "@/lib/auth/deviceNonce";
 
 export default function AuthLogin() {
   const navigate = useNavigate();
@@ -84,11 +85,7 @@ export default function AuthLogin() {
 
     try {
       // Get device nonce from localStorage or create one
-      let deviceNonce = localStorage.getItem("device_nonce");
-      if (!deviceNonce) {
-        deviceNonce = crypto.randomUUID();
-        localStorage.setItem("device_nonce", deviceNonce);
-      }
+      const deviceNonce = getOrCreateDeviceNonce();
 
       // Send magic link
       const { data, error } = await supabase.functions.invoke("send-magic-link", {
