@@ -72,6 +72,9 @@ verify_jwt = false
 [functions.verify-magic-link]
 verify_jwt = false
 
+[functions.verify-magic-debug]
+verify_jwt = false
+
 [functions.accept-staff-invite]
 verify_jwt = false
 
