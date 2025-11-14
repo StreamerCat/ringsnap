@@ -75,6 +75,35 @@ verify_jwt = false
 - Function now properly invokes `send-password-reset` edge function
 - Added email sent type tracking to show appropriate UI messages
 
+### Bug 3: Production Edge Functions Reject Anonymous Requests (Open)
+
+**Problem:**
+- Even after `verify_jwt = false` landed in `supabase/config.toml`, the **deployed** versions of
+  `send-magic-link` and `send-password-reset` in project `rmyvvbqnccpfeyowidrq` were never redeployed.
+- Production keeps running the old bundles that still expect a valid JWT and therefore respond with
+  `403 Access denied` as soon as an unauthenticated request arrives from the public login / reset forms.
+
+**Impact:**
+- Magic link and password reset flows fail before reaching the Resend email logic, so no email is ever sent.
+- Auth pages silently spin forever which looks like a frontend bug even though the backend is rejecting the call.
+- Support keeps receiving reports that “emails never arrive” because anonymous users cannot hit the edge
+  functions anymore.
+
+**Fix Plan:**
+1. Re-auth the Supabase CLI and link it to `rmyvvbqnccpfeyowidrq`.
+2. Run `npx supabase functions deploy send-magic-link verify-magic-link send-password-reset` so the
+   production copies inherit `verify_jwt = false`.
+3. Smoke-test `send-magic-link` with `./test-magic-link.sh user@example.com` and verify it returns HTTP 200 with `{ "success": true }`.
+4. Manually test `send-password-reset` with:
+   ```bash
+   curl -X POST \
+     https://rmyvvbqnccpfeyowidrq.functions.supabase.co/send-password-reset \
+     -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com"}'
+   ```
+5. Tail both functions' logs (`supabase functions logs <name> --tail`) to ensure Resend send events succeed.
+6. Document the successful redeploy in the runbook and notify stakeholders.
+
 ---
 
 ## Email Flow Testing Plan
