@@ -1,7 +1,7 @@
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { TrialSignupFlow } from "./TrialSignupFlow";
-import { SalesSignupWizard } from "../wizard/SalesSignupWizard";
+import { SelfServeTrialFlow } from "../onboarding/SelfServeTrialFlow";
+import { SalesGuidedTrialFlow } from "../onboarding/SalesGuidedTrialFlow";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
@@ -20,17 +20,29 @@ export const UnifiedSignupRouter = ({
   source,
   onSuccess
 }: UnifiedSignupRouterProps) => {
+  const handleSuccess = () => {
+    if (onSuccess) {
+      onSuccess({});
+    }
+    if (onOpenChange) {
+      onOpenChange(false);
+    }
+  };
+
   return (
     <Elements stripe={stripePromise}>
       {mode === 'trial' ? (
-        <TrialSignupFlow
+        <SelfServeTrialFlow
           open={open}
           onOpenChange={onOpenChange || (() => {})}
-          source={source}
-          onSuccess={onSuccess}
+          onSuccess={handleSuccess}
         />
       ) : (
-        <SalesSignupWizard />
+        <SalesGuidedTrialFlow
+          open={open}
+          onOpenChange={onOpenChange || (() => {})}
+          onSuccess={handleSuccess}
+        />
       )}
     </Elements>
   );
