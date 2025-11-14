@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
-import toast from "react-hot-toast";
-import { redirectToRoleDashboard } from "../lib/redirects";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 export default function AuthLogin() {
   const navigate = useNavigate();

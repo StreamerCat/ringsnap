@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
-import { redirectToRoleDashboard } from "../lib/redirects";
+import { supabase } from "@/lib/supabase";
+import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 const POLL_MAX_ATTEMPTS = 6;
 const POLL_DELAY_MS = 500;
