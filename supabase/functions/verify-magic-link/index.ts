@@ -1,264 +1,130 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { randomBytes } from 'node:crypto';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
-import { corsHeaders } from '../_shared/cors.ts';
-import {
-  validateAndConsumeToken,
-  logAuthEvent,
-  getIpAddress,
-  getUserAgent,
-  createAdminClient
-} from '../_shared/auth-utils.ts';
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-interface RequestBody {
-  token: string;
-  deviceNonce?: string;
-}
+import { serve } from "std/server";
+import { createClient } from "@supabase/supabase-js";
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const corsHeaders = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
 
   try {
-    console.log('[verify-magic-link] Starting verification', {
-      hasUrl: !!SUPABASE_URL,
-      hasKey: !!SUPABASE_SERVICE_ROLE_KEY,
-      urlPrefix: SUPABASE_URL?.substring(0, 8)
-    });
-
-    const supabase = createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { token, deviceNonce }: RequestBody = await req.json();
-
-    console.log('[verify-magic-link] Request data', {
-      hasToken: !!token,
-      tokenPrefix: token?.substring(0, 10),
-      hasDeviceNonce: !!deviceNonce,
-      deviceNoncePrefix: deviceNonce?.substring(0, 10)
-    });
+    const body = await req.json().catch(() => ({}));
+    const { token, deviceNonce } = body || {};
 
     if (!token) {
-      console.error('[verify-magic-link] No token provided');
-      return new Response(
-        JSON.stringify({ error: 'Token is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Missing token" }), { status: 400, headers: corsHeaders });
     }
 
-    const ipAddress = getIpAddress(req);
-    const userAgent = getUserAgent(req);
+    // Use HMAC-SHA256 with service role key so hash matches send-magic-link storage
+    const tokenHash = await hashTokenHmac(token, supabaseKey);
+    const nowIso = new Date().toISOString();
 
-    // Validate and consume token
-    console.log('[verify-magic-link] Validating token...');
-    const result = await validateAndConsumeToken(
-      supabase,
-      token,
-      'magic_link',
-      deviceNonce
-    );
+    // Device clause: if deviceNonce provided, allow stored device_nonce NULL or equal to provided
+    const deviceOrClause = deviceNonce ? `device_nonce.is.null,device_nonce.eq.${deviceNonce}` : `device_nonce.is.null`;
 
-    console.log('[verify-magic-link] Validation result', {
-      valid: result.valid,
-      hasData: !!result.data,
-      error: result.error
-    });
+    // Atomically mark token used and return the consumed row
+    const { data: consumedRow, error: updateError } = await supabase
+      .from("auth_tokens")
+      .update({ used_at: nowIso })
+      .match({ token_hash: tokenHash, token_type: "magic_link" })
+      .is("used_at", null)
+      .gt("expires_at", nowIso)
+      .or(deviceOrClause)
+      .select("*")
+      .limit(1)
+      .maybeSingle();
 
-    if (!result.valid || !result.data) {
-      console.error('[verify-magic-link] Token validation failed', { error: result.error });
-      await logAuthEvent(
-        supabase,
-        null,
-        null,
-        'magic_link_invalid',
-        { error: result.error },
-        ipAddress,
-        userAgent,
-        false
-      );
-
-      return new Response(
-        JSON.stringify({ error: result.error || 'Invalid or expired magic link' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (updateError) {
+      console.error("[verify-magic-link] DB update error:", updateError);
+      return new Response(JSON.stringify({ error: "Failed to validate token" }), { status: 500, headers: corsHeaders });
     }
 
-    const tokenData = result.data;
-    const email = tokenData.email;
-
-    console.log('[verify-magic-link] Token valid, checking user', { email });
-
-    // Check if auth user exists via admin lookup
-    const { data: usersData, error: authLookupError } = await supabase.auth.admin.listUsers();
-
-    if (authLookupError) {
-      console.error('[verify-magic-link] Failed to lookup auth users', authLookupError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to verify user account',
-          details: authLookupError.message
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!consumedRow) {
+      // token invalid/expired/consumed or device mismatch
+      return new Response(JSON.stringify({ error: "Invalid or expired magic link" }), { status: 401, headers: corsHeaders });
     }
 
-    const existingAuthUser = usersData?.users?.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    ) ?? null;
+    const email = consumedRow.email;
+    if (!email) {
+      return new Response(JSON.stringify({ error: "Token missing email" }), { status: 500, headers: corsHeaders });
+    }
 
-    console.log('[verify-magic-link] Auth lookup result', {
-      found: !!existingAuthUser
-    });
+    // Find existing auth user or create
+    const listResp = await supabase.auth.admin.listUsers();
+    if (listResp.error) {
+      console.error("[verify-magic-link] listUsers error:", listResp.error);
+      return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: corsHeaders });
+    }
+    const existing = (listResp.data?.users || []).find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
 
     let userId: string;
-    let accountId: string | null = null;
-    let isNewUser = false;
-
-    if (!existingAuthUser) {
-      // Create new user via Supabase Auth (passwordless)
-      console.log('[verify-magic-link] Creating new user for email:', email);
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: {
-          email_verified: true
-        }
-      });
-
-      if (authError || !authData.user) {
-        console.error('[verify-magic-link] Failed to create user:', authError);
-        return new Response(
-          JSON.stringify({
-            error: 'Failed to create user account',
-            details: authError?.message
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      userId = authData.user.id;
-      isNewUser = true;
-      console.log('[verify-magic-link] New user created:', userId);
-
-      // The trigger should create profile automatically, but let's verify
-      await new Promise(resolve => setTimeout(resolve, 500));
-
+    if (existing) {
+      userId = existing.id;
     } else {
-      userId = existingAuthUser.id;
-
-      const { data: existingProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, account_id, email_verified')
-        .eq('id', userId)
-        .single();
-
-      if (profileError) {
-        console.warn('[verify-magic-link] Failed to fetch profile for existing user', {
-          userId,
-          error: profileError.message,
-          errorCode: profileError.code
-        });
+      const createResp = await supabase.auth.admin.createUser({ email, email_confirm: true, user_metadata: { email_verified: true } });
+      if (createResp.error || !createResp.data?.user) {
+        console.error("[verify-magic-link] createUser error:", createResp.error);
+        return new Response(JSON.stringify({ error: "Failed to create user" }), { status: 500, headers: corsHeaders });
       }
-
-      accountId = existingProfile?.account_id ?? null;
-      console.log('[verify-magic-link] Existing user found:', { userId, accountId });
-
-      // Mark email as verified if not already
-      if (existingProfile && !existingProfile.email_verified) {
-        await supabase
-          .from('profiles')
-          .update({ email_verified: true })
-          .eq('id', userId);
-        console.log('[verify-magic-link] Marked email as verified');
-      }
+      userId = createResp.data.user.id;
+      // small delay for triggers if needed
+      await new Promise((res) => setTimeout(res, 300));
     }
 
-    // Generate a temporary password to create a session
-    console.log('[verify-magic-link] Creating session for user:', userId);
-    const tempPassword = randomBytes(32).toString('base64url');
-
-    const { error: setPasswordError } = await supabase.auth.admin.updateUserById(userId, {
-      password: tempPassword
-    });
-
-    if (setPasswordError) {
-      console.error('[verify-magic-link] Failed to set temporary password:', setPasswordError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to create session',
-          details: setPasswordError.message
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Create a temporary password, set it, sign in to obtain session tokens
+    const tempPassword = randomHex(32);
+    const updatePw = await supabase.auth.admin.updateUserById(userId, { password: tempPassword });
+    if (updatePw.error) {
+      console.error("[verify-magic-link] updateUserById error:", updatePw.error);
+      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: corsHeaders });
     }
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
-      email,
-      password: tempPassword
-    });
-
-    if (sessionError || !sessionData.session) {
-      console.error('[verify-magic-link] Failed to create session:', sessionError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to create session',
-          details: sessionError?.message
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const signInResp = await supabase.auth.signInWithPassword({ email, password: tempPassword });
+    if (signInResp.error || !signInResp.data?.session) {
+      console.error("[verify-magic-link] signInWithPassword error:", signInResp.error);
+      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: corsHeaders });
     }
 
-    const accessToken = sessionData.session.access_token;
-    const refreshToken = sessionData.session.refresh_token;
-
-    console.log('[verify-magic-link] Session generated successfully');
-
+    // Rotate password after short delay to minimize window (best-effort)
     setTimeout(async () => {
-      const newRandomPassword = randomBytes(32).toString('base64url');
-      await supabase.auth.admin.updateUserById(userId, { password: newRandomPassword });
+      try {
+        const newPw = randomHex(32);
+        await supabase.auth.admin.updateUserById(userId, { password: newPw });
+      } catch (e) {
+        console.warn("[verify-magic-link] failed to rotate password:", e);
+      }
     }, 100);
 
-    // Log successful login
-    await logAuthEvent(
-      supabase,
-      userId,
-      accountId,
-      'magic_link_login',
-      { email, is_new_user: isNewUser },
-      ipAddress,
-      userAgent,
-      true
-    );
-
-    // Return session to client
+    // Return session + user to the client; the client will call supabase.auth.setSession(...)
     return new Response(
       JSON.stringify({
         success: true,
-        isNewUser,
         session: {
-          access_token: accessToken,
-          refresh_token: refreshToken
+          access_token: signInResp.data.session.access_token,
+          refresh_token: signInResp.data.session.refresh_token,
         },
-        user: {
-          id: userId,
-          email: email,
-          accountId: accountId
-        }
+        user: { id: userId, email },
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: corsHeaders }
     );
-
-  } catch (error) {
-    console.error('[verify-magic-link] Uncaught error:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error)
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  } catch (err: any) {
+    console.error("[verify-magic-link] unexpected error:", err);
+    return new Response(JSON.stringify({ error: err?.message || "Unexpected error" }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
+
+// HMAC-SHA256 helper that must align with send-magic-link hashing scheme
+async function hashTokenHmac(token: string, key: string) {
+  const enc = new TextEncoder();
+  const keyData = enc.encode(key);
+  const cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(token));
+  const arr = Array.from(new Uint8Array(sig));
+  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// helper: random hex string
+function randomHex(bytes = 32) {
+  const arr = crypto.getRandomValues(new Uint8Array(bytes));
+  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
