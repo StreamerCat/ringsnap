@@ -1,18 +1,23 @@
 import { serve } from "std/server";
 import { createClient } from "@supabase/supabase-js";
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const corsHeaders = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
     const body = await req.json().catch(() => ({}));
     const { token, deviceNonce } = body || {};
 
     if (!token) {
-      return new Response(JSON.stringify({ error: "Missing token" }), { status: 400, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Missing token" }), { status: 400, headers: jsonHeaders });
     }
 
     // Use HMAC-SHA256 with service role key so hash matches send-magic-link storage
@@ -36,24 +41,24 @@ serve(async (req) => {
 
     if (updateError) {
       console.error("[verify-magic-link] DB update error:", updateError);
-      return new Response(JSON.stringify({ error: "Failed to validate token" }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Failed to validate token" }), { status: 500, headers: jsonHeaders });
     }
 
     if (!consumedRow) {
       // token invalid/expired/consumed or device mismatch
-      return new Response(JSON.stringify({ error: "Invalid or expired magic link" }), { status: 401, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Invalid or expired magic link" }), { status: 401, headers: jsonHeaders });
     }
 
     const email = consumedRow.email;
     if (!email) {
-      return new Response(JSON.stringify({ error: "Token missing email" }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Token missing email" }), { status: 500, headers: jsonHeaders });
     }
 
     // Find existing auth user or create
     const listResp = await supabase.auth.admin.listUsers();
     if (listResp.error) {
       console.error("[verify-magic-link] listUsers error:", listResp.error);
-      return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
     }
     const existing = (listResp.data?.users || []).find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
 
@@ -64,7 +69,7 @@ serve(async (req) => {
       const createResp = await supabase.auth.admin.createUser({ email, email_confirm: true, user_metadata: { email_verified: true } });
       if (createResp.error || !createResp.data?.user) {
         console.error("[verify-magic-link] createUser error:", createResp.error);
-        return new Response(JSON.stringify({ error: "Failed to create user" }), { status: 500, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Failed to create user" }), { status: 500, headers: jsonHeaders });
       }
       userId = createResp.data.user.id;
       // small delay for triggers if needed
@@ -76,13 +81,13 @@ serve(async (req) => {
     const updatePw = await supabase.auth.admin.updateUserById(userId, { password: tempPassword });
     if (updatePw.error) {
       console.error("[verify-magic-link] updateUserById error:", updatePw.error);
-      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: jsonHeaders });
     }
 
     const signInResp = await supabase.auth.signInWithPassword({ email, password: tempPassword });
     if (signInResp.error || !signInResp.data?.session) {
       console.error("[verify-magic-link] signInWithPassword error:", signInResp.error);
-      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: jsonHeaders });
     }
 
     // Rotate password after short delay to minimize window (best-effort)
@@ -105,11 +110,11 @@ serve(async (req) => {
         },
         user: { id: userId, email },
       }),
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: jsonHeaders }
     );
   } catch (err: any) {
     console.error("[verify-magic-link] unexpected error:", err);
-    return new Response(JSON.stringify({ error: err?.message || "Unexpected error" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: err?.message || "Unexpected error" }), { status: 500, headers: jsonHeaders });
   }
 });
 
