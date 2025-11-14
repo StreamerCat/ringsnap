@@ -131,11 +131,7 @@ serve(async (req) => {
     const { data: usersData, error: getUserError } = await supabase.auth.admin.listUsers();
 
     if (getUserError) {
-      console.error('[send-magic-link] Failed to list users:', getUserError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to lookup user' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('[send-magic-link] Failed to list users (continuing without lookup):', getUserError);
     }
 
     const existingUser = usersData?.users?.find(
