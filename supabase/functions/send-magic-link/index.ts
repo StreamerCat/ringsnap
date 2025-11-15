@@ -13,17 +13,29 @@ import {
 } from '../_shared/auth-utils.ts';
 import { sendEmail } from '../_shared/resend-client.ts';
 import { buildMagicLinkEmail } from '../_shared/auth-email-templates.ts';
+import { getResendApiKey, getSupabaseServiceRoleKey, getSupabaseUrl } from '../_shared/env.ts';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-const RESEND_PROD_KEY = Deno.env.get('RESEND_PROD_KEY');
-const RESEND_LEGACY_KEY = Deno.env.get('RESEND_API_KEY');
+const { value: SUPABASE_URL, source: supabaseUrlSource } = getSupabaseUrl();
+const { value: SUPABASE_SERVICE_ROLE_KEY, source: serviceRoleSource } = getSupabaseServiceRoleKey();
+const { value: RESEND_API_KEY, source: resendKeySource } = getResendApiKey();
 
-if (!RESEND_PROD_KEY && RESEND_LEGACY_KEY) {
-  console.warn('[send-magic-link] RESEND_PROD_KEY not set; falling back to RESEND_API_KEY');
+if (resendKeySource && resendKeySource !== 'RESEND_PROD_KEY') {
+  console.warn(
+    `[send-magic-link] Using fallback Resend key from ${resendKeySource}; configure RESEND_PROD_KEY when possible`
+  );
 }
 
-const RESEND_API_KEY = RESEND_PROD_KEY ?? RESEND_LEGACY_KEY;
+if (serviceRoleSource && serviceRoleSource !== 'SUPABASE_SERVICE_ROLE_KEY') {
+  console.warn(
+    `[send-magic-link] Using service role key from ${serviceRoleSource}; set SUPABASE_SERVICE_ROLE_KEY to avoid surprises`
+  );
+}
+
+if (supabaseUrlSource && supabaseUrlSource !== 'SUPABASE_URL') {
+  console.warn(
+    `[send-magic-link] Using Supabase URL from ${supabaseUrlSource}; prefer SUPABASE_URL for clarity`
+  );
+}
 const SITE_URL = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
 const MAGIC_LINK_TTL_MINUTES = parseInt(Deno.env.get('AUTH_MAGIC_LINK_TTL_MINUTES') || '20');
 
