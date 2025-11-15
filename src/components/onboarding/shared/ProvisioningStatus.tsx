@@ -59,9 +59,6 @@ export function ProvisioningStatus({
   useEffect(() => {
     if (disabled) return;
 
-    let intervalId: number;
-    let timeIntervalId: number;
-
     const pollStatus = async () => {
       try {
         const { data, error: queryError } = await supabase
@@ -107,10 +104,10 @@ export function ProvisioningStatus({
     };
 
     // Start polling
-    intervalId = window.setInterval(pollStatus, pollingInterval);
+    const intervalId = window.setInterval(pollStatus, pollingInterval);
 
     // Track elapsed time
-    timeIntervalId = window.setInterval(() => {
+    const timeIntervalId = window.setInterval(() => {
       setElapsedTime((prev) => prev + 1);
     }, 1000);
 

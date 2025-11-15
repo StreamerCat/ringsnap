@@ -15,13 +15,13 @@ type GoogleButtonProps = {
 const OAUTH_TIMEOUT_MS = 10000; // 10 second timeout
 
 export function GoogleButton({ onError }: GoogleButtonProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   if (!isGoogleOAuthEnabled) {
     // TODO(google-oauth): Remove this guard when the provider can return.
     // Flip VITE_ENABLE_GOOGLE_OAUTH to "true" (or set NEXT_PUBLIC_*) to render the button again.
     return null;
   }
-
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async () => {
     try {

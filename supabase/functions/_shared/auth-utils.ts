@@ -308,6 +308,29 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
+ * Detect when the Supabase admin API returns "user not found"
+ * so callers can gracefully treat it as a non-error.
+ */
+export function isUserNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const status = (error as { status?: number }).status;
+  if (typeof status === 'number' && (status === 400 || status === 404)) {
+    return true;
+  }
+
+  const message = (error as { message?: string }).message;
+  if (typeof message === 'string') {
+    const normalized = message.toLowerCase();
+    return normalized.includes('user') && normalized.includes('not') && normalized.includes('found');
+  }
+
+  return false;
+}
+
+/**
  * @deprecated This function uses Node.js crypto and cannot run in browser.
  * Use src/lib/auth/deviceNonce.ts instead for frontend code.
  * This function is only usable in Deno edge functions.
