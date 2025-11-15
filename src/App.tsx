@@ -48,7 +48,7 @@ const App = () => (
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth/magic-callback" element={<MagicCallback />} />
           <Route path="/auth/staff-invite" element={<StaffInvite />} />
-          <Route path="/auth/password" element={<PasswordReset />} />
+          <Route path="/auth/reset" element={<PasswordReset />} />
           {/* Settings */}
           <Route path="/settings/security" element={<SecuritySettings />} />
           {/* App routes */}

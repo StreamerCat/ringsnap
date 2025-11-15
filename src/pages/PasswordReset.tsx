@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,13 +11,9 @@ import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 export default function PasswordReset() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const mode = searchParams.get("mode") || "reset"; // "reset" or "set"
-  const isFirstTime = mode === "set";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,13 +31,14 @@ export default function PasswordReset() {
     setIsLoading(true);
 
     try {
+      // Update password using Supabase auth
       const { error } = await supabase.auth.updateUser({
         password
       });
 
       if (error) throw error;
 
-      toast.success(isFirstTime ? "Password set successfully!" : "Password reset successfully!");
+      toast.success("Password reset successfully!");
 
       // Get current user and redirect to their dashboard
       const { data: { user } } = await supabase.auth.getUser();
@@ -50,14 +47,27 @@ export default function PasswordReset() {
         console.log('[PasswordReset] Redirecting to:', dashboardUrl);
         navigate(dashboardUrl);
       } else {
-        // Fallback to login if user not found
+        // Fallback to login if user not found (shouldn't happen)
         navigate("/auth/login");
       }
 
     } catch (error: any) {
       console.error("Password update error:", error);
-      const message = error?.message || "Failed to update password";
+
+      // Provide helpful error messages
+      let message = "Failed to update password";
+      if (error?.message?.includes("session")) {
+        message = "Reset link expired. Please request a new password reset.";
+      } else if (error?.message) {
+        message = error.message;
+      }
+
       toast.error(message);
+
+      // If session expired, redirect back to login
+      if (error?.message?.includes("session")) {
+        setTimeout(() => navigate("/auth/login"), 2000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -71,13 +81,10 @@ export default function PasswordReset() {
             <Lock className="h-12 w-12 text-primary" />
           </div>
           <CardTitle className="text-2xl font-bold text-center">
-            {isFirstTime ? "Set Your Password" : "Reset Password"}
+            Reset Your Password
           </CardTitle>
           <CardDescription className="text-center">
-            {isFirstTime
-              ? "Create a secure password for your account"
-              : "Create a new password for your account"
-            }
+            Enter a new password for your account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -118,10 +125,10 @@ export default function PasswordReset() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isFirstTime ? "Setting password..." : "Resetting password..."}
+                  Resetting password...
                 </>
               ) : (
-                isFirstTime ? "Set Password" : "Reset Password"
+                "Reset Password"
               )}
             </Button>
 
