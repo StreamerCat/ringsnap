@@ -63,37 +63,33 @@ Deno.serve(async (req) => {
     let userId: string;
     let isNewUser = false;
 
-    try {
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: { name }
-      });
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { name }
+    });
 
-      if (createError) {
-        // Check if user already exists
-        if (createError.message.includes('already registered')) {
-          // Fetch only this specific user (targeted query)
-          const { data: existingUsers } = await supabase.auth.admin.listUsers();
-          const existingUser = existingUsers?.users?.find(u => u.email === email);
+    if (createError) {
+      // Check if user already exists
+      if (createError.message.includes('already registered')) {
+        // Fetch only this specific user (targeted query)
+        const { data: existingUsers } = await supabase.auth.admin.listUsers();
+        const existingUser = existingUsers?.users?.find(u => u.email === email);
 
-          if (!existingUser) {
-            throw new Error('User exists but could not be found');
-          }
-
-          userId = existingUser.id;
-          console.log(`User ${email} already exists, updating role`);
-        } else {
-          throw createError;
+        if (!existingUser) {
+          throw new Error('User exists but could not be found');
         }
+
+        userId = existingUser.id;
+        console.log(`User ${email} already exists, updating role`);
       } else {
-        userId = newUser.user.id;
-        isNewUser = true;
-        console.log(`Created new user ${email}`);
+        throw createError;
       }
-    } catch (error) {
-      throw error;
+    } else {
+      userId = newUser.user.id;
+      isNewUser = true;
+      console.log(`Created new user ${email}`);
     }
 
     // Create or update staff role

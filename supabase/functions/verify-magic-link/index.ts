@@ -1,7 +1,7 @@
 import { serve } from "std/server";
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
-import { hashToken } from "../_shared/auth-utils.ts";
+import { hashToken, isUserNotFoundError } from "../_shared/auth-utils.ts";
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -56,16 +56,15 @@ serve(async (req) => {
     }
 
     // Find existing auth user or create
-    const listResp = await supabase.auth.admin.listUsers();
-    if (listResp.error) {
-      console.error("[verify-magic-link] listUsers error:", listResp.error);
+    const { data: userLookup, error: userLookupError } = await supabase.auth.admin.getUserByEmail(email);
+    if (userLookupError && !isUserNotFoundError(userLookupError)) {
+      console.error("[verify-magic-link] getUserByEmail error:", userLookupError);
       return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
     }
-    const existing = (listResp.data?.users || []).find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
 
     let userId: string;
-    if (existing) {
-      userId = existing.id;
+    if (userLookup?.user) {
+      userId = userLookup.user.id;
     } else {
       const createResp = await supabase.auth.admin.createUser({ email, email_confirm: true, user_metadata: { email_verified: true } });
       if (createResp.error || !createResp.data?.user) {

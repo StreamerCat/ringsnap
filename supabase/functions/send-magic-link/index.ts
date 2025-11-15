@@ -8,7 +8,8 @@ import {
   getUserAgent,
   isValidEmail,
   createAdminClient,
-  buildAuthUrl
+  buildAuthUrl,
+  isUserNotFoundError
 } from '../_shared/auth-utils.ts';
 import { sendEmail } from '../_shared/resend-client.ts';
 import { buildMagicLinkEmail } from '../_shared/auth-email-templates.ts';
@@ -128,20 +129,19 @@ serve(async (req) => {
     }
 
     // Check if user exists via auth admin API
-    const { data: usersData, error: getUserError } = await supabase.auth.admin.listUsers();
+    const { data: userLookup, error: getUserError } = await supabase.auth.admin.getUserByEmail(
+      normalizedEmail
+    );
 
-    if (getUserError) {
-      console.error('[send-magic-link] Failed to list users:', getUserError);
+    if (getUserError && !isUserNotFoundError(getUserError)) {
+      console.error('[send-magic-link] Failed to lookup user:', getUserError);
       return new Response(
         JSON.stringify({ error: 'Failed to lookup user' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const existingUser = usersData?.users?.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    );
-    const userId = existingUser?.id ?? null;
+    const userId = userLookup?.user?.id ?? null;
 
     let userName: string | undefined;
     let emailVerified: boolean | undefined;
