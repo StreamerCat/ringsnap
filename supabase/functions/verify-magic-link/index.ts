@@ -1,6 +1,7 @@
 import { serve } from "std/server";
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
+import { hashToken } from "../_shared/auth-utils.ts";
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -20,8 +21,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Missing token" }), { status: 400, headers: jsonHeaders });
     }
 
-    // Use HMAC-SHA256 with service role key so hash matches send-magic-link storage
-    const tokenHash = await hashTokenHmac(token, supabaseKey);
+    // Use SHA256 to match send-magic-link hashing (fixes token mismatch bug)
+    const tokenHash = hashToken(token);
     const nowIso = new Date().toISOString();
 
     // Device clause: if deviceNonce provided, allow stored device_nonce NULL or equal to provided
@@ -117,16 +118,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: err?.message || "Unexpected error" }), { status: 500, headers: jsonHeaders });
   }
 });
-
-// HMAC-SHA256 helper that must align with send-magic-link hashing scheme
-async function hashTokenHmac(token: string, key: string) {
-  const enc = new TextEncoder();
-  const keyData = enc.encode(key);
-  const cryptoKey = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(token));
-  const arr = Array.from(new Uint8Array(sig));
-  return arr.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 // helper: random hex string
 function randomHex(bytes = 32) {

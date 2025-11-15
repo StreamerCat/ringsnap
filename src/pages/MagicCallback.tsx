@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
+import { getOrCreateDeviceNonce } from "@/lib/auth/deviceNonce";
 
 export default function MagicCallback() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function MagicCallback() {
 
       try {
         // Get device nonce
-        const deviceNonce = localStorage.getItem("device_nonce");
+        const deviceNonce = getOrCreateDeviceNonce();
         console.log('[MagicCallback] Device nonce:', deviceNonce?.substring(0, 10));
 
         // Verify the magic link token

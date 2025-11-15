@@ -1,5 +1,32 @@
+/**
+ * Authentication Utilities
+ *
+ * ACTIVELY USED FUNCTIONS:
+ * - generateToken() - Used by createMagicLinkToken, createInviteToken
+ * - hashToken() - Used by verify-magic-link to hash tokens for lookup
+ * - createMagicLinkToken() - Used by send-magic-link
+ * - createInviteToken() - Used by staff invite system
+ * - checkRateLimit() - Used by send-magic-link, other endpoints
+ * - logAuthEvent() - Used by all auth edge functions
+ * - requiresStepUp() - Used by require-step-up edge function
+ * - updateStepUpTimestamp() - Used by require-step-up edge function
+ * - buildAuthUrl() - Used by send-magic-link to build callback URLs
+ * - createAdminClient() - Used by all edge functions
+ *
+ * DEPRECATED FUNCTIONS (see individual comments):
+ * - createPasswordResetToken() - Use Supabase's generateLink() instead
+ * - validateAndConsumeToken() - Has race condition, use atomic DB update
+ * - verify2FACode() - Placeholder only
+ * - getOrCreateDeviceNonce() - Use src/lib/auth/deviceNonce.ts for browser
+ *
+ * HELPER FUNCTIONS:
+ * - getIpAddress() - Extract IP from request headers
+ * - getUserAgent() - Extract user agent from request headers
+ * - isValidEmail() - Email format validation
+ */
+
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'https://deno.land/std@0.177.0/node/crypto.ts';
 
 export interface AuthToken {
   token: string;
@@ -96,6 +123,10 @@ export async function createInviteToken(
 }
 
 /**
+ * @deprecated This function is not used. Password reset uses Supabase's built-in
+ * generateLink() API instead. See send-password-reset/index.ts line 55.
+ * Kept for reference only.
+ *
  * Create a password reset token
  */
 export async function createPasswordResetToken(
@@ -127,6 +158,11 @@ export async function createPasswordResetToken(
 }
 
 /**
+ * @deprecated This function contains a race condition and is not used.
+ * verify-magic-link implements atomic token consumption directly using
+ * a single UPDATE...WHERE query that prevents race conditions.
+ * DO NOT USE THIS FUNCTION. See verify-magic-link/index.ts lines 31-40.
+ *
  * Validate and consume a token
  */
 export async function validateAndConsumeToken(
@@ -258,6 +294,10 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
+ * @deprecated This function uses Node.js crypto and cannot run in browser.
+ * Use src/lib/auth/deviceNonce.ts instead for frontend code.
+ * This function is only usable in Deno edge functions.
+ *
  * Generate a device nonce from localStorage or create new
  */
 export function getOrCreateDeviceNonce(): string {
@@ -319,6 +359,11 @@ export async function updateStepUpTimestamp(
 }
 
 /**
+ * @deprecated Placeholder implementation. Only checks backup codes.
+ * Full TOTP implementation pending. Actual TOTP verification would use
+ * a library like 'otpauth' to verify time-based one-time passwords.
+ * See require-step-up function for actual 2FA verification.
+ *
  * Verify 2FA code (TOTP)
  */
 export async function verify2FACode(

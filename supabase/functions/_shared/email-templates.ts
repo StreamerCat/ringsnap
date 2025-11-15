@@ -1,3 +1,14 @@
+/**
+ * @deprecated This file is deprecated. Use auth-email-templates.ts instead.
+ * This file is kept only for backwards compatibility and will be removed in a future version.
+ *
+ * Migration status:
+ * - buildPasswordResetEmail() → Use buildPasswordSetResetEmail() from auth-email-templates.ts ✅ MIGRATED
+ * - buildTeamInviteEmail() → Use buildStaffInviteEmail() from auth-email-templates.ts (pending)
+ *
+ * As of the latest update, send-password-reset has been migrated to use auth-email-templates.ts.
+ */
+
 type EmailTemplate = {
   subject: string;
   html: string;
