@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2, Mail, Lock, ArrowLeft } from "lucide-react";
 
-import GoogleButton from "@/components/GoogleButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/lib/supabase";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 import { getOrCreateDeviceNonce } from "@/lib/auth/deviceNonce";
+import GoogleButton from "@/components/GoogleButton";
+import { isGoogleOAuthEnabled } from "@/config/authProviders";
 
 export default function AuthLogin() {
   const navigate = useNavigate();
@@ -233,17 +234,22 @@ export default function AuthLogin() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <GoogleButton onError={handleOAuthError} />
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
+          {isGoogleOAuthEnabled && (
+            <div className="space-y-3">
+              <GoogleButton onError={handleOAuthError} />
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                    {/* TODO(google-oauth): Remove this wrapper when restoring the provider flag. */}
+                    Or continue with email
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {!showPasswordInput ? (
             <form onSubmit={handleContinueWithEmail} className="space-y-4">
