@@ -26,7 +26,6 @@
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
-import { createHash, randomBytes } from 'https://deno.land/std@0.177.0/node/crypto.ts';
 
 export interface AuthToken {
   token: string;
@@ -40,19 +39,31 @@ export interface RateLimitConfig {
 }
 
 /**
- * Generate a secure random token and its hash
+ * Generate a secure random token using Web Crypto API
+ * Returns just the token - caller must hash it separately using hashToken()
  */
-export function generateToken(length: number = 32): AuthToken {
-  const token = randomBytes(length).toString('base64url');
-  const tokenHash = createHash('sha256').update(token).digest('hex');
-  return { token, tokenHash, expiresAt: new Date() };
+export function generateToken(length: number = 32): string {
+  // Generate random bytes using Web Crypto API
+  const randomBytes = crypto.getRandomValues(new Uint8Array(length));
+
+  // Convert to base64url string
+  const token = btoa(String.fromCharCode(...randomBytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+
+  return token;
 }
 
 /**
- * Hash a token for storage
+ * Hash a token for storage using Web Crypto API SHA-256
  */
-export function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+export async function hashToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -65,7 +76,8 @@ export async function createMagicLinkToken(
   ttlMinutes: number = 20,
   deviceNonce?: string
 ): Promise<AuthToken> {
-  const { token, tokenHash } = generateToken();
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
   const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
   const { error } = await supabaseClient
@@ -99,7 +111,8 @@ export async function createInviteToken(
   invitedBy: string,
   ttlHours: number = 48
 ): Promise<AuthToken> {
-  const { token, tokenHash } = generateToken();
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
   const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
   const { error } = await supabaseClient
@@ -135,7 +148,8 @@ export async function createPasswordResetToken(
   userId: string,
   ttlMinutes: number = 60
 ): Promise<AuthToken> {
-  const { token, tokenHash } = generateToken();
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
   const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
   const { error } = await supabaseClient
@@ -171,7 +185,7 @@ export async function validateAndConsumeToken(
   tokenType: string,
   deviceNonce?: string
 ): Promise<{ valid: boolean; data?: any; error?: string }> {
-  const tokenHash = hashToken(token);
+  const tokenHash = await hashToken(token);
 
   // Fetch the token
   const { data: tokenData, error: fetchError } = await supabaseClient
@@ -304,12 +318,22 @@ export function getOrCreateDeviceNonce(): string {
   if (typeof localStorage !== 'undefined') {
     let nonce = localStorage.getItem('device_nonce');
     if (!nonce) {
-      nonce = randomBytes(16).toString('base64url');
+      // Use Web Crypto API
+      const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+      nonce = btoa(String.fromCharCode(...randomBytes))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
       localStorage.setItem('device_nonce', nonce);
     }
     return nonce;
   }
-  return randomBytes(16).toString('base64url');
+  // Use Web Crypto API
+  const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...randomBytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
 }
 
 /**
@@ -385,7 +409,7 @@ export async function verify2FACode(
 
   // Check if code matches a backup code
   if (data.totp_backup_codes && Array.isArray(data.totp_backup_codes)) {
-    const hashedCode = createHash('sha256').update(code).digest('hex');
+    const hashedCode = await hashToken(code);
     return data.totp_backup_codes.includes(hashedCode);
   }
 

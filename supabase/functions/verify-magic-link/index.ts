@@ -22,7 +22,7 @@ serve(async (req) => {
     }
 
     // Use SHA256 to match send-magic-link hashing (fixes token mismatch bug)
-    const tokenHash = hashToken(token);
+    const tokenHash = await hashToken(token);
     const nowIso = new Date().toISOString();
 
     // Device clause: if deviceNonce provided, allow stored device_nonce NULL or equal to provided
