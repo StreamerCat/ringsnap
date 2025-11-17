@@ -21,12 +21,12 @@ serve(async (req) => {
     const VAPI_ASSISTANT_ID = Deno.env.get('VAPI_DEMO_ASSISTANT_ID');
 
     if (!VAPI_PUBLIC_KEY || !VAPI_ASSISTANT_ID) {
-      logError('Missing VAPI configuration', {
+      logError('Missing voice demo configuration', {
         ...baseLogOptions,
-        error: new Error('Missing VAPI configuration values')
+        error: new Error('Missing voice demo configuration values')
       });
       return new Response(
-        JSON.stringify({ error: 'VAPI not configured' }),
+        JSON.stringify({ error: 'Voice demo service not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -40,11 +40,11 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    logError('VAPI demo call error', {
+    logError('Voice demo error', {
       ...baseLogOptions,
       error
     });
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    const errorMessage = error instanceof Error ? error.message : 'Voice demo service error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
