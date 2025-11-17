@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
-import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 export default function PasswordReset() {
   const navigate = useNavigate();
@@ -38,18 +37,10 @@ export default function PasswordReset() {
 
       if (error) throw error;
 
-      toast.success("Password reset successfully!");
+      toast.success("Password reset successfully! Please log in with your new password.");
 
-      // Get current user and redirect to their dashboard
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const dashboardUrl = await redirectToRoleDashboard(user.id);
-        console.log('[PasswordReset] Redirecting to:', dashboardUrl);
-        navigate(dashboardUrl);
-      } else {
-        // Fallback to login if user not found (shouldn't happen)
-        navigate("/auth/login");
-      }
+      // Always redirect to login after password reset
+      navigate("/auth/login");
 
     } catch (error: any) {
       console.error("Password update error:", error);

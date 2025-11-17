@@ -77,9 +77,30 @@ export function getRoleDashboardUrl(role: UserRole): string {
 }
 
 /**
- * Redirect user to appropriate dashboard based on their role
+ * Redirect user to appropriate dashboard based on their role and onboarding status
  */
 export async function redirectToRoleDashboard(userId: string): Promise<string> {
   const role = await getUserRole(userId);
+
+  // For customers, check onboarding status
+  if (role.isCustomer) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', userId)
+        .single();
+
+      // If onboarding not completed, redirect to onboarding
+      if (!profile?.onboarding_completed) {
+        return '/onboarding';
+      }
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      // On error, default to onboarding to be safe
+      return '/onboarding';
+    }
+  }
+
   return getRoleDashboardUrl(role);
 }
