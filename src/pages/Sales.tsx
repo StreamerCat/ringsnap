@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SalesPasswordGate } from "@/components/SalesPasswordGate";
 import { SalesGuidedTrialFlowEmbedded } from "@/components/onboarding/SalesGuidedTrialFlowEmbedded";
 import { CallValueCalculator } from "@/components/CallValueCalculator";
-import { VapiDemoWidget } from "@/components/VapiDemoWidget";
+import { VoiceDemoWidget } from "@/components/VoiceDemoWidget";
 import { Users, Calculator, Phone } from "lucide-react";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
@@ -169,7 +169,7 @@ export default function Sales() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <VapiDemoWidget />
+                    <VoiceDemoWidget />
                   </CardContent>
                 </Card>
 
