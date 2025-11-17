@@ -3,17 +3,20 @@ import { jsPDF } from 'jspdf';
 import { Helmet } from 'react-helmet';
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SalesPasswordGate } from "@/components/SalesPasswordGate";
-import { SalesGuidedTrialFlowEmbedded } from "@/components/onboarding/SalesGuidedTrialFlowEmbedded";
 import { CallValueCalculator } from "@/components/CallValueCalculator";
 import { VoiceDemoWidget } from "@/components/VoiceDemoWidget";
-import { Users, Calculator, Phone } from "lucide-react";
+import { SalesSignupForm } from "@/components/SalesSignupForm";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import RSLogo from "@/assets/RS_logo_color.svg";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
 export default function Sales() {
   const [companyName, setCompanyName] = useState("");
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
 
   const handlePdfDownload = (metrics: any) => {
     const doc = new jsPDF();
@@ -70,152 +73,106 @@ export default function Sales() {
         <title>Sales Workspace - RingSnap</title>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background">
-        {/* Header Section */}
-        <section className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b border-primary/10">
-          <div className="container mx-auto max-w-7xl px-4 py-8 sm:py-10">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-11 h-11 bg-primary/15 rounded-xl flex items-center justify-center">
-                    <Users className="w-6 h-6 text-primary" />
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
-                    Sales Workspace
-                  </h1>
-                </div>
-                <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-                  Create new customer accounts and start trials. Use this page to onboard customers during sales calls or in-person meetings.
-                </p>
+      <div className="min-h-screen bg-background">
+        {/* Header with Logo */}
+        <header className="border-b border-border bg-white sticky top-0 z-50 shadow-sm">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <img
+                src={RSLogo}
+                alt="RingSnap Logo"
+                className="h-8 sm:h-10 w-auto"
+              />
+              <div className="text-sm text-muted-foreground">
+                Sales Workspace
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <section className="bg-gradient-to-b from-background to-muted/20 py-12 sm:py-16 lg:py-20">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-4xl mx-auto space-y-6">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
+                Experience RingSnap Live
+              </h1>
+              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+                See how our AI receptionist handles calls 24/7, captures every lead, and helps contractors never miss an opportunity.
+              </p>
+              <div className="pt-4">
+                <Button
+                  size="lg"
+                  className="bg-primary hover:bg-primary/90 text-white text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  onClick={() => setShowDemoModal(true)}
+                >
+                  <svg
+                    className="w-6 h-6 mr-2"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Start Live Demo
+                </Button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Main Content - Two Column Layout */}
-        <section className="py-8 sm:py-12 px-4">
-          <div className="container mx-auto max-w-7xl">
-            <div className="grid gap-6 lg:grid-cols-3">
-              {/* Left Column - Customer Onboarding Form (2 cols on large screens) */}
-              <div className="lg:col-span-2 space-y-6">
-                <Card className="border-primary/20">
-                  <CardHeader className="bg-primary/5 border-b border-primary/10">
-                    <CardTitle className="text-xl text-foreground">Customer Onboarding</CardTitle>
-                    <CardDescription>
-                      Guide customers through account creation, plan selection, and activation
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <Elements stripe={stripePromise}>
-                      <SalesGuidedTrialFlowEmbedded />
-                    </Elements>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Right Column - Tools & Demo (1 col on large screens) */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* ROI Calculator */}
-                <Card className="border-primary/20 bg-card">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <Calculator className="w-5 h-5 text-primary" />
-                      <CardTitle className="text-lg">ROI Calculator</CardTitle>
-                    </div>
-                    <CardDescription className="text-xs">
-                      Show customers their potential revenue recovery
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Customer Company Name
-                      </label>
-                      <input
-                        type="text"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        placeholder="Enter company name"
-                        className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1.5">
-                        Used for personalized PDF reports
-                      </p>
-                    </div>
-
-                    <div className="pt-2">
-                      <a
-                        href="#calculator"
-                        className="text-sm text-primary hover:text-primary/80 underline underline-offset-4 inline-flex items-center gap-1"
-                      >
-                        Open Full Calculator Below
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Demo Widget */}
-                <Card className="border-primary/20 bg-card">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-5 h-5 text-primary" />
-                      <CardTitle className="text-lg">AI Demo</CardTitle>
-                    </div>
-                    <CardDescription className="text-xs">
-                      Let customers experience the AI receptionist
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <VoiceDemoWidget />
-                  </CardContent>
-                </Card>
-
-                {/* Quick Tips */}
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base text-primary">Sales Tips</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary font-bold shrink-0">1.</span>
-                        <span>Run the demo first to build excitement</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary font-bold shrink-0">2.</span>
-                        <span>Use the calculator to show ROI</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary font-bold shrink-0">3.</span>
-                        <span>Complete onboarding while they're engaged</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-primary font-bold shrink-0">4.</span>
-                        <span>Have them test-call their new AI number</span>
-                      </li>
-                    </ul>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Full ROI Calculator Section */}
-        <div className="bg-background">
+        {/* ROI Calculator Section */}
+        <section className="bg-background">
           <CallValueCalculator
             showPdfDownload={true}
             companyName={companyName}
             onPdfDownload={handlePdfDownload}
           />
-        </div>
+        </section>
 
-        {/* Bottom Padding */}
-        <div className="pb-12"></div>
+        {/* CTA Section */}
+        <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-b from-muted/20 to-background">
+          <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center space-y-8">
+              <div className="space-y-4">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground">
+                  Ready to Get Started?
+                </h2>
+                <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+                  Set up a new customer account in minutes. Complete onboarding, plan selection, and payment all in one seamless flow.
+                </p>
+              </div>
+              <Button
+                size="lg"
+                className="bg-primary hover:bg-primary/90 text-white text-xl px-12 py-7 rounded-2xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
+                onClick={() => setShowSignupModal(true)}
+              >
+                Start Sign-Up
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* Bottom padding */}
+        <div className="pb-16"></div>
       </div>
+
+      {/* Demo Modal */}
+      <Dialog open={showDemoModal} onOpenChange={setShowDemoModal}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <VoiceDemoWidget />
+        </DialogContent>
+      </Dialog>
+
+      {/* Signup Modal */}
+      <Dialog open={showSignupModal} onOpenChange={setShowSignupModal}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <div className="py-4">
+            <Elements stripe={stripePromise}>
+              <SalesSignupForm />
+            </Elements>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SalesPasswordGate>
   );
 }

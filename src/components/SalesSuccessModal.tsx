@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { useEmailInstructions } from "@/hooks/useEmailInstructions";
-import { Check, Copy, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { Check, Copy, Mail, ShieldCheck, UserRound, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 interface SalesSuccessModalProps {
@@ -43,6 +44,7 @@ const formatPhone = (phone: string) => {
 export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuccessModalProps) => {
   const [copiedPassword, setCopiedPassword] = useState(false);
   const { sendInstructions, isSending } = useEmailInstructions();
+  const navigate = useNavigate();
 
   const formattedCustomerPhone = useMemo(() => formatPhone(data?.customerPhone ?? ""), [data?.customerPhone]);
   const formattedRingSnapNumber = useMemo(
@@ -74,6 +76,15 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
       customerName: data.customerName,
       tempPassword: data.tempPassword,
     });
+  };
+
+  const handleGoToDashboard = () => {
+    if (data.accountId) {
+      // Navigate to the sales dashboard where the sales rep can see all their accounts
+      // including the newly created customer account
+      navigate('/salesdash');
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -184,19 +195,31 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleEmailInstructions}
-            disabled={isSending}
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            {isSending ? "Opening Email..." : "Email Instructions"}
-          </Button>
-          <Button type="button" onClick={onDone}>
-            <Check className="h-4 w-4 mr-2" />Done
-          </Button>
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <div className="flex gap-2 flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleEmailInstructions}
+              disabled={isSending}
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              {isSending ? "Opening Email..." : "Email Instructions"}
+            </Button>
+            <Button type="button" variant="outline" onClick={onDone}>
+              <Check className="h-4 w-4 mr-2" />Done
+            </Button>
+          </div>
+          {data.accountId && (
+            <Button
+              type="button"
+              onClick={handleGoToDashboard}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View in Sales Dashboard
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
