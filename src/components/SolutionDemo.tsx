@@ -13,9 +13,11 @@ const VapiWidget = () => {
   const vapiRef = useRef<Vapi | null>(null);
 
   useEffect(() => {
-    const loadVapiConfig = async () => {
+    const loadVapiConfig = async (retryCount = 0) => {
       try {
         setIsLoading(true);
+        console.log('[Voice Demo] Loading configuration...', { retryCount });
+
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`,
           {
@@ -26,35 +28,67 @@ const VapiWidget = () => {
           }
         );
 
+        console.log('[Voice Demo] Response received:', {
+          status: response.status,
+          ok: response.ok
+        });
+
         if (!response.ok) {
+          // Retry on 500+ errors (server issues)
+          if (response.status >= 500 && retryCount < 2) {
+            console.log('[Voice Demo] Server error, retrying...', { retryCount });
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+            return loadVapiConfig(retryCount + 1);
+          }
+
           const errorData = await response.json().catch(() => ({
-            error: 'Unknown error'
+            error: 'Unable to connect to voice demo service'
           }));
-          console.error('Failed to load Vapi config:', errorData);
-          setConfigError(errorData.error || 'Failed to load demo configuration');
+          console.error('[Voice Demo] Failed to load config:', errorData);
+          setConfigError(errorData.error || 'Voice demo temporarily unavailable. Please try again in a moment.');
           setIsLoading(false);
           return;
         }
 
         const data = await response.json();
+        console.log('[Voice Demo] Configuration loaded successfully', {
+          hasPublicKey: !!data.publicKey,
+          hasAssistantId: !!data.assistantId
+        });
 
         // Validate response
         if (!data.publicKey || !data.assistantId) {
-          setConfigError('Demo not configured - missing credentials');
+          console.error('[Voice Demo] Missing credentials in response');
+          setConfigError('Voice demo configuration error. Please refresh or contact support.');
           setIsLoading(false);
           return;
         }
 
         setVapiConfig(data);
-        // Initialize Vapi instance with fetched public key
-        // TODO: Legacy client-side Vapi demo usage. Provisioning now happens server-side; migrate this demo when backend tokens are available.
+        // Initialize voice demo client with fetched credentials
+        // TODO: Legacy client-side usage. Provisioning now happens server-side; migrate when backend tokens are available.
         vapiRef.current = new Vapi(data.publicKey);
 
+        // Add error event handler
+        vapiRef.current.on("error", (error) => {
+          console.error('[Voice Demo] Connection error:', error);
+          setIsConnecting(false);
+          setIsCallActive(false);
+          const errorMsg = error?.message || 'Connection failed';
+          if (errorMsg.toLowerCase().includes('microphone') || errorMsg.toLowerCase().includes('permission')) {
+            setConfigError('Microphone access required. Please allow microphone access to use the voice demo.');
+          } else {
+            setConfigError('Voice demo connection failed. Please try again.');
+          }
+        });
+
         const handleCallStart = () => {
+          console.log('[Voice Demo] Call started');
           setIsCallActive(true);
           setIsConnecting(false);
         };
         const handleCallEnd = () => {
+          console.log('[Voice Demo] Call ended');
           setIsCallActive(false);
           setIsConnecting(false);
         };
@@ -62,10 +96,17 @@ const VapiWidget = () => {
         vapiRef.current.on("call-start", handleCallStart);
         vapiRef.current.on("call-end", handleCallEnd);
 
+        console.log('[Voice Demo] Initialization complete');
         setIsLoading(false);
       } catch (error) {
-        console.error('Error loading Vapi config:', error);
-        setConfigError('Failed to initialize demo');
+        // Retry on network errors
+        if (retryCount < 2) {
+          console.log('[Voice Demo] Network error, retrying...', { retryCount, error });
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return loadVapiConfig(retryCount + 1);
+        }
+        console.error('[Voice Demo] Error loading config:', error);
+        setConfigError('Unable to initialize voice demo. Please check your connection and try again.');
         setIsLoading(false);
       }
     };
@@ -82,8 +123,9 @@ const VapiWidget = () => {
     if (isConnecting) {
       const timeout = setTimeout(() => {
         if (isConnecting) {
+          console.error('[Voice Demo] Connection timeout');
           setIsConnecting(false);
-          setConfigError('Connection timeout. Please try again.');
+          setConfigError('Connection took too long. Please check your internet connection and try again.');
           vapiRef.current?.stop();
         }
       }, 10000);
@@ -94,22 +136,30 @@ const VapiWidget = () => {
 
   const startCall = async () => {
     if (!vapiConfig || !vapiRef.current) {
-      setConfigError('Demo not ready. Please refresh the page.');
+      setConfigError('Voice demo not ready. Please refresh the page.');
       return;
     }
 
+    console.log('[Voice Demo] Starting call...');
     setIsConnecting(true);
     setConfigError(null);
     try {
       await vapiRef.current.start(vapiConfig.assistantId);
+      console.log('[Voice Demo] Call start request sent');
     } catch (error) {
-      console.error('Failed to start call:', error);
+      console.error('[Voice Demo] Failed to start call:', error);
       setIsConnecting(false);
-      setConfigError('Failed to start demo call. Please check microphone permissions and try again.');
+      const errorMsg = error instanceof Error ? error.message : '';
+      if (errorMsg.toLowerCase().includes('microphone') || errorMsg.toLowerCase().includes('permission')) {
+        setConfigError('Microphone access required. Please allow microphone access and try again.');
+      } else {
+        setConfigError('Failed to start voice demo. Please check your microphone permissions and try again.');
+      }
     }
   };
 
   const endCall = () => {
+    console.log('[Voice Demo] Ending call...');
     vapiRef.current?.stop();
     setIsConnecting(false);
   };
