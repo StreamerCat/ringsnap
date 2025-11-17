@@ -39,18 +39,34 @@ export const VoiceDemoWidget = () => {
         });
 
         if (!response.ok) {
-          // Retry on 500+ errors (server issues)
+          // Parse error response
+          const errorData = await response.json().catch(() => ({
+            error: 'Unable to connect to voice demo service'
+          }));
+
+          console.error('[Voice Demo] Failed to load config:', {
+            status: response.status,
+            error: errorData.error,
+            message: errorData.message,
+            missingKeys: errorData.missingKeys
+          });
+
+          // Don't retry on configuration errors (MissingConfig)
+          if (errorData.error === 'MissingConfig') {
+            console.error('[Voice Demo] Configuration error - missing keys:', errorData.missingKeys);
+            setErrorMessage('The live demo is not configured correctly right now. Please try again later or contact support.');
+            setDemoState('error');
+            return;
+          }
+
+          // Retry on 500+ errors (server issues) but not on config errors
           if (response.status >= 500 && retryCount < 2) {
             console.log('[Voice Demo] Server error, retrying...', { retryCount });
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
             return loadVapiConfig(retryCount + 1);
           }
 
-          const errorData = await response.json().catch(() => ({
-            error: 'Unable to connect to voice demo service'
-          }));
-          console.error('[Voice Demo] Failed to load config:', errorData);
-          const sanitizedError = sanitizeErrorMessage(errorData.error || 'Demo temporarily unavailable.');
+          const sanitizedError = sanitizeErrorMessage(errorData.message || errorData.error || 'Demo temporarily unavailable.');
           setErrorMessage(sanitizedError);
           setDemoState('error');
           return;
