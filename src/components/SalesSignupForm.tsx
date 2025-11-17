@@ -53,6 +53,8 @@ type CreateSalesAccountResponse = {
   tempPassword: string;
   subscriptionStatus?: string | null;
   ringSnapNumber?: string | null;
+  provisioned?: boolean;
+  provisioningMessage?: string;
 };
 
 // Plan data
@@ -217,15 +219,19 @@ function SalesSignupFormInner() {
       setSuccessData(modalPayload);
       setShowSuccessModal(true);
 
-      toast({
-        title: "Account created",
-        description: "Review the forwarding instructions and share them with your customer.",
-      });
-
-      // Redirect to onboarding
-      setTimeout(() => {
-        navigate('/onboarding');
-      }, 2000);
+      // Show appropriate toast based on provisioning status
+      if (typedResult.provisioningMessage) {
+        toast({
+          title: "Account created with warnings",
+          description: typedResult.provisioningMessage,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Account created successfully",
+          description: "Review the forwarding instructions and share them with your customer.",
+        });
+      }
 
     } catch (err) {
       console.error('Signup error:', err);
@@ -664,7 +670,7 @@ function SalesSignupFormInner() {
           setShowSuccessModal(false);
           form.reset();
           setSuccessData(null);
-          navigate('/onboarding');
+          // Stay on sales page so sales rep can create another account
         }}
         data={successData}
       />
