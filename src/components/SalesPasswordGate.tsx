@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { signOutUser } from "@/lib/auth/session";
 import { useToast } from "@/hooks/use-toast";
+import { hasRoleAccess } from "@/lib/auth/roles";
 
 export const SalesPasswordGate = ({
   children
@@ -25,15 +26,14 @@ export const SalesPasswordGate = ({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Check if user has platform_owner role
+        // Check if user has sales, platform_admin, or platform_owner role
         const { data: staffRole } = await supabase
           .from('staff_roles')
           .select('role')
           .eq('user_id', session.user.id)
-          .eq('role', 'platform_owner')
           .maybeSingle();
-        
-        setHasAccess(!!staffRole);
+
+        setHasAccess(hasRoleAccess(staffRole?.role, ['sales']));
       }
     } catch (error) {
       console.error("Auth check error:", error);
@@ -55,15 +55,14 @@ export const SalesPasswordGate = ({
       if (error) throw error;
 
       if (data.user) {
-        // Check if user has platform_owner role
+        // Check if user has sales, platform_admin, or platform_owner role
         const { data: staffRole } = await supabase
           .from('staff_roles')
           .select('role')
           .eq('user_id', data.user.id)
-          .eq('role', 'platform_owner')
           .maybeSingle();
 
-        if (staffRole) {
+        if (hasRoleAccess(staffRole?.role, ['sales'])) {
           setHasAccess(true);
           toast({
             title: "Access Granted",

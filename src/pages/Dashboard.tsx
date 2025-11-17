@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { hasRoleAccess } from "@/lib/auth/roles";
 
 const PLAN_PRICING: Record<string, number> = {
   starter: 297,
@@ -47,11 +48,7 @@ export default function Dashboard() {
       }
 
       const role = (staffRole as any)?.role;
-      if (role === "platform_owner" || role === "platform_admin" || role === "sales") {
-        setIsOwner(true);
-      } else {
-        setIsOwner(false);
-      }
+      setIsOwner(hasRoleAccess(role, ['sales']));
     };
 
     checkAuth();
