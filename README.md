@@ -89,6 +89,10 @@ Operations and admin users can access the monitoring dashboard at `/admin/monito
 - Edge function errors
 - Flagged accounts requiring attention
 
+## Sales Page & Bot Access
+
+The `/sales` route is protected by a password gate requiring authenticated staff users. For automated testing and debugging (e.g., Google Jules), a secure bypass is available using a secret URL parameter. See [docs/BOT_ACCESS.md](docs/BOT_ACCESS.md) for detailed usage instructions.
+
 ## Support
 
 For technical issues or questions, contact the development team.
