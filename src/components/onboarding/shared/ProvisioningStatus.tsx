@@ -126,9 +126,30 @@ export function ProvisioningStatus({
     setProgress(10);
 
     try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, phone, email")
+        .eq("account_id", accountId)
+        .single();
+
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("areaCode, company_name, trade, assistant_gender")
+        .eq("id", accountId)
+        .single();
+
       // Call retry endpoint (or re-invoke provision-resources)
       const { error: retryError } = await supabase.functions.invoke("provision-resources", {
-        body: { accountId },
+        body: {
+          accountId,
+          email: profile?.email,
+          name: profile?.name,
+          phone: profile?.phone,
+          areaCode: account?.areaCode,
+          companyName: account?.company_name,
+          trade: account?.trade,
+          assistantGender: account?.assistant_gender,
+        },
       });
 
       if (retryError) throw retryError;

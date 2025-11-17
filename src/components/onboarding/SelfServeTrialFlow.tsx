@@ -39,6 +39,7 @@ const selfServeSchema = z.object({
   companyName: z.string().min(1, "Company name required"),
   trade: z.string().min(1, "Trade required"),
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  zipCode: z.string().regex(/^\d{5}$/, "A valid 5-digit ZIP code is required"),
 
   // Step 3: Business Advanced
   primaryGoal: z.enum(["book_appointments", "capture_leads", "answer_questions", "take_orders"]).optional(),
@@ -118,7 +119,7 @@ export function SelfServeTrialFlow({
         fieldsToValidate = ["name", "email", "phone"];
         break;
       case 2:
-        fieldsToValidate = ["companyName", "trade"];
+        fieldsToValidate = ["companyName", "trade", "zipCode"];
         break;
       case 3:
         // Optional fields, can skip validation
@@ -276,7 +277,7 @@ export function SelfServeTrialFlow({
               <div className="py-4">
                 <BusinessBasicsForm
                   form={form}
-                  requiredFields={["companyName", "trade", "website"]}
+                  requiredFields={["companyName", "trade", "website", "zipCode"]}
                   showOptionalBadges={true}
                 />
               </div>
