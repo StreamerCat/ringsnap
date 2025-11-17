@@ -31,7 +31,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const requestPayload = await req.json();
-    const { accountId, email, name, phone, areaCode: requestedAreaCode } = requestPayload;
+    const { accountId, email, name, phone, zipCode, areaCode: requestedAreaCode } = requestPayload;
     currentAccountId = accountId;
 
     if (!accountId) {
@@ -65,36 +65,14 @@ serve(async (req) => {
       throw new Error(`Account not found: ${accountError?.message}`);
     }
 
-    const normalizedRequestAreaCode = typeof requestedAreaCode === 'string'
-      ? requestedAreaCode.replace(/\D/g, '').slice(0, 3)
-      : null;
-
-    let areaCode = account.phone_number_area_code;
-
-    if ((!areaCode || areaCode.length !== 3) && normalizedRequestAreaCode && normalizedRequestAreaCode.length === 3) {
-      const { error: updateError } = await supabase
-        .from('accounts')
-        .update({ phone_number_area_code: normalizedRequestAreaCode })
-        .eq('id', accountId);
-
-      if (updateError) {
-        logWarn('Failed to backfill account area code from request payload', {
-          ...baseLogOptions,
-          accountId,
-          context: { requestedAreaCode: normalizedRequestAreaCode, error: updateError.message },
-        });
-      } else {
-        areaCode = normalizedRequestAreaCode;
-      }
+    let areaCode = requestedAreaCode;
+    if (!areaCode && zipCode) {
+      areaCode = getAreaCodeFromZip(zipCode);
     }
 
-    const sanitizedAreaCode = areaCode?.replace(/\D/g, '').slice(0, 3) || null;
-
-    if (!sanitizedAreaCode || sanitizedAreaCode.length !== 3) {
-      throw new Error('No area code selected for account');
+    if (!areaCode) {
+      throw new Error('Area code could not be determined from zip code or request');
     }
-
-    areaCode = sanitizedAreaCode;
 
     logInfo('Using selected area code', {
       ...baseLogOptions,
@@ -141,16 +119,13 @@ serve(async (req) => {
 
       if (!phoneResponse.ok) {
         const errorText = await phoneResponse.text();
-        logError('VAPI phone creation failed', {
-          ...baseLogOptions,
-          accountId,
-          error: new Error(errorText),
-          context: {
-            provider: 'vapi',
-            areaCode,
-            companyName: account.company_name
-          }
-        });
+        await supabase
+          .from('accounts')
+          .update({
+            provisioning_status: 'failed',
+            provisioning_error: `VAPI phone creation failed: ${errorText}`,
+          })
+          .eq('id', accountId);
         throw new Error(`Failed to create phone number: ${errorText}`);
       }
 
@@ -213,11 +188,13 @@ serve(async (req) => {
 
       if (!assistantResponse.ok) {
         const errorText = await assistantResponse.text();
-        logError('VAPI assistant creation failed', {
-          ...baseLogOptions,
-          accountId,
-          error: new Error(errorText)
-        });
+        await supabase
+          .from('accounts')
+          .update({
+            provisioning_status: 'failed',
+            provisioning_error: `VAPI assistant creation failed: ${errorText}`,
+          })
+          .eq('id', accountId);
         throw new Error(`Failed to create assistant: ${errorText}`);
       }
 

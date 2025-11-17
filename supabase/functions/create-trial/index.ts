@@ -30,7 +30,7 @@ const createTrialSchema = z.object({
   // Business extended (optional - self-serve provides more detail)
   website: z.string().url("Invalid website URL").optional().or(z.literal("")),
   serviceArea: z.string().max(200, "Service area too long").optional(),
-  zipCode: z.string().regex(/^\d{5}$/, "ZIP code must be 5 digits").optional().or(z.literal("")),
+  zipCode: z.string().regex(/^\d{5}$/, "ZIP code must be 5 digits"),
 
   // Business operations (optional - sales flow uses these)
   businessHours: z.string().max(500).optional(),
@@ -484,11 +484,12 @@ serve(async (req) => {
         email: data.email,
         name: data.name,
         phone: data.phone,
-        areaCode: data.zipCode?.slice(0, 3) || null,
-        company_name: data.companyName,
-        company_website: data.website,
+        zipCode: data.zipCode,
+        areaCode: data.zipCode.slice(0, 3),
+        companyName: data.companyName,
+        website: data.website,
         trade: data.trade,
-        assistant_gender: data.assistantGender,
+        assistantGender: data.assistantGender,
       },
     });
 
