@@ -4,18 +4,19 @@ import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, Dol
 import Vapi from "@vapi-ai/web";
 import { useEffect, useRef, useState } from "react";
 import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
+// State machine for demo widget
+type DemoState = 'initializing' | 'ready' | 'connecting' | 'active' | 'error';
+
 const VapiWidget = () => {
-  const [isCallActive, setIsCallActive] = useState(false);
+  const [demoState, setDemoState] = useState<DemoState>('initializing');
   const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
-  const [configError, setConfigError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const vapiRef = useRef<Vapi | null>(null);
 
   useEffect(() => {
     const loadVapiConfig = async (retryCount = 0) => {
       try {
-        setIsLoading(true);
+        setDemoState('initializing');
         console.log('[Voice Demo] Loading configuration...', { retryCount });
 
         const response = await fetch(
@@ -45,8 +46,8 @@ const VapiWidget = () => {
             error: 'Unable to connect to voice demo service'
           }));
           console.error('[Voice Demo] Failed to load config:', errorData);
-          setConfigError(errorData.error || 'Voice demo temporarily unavailable. Please try again in a moment.');
-          setIsLoading(false);
+          setErrorMessage(errorData.error || 'Demo temporarily unavailable.');
+          setDemoState('error');
           return;
         }
 
@@ -59,8 +60,8 @@ const VapiWidget = () => {
         // Validate response
         if (!data.publicKey || !data.assistantId) {
           console.error('[Voice Demo] Missing credentials in response');
-          setConfigError('Voice demo configuration error. Please refresh or contact support.');
-          setIsLoading(false);
+          setErrorMessage('Demo configuration error.');
+          setDemoState('error');
           return;
         }
 
@@ -72,32 +73,29 @@ const VapiWidget = () => {
         // Add error event handler
         vapiRef.current.on("error", (error) => {
           console.error('[Voice Demo] Connection error:', error);
-          setIsConnecting(false);
-          setIsCallActive(false);
+          setDemoState('error');
           const errorMsg = error?.message || 'Connection failed';
           if (errorMsg.toLowerCase().includes('microphone') || errorMsg.toLowerCase().includes('permission')) {
-            setConfigError('Microphone access required. Please allow microphone access to use the voice demo.');
+            setErrorMessage('Microphone access required.');
           } else {
-            setConfigError('Voice demo connection failed. Please try again.');
+            setErrorMessage('Connection failed. Please try again.');
           }
         });
 
         const handleCallStart = () => {
           console.log('[Voice Demo] Call started');
-          setIsCallActive(true);
-          setIsConnecting(false);
+          setDemoState('active');
         };
         const handleCallEnd = () => {
           console.log('[Voice Demo] Call ended');
-          setIsCallActive(false);
-          setIsConnecting(false);
+          setDemoState('ready');
         };
 
         vapiRef.current.on("call-start", handleCallStart);
         vapiRef.current.on("call-end", handleCallEnd);
 
         console.log('[Voice Demo] Initialization complete');
-        setIsLoading(false);
+        setDemoState('ready');
       } catch (error) {
         // Retry on network errors
         if (retryCount < 2) {
@@ -106,8 +104,8 @@ const VapiWidget = () => {
           return loadVapiConfig(retryCount + 1);
         }
         console.error('[Voice Demo] Error loading config:', error);
-        setConfigError('Unable to initialize voice demo. Please check your connection and try again.');
-        setIsLoading(false);
+        setErrorMessage('Unable to initialize demo. Please refresh the page.');
+        setDemoState('error');
       }
     };
 
@@ -120,40 +118,41 @@ const VapiWidget = () => {
 
   // Timeout protection for connecting state
   useEffect(() => {
-    if (isConnecting) {
+    if (demoState === 'connecting') {
       const timeout = setTimeout(() => {
-        if (isConnecting) {
+        if (demoState === 'connecting') {
           console.error('[Voice Demo] Connection timeout');
-          setIsConnecting(false);
-          setConfigError('Connection took too long. Please check your internet connection and try again.');
+          setDemoState('error');
+          setErrorMessage('Connection timeout. Please try again.');
           vapiRef.current?.stop();
         }
       }, 10000);
 
       return () => clearTimeout(timeout);
     }
-  }, [isConnecting]);
+  }, [demoState]);
 
   const startCall = async () => {
     if (!vapiConfig || !vapiRef.current) {
-      setConfigError('Voice demo not ready. Please refresh the page.');
+      setErrorMessage('Demo not ready. Please refresh the page.');
+      setDemoState('error');
       return;
     }
 
     console.log('[Voice Demo] Starting call...');
-    setIsConnecting(true);
-    setConfigError(null);
+    setDemoState('connecting');
+    setErrorMessage(null);
     try {
       await vapiRef.current.start(vapiConfig.assistantId);
       console.log('[Voice Demo] Call start request sent');
     } catch (error) {
       console.error('[Voice Demo] Failed to start call:', error);
-      setIsConnecting(false);
+      setDemoState('error');
       const errorMsg = error instanceof Error ? error.message : '';
       if (errorMsg.toLowerCase().includes('microphone') || errorMsg.toLowerCase().includes('permission')) {
-        setConfigError('Microphone access required. Please allow microphone access and try again.');
+        setErrorMessage('Microphone access required.');
       } else {
-        setConfigError('Failed to start voice demo. Please check your microphone permissions and try again.');
+        setErrorMessage('Failed to start demo. Please check your microphone permissions.');
       }
     }
   };
@@ -161,71 +160,35 @@ const VapiWidget = () => {
   const endCall = () => {
     console.log('[Voice Demo] Ending call...');
     vapiRef.current?.stop();
-    setIsConnecting(false);
+    setDemoState('ready');
   };
+  // Determine button state
+  const isButtonDisabled = demoState === 'initializing' || demoState === 'connecting' || demoState === 'error';
+  const buttonText = demoState === 'connecting' ? 'Connecting...' : 'Hear It in Action';
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-      {/* Loading state - initial config fetch */}
-      {isLoading && (
-        <div className="space-y-4">
-          <div className="w-16 h-16 border-4 border-[#D97757] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-lg text-muted-foreground">Loading demo...</p>
-        </div>
-      )}
-
-      {/* Error state */}
-      {configError && !isLoading && (
-        <div className="space-y-4 max-w-md mx-auto">
-          <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <div className="text-red-600 text-lg font-semibold">Demo Unavailable</div>
-          <p className="text-muted-foreground">{configError}</p>
-          <p className="text-sm text-muted-foreground">
-            Please contact support or try refreshing the page.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 bg-[#D97757] text-white px-6 py-3 rounded-xl text-base font-semibold hover:opacity-90 transition-all"
-          >
-            Refresh Page
-          </button>
-        </div>
-      )}
-
-      {/* Connecting state - after button click, before call starts */}
-      {isConnecting && !isCallActive && !configError && (
-        <div className="space-y-6 max-w-md mx-auto">
-          <div className="relative">
-            <div className="w-20 h-20 border-4 border-[#D97757] border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-10 h-10 text-[#D97757]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                />
+      {/* Active call state - full screen replacement */}
+      {demoState === 'active' ? (
+        <div className="space-y-6">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-[#D97757] rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
+              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
               </svg>
             </div>
+            <p className="text-xl font-semibold text-[#2C3639]">Call in Progress</p>
+            <p className="text-sm text-muted-foreground mt-2">AI receptionist is listening...</p>
           </div>
-          <div className="space-y-2">
-            <p className="text-xl font-semibold text-[#2C3639]">Connecting...</p>
-            <p className="text-sm text-muted-foreground">Setting up your demo call with the AI receptionist</p>
-          </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
-            <svg className="w-5 h-5 text-blue-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Please allow microphone access if prompted
-          </div>
+          <button
+            onClick={endCall}
+            className="bg-red-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-700 transition-colors shadow-lg"
+          >
+            End Conversation
+          </button>
         </div>
-      )}
-
-      {/* Ready state - show button */}
-      {!isCallActive && !isConnecting && !configError && !isLoading && (
+      ) : (
+        /* Demo card - ALWAYS renders for non-active states */
         <div className="space-y-6 max-w-2xl mx-auto">
           {/* Headline - Benefit-Driven */}
           <div className="text-center space-y-3">
@@ -241,19 +204,55 @@ const VapiWidget = () => {
             </p>
           </div>
 
+          {/* Inline status indicators */}
+          {demoState === 'initializing' && (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <div className="w-4 h-4 border-2 border-[#D97757] border-t-transparent rounded-full animate-spin"></div>
+              <span>Loading demo...</span>
+            </div>
+          )}
+
+          {demoState === 'connecting' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center justify-center gap-2 text-sm text-blue-900 mb-2">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <span className="font-medium">Connecting to demo...</span>
+              </div>
+              <p className="text-xs text-blue-800 text-center">Please allow microphone access if prompted</p>
+            </div>
+          )}
+
+          {demoState === 'error' && errorMessage && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 text-sm text-amber-900">
+                <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1 text-left">
+                  <p className="font-medium">{errorMessage}</p>
+                  <p className="text-xs text-amber-800 mt-1">Please try refreshing the page or contact support if the issue persists.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Enhanced Button with Visual Cue */}
           <div className="space-y-4">
             <button
               onClick={startCall}
-              disabled={!vapiConfig}
+              disabled={isButtonDisabled}
               className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
+                {demoState === 'connecting' ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
               </div>
-              <span>Hear It in Action</span>
+              <span>{buttonText}</span>
             </button>
 
             {/* Microphone Instruction */}
@@ -328,27 +327,6 @@ const VapiWidget = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Active call state */}
-      {isCallActive && (
-        <div className="space-y-6">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-[#D97757] rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
-              <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-              </svg>
-            </div>
-            <p className="text-xl font-semibold text-[#2C3639]">Call in Progress</p>
-            <p className="text-sm text-muted-foreground mt-2">AI receptionist is listening...</p>
-          </div>
-          <button
-            onClick={endCall}
-            className="bg-red-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-red-700 transition-colors shadow-lg"
-          >
-            End Conversation
-          </button>
         </div>
       )}
     </div>
