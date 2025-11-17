@@ -7,46 +7,175 @@ import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
 const VapiWidget = () => {
   const [isCallActive, setIsCallActive] = useState(false);
   const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
   const vapiRef = useRef<Vapi | null>(null);
-  
+
   useEffect(() => {
-    // Fetch VAPI config from secure edge function
-    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`, {
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
+    const loadVapiConfig = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({
+            error: 'Unknown error'
+          }));
+          console.error('Failed to load Vapi config:', errorData);
+          setConfigError(errorData.error || 'Failed to load demo configuration');
+          setIsLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+
+        // Validate response
+        if (!data.publicKey || !data.assistantId) {
+          setConfigError('Demo not configured - missing credentials');
+          setIsLoading(false);
+          return;
+        }
+
         setVapiConfig(data);
         // Initialize Vapi instance with fetched public key
         // TODO: Legacy client-side Vapi demo usage. Provisioning now happens server-side; migrate this demo when backend tokens are available.
         vapiRef.current = new Vapi(data.publicKey);
-        
-        // Event listeners
-        const handleCallStart = () => setIsCallActive(true);
-        const handleCallEnd = () => setIsCallActive(false);
+
+        const handleCallStart = () => {
+          setIsCallActive(true);
+          setIsConnecting(false);
+        };
+        const handleCallEnd = () => {
+          setIsCallActive(false);
+          setIsConnecting(false);
+        };
+
         vapiRef.current.on("call-start", handleCallStart);
         vapiRef.current.on("call-end", handleCallEnd);
-      })
-      .catch(err => console.error('Failed to load VAPI config:', err));
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading Vapi config:', error);
+        setConfigError('Failed to initialize demo');
+        setIsLoading(false);
+      }
+    };
+
+    loadVapiConfig();
 
     return () => {
       vapiRef.current?.stop();
     };
   }, []);
-  
-  const startCall = () => {
-    if (vapiConfig) {
-      vapiRef.current?.start(vapiConfig.assistantId);
+
+  // Timeout protection for connecting state
+  useEffect(() => {
+    if (isConnecting) {
+      const timeout = setTimeout(() => {
+        if (isConnecting) {
+          setIsConnecting(false);
+          setConfigError('Connection timeout. Please try again.');
+          vapiRef.current?.stop();
+        }
+      }, 10000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isConnecting]);
+
+  const startCall = async () => {
+    if (!vapiConfig || !vapiRef.current) {
+      setConfigError('Demo not ready. Please refresh the page.');
+      return;
+    }
+
+    setIsConnecting(true);
+    setConfigError(null);
+    try {
+      await vapiRef.current.start(vapiConfig.assistantId);
+    } catch (error) {
+      console.error('Failed to start call:', error);
+      setIsConnecting(false);
+      setConfigError('Failed to start demo call. Please check microphone permissions and try again.');
     }
   };
+
   const endCall = () => {
     vapiRef.current?.stop();
+    setIsConnecting(false);
   };
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-      {!isCallActive ? (
+      {/* Loading state - initial config fetch */}
+      {isLoading && (
+        <div className="space-y-4">
+          <div className="w-16 h-16 border-4 border-[#D97757] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-lg text-muted-foreground">Loading demo...</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {configError && !isLoading && (
+        <div className="space-y-4 max-w-md mx-auto">
+          <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="text-red-600 text-lg font-semibold">Demo Unavailable</div>
+          <p className="text-muted-foreground">{configError}</p>
+          <p className="text-sm text-muted-foreground">
+            Please contact support or try refreshing the page.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-[#D97757] text-white px-6 py-3 rounded-xl text-base font-semibold hover:opacity-90 transition-all"
+          >
+            Refresh Page
+          </button>
+        </div>
+      )}
+
+      {/* Connecting state - after button click, before call starts */}
+      {isConnecting && !isCallActive && !configError && (
+        <div className="space-y-6 max-w-md mx-auto">
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-[#D97757] border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="w-10 h-10 text-[#D97757]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                />
+              </svg>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xl font-semibold text-[#2C3639]">Connecting...</p>
+            <p className="text-sm text-muted-foreground">Setting up your demo call with the AI receptionist</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+            <svg className="w-5 h-5 text-blue-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Please allow microphone access if prompted
+          </div>
+        </div>
+      )}
+
+      {/* Ready state - show button */}
+      {!isCallActive && !isConnecting && !configError && !isLoading && (
         <div className="space-y-6 max-w-2xl mx-auto">
           {/* Headline - Benefit-Driven */}
           <div className="text-center space-y-3">
@@ -66,7 +195,8 @@ const VapiWidget = () => {
           <div className="space-y-4">
             <button
               onClick={startCall}
-              className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group"
+              disabled={!vapiConfig}
+              className="w-full bg-[#D97757] text-white px-8 py-5 rounded-2xl text-xl font-semibold hover:opacity-90 transition-all shadow-xl hover:shadow-2xl hover:scale-[1.02] transform duration-200 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -149,7 +279,10 @@ const VapiWidget = () => {
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* Active call state */}
+      {isCallActive && (
         <div className="space-y-6">
           <div className="text-center">
             <div className="w-16 h-16 bg-[#D97757] rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
