@@ -20,13 +20,30 @@ serve(async (req) => {
     const VAPI_PUBLIC_KEY = Deno.env.get('VAPI_PUBLIC_KEY');
     const VAPI_ASSISTANT_ID = Deno.env.get('VAPI_DEMO_ASSISTANT_ID');
 
-    if (!VAPI_PUBLIC_KEY || !VAPI_ASSISTANT_ID) {
+    // Check for missing configuration and provide explicit details
+    const requiredKeys = ['VAPI_PUBLIC_KEY', 'VAPI_DEMO_ASSISTANT_ID'];
+    const missingKeys: string[] = [];
+
+    if (!VAPI_PUBLIC_KEY) missingKeys.push('VAPI_PUBLIC_KEY');
+    if (!VAPI_ASSISTANT_ID) missingKeys.push('VAPI_DEMO_ASSISTANT_ID');
+
+    if (missingKeys.length > 0) {
+      console.error('[Voice Demo] Missing configuration keys:', missingKeys);
       logError('Missing voice demo configuration', {
         ...baseLogOptions,
-        error: new Error('Missing voice demo configuration values')
+        error: new Error('Missing voice demo configuration values'),
+        context: {
+          missingKeys,
+          requiredKeys
+        }
       });
       return new Response(
-        JSON.stringify({ error: 'Voice demo service not configured' }),
+        JSON.stringify({
+          error: 'MissingConfig',
+          message: 'Voice demo is not configured correctly. Please contact support.',
+          missingKeys,
+          details: 'Required environment variables are not set in Supabase Edge Function configuration.'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
