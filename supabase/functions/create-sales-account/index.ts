@@ -190,15 +190,26 @@ serve(async (req) => {
     // Step 4: Database trigger will automatically create:
     // - accounts table entry
     // - profiles table entry
-    // - user_roles table entry (owner role)
+    // - account_members table entry (owner role)
+    // However, we need to verify this succeeds and create manually if it fails
 
-    // Wait brief moment for trigger to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
+    logInfo('Waiting for database trigger to complete', {
+      ...baseLogOptions,
+      context: {
+        userId: authData.user.id,
+        email: customerInfo.email,
+        hasPhone: !!customerInfo.phone,
+        phoneValue: customerInfo.phone
+      }
+    });
 
-    // Step 5: Update account with sales-specific fields
+    // Wait longer for trigger to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Step 5: Fetch profile and check if account was created by trigger
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('account_id')
+      .select('account_id, id, name')
       .eq('id', authData.user.id)
       .single();
 
@@ -211,78 +222,181 @@ serve(async (req) => {
       throw new Error(`Profile fetch failed: ${profileError.message}`);
     }
 
-    if (!profile?.account_id) {
-      logError('Account ID not found on profile', {
+    if (!profile) {
+      logError('Profile not found after user creation', {
+        ...baseLogOptions,
+        context: { userId: authData.user.id }
+      });
+      throw new Error('Profile record not found - database trigger failed completely');
+    }
+
+    // Check if trigger created the account
+    if (!profile.account_id) {
+      logWarn('Trigger did not create account - creating manually', {
         ...baseLogOptions,
         context: {
           userId: authData.user.id,
-          profileData: profile
+          profileData: profile,
+          phone: customerInfo.phone,
+          companyName: customerInfo.companyName
         }
       });
-      throw new Error('Account record not found after user creation - database trigger may have failed');
+
+      // Manually create the account since trigger didn't
+      const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
+        ? getAreaCodeFromZip(customerInfo.zipCode.trim())
+        : '212';
+      const billingState = (customerInfo.zipCode && customerInfo.zipCode.trim())
+        ? getStateFromZip(customerInfo.zipCode.trim())
+        : null;
+
+      const { data: newAccount, error: accountCreateError } = await supabaseAdmin
+        .from('accounts')
+        .insert({
+          company_name: customerInfo.companyName,
+          company_domain: null,
+          trade: customerInfo.trade,
+          wants_advanced_voice: false,
+          subscription_status: 'active',
+          trial_start_date: null,
+          trial_end_date: null,
+          provisioning_status: 'pending',
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id: subscriptionId,
+          sales_rep_name: customerInfo.salesRepName,
+          service_area: customerInfo.serviceArea,
+          business_hours: customerInfo.businessHours,
+          emergency_policy: customerInfo.emergencyPolicy,
+          plan_type: customerInfo.planType,
+          phone_number_area_code: areaCode,
+          billing_state: billingState
+        })
+        .select('id')
+        .single();
+
+      if (accountCreateError || !newAccount) {
+        logError('Failed to manually create account', {
+          ...baseLogOptions,
+          error: accountCreateError,
+          context: {
+            userId: authData.user.id,
+            companyName: customerInfo.companyName,
+            planType: customerInfo.planType,
+            errorDetails: JSON.stringify(accountCreateError)
+          }
+        });
+        throw new Error(`Account creation failed: ${accountCreateError?.message || 'Unknown error'}`);
+      }
+
+      currentAccountId = newAccount.id;
+
+      logInfo('Account created manually', {
+        ...baseLogOptions,
+        accountId: currentAccountId
+      });
+
+      // Update profile with the new account_id
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ account_id: currentAccountId, is_primary: true })
+        .eq('id', authData.user.id);
+
+      if (profileUpdateError) {
+        logError('Failed to link profile to manually created account', {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: profileUpdateError
+        });
+      }
+
+      // Create account_members entry
+      const { error: memberError } = await supabaseAdmin
+        .from('account_members')
+        .insert({
+          user_id: authData.user.id,
+          account_id: currentAccountId,
+          role: 'owner'
+        });
+
+      if (memberError) {
+        logWarn('Failed to create account_members entry', {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: memberError
+        });
+      }
+    } else {
+      // Trigger successfully created the account
+      currentAccountId = profile.account_id;
+
+      logInfo('Account created by trigger', {
+        ...baseLogOptions,
+        accountId: currentAccountId
+      });
     }
 
-    currentAccountId = profile.account_id;
+    // If trigger created the account, we need to update it with sales-specific fields
+    if (profile.account_id) {
+      const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
+        ? getAreaCodeFromZip(customerInfo.zipCode.trim())
+        : '212';
+      const billingState = (customerInfo.zipCode && customerInfo.zipCode.trim())
+        ? getStateFromZip(customerInfo.zipCode.trim())
+        : null;
 
-    // Convert ZIP code to area code and extract state
-    // Use a default area code (212 - New York) if ZIP not provided
-    const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
-      ? getAreaCodeFromZip(customerInfo.zipCode.trim())
-      : '212';
-    const billingState = (customerInfo.zipCode && customerInfo.zipCode.trim())
-      ? getStateFromZip(customerInfo.zipCode.trim())
-      : null;
-
-    logInfo('Updating account with sales-specific fields', {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: {
-        salesRepName: customerInfo.salesRepName,
-        planType: customerInfo.planType,
-        areaCode,
-        billingState
-      }
-    });
-
-    const { error: updateError } = await supabaseAdmin
-      .from('accounts')
-      .update({
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: subscriptionId,
-        sales_rep_name: customerInfo.salesRepName,
-        service_area: customerInfo.serviceArea,
-        business_hours: customerInfo.businessHours,
-        emergency_policy: customerInfo.emergencyPolicy,
-        plan_type: customerInfo.planType,
-        subscription_status: 'active',
-        phone_number_area_code: areaCode,
-        billing_state: billingState
-      })
-      .eq('id', profile.account_id);
-
-    if (updateError) {
-      logError('Failed to update account with sales data', {
+      logInfo('Updating trigger-created account with sales-specific fields', {
         ...baseLogOptions,
         accountId: currentAccountId,
-        error: updateError,
         context: {
-          stripeCustomerId,
-          subscriptionId,
-          planType: customerInfo.planType
+          salesRepName: customerInfo.salesRepName,
+          planType: customerInfo.planType,
+          areaCode,
+          billingState
         }
       });
-      throw new Error(`Account update failed: ${updateError.message}`);
-    }
 
-    logInfo('Account updated with sales data', {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: {
-        salesRepName: customerInfo.salesRepName,
-        planType: customerInfo.planType,
-        subscriptionStatus: 'active'
+      const { error: updateError } = await supabaseAdmin
+        .from('accounts')
+        .update({
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id: subscriptionId,
+          sales_rep_name: customerInfo.salesRepName,
+          service_area: customerInfo.serviceArea,
+          business_hours: customerInfo.businessHours,
+          emergency_policy: customerInfo.emergencyPolicy,
+          plan_type: customerInfo.planType,
+          subscription_status: 'active',  // Override trigger's 'trial' status
+          phone_number_area_code: areaCode,
+          billing_state: billingState,
+          trial_start_date: null,  // Sales accounts don't have trials
+          trial_end_date: null
+        })
+        .eq('id', currentAccountId);
+
+      if (updateError) {
+        logError('Failed to update account with sales data', {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: updateError,
+          context: {
+            stripeCustomerId,
+            subscriptionId,
+            planType: customerInfo.planType
+          }
+        });
+        throw new Error(`Account update failed: ${updateError.message}`);
       }
-    });
+
+      logInfo('Account updated with sales data', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: {
+          salesRepName: customerInfo.salesRepName,
+          planType: customerInfo.planType,
+          subscriptionStatus: 'active'
+        }
+      });
+    }
 
     // Step 5.5: Handle referral code if provided
     if (customerInfo.referralCode && customerInfo.referralCode.trim().length === 8) {
@@ -300,7 +414,7 @@ serve(async (req) => {
             .from('referrals')
             .insert({
               referrer_account_id: referralCodeData.account_id,
-              referee_account_id: profile.account_id,
+              referee_account_id: currentAccountId,
               referral_code: customerInfo.referralCode,
               referee_email: customerInfo.email,
               referee_phone: customerInfo.phone,
@@ -310,7 +424,7 @@ serve(async (req) => {
 
           logInfo('Referral tracked', {
             ...baseLogOptions,
-            accountId: profile.account_id,
+            accountId: currentAccountId,
             context: {
               referralCode: customerInfo.referralCode,
               referrerAccountId: referralCodeData.account_id
@@ -319,7 +433,7 @@ serve(async (req) => {
         } else {
           logInfo('Referral code not found, skipping tracking', {
             ...baseLogOptions,
-            accountId: profile.account_id,
+            accountId: currentAccountId,
             context: { referralCode: customerInfo.referralCode }
           });
         }
@@ -327,7 +441,7 @@ serve(async (req) => {
         // Log but don't fail the signup
         logError('Referral tracking failed (non-critical)', {
           ...baseLogOptions,
-          accountId: profile.account_id,
+          accountId: currentAccountId,
           error: referralError
         });
       }
