@@ -7,6 +7,10 @@ import { signOutUser } from "@/lib/auth/session";
 import { useToast } from "@/hooks/use-toast";
 import { hasRoleAccess } from "@/lib/auth/roles";
 
+// Bot access secret for automated testing (Google Jules, etc.)
+const BOT_SECRET = import.meta.env.VITE_JULES_SECRET;
+const BOT_ACCESS_SESSION_KEY = 'ringsnap_bot_access_granted';
+
 export const SalesPasswordGate = ({
   children
 }: {
@@ -24,6 +28,37 @@ export const SalesPasswordGate = ({
 
   const checkAuth = async () => {
     try {
+      // PRIORITY 1: Check for bot access via URL parameter or sessionStorage
+      // This allows automated testing tools to bypass the password gate
+      const urlParams = new URLSearchParams(window.location.search);
+      const botAccessParam = urlParams.get('bot_access');
+      const sessionBotAccess = sessionStorage.getItem(BOT_ACCESS_SESSION_KEY);
+
+      if (BOT_SECRET && botAccessParam === BOT_SECRET) {
+        // Valid bot access token in URL - grant access and store in session
+        sessionStorage.setItem(BOT_ACCESS_SESSION_KEY, 'true');
+        setHasAccess(true);
+        setIsLoading(false);
+
+        // Clean up the URL parameter for cleaner appearance
+        if (urlParams.has('bot_access')) {
+          urlParams.delete('bot_access');
+          const newUrl = window.location.pathname +
+            (urlParams.toString() ? '?' + urlParams.toString() : '') +
+            window.location.hash;
+          window.history.replaceState({}, '', newUrl);
+        }
+        return;
+      }
+
+      if (sessionBotAccess === 'true') {
+        // Bot access already granted in this session
+        setHasAccess(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // PRIORITY 2: Check for existing authenticated user with proper role
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         // Check if user has sales, platform_admin, or platform_owner role
