@@ -447,111 +447,34 @@ serve(async (req) => {
       }
     }
 
-    // Step 6: Provision resources immediately (phone number + assistant)
-    // This is separate from vapi-demo-call which is only for demos
-    logInfo('Starting immediate provisioning for sales account', {
+    // Step 6: Queue provisioning for async processing
+    // Phone number provisioning takes 1-2 minutes, so we don't wait for it
+    // Instead, mark account as pending and let background job handle it
+    logInfo('Queueing async provisioning for sales account', {
       ...baseLogOptions,
       accountId: currentAccountId,
       context: {
         email: customerInfo.email,
-        areaCode: areaCode
+        phone: customerInfo.phone,
+        areaCode: customerInfo.zipCode ? getAreaCodeFromZip(customerInfo.zipCode.trim()) : '212'
       }
     });
 
-    let vapiPhoneNumber = null;
-    let vapiAssistantId = null;
-    let provisioningSucceeded = false;
-    let provisioningMessage = null;
+    // Account is already marked with provisioning_status='pending' during creation
+    // No synchronous provisioning - return success immediately
+    const provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
 
-    try {
-      const { data: provisionData, error: provisionError } = await supabaseAdmin.functions.invoke(
-        'provision-resources',
-        {
-          body: {
-            accountId: currentAccountId,
-            email: customerInfo.email,
-            name: customerInfo.name,
-            phone: customerInfo.phone,
-            areaCode: areaCode  // Pass the area code we already computed
-          }
-        }
-      );
-
-      if (provisionError) {
-        logError('Provisioning edge function returned error', {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: provisionError,
-          context: {
-            errorMessage: provisionError.message,
-            errorDetails: JSON.stringify(provisionError)
-          }
-        });
-        provisioningMessage = `Provisioning failed: ${provisionError.message}. Account created but phone number needs manual setup.`;
-        // Don't fail the whole signup - provisioning can be retried
-        // Customer has already paid, so we create the account regardless
-      } else if (!provisionData) {
-        logError('Provisioning returned no data', {
-          ...baseLogOptions,
-          accountId: currentAccountId
-        });
-        provisioningMessage = 'Provisioning returned no data. Account created but phone number needs manual setup.';
-      } else {
-        provisioningSucceeded = true;
-        logInfo('Provisioning succeeded for sales account', {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: {
-            phoneNumber: provisionData.phoneNumber,
-            responseKeys: Object.keys(provisionData)
-          }
-        });
-
-        // Wait briefly then fetch updated account with provisioned resources
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const { data: updatedAccount, error: fetchError } = await supabaseAdmin
-          .from('accounts')
-          .select('vapi_phone_number, vapi_assistant_id, provisioning_status')
-          .eq('id', currentAccountId)
-          .single();
-
-        if (fetchError) {
-          logWarn('Failed to fetch updated account after provisioning', {
-            ...baseLogOptions,
-            accountId: currentAccountId,
-            error: fetchError
-          });
-        } else {
-          vapiPhoneNumber = updatedAccount?.vapi_phone_number;
-          vapiAssistantId = updatedAccount?.vapi_assistant_id;
-
-          logInfo('Retrieved provisioned resources from account', {
-            ...baseLogOptions,
-            accountId: currentAccountId,
-            context: {
-              hasPhoneNumber: !!vapiPhoneNumber,
-              hasAssistantId: !!vapiAssistantId,
-              provisioningStatus: updatedAccount?.provisioning_status
-            }
-          });
-        }
+    logInfo('Sales account created successfully - provisioning queued', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        email: customerInfo.email,
+        planType: customerInfo.planType,
+        subscriptionStatus: 'active'
       }
-    } catch (provisioningError) {
-      logError('Exception during provisioning invocation', {
-        ...baseLogOptions,
-        accountId: currentAccountId,
-        error: provisioningError,
-        context: {
-          errorType: provisioningError instanceof Error ? provisioningError.constructor.name : typeof provisioningError,
-          errorMessage: provisioningError instanceof Error ? provisioningError.message : String(provisioningError)
-        }
-      });
-      provisioningMessage = `Provisioning exception: ${provisioningError instanceof Error ? provisioningError.message : 'Unknown error'}. Account created but phone number needs manual setup.`;
-      // Continue - don't fail the signup
-    }
+    });
 
-    // Return success response with detailed provisioning status
+    // Return success response - provisioning will complete asynchronously
     const responsePayload = {
       success: true,
       userId: authData.user.id,
@@ -561,19 +484,18 @@ serve(async (req) => {
       subscriptionId,
       tempPassword,
       subscriptionStatus: 'active',
-      ringSnapNumber: vapiPhoneNumber,
-      vapiAssistantId,
-      provisioned: provisioningSucceeded && !!vapiPhoneNumber,
-      ...(provisioningMessage && { provisioningMessage })
+      ringSnapNumber: null,  // Will be populated when provisioning completes
+      vapiAssistantId: null,
+      provisioned: false,
+      provisioningMessage
     };
 
     logInfo('Sales account creation completed successfully', {
       ...baseLogOptions,
       accountId: currentAccountId,
       context: {
-        provisioned: responsePayload.provisioned,
-        hasPhoneNumber: !!vapiPhoneNumber,
-        hasProvisioningWarning: !!provisioningMessage
+        provisioned: false,
+        provisioningQueued: true
       }
     });
 
