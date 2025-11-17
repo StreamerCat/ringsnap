@@ -4,15 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import logo from "@/assets/RS_logo_color.svg";
 import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
-
 export const ContractorHero = () => {
   const [showSignupForm, setShowSignupForm] = useState(false);
   const scrollToVapiDemo = () => {
-    document.getElementById('vapi-chat-container')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('vapi-chat-container')?.scrollIntoView({
+      behavior: 'smooth'
+    });
   };
-
-  return (
-    <section className="relative min-h-screen-safe flex items-center overflow-hidden section-spacer">
+  return <section className="relative min-h-screen-safe flex items-center overflow-hidden section-spacer">
       {/* Gradient Aura Background */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-br from-off-white to-cream/30" />
@@ -28,59 +27,66 @@ export const ContractorHero = () => {
             <img src={logo} alt="RingSnap AI Receptionist for Contractors" className="h-10 sm:h-12 lg:h-14 w-auto mb-6 sm:mb-8 mx-auto sm:mx-0" />
             
             <div className="space-y-8">
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal))'}}>
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{
+              color: 'hsl(var(--charcoal))'
+            }}>
                 Stop Losing $4K+/Month to Unanswered Calls
               </h1>
               
               <div className="space-y-4">
-                <p className="text-2xl sm:text-3xl leading-tight font-bold" style={{color: 'hsl(var(--charcoal) / 0.9)'}}>
-                  The AI Receptionist Built for Home Service Contractors
+                <p className="text-2xl sm:text-3xl leading-tight font-bold" style={{
+                color: 'hsl(var(--charcoal) / 0.9)'
+              }}>
+                  The AI Receptionist Built for Home Service Pros
                 </p>
-                <p className="text-lg sm:text-xl leading-relaxed font-secondary" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
+                <p className="text-lg sm:text-xl leading-relaxed font-secondary" style={{
+                color: 'hsl(var(--charcoal) / 0.7)'
+              }}>
                   Answers in under 2 rings. Sounds completely human. Has intelligent conversations. Your customers won't know it's AI—and you'll never miss another call.
                 </p>
               </div>
               
               {/* Gradient CTAs */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button
-                  size="lg"
-                  className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all"
-                  onClick={() => setShowSignupForm(true)}
-                >
+                <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={() => setShowSignupForm(true)}>
                   <PhoneCall className="mr-2" />
                   Start Free
                 </Button>
-                <Button
-                  size="lg"
-                  className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md"
-                  style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
-                  onClick={scrollToVapiDemo}
-                >
+                <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md" style={{
+                borderColor: 'hsl(var(--charcoal) / 0.3)',
+                color: 'hsl(var(--charcoal))'
+              }} onClick={scrollToVapiDemo}>
                   Hear how it sounds
                 </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md"
-                  style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
-                  onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                >
+                <Button size="lg" variant="outline" className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md" style={{
+                borderColor: 'hsl(var(--charcoal) / 0.3)',
+                color: 'hsl(var(--charcoal))'
+              }} onClick={() => document.getElementById('pricing')?.scrollIntoView({
+                behavior: 'smooth'
+              })}>
                   See pricing
                 </Button>
               </div>
             
               {/* Trust Badges */}
-              <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{borderColor: 'hsl(var(--charcoal) / 0.05)'}}>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+              <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{
+              borderColor: 'hsl(var(--charcoal) / 0.05)'
+            }}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
+                color: 'hsl(var(--charcoal))'
+              }}>
                   <Star className="w-4 h-4 text-primary fill-primary" />
                   <span className="font-medium">5-star rated</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
+                color: 'hsl(var(--charcoal))'
+              }}>
                   <CheckCircle className="w-4 h-4 text-primary" />
                   <span className="font-medium">Free trial</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{color: 'hsl(var(--charcoal))'}}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
+                color: 'hsl(var(--charcoal))'
+              }}>
                   <PhoneCall className="w-4 h-4 text-primary" />
                   <span className="font-medium">All call types covered</span>
                 </div>
@@ -121,8 +127,12 @@ export const ContractorHero = () => {
                   <div className="flex items-center gap-2 pt-4 border-t border-foreground/5">
                     <div className="flex items-center gap-1">
                       <div className="w-1 h-4 gradient-core rounded animate-pulse" />
-                      <div className="w-1 h-6 gradient-core rounded animate-pulse" style={{animationDelay: '75ms'}} />
-                      <div className="w-1 h-4 gradient-core rounded animate-pulse" style={{animationDelay: '150ms'}} />
+                      <div className="w-1 h-6 gradient-core rounded animate-pulse" style={{
+                      animationDelay: '75ms'
+                    }} />
+                      <div className="w-1 h-4 gradient-core rounded animate-pulse" style={{
+                      animationDelay: '150ms'
+                    }} />
                       <div className="w-1 h-5 gradient-core rounded animate-pulse" />
                     </div>
                     <span className="text-xs text-foreground/40">Call active • 0:47</span>
@@ -141,13 +151,7 @@ export const ContractorHero = () => {
           
         </div>
 
-        <UnifiedSignupRouter
-          mode="trial"
-          open={showSignupForm}
-          onOpenChange={setShowSignupForm}
-          source="hero"
-        />
+        <UnifiedSignupRouter mode="trial" open={showSignupForm} onOpenChange={setShowSignupForm} source="hero" />
       </div>
-    </section>
-  );
+    </section>;
 };
