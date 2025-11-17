@@ -2,7 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
-import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { getAreaCodeFromZip, getStateFromZip } from "../_shared/area-code-lookup.ts";
 
@@ -196,54 +196,93 @@ serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 5: Update account with sales-specific fields
-    const { data: profile } = await supabaseAdmin
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('account_id')
       .eq('id', authData.user.id)
       .single();
 
-    if (profile?.account_id) {
-      currentAccountId = profile.account_id;
-
-      // Convert ZIP code to area code and extract state
-      // Use a default area code (212 - New York) if ZIP not provided
-      const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
-        ? getAreaCodeFromZip(customerInfo.zipCode.trim())
-        : '212';
-      const billingState = (customerInfo.zipCode && customerInfo.zipCode.trim())
-        ? getStateFromZip(customerInfo.zipCode.trim())
-        : null;
-
-      await supabaseAdmin
-        .from('accounts')
-        .update({
-          stripe_customer_id: stripeCustomerId,
-          stripe_subscription_id: subscriptionId,
-          sales_rep_name: customerInfo.salesRepName,
-          service_area: customerInfo.serviceArea,
-          business_hours: customerInfo.businessHours,
-          emergency_policy: customerInfo.emergencyPolicy,
-          plan_type: customerInfo.planType,
-          subscription_status: 'active',
-          phone_number_area_code: areaCode,
-          billing_state: billingState
-        })
-        .eq('id', profile.account_id);
-
-      logInfo('Account updated with sales data', {
+    if (profileError) {
+      logError('Failed to fetch profile after user creation', {
         ...baseLogOptions,
-        accountId: currentAccountId,
-        context: {
-          salesRepName: customerInfo.salesRepName,
-          planType: customerInfo.planType,
-          subscriptionStatus: 'active'
-        }
+        error: profileError,
+        context: { userId: authData.user.id }
       });
+      throw new Error(`Profile fetch failed: ${profileError.message}`);
     }
 
     if (!profile?.account_id) {
-      throw new Error('Account record not found after user creation');
+      logError('Account ID not found on profile', {
+        ...baseLogOptions,
+        context: {
+          userId: authData.user.id,
+          profileData: profile
+        }
+      });
+      throw new Error('Account record not found after user creation - database trigger may have failed');
     }
+
+    currentAccountId = profile.account_id;
+
+    // Convert ZIP code to area code and extract state
+    // Use a default area code (212 - New York) if ZIP not provided
+    const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
+      ? getAreaCodeFromZip(customerInfo.zipCode.trim())
+      : '212';
+    const billingState = (customerInfo.zipCode && customerInfo.zipCode.trim())
+      ? getStateFromZip(customerInfo.zipCode.trim())
+      : null;
+
+    logInfo('Updating account with sales-specific fields', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        salesRepName: customerInfo.salesRepName,
+        planType: customerInfo.planType,
+        areaCode,
+        billingState
+      }
+    });
+
+    const { error: updateError } = await supabaseAdmin
+      .from('accounts')
+      .update({
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: subscriptionId,
+        sales_rep_name: customerInfo.salesRepName,
+        service_area: customerInfo.serviceArea,
+        business_hours: customerInfo.businessHours,
+        emergency_policy: customerInfo.emergencyPolicy,
+        plan_type: customerInfo.planType,
+        subscription_status: 'active',
+        phone_number_area_code: areaCode,
+        billing_state: billingState
+      })
+      .eq('id', profile.account_id);
+
+    if (updateError) {
+      logError('Failed to update account with sales data', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        error: updateError,
+        context: {
+          stripeCustomerId,
+          subscriptionId,
+          planType: customerInfo.planType
+        }
+      });
+      throw new Error(`Account update failed: ${updateError.message}`);
+    }
+
+    logInfo('Account updated with sales data', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        salesRepName: customerInfo.salesRepName,
+        planType: customerInfo.planType,
+        subscriptionStatus: 'active'
+      }
+    });
 
     // Step 5.5: Handle referral code if provided
     if (customerInfo.referralCode && customerInfo.referralCode.trim().length === 8) {
@@ -295,82 +334,137 @@ serve(async (req) => {
     }
 
     // Step 6: Provision resources immediately (phone number + assistant)
+    // This is separate from vapi-demo-call which is only for demos
     logInfo('Starting immediate provisioning for sales account', {
       ...baseLogOptions,
-      accountId: profile.account_id,
-      context: { email: customerInfo.email }
+      accountId: currentAccountId,
+      context: {
+        email: customerInfo.email,
+        areaCode: areaCode
+      }
     });
 
     let vapiPhoneNumber = null;
     let vapiAssistantId = null;
     let provisioningSucceeded = false;
+    let provisioningMessage = null;
 
     try {
       const { data: provisionData, error: provisionError } = await supabaseAdmin.functions.invoke(
         'provision-resources',
         {
           body: {
-            accountId: profile.account_id,
+            accountId: currentAccountId,
             email: customerInfo.email,
             name: customerInfo.name,
-            phone: customerInfo.phone
-            // No selectedNumber - let Vapi auto-assign from area code stored in account
+            phone: customerInfo.phone,
+            areaCode: areaCode  // Pass the area code we already computed
           }
         }
       );
 
       if (provisionError) {
-        logError('Provisioning failed for sales account', {
+        logError('Provisioning edge function returned error', {
           ...baseLogOptions,
-          accountId: profile.account_id,
-          error: provisionError
+          accountId: currentAccountId,
+          error: provisionError,
+          context: {
+            errorMessage: provisionError.message,
+            errorDetails: JSON.stringify(provisionError)
+          }
         });
+        provisioningMessage = `Provisioning failed: ${provisionError.message}. Account created but phone number needs manual setup.`;
         // Don't fail the whole signup - provisioning can be retried
         // Customer has already paid, so we create the account regardless
+      } else if (!provisionData) {
+        logError('Provisioning returned no data', {
+          ...baseLogOptions,
+          accountId: currentAccountId
+        });
+        provisioningMessage = 'Provisioning returned no data. Account created but phone number needs manual setup.';
       } else {
         provisioningSucceeded = true;
         logInfo('Provisioning succeeded for sales account', {
           ...baseLogOptions,
-          accountId: profile.account_id,
-          context: { phoneNumber: provisionData?.phoneNumber }
+          accountId: currentAccountId,
+          context: {
+            phoneNumber: provisionData.phoneNumber,
+            responseKeys: Object.keys(provisionData)
+          }
         });
 
         // Wait briefly then fetch updated account with provisioned resources
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const { data: updatedAccount } = await supabaseAdmin
+        const { data: updatedAccount, error: fetchError } = await supabaseAdmin
           .from('accounts')
-          .select('vapi_phone_number, vapi_assistant_id')
-          .eq('id', profile.account_id)
+          .select('vapi_phone_number, vapi_assistant_id, provisioning_status')
+          .eq('id', currentAccountId)
           .single();
 
-        vapiPhoneNumber = updatedAccount?.vapi_phone_number;
-        vapiAssistantId = updatedAccount?.vapi_assistant_id;
+        if (fetchError) {
+          logWarn('Failed to fetch updated account after provisioning', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: fetchError
+          });
+        } else {
+          vapiPhoneNumber = updatedAccount?.vapi_phone_number;
+          vapiAssistantId = updatedAccount?.vapi_assistant_id;
+
+          logInfo('Retrieved provisioned resources from account', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            context: {
+              hasPhoneNumber: !!vapiPhoneNumber,
+              hasAssistantId: !!vapiAssistantId,
+              provisioningStatus: updatedAccount?.provisioning_status
+            }
+          });
+        }
       }
     } catch (provisioningError) {
-      logError('Provisioning error during sales account creation', {
+      logError('Exception during provisioning invocation', {
         ...baseLogOptions,
-        accountId: profile.account_id,
-        error: provisioningError
+        accountId: currentAccountId,
+        error: provisioningError,
+        context: {
+          errorType: provisioningError instanceof Error ? provisioningError.constructor.name : typeof provisioningError,
+          errorMessage: provisioningError instanceof Error ? provisioningError.message : String(provisioningError)
+        }
       });
+      provisioningMessage = `Provisioning exception: ${provisioningError instanceof Error ? provisioningError.message : 'Unknown error'}. Account created but phone number needs manual setup.`;
       // Continue - don't fail the signup
     }
 
-    // Return success response
+    // Return success response with detailed provisioning status
+    const responsePayload = {
+      success: true,
+      userId: authData.user.id,
+      accountId: currentAccountId,
+      planType: customerInfo.planType,
+      stripeCustomerId,
+      subscriptionId,
+      tempPassword,
+      subscriptionStatus: 'active',
+      ringSnapNumber: vapiPhoneNumber,
+      vapiAssistantId,
+      provisioned: provisioningSucceeded && !!vapiPhoneNumber,
+      ...(provisioningMessage && { provisioningMessage })
+    };
+
+    logInfo('Sales account creation completed successfully', {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        provisioned: responsePayload.provisioned,
+        hasPhoneNumber: !!vapiPhoneNumber,
+        hasProvisioningWarning: !!provisioningMessage
+      }
+    });
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        userId: authData.user.id,
-        accountId: profile?.account_id,
-        planType: customerInfo.planType,
-        stripeCustomerId,
-        subscriptionId,
-        tempPassword,
-        subscriptionStatus: 'active',
-        ringSnapNumber: vapiPhoneNumber,
-        vapiAssistantId,
-        provisioned: provisioningSucceeded && !!vapiPhoneNumber
-      }),
+      JSON.stringify(responsePayload),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
