@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:vapi-demo": "bash scripts/test-vapi-demo.sh"
+    "test:voice-demo": "bash scripts/test-voice-demo.sh",
+    "test:vapi-demo": "bash scripts/test-voice-demo.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

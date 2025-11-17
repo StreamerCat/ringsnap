@@ -7,6 +7,13 @@ import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
 // State machine for demo widget
 type DemoState = 'initializing' | 'ready' | 'connecting' | 'active' | 'error';
 
+// Utility to sanitize error messages and remove internal service names
+const sanitizeErrorMessage = (message: string): string => {
+  return message
+    .replace(/vapi/gi, 'voice demo')
+    .replace(/assistant/gi, 'demo');
+};
+
 const VapiWidget = () => {
   const [demoState, setDemoState] = useState<DemoState>('initializing');
   const [vapiConfig, setVapiConfig] = useState<{ publicKey: string; assistantId: string } | null>(null);
@@ -46,7 +53,8 @@ const VapiWidget = () => {
             error: 'Unable to connect to voice demo service'
           }));
           console.error('[Voice Demo] Failed to load config:', errorData);
-          setErrorMessage(errorData.error || 'Demo temporarily unavailable.');
+          const sanitizedError = sanitizeErrorMessage(errorData.error || 'Demo temporarily unavailable.');
+          setErrorMessage(sanitizedError);
           setDemoState('error');
           return;
         }
@@ -74,7 +82,7 @@ const VapiWidget = () => {
         vapiRef.current.on("error", (error) => {
           console.error('[Voice Demo] Connection error:', error);
           setDemoState('error');
-          const errorMsg = error?.message || 'Connection failed';
+          const errorMsg = sanitizeErrorMessage(error?.message || 'Connection failed');
           if (errorMsg.toLowerCase().includes('microphone') || errorMsg.toLowerCase().includes('permission')) {
             setErrorMessage('Microphone access required.');
           } else {
@@ -148,7 +156,8 @@ const VapiWidget = () => {
     } catch (error) {
       console.error('[Voice Demo] Failed to start call:', error);
       setDemoState('error');
-      const errorMsg = error instanceof Error ? error.message : '';
+      const rawMsg = error instanceof Error ? error.message : '';
+      const errorMsg = sanitizeErrorMessage(rawMsg);
       if (errorMsg.toLowerCase().includes('microphone') || errorMsg.toLowerCase().includes('permission')) {
         setErrorMessage('Microphone access required.');
       } else {
