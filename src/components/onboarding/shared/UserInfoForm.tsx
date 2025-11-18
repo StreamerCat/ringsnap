@@ -5,8 +5,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface UserInfoFormProps {
@@ -15,6 +17,7 @@ interface UserInfoFormProps {
   showLabels?: boolean;
   compact?: boolean;
   disabled?: boolean;
+  enhancedValidation?: boolean; // Show visual feedback
 }
 
 /**
