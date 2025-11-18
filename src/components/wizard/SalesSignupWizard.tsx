@@ -34,6 +34,7 @@ function WizardInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [leadId, setLeadId] = useState<string | null>(null);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -151,6 +152,40 @@ function WizardInner() {
     const isValid = await validateStep(currentStep);
     if (!isValid) return;
 
+    // Capture lead after BusinessDetails step (when we have customer contact info)
+    if (currentStep === WizardStep.BusinessDetails && !leadId) {
+      try {
+        console.log("📝 Capturing lead for sales signup...");
+        const { data: lead, error: leadError } = await supabase
+          .from("signup_leads")
+          .insert({
+            email: form.getValues("customerEmail"),
+            full_name: form.getValues("customerName"),
+            phone: form.getValues("customerPhone"),
+            source: "sales",
+            signup_flow: "sales",
+            ip_address: null,
+            user_agent: navigator.userAgent,
+          })
+          .select()
+          .single();
+
+        if (leadError) {
+          console.error("❌ Lead capture failed:", leadError);
+          toast.error("Failed to save lead information. Please try again.");
+          return;
+        }
+
+        console.log("✅ Sales lead captured:", lead.id);
+        setLeadId(lead.id);
+        toast.success("Customer information saved!");
+      } catch (err) {
+        console.error("❌ Lead capture error:", err);
+        toast.error("Failed to save lead information. Please try again.");
+        return;
+      }
+    }
+
     // Special handling for payment step
     if (currentStep === WizardStep.Payment) {
       await handlePayment();
@@ -211,6 +246,9 @@ function WizardInner() {
           // Source tracking (CRITICAL)
           source: 'sales',
           salesRepName: form.getValues("salesRepName"),
+
+          // Lead linking
+          leadId: leadId,
 
           // Optional business details
           serviceArea: form.getValues("serviceArea") || "",
