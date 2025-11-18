@@ -55,6 +55,7 @@ export const TrialSignupFlow = ({
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [showCompanyName, setShowCompanyName] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -141,6 +142,41 @@ export const TrialSignupFlow = ({
         return;
       }
     }
+
+    // STEP 1: Capture lead after validation
+    if (currentStep === 1 && !leadId) {
+      try {
+        console.log("📝 Capturing lead for step 1...");
+        const { data: lead, error: leadError } = await supabase
+          .from("signup_leads")
+          .insert({
+            email: form.getValues("email"),
+            full_name: form.getValues("name"),
+            phone: form.getValues("phone"),
+            source: source,
+            signup_flow: "trial",
+            ip_address: null,
+            user_agent: navigator.userAgent,
+          })
+          .select()
+          .single();
+
+        if (leadError) {
+          console.error("❌ Lead capture failed:", leadError);
+          toast.error("Failed to save your information. Please try again.");
+          return;
+        }
+
+        console.log("✅ Lead captured:", lead.id);
+        setLeadId(lead.id);
+        toast.success("Information saved!");
+      } catch (err) {
+        console.error("❌ Lead capture error:", err);
+        toast.error("Failed to save your information. Please try again.");
+        return;
+      }
+    }
+
     setCurrentStep(prev => prev + 1);
   };
 
@@ -212,6 +248,7 @@ export const TrialSignupFlow = ({
         source,
         assistantGender: "female",
         wantsAdvancedVoice: false,
+        leadId: leadId,
       };
 
       // DETAILED LOGGING FOR DEBUGGING
