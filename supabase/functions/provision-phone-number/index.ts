@@ -16,7 +16,7 @@
  *   3. Saves phone number to database
  *   4. Generates referral code
  *   5. Sends welcome emails
- *   6. Updates phone_provisioning_status = 'ready'
+ *   6. Updates phone_number_status = 'ready'
  *
  * WHY ASYNC:
  *   - Vapi phone number provisioning can take 1-2 minutes for the number to
@@ -25,7 +25,7 @@
  *   - Instead, they see "Setting up your phone number..." in the dashboard
  *
  * ERROR HANDLING:
- *   - Errors are logged and phone_provisioning_status set to 'failed'
+ *   - Errors are logged and phone_number_status set to 'failed'
  *   - Support team can be notified to manually provision or issue refund
  *   - User sees clear error message with support contact info
  *
@@ -79,7 +79,7 @@ serve(async (req) => {
     // Update provisioning status
     await supabase
       .from("accounts")
-      .update({ phone_provisioning_status: "provisioning" })
+      .update({ phone_number_status: "provisioning" })
       .eq("id", accountId);
 
     // Fetch account details
@@ -117,7 +117,7 @@ serve(async (req) => {
       });
       await supabase
         .from("accounts")
-        .update({ phone_provisioning_status: "ready" })
+        .update({ phone_number_status: "ready" })
         .eq("id", accountId);
       return new Response(
         JSON.stringify({ ok: true, message: "Phone already provisioned" }),
@@ -161,7 +161,7 @@ serve(async (req) => {
         await supabase
           .from("accounts")
           .update({
-            phone_provisioning_status: "failed",
+            phone_number_status: "failed",
             provisioning_error: `Phone creation failed: ${errorText}`,
           })
           .eq("id", accountId);
@@ -276,8 +276,11 @@ serve(async (req) => {
       .from("accounts")
       .update({
         vapi_phone_number: phoneNumber,
-        phone_provisioning_status: "ready",
+        phone_number_e164: phoneNumber,
+        vapi_phone_number_id: vapiPhoneId,
         phone_number_status: "active",
+        phone_provisioned_at: new Date().toISOString(),
+        provisioning_status: "completed",
         onboarding_completed: true,
       })
       .eq("id", accountId);
@@ -440,7 +443,7 @@ serve(async (req) => {
       await supabase
         .from("accounts")
         .update({
-          phone_provisioning_status: "failed",
+          phone_number_status: "failed",
           provisioning_error: errorMessage,
         })
         .eq("id", currentAccountId);

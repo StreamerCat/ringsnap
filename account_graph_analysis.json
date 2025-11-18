@@ -1,0 +1,43 @@
+{
+  "level_1_happy_state": {
+    "description": "Core account + billing created (synchronous)",
+    "checklist": [
+      "✓ auth.users row exists with email_confirmed_at set",
+      "✓ profiles row exists where id = auth.users.id",
+      "✓ profiles.account_id links to accounts.id",
+      "✓ accounts row exists with:",
+      "  - company_name, trade, service_area, business_hours, emergency_policy",
+      "  - plan_type (starter/professional/premium)",
+      "  - subscription_status = 'active' (sales) or 'trial' (website)",
+      "  - stripe_customer_id and stripe_subscription_id populated",
+      "  - billing_state (derived from ZIP)",
+      "  - sales_rep_name (for sales flow)",
+      "  - provisioning_status = 'pending'",
+      "  - phone_number_status = 'pending'",
+      "  - vapi fields NULL: vapi_assistant_id, vapi_phone_number, vapi_number_id, phone_number_e164, vapi_phone_number_id, phone_provisioned_at"
+    ]
+  },
+  "level_2_happy_state": {
+    "description": "Fully provisioned phone + assistant (asynchronous)",
+    "checklist": [
+      "✓ vapi_assistants row exists with account_id and vapi_assistant_id",
+      "✓ phone_numbers row exists with account_id, phone_number, vapi_phone_id/vapi_id, status='active', is_primary=true",
+      "✓ vapi_numbers row exists (optional) with account_id, vapi_number_id, phone_e164",
+      "✓ accounts updated with:",
+      "  - vapi_assistant_id populated",
+      "  - vapi_phone_number_id, vapi_number_id, phone_number_e164 populated",
+      "  - phone_number_status = 'active'",
+      "  - phone_provisioned_at timestamp set",
+      "  - provisioning_status = 'completed'"
+    ]
+  },
+  "relationships": {
+    "auth_to_profile": "profiles.id = auth.users.id (1:1)",
+    "profile_to_account": "profiles.account_id = accounts.id (N:1)",
+    "account_to_stripe": "accounts.stripe_customer_id, accounts.stripe_subscription_id (fields on account)",
+    "account_to_vapi": "accounts.vapi_assistant_id, vapi_phone_number_id, vapi_number_id, phone_number_e164 (fields on account)",
+    "account_to_vapi_assistants": "vapi_assistants.account_id = accounts.id (1:N)",
+    "account_to_phone_numbers": "phone_numbers.account_id = accounts.id (1:N)",
+    "account_to_vapi_numbers": "vapi_numbers.account_id = accounts.id (1:N)"
+  }
+}
