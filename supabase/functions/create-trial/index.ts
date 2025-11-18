@@ -86,6 +86,7 @@ const signupSchema = z.object({
   referralCode: z.string().max(50).optional(),
   deviceFingerprint: z.string().max(500).optional(),
   primaryGoal: z.string().max(500).optional(),
+  leadId: z.string().uuid().optional(), // Link to signup_leads table
 });
 
 type SignupData = z.infer<typeof signupSchema>;
@@ -102,6 +103,23 @@ function getStripePriceId(planType: string): string {
     throw new Error(`Price ID not configured for plan: ${planType}`);
   }
   return priceId;
+}
+
+// Helper: Derive state code from ZIP code (simplified)
+function getStateFromZip(zipCode: string): string {
+  const zip = parseInt(zipCode.substring(0, 3));
+
+  // Simplified ZIP to state mapping (first 3 digits)
+  if (zip >= 300 && zip <= 319) return "CO"; // Colorado
+  if (zip >= 970 && zip <= 999) return "CA"; // California (some ranges)
+  if (zip >= 900 && zip <= 961) return "CA"; // California
+  if (zip >= 750 && zip <= 799) return "TX"; // Texas
+  if (zip >= 100 && zip <= 149) return "NY"; // New York
+  if (zip >= 600 && zip <= 629) return "IL"; // Illinois
+  if (zip >= 980 && zip <= 994) return "WA"; // Washington
+
+  // Default to California if unknown
+  return "CA";
 }
 
 serve(async (req) => {
@@ -356,6 +374,19 @@ serve(async (req) => {
       }
     }
 
+    // Derive billing state from ZIP code
+    const billingState = getStateFromZip(data.zipCode);
+
+    logInfo("Creating account record", {
+      ...baseLogOptions,
+      context: {
+        companyName: data.companyName,
+        billingState,
+        source: data.source,
+        subscriptionStatus
+      }
+    });
+
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
       .insert({
@@ -367,7 +398,6 @@ serve(async (req) => {
         emergency_policy: data.emergencyPolicy || null,
         assistant_gender: data.assistantGender,
         wants_advanced_voice: data.wantsAdvancedVoice,
-        primary_goal: data.primaryGoal || null,
 
         subscription_status: subscriptionStatus,
         trial_start_date: trialStartDate,
@@ -380,9 +410,11 @@ serve(async (req) => {
         source: data.source,
         sales_rep_name: data.salesRepName || null,
 
-        provisioning_status: "idle",
-        phone_provisioning_status: "pending",
+        provisioning_status: "pending",
+        phone_number_status: "pending",
         phone_number_area_code: data.zipCode.slice(0, 3),
+        billing_state: billingState,
+        zip_code: data.zipCode,
       })
       .select()
       .single();
@@ -390,9 +422,15 @@ serve(async (req) => {
     if (accountError) {
       logError("Account creation failed", {
         ...baseLogOptions,
-        error: accountError
+        error: accountError,
+        context: {
+          message: accountError.message,
+          details: accountError.details,
+          hint: accountError.hint,
+          code: accountError.code
+        }
       });
-      throw accountError;
+      throw new Error(`Account creation failed: ${accountError.message}`);
     }
 
     currentAccountId = accountData.id;
@@ -632,7 +670,42 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 13: Log Success for Analytics
+    // STEP 13: Link to Lead Record (if provided)
+    // ═══════════════════════════════════════════════════════════════
+
+    if (data.leadId) {
+      logInfo("Linking signup to lead record", {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: { leadId: data.leadId }
+      });
+
+      const { error: leadUpdateError } = await supabase
+        .from("signup_leads")
+        .update({
+          auth_user_id: authData.user.id,
+          account_id: accountData.id,
+          profile_id: authData.user.id,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", data.leadId);
+
+      if (leadUpdateError) {
+        logWarn("Failed to link lead record (non-critical)", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          context: { leadId: data.leadId, error: leadUpdateError.message }
+        });
+      } else {
+        logInfo("Lead linked successfully", {
+          ...baseLogOptions,
+          accountId: currentAccountId
+        });
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 14: Log Success for Analytics
     // ═══════════════════════════════════════════════════════════════
 
     if (data.source === "website") {
@@ -660,7 +733,7 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 14: Return Success Response (IMMEDIATELY)
+    // STEP 15: Return Success Response (IMMEDIATELY)
     // ═══════════════════════════════════════════════════════════════
 
     const successMessage = isWebsiteTrial
@@ -681,7 +754,7 @@ serve(async (req) => {
         source: data.source,
         subscription_status: subscriptionStatus,
         vapi_assistant_id: vapiAssistantId,
-        phone_provisioning_status: "pending",
+        phone_number_status: "pending",
         message: successMessage,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
