@@ -18,9 +18,9 @@ import { Form } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft } from "lucide-react";
 
-// Import shared atomic components
-import { UserInfoForm } from "./shared/UserInfoForm";
-import { BusinessBasicsForm } from "./shared/BusinessBasicsForm";
+// Import enhanced atomic components
+import { EnhancedUserInfoForm } from "./shared/EnhancedUserInfoForm";
+import { EnhancedBusinessBasicsForm } from "./shared/EnhancedBusinessBasicsForm";
 import { BusinessAdvancedForm } from "./shared/BusinessAdvancedForm";
 import { VoiceSelector } from "./shared/VoiceSelector";
 import { PlanSelector } from "./shared/PlanSelector";
@@ -28,28 +28,42 @@ import { PaymentForm } from "./shared/PaymentForm";
 import { ProvisioningStatus } from "./shared/ProvisioningStatus";
 import { PhoneReadyPanel } from "./shared/PhoneReadyPanel";
 
-// Self-serve flow schema
+// Import enhanced validation schemas
+import {
+  nameSchema,
+  emailSchema,
+  phoneSchema,
+  companyNameSchema,
+  tradeSchema,
+  websiteSchema,
+  zipCodeSchema,
+  assistantGenderSchema,
+  planTypeSchema,
+  primaryGoalSchema,
+} from "@/components/signup/shared/enhanced-schemas";
+
+// Self-serve flow schema with enhanced validation
 const selfServeSchema = z.object({
   // Step 1: User Info
-  name: z.string().min(1, "Name required"),
-  email: z.string().email("Invalid email"),
-  phone: z.string().min(10, "Phone required"),
+  name: nameSchema,
+  email: emailSchema,
+  phone: phoneSchema,
 
   // Step 2: Business Basics
-  companyName: z.string().min(1, "Company name required"),
-  trade: z.string().min(1, "Trade required"),
-  website: z.string().url("Invalid URL").optional().or(z.literal("")),
-  zipCode: z.string().regex(/^\d{5}$/, "A valid 5-digit ZIP code is required"),
+  companyName: companyNameSchema,
+  trade: tradeSchema,
+  website: websiteSchema,
+  zipCode: zipCodeSchema,
 
   // Step 3: Business Advanced
-  primaryGoal: z.enum(["book_appointments", "capture_leads", "answer_questions", "take_orders"]).optional(),
+  primaryGoal: primaryGoalSchema,
   businessHours: z.string().optional(),
 
   // Step 4: Voice
-  assistantGender: z.enum(["male", "female"]).default("female"),
+  assistantGender: assistantGenderSchema,
 
   // Step 5: Plan
-  planType: z.enum(["starter", "professional", "premium"]),
+  planType: planTypeSchema,
 });
 
 type SelfServeFormData = z.infer<typeof selfServeSchema>;
@@ -90,6 +104,7 @@ export function SelfServeTrialFlow({
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [leadCaptured, setLeadCaptured] = useState(false);
 
   const form = useForm<SelfServeFormData>({
     resolver: zodResolver(selfServeSchema),
@@ -110,6 +125,34 @@ export function SelfServeTrialFlow({
 
   const totalSteps = 8;
   const progressPercent = (currentStep / totalSteps) * 100;
+
+  // Capture lead after Step 1 (even if they abandon)
+  const captureLead = async () => {
+    if (leadCaptured) return; // Already captured
+
+    const { name, email, phone } = form.getValues();
+
+    try {
+      // Call edge function to capture lead
+      const { error } = await supabase.functions.invoke("capture-trial-lead", {
+        body: {
+          name,
+          email,
+          phone,
+          source: "website_trial",
+          step_reached: "contact_info",
+        },
+      });
+
+      if (!error) {
+        setLeadCaptured(true);
+        console.log("Lead captured successfully");
+      }
+    } catch (error) {
+      // Don't block the user if lead capture fails
+      console.error("Lead capture error (non-blocking):", error);
+    }
+  };
 
   const handleNext = async () => {
     let fieldsToValidate: (keyof SelfServeFormData)[] = [];
@@ -149,6 +192,10 @@ export function SelfServeTrialFlow({
 
     const isValid = await form.trigger(fieldsToValidate);
     if (isValid) {
+      // Capture lead after Step 1 (contact info)
+      if (currentStep === 1) {
+        await captureLead();
+      }
       setCurrentStep((prev) => prev + 1);
     } else {
       toast.error("Please complete all required fields");
@@ -253,10 +300,11 @@ export function SelfServeTrialFlow({
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
-                <UserInfoForm
+                <EnhancedUserInfoForm
                   form={form}
                   requiredFields={["name", "email", "phone"]}
                   showLabels={true}
+                  enableSmartEmail={true}
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -275,7 +323,7 @@ export function SelfServeTrialFlow({
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
-                <BusinessBasicsForm
+                <EnhancedBusinessBasicsForm
                   form={form}
                   requiredFields={["companyName", "trade", "website", "zipCode"]}
                   showOptionalBadges={true}
