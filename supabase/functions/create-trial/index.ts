@@ -271,22 +271,29 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Create Subscription (3-day trial)
+    // STEP 3: Create Subscription (trial for website, active for sales)
     // ═══════════════════════════════════════════════════════════════
 
     const priceId = getStripePriceId(data.planType);
 
-    const subscription = await stripe.subscriptions.create({
+    // Sales accounts: no trial, immediately active
+    // Website accounts: 3-day trial
+    const subscriptionParams: any = {
       customer: customer.id,
       items: [{ price: priceId }],
-      trial_period_days: 3,
       payment_behavior: "default_incomplete",
       metadata: {
         source: data.source, // CRITICAL: Track source
         sales_rep: data.salesRepName || "",
         plan_type: data.planType,
       },
-    });
+    };
+
+    if (data.source === "website") {
+      subscriptionParams.trial_period_days = 3;
+    }
+
+    const subscription = await stripe.subscriptions.create(subscriptionParams);
 
     logInfo("Stripe subscription created", {
       ...baseLogOptions,
@@ -349,7 +356,23 @@ serve(async (req) => {
     // STEP 5: Create Account Record
     // ═══════════════════════════════════════════════════════════════
 
-    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    // Determine subscription status and trial dates based on source
+    const isWebsiteTrial = data.source === "website";
+    const subscriptionStatus = isWebsiteTrial ? "trial" : "active";
+    const trialStartDate = isWebsiteTrial ? new Date().toISOString() : null;
+    const trialEndDate = isWebsiteTrial
+      ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+
+    // Parse business hours if provided as JSON string
+    let businessHoursValue = null;
+    if (data.businessHours) {
+      try {
+        businessHoursValue = JSON.parse(data.businessHours);
+      } catch {
+        businessHoursValue = { text: data.businessHours };
+      }
+    }
 
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
@@ -358,14 +381,14 @@ serve(async (req) => {
         company_website: data.website || null,
         trade: data.trade,
         service_area: data.serviceArea || null,
-        business_hours: data.businessHours ? { text: data.businessHours } : null,
+        business_hours: businessHoursValue,
         emergency_policy: data.emergencyPolicy || null,
         assistant_gender: data.assistantGender,
         wants_advanced_voice: data.wantsAdvancedVoice,
         primary_goal: data.primaryGoal || null,
 
-        subscription_status: "trial",
-        trial_start_date: new Date().toISOString(),
+        subscription_status: subscriptionStatus,
+        trial_start_date: trialStartDate,
         trial_end_date: trialEndDate,
 
         stripe_customer_id: customer.id,
@@ -531,6 +554,11 @@ serve(async (req) => {
     // STEP 11: Return Success Response
     // ═══════════════════════════════════════════════════════════════
 
+    // Customize message based on source
+    const successMessage = isWebsiteTrial
+      ? "Trial started! Your AI receptionist is being created..."
+      : "Account created! Your AI assistant and phone number are being set up...";
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -543,8 +571,9 @@ serve(async (req) => {
         trial_end_date: trialEndDate,
         plan_type: data.planType,
         source: data.source,
+        subscription_status: subscriptionStatus,
         provisioning_status: "provisioning",
-        message: "Trial started! Your AI receptionist is being created...",
+        message: successMessage,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
