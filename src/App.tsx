@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
 import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales";
+import FormPreview from "./pages/FormPreview";
 import Dashboard from "./pages/Dashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminMonitoring from "./pages/AdminMonitoring";
@@ -53,6 +54,7 @@ const App = () => (
           <Route path="/settings/security" element={<SecuritySettings />} />
           {/* App routes */}
           <Route path="/sales" element={<Sales />} />
+          <Route path="/form-preview" element={<FormPreview />} />
           <Route path="/salesdash" element={<Dashboard />} />
           <Route path="/dashboard" element={<ProtectedCustomerDashboard />} />
           <Route path="/dashboard/team" element={<TeamManagement />} />
