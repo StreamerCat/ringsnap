@@ -12,6 +12,7 @@ import Onboarding from "./pages/Onboarding";
 import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales";
 import FormPreview from "./pages/FormPreview";
+import TrialFlowPreview from "./pages/TrialFlowPreview";
 import Dashboard from "./pages/Dashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminMonitoring from "./pages/AdminMonitoring";
@@ -55,6 +56,7 @@ const App = () => (
           {/* App routes */}
           <Route path="/sales" element={<Sales />} />
           <Route path="/form-preview" element={<FormPreview />} />
+          <Route path="/trial-preview" element={<TrialFlowPreview />} />
           <Route path="/salesdash" element={<Dashboard />} />
           <Route path="/dashboard" element={<ProtectedCustomerDashboard />} />
           <Route path="/dashboard/team" element={<TeamManagement />} />
