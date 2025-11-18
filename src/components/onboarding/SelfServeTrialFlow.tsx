@@ -105,6 +105,7 @@ export function SelfServeTrialFlow({
   const [accountId, setAccountId] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [leadCaptured, setLeadCaptured] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
 
   const form = useForm<SelfServeFormData>({
     resolver: zodResolver(selfServeSchema),
@@ -130,22 +131,28 @@ export function SelfServeTrialFlow({
   const captureLead = async () => {
     if (leadCaptured) return; // Already captured
 
-    const { email, phone } = form.getValues();
+    const { name, email, phone } = form.getValues();
 
     try {
-      // Insert into signup_attempts table to track partial signups
-      const { error } = await supabase
-        .from("signup_attempts")
+      // Insert into signup_leads table to track partial signups
+      const { data: lead, error } = await supabase
+        .from("signup_leads")
         .insert({
           email: email,
+          full_name: name,
           phone: phone,
-          success: false,
-          blocked_reason: "partial_signup_step_1",
-        });
+          source: "website",
+          signup_flow: "self_serve_trial",
+          ip_address: null,
+          user_agent: navigator.userAgent,
+        })
+        .select()
+        .single();
 
-      if (!error) {
+      if (!error && lead) {
         setLeadCaptured(true);
-        console.log("Lead captured successfully in signup_attempts");
+        setLeadId(lead.id);
+        console.log("Lead captured successfully in signup_leads:", lead.id);
       }
     } catch (error) {
       // Don't block the user if lead capture fails
@@ -242,6 +249,7 @@ export function SelfServeTrialFlow({
           ...formData,
           source: "website",
           paymentMethodId: paymentMethod.id,
+          leadId: leadId,
         },
       });
 
