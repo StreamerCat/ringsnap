@@ -130,23 +130,22 @@ export function SelfServeTrialFlow({
   const captureLead = async () => {
     if (leadCaptured) return; // Already captured
 
-    const { name, email, phone } = form.getValues();
+    const { email, phone } = form.getValues();
 
     try {
-      // Call edge function to capture lead
-      const { error } = await supabase.functions.invoke("capture-trial-lead", {
-        body: {
-          name,
-          email,
-          phone,
-          source: "website_trial",
-          step_reached: "contact_info",
-        },
-      });
+      // Insert into signup_attempts table to track partial signups
+      const { error } = await supabase
+        .from("signup_attempts")
+        .insert({
+          email: email,
+          phone: phone,
+          success: false,
+          blocked_reason: "partial_signup_step_1",
+        });
 
       if (!error) {
         setLeadCaptured(true);
-        console.log("Lead captured successfully");
+        console.log("Lead captured successfully in signup_attempts");
       }
     } catch (error) {
       // Don't block the user if lead capture fails
