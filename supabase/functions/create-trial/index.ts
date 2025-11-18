@@ -1,74 +1,95 @@
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * FUNCTION: create-trial
+ *
+ * SYNCHRONOUS vs ASYNCHRONOUS PROVISIONING STRATEGY
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * This function creates new trial or paid accounts for both homepage and /sales
+ * signup flows. It uses a split provisioning strategy:
+ *
+ * SYNCHRONOUS (Core Provisioning - executes before returning response):
+ *   1. Input validation
+ *   2. Anti-abuse checks (for website signups only)
+ *   3. Create Stripe customer
+ *   4. Attach payment method to Stripe customer
+ *   5. Create Stripe subscription (3-day trial for website, active for sales)
+ *   6. Create Supabase auth user
+ *   7. Create account record
+ *   8. Create profile record
+ *   9. Assign owner role
+ *   10. CREATE VAPI ASSISTANT (fast, ~2-3 seconds)
+ *   11. Create provisioning job record
+ *   12. Return success response immediately
+ *
+ * ASYNCHRONOUS (Slow Provisioning - runs in background):
+ *   1. Create Vapi phone number (SLOW: 1-2 minutes for activation)
+ *   2. Link phone number to assistant
+ *   3. Save phone number to database
+ *   4. Generate referral code
+ *   5. Send welcome emails
+ *   6. Update account.phone_provisioning_status = 'ready'
+ *
+ * WHY THIS SPLIT:
+ *   - Vapi assistant creation is fast and should complete before user sees dashboard
+ *   - Vapi phone number provisioning can take 1-2 minutes for the number to
+ *     become fully active and able to receive calls
+ *   - We don't want users waiting on a spinner for 1-2 minutes
+ *   - Instead, we return success immediately and show "Setting up your phone number"
+ *     in the dashboard while the async provisioning completes
+ *
+ * ERROR HANDLING:
+ *   - Synchronous errors: Return error response, no account created
+ *   - Async provisioning errors: Account exists, phone_provisioning_status='failed',
+ *     support team notified, user can contact support or retry
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { buildVapiPrompt } from "../_shared/template-builder.ts";
 
 const FUNCTION_NAME = "create-trial";
+const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * Unified Trial Creation Schema
- * Supports both self-serve (website) and sales-guided flows
- */
-const createTrialSchema = z.object({
-  // User info (required for both flows)
-  name: z.string().trim().min(1, "Name required").max(100, "Name too long"),
-  email: z.string().email("Invalid email").max(255, "Email too long"),
-  phone: z.string().min(1, "Phone required"),
-
-  // Business basics (required for both flows)
-  companyName: z.string().trim().min(1, "Company name required").max(200, "Company name too long"),
-  trade: z.string().min(1, "Trade required").max(100, "Trade too long"),
-
-  // Business extended (optional - self-serve provides more detail)
-  website: z.string().url("Invalid website URL").optional().or(z.literal("")),
-  serviceArea: z.string().max(200, "Service area too long").optional(),
-  zipCode: z.string().regex(/^\d{5}$/, "ZIP code must be 5 digits"),
-
-  // Business operations (optional - sales flow uses these)
-  businessHours: z.string().max(500).optional(),
-  emergencyPolicy: z.string().max(1000).optional(),
-
-  // AI configuration
-  assistantGender: z.enum(["male", "female"]).default("female"),
-  primaryGoal: z.enum(["book_appointments", "capture_leads", "answer_questions", "take_orders"]).optional(),
-  wantsAdvancedVoice: z.boolean().optional().default(false),
-
-  // Plan & payment
-  planType: z.enum(["starter", "professional", "premium"], {
-    required_error: "Plan type required"
-  }),
+// Validation schema
+const signupSchema = z.object({
+  name: z.string().trim().min(1, "Name required").max(100),
+  email: z.string().trim().email("Invalid email").max(255),
+  phone: z.string().trim().min(1, "Phone required"),
+  companyName: z.string().trim().min(1, "Company name required").max(200),
+  trade: z.string().max(100),
+  zipCode: z.string().trim().regex(/^\d{5}$/, "5-digit ZIP required"),
+  planType: z.enum(["starter", "professional", "premium"]),
   paymentMethodId: z.string().min(1, "Payment method required"),
-
-  // Source tracking (CRITICAL - differentiates flows)
   source: z.enum(["website", "sales"]).default("website"),
-  salesRepName: z.string().max(100).optional(),
 
-  // Optional metadata
-  referralCode: z.string().length(8).optional().or(z.literal("")),
+  // Optional fields
+  website: z.string().max(255).optional(),
+  serviceArea: z.string().max(200).optional(),
+  businessHours: z.string().optional(),
+  emergencyPolicy: z.string().max(1000).optional(),
+  assistantGender: z.enum(["female", "male"]).default("female"),
+  wantsAdvancedVoice: z.boolean().default(false),
+  salesRepName: z.string().max(100).optional(),
+  referralCode: z.string().max(50).optional(),
   deviceFingerprint: z.string().max(500).optional(),
+  primaryGoal: z.string().max(500).optional(),
 });
 
-type CreateTrialInput = z.infer<typeof createTrialSchema>;
+type SignupData = z.infer<typeof signupSchema>;
 
-/**
- * Generate secure random password for user account
- */
-function generateSecurePassword(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-  return Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-}
-
-/**
- * Get Stripe price ID for plan type
- */
 function getStripePriceId(planType: string): string {
   const priceIds = {
     starter: Deno.env.get("STRIPE_PRICE_STARTER"),
@@ -77,66 +98,50 @@ function getStripePriceId(planType: string): string {
   };
 
   const priceId = priceIds[planType as keyof typeof priceIds];
-
   if (!priceId) {
-    throw new Error(`Stripe price ID not configured for plan: ${planType}`);
+    throw new Error(`Price ID not configured for plan: ${planType}`);
   }
-
   return priceId;
 }
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+  let currentAccountId: string | null = null;
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let currentAccountId: string | null = null;
-
   try {
-    // Initialize clients
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-      apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(),
-    });
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Validate Input
+    // ═══════════════════════════════════════════════════════════════
 
-    // Parse and validate input
     const rawData = await req.json();
-    let data: CreateTrialInput;
+    let data: SignupData;
 
     try {
-      data = createTrialSchema.parse(rawData);
+      data = signupSchema.parse(rawData);
     } catch (zodError: any) {
-      logWarn("Validation error in create-trial", {
-        ...baseLogOptions,
-        context: { errors: zodError.errors }
-      });
       return new Response(
-        JSON.stringify({ error: "Invalid input data", details: zodError.errors }),
+        JSON.stringify({ error: "Invalid input", details: zodError.errors }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    logInfo("Creating trial account", {
+    logInfo("Signup request received", {
       ...baseLogOptions,
       context: {
-        email: data.email,
         source: data.source,
-        salesRep: data.salesRepName,
         planType: data.planType,
+        email: data.email
       }
     });
-
-    // ═══════════════════════════════════════════════════════════════
-    // VALIDATION: Phone number and email checks
-    // ═══════════════════════════════════════════════════════════════
 
     if (!isValidPhoneNumber(data.phone)) {
       return new Response(
@@ -145,22 +150,22 @@ serve(async (req) => {
       );
     }
 
-    if (isDisposableEmail(data.email)) {
-      logWarn("Blocked disposable email", {
-        ...baseLogOptions,
-        context: { email: data.email }
-      });
-      return new Response(
-        JSON.stringify({ error: "Please use a valid business or personal email address" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // ═══════════════════════════════════════════════════════════════
-    // ANTI-ABUSE: Rate limiting (website signups only)
+    // STEP 2: Anti-Abuse Checks (Website Only)
     // ═══════════════════════════════════════════════════════════════
 
     if (data.source === "website") {
+      if (isDisposableEmail(data.email)) {
+        logWarn("Blocked disposable email", {
+          ...baseLogOptions,
+          context: { email: data.email }
+        });
+        return new Response(
+          JSON.stringify({ error: "Please use a valid business or personal email" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0] ||
                        req.headers.get("cf-connecting-ip") ||
                        "unknown";
@@ -180,23 +185,12 @@ serve(async (req) => {
           ...baseLogOptions,
           context: { clientIP, ipAttempts }
         });
-
-        await supabase.from("signup_attempts").insert({
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: false,
-          blocked_reason: "IP rate limit exceeded (3 trials per 30 days)",
-        });
-
         return new Response(
-          JSON.stringify({ error: "Trial limit reached for this location. Please contact support." }),
+          JSON.stringify({ error: "Trial limit reached for this location" }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Check phone number reuse
       const { data: recentPhoneUse } = await supabase
         .from("profiles")
         .select("created_at")
@@ -209,16 +203,6 @@ serve(async (req) => {
           ...baseLogOptions,
           context: { phone: data.phone }
         });
-
-        await supabase.from("signup_attempts").insert({
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: false,
-          blocked_reason: "Phone number used within 30 days",
-        });
-
         return new Response(
           JSON.stringify({ error: "This phone number was recently used for a trial" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -227,8 +211,18 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Create Stripe Customer
+    // STEP 3: Create Stripe Customer
     // ═══════════════════════════════════════════════════════════════
+
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
+      apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(),
+    });
+
+    logInfo("Creating Stripe customer", {
+      ...baseLogOptions,
+      context: { email: data.email }
+    });
 
     const customer = await stripe.customers.create({
       email: data.email,
@@ -236,23 +230,19 @@ serve(async (req) => {
       phone: data.phone,
       metadata: {
         company_name: data.companyName,
+        source: data.source,
         trade: data.trade,
-        source: data.source, // CRITICAL: Track source in Stripe
         sales_rep: data.salesRepName || "",
       },
     });
 
     logInfo("Stripe customer created", {
       ...baseLogOptions,
-      context: {
-        customerId: customer.id,
-        source: data.source,
-        email: data.email,
-      }
+      context: { customerId: customer.id }
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Attach Payment Method
+    // STEP 4: Attach Payment Method
     // ═══════════════════════════════════════════════════════════════
 
     await stripe.paymentMethods.attach(data.paymentMethodId, {
@@ -271,19 +261,17 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Create Subscription (trial for website, active for sales)
+    // STEP 5: Create Subscription (trial for website, active for sales)
     // ═══════════════════════════════════════════════════════════════
 
     const priceId = getStripePriceId(data.planType);
 
-    // Sales accounts: no trial, immediately active
-    // Website accounts: 3-day trial
     const subscriptionParams: any = {
       customer: customer.id,
       items: [{ price: priceId }],
       payment_behavior: "default_incomplete",
       metadata: {
-        source: data.source, // CRITICAL: Track source
+        source: data.source,
         sales_rep: data.salesRepName || "",
         plan_type: data.planType,
       },
@@ -306,27 +294,29 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 4: Create Auth User
+    // STEP 6: Create Auth User
     // ═══════════════════════════════════════════════════════════════
 
-    const tempPassword = generateSecurePassword();
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    const tempPassword = Array.from(
+      { length: 16 },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: data.email,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
+        company_name: data.companyName,
         name: data.name,
         phone: data.phone,
-        company_name: data.companyName,
         trade: data.trade,
-        source: data.source, // CRITICAL: Track source
-        sales_rep_name: data.salesRepName,
+        source: data.source,
       },
     });
 
     if (authError) {
-      // Check if duplicate email
       if (authError.message?.toLowerCase().includes("already") ||
           authError.message?.toLowerCase().includes("duplicate")) {
         logWarn("Email already registered", {
@@ -334,16 +324,10 @@ serve(async (req) => {
           context: { email: data.email }
         });
         return new Response(
-          JSON.stringify({ error: "This email is already registered. Please sign in instead." }),
+          JSON.stringify({ error: "This email is already registered" }),
           { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      logError("Auth user creation failed", {
-        ...baseLogOptions,
-        error: authError,
-        context: { email: data.email }
-      });
       throw authError;
     }
 
@@ -353,10 +337,9 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 5: Create Account Record
+    // STEP 7: Create Account Record
     // ═══════════════════════════════════════════════════════════════
 
-    // Determine subscription status and trial dates based on source
     const isWebsiteTrial = data.source === "website";
     const subscriptionStatus = isWebsiteTrial ? "trial" : "active";
     const trialStartDate = isWebsiteTrial ? new Date().toISOString() : null;
@@ -364,7 +347,6 @@ serve(async (req) => {
       ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
-    // Parse business hours if provided as JSON string
     let businessHoursValue = null;
     if (data.businessHours) {
       try {
@@ -395,10 +377,12 @@ serve(async (req) => {
         stripe_subscription_id: subscription.id,
         plan_type: data.planType,
 
-        source: data.source, // CRITICAL: Track source
+        source: data.source,
         sales_rep_name: data.salesRepName || null,
 
         provisioning_status: "idle",
+        phone_provisioning_status: "pending",
+        phone_number_area_code: data.zipCode.slice(0, 3),
       })
       .select()
       .single();
@@ -406,8 +390,7 @@ serve(async (req) => {
     if (accountError) {
       logError("Account creation failed", {
         ...baseLogOptions,
-        error: accountError,
-        context: { userId: authData.user.id }
+        error: accountError
       });
       throw accountError;
     }
@@ -417,11 +400,14 @@ serve(async (req) => {
     logInfo("Account created", {
       ...baseLogOptions,
       accountId: currentAccountId,
-      context: { source: data.source }
+      context: {
+        subscriptionStatus,
+        source: data.source
+      }
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 6: Create Profile Record
+    // STEP 8: Create Profile Record
     // ═══════════════════════════════════════════════════════════════
 
     const { error: profileError } = await supabase
@@ -432,7 +418,7 @@ serve(async (req) => {
         name: data.name,
         phone: data.phone,
         is_primary: true,
-        source: data.source, // CRITICAL: Track source
+        source: data.source,
       });
 
     if (profileError) {
@@ -450,7 +436,7 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 7: Assign Owner Role
+    // STEP 9: Assign Owner Role
     // ═══════════════════════════════════════════════════════════════
 
     const { error: roleError } = await supabase
@@ -461,16 +447,122 @@ serve(async (req) => {
       });
 
     if (roleError) {
-      logWarn("User role assignment failed (non-critical)", {
+      logWarn("Owner role assignment failed (non-critical)", {
         ...baseLogOptions,
         accountId: currentAccountId,
         error: roleError
       });
-      // Don't throw - not critical
+    } else {
+      logInfo("Owner role assigned", {
+        ...baseLogOptions,
+        accountId: currentAccountId
+      });
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 8: Create Provisioning Job
+    // STEP 10: Create Vapi Assistant (SYNCHRONOUS - Fast Operation)
+    // ═══════════════════════════════════════════════════════════════
+
+    let vapiAssistantId: string | null = null;
+
+    if (VAPI_API_KEY) {
+      logInfo("Creating Vapi assistant (synchronous)", {
+        ...baseLogOptions,
+        accountId: currentAccountId
+      });
+
+      const voiceId = data.assistantGender === "male" ? "michael" : "sarah";
+
+      // Get state recording laws for prompt
+      const { data: recordingLaw } = await supabase
+        .from("state_recording_laws")
+        .select("*")
+        .eq("state_code", "CA") // Default to CA, will be updated later
+        .maybeSingle();
+
+      const prompt = await buildVapiPrompt({
+        company_name: data.companyName,
+        trade: data.trade,
+        service_area: data.serviceArea || "",
+        business_hours: businessHoursValue || null,
+        custom_instructions: null,
+        service_specialties: null,
+        company_website: data.website || "",
+      }, recordingLaw);
+
+      const assistantResponse = await fetch("https://api.vapi.ai/assistant", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${VAPI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: `${data.companyName} Assistant`,
+          model: {
+            provider: "openai",
+            model: "gpt-4o-mini",
+            temperature: 0.7,
+            systemPrompt: prompt,
+          },
+          voice: {
+            provider: "11labs",
+            voiceId: voiceId,
+          },
+          firstMessage: `Thank you for calling ${data.companyName}. How can I help you today?`,
+        }),
+      });
+
+      if (!assistantResponse.ok) {
+        const errorText = await assistantResponse.text();
+        logError("Vapi assistant creation failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: new Error(errorText)
+        });
+        // Don't throw - we can create assistant later
+        // Update account to reflect assistant creation failure
+        await supabase
+          .from("accounts")
+          .update({
+            provisioning_status: "partial",
+            provisioning_error: `Assistant creation failed: ${errorText}`,
+          })
+          .eq("id", currentAccountId);
+      } else {
+        const assistantData = await assistantResponse.json();
+        vapiAssistantId = assistantData.id;
+
+        // Update account with assistant ID immediately
+        await supabase
+          .from("accounts")
+          .update({
+            vapi_assistant_id: vapiAssistantId,
+          })
+          .eq("id", currentAccountId);
+
+        // Also insert into assistants table
+        await supabase
+          .from("assistants")
+          .insert({
+            account_id: currentAccountId,
+            vapi_assistant_id: vapiAssistantId,
+            name: `${data.companyName} Assistant`,
+            voice_id: voiceId,
+            voice_gender: data.assistantGender,
+            is_primary: true,
+            status: "active",
+          });
+
+        logInfo("Vapi assistant created successfully", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          context: { vapiAssistantId }
+        });
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 11: Create Provisioning Job
     // ═══════════════════════════════════════════════════════════════
 
     const { error: jobError } = await supabase
@@ -489,32 +581,49 @@ serve(async (req) => {
         accountId: currentAccountId,
         error: jobError
       });
-      // Don't throw - provisioning can be retried manually
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 9: Trigger Async Provisioning
+    // STEP 12: Trigger Async Phone Provisioning (ASYNCHRONOUS - Slow)
     // ═══════════════════════════════════════════════════════════════
 
-    logInfo("Triggering async provisioning", {
+    logInfo("Triggering async phone provisioning", {
       ...baseLogOptions,
       accountId: currentAccountId
     });
 
-    const provisioningTask = supabase.functions.invoke("provision-resources", {
-      body: {
-        accountId: accountData.id,
-        email: data.email,
-        name: data.name,
-        phone: data.phone,
-        zipCode: data.zipCode,
-        areaCode: data.zipCode.slice(0, 3),
-        companyName: data.companyName,
-        website: data.website,
-        trade: data.trade,
-        assistantGender: data.assistantGender,
-      },
-    });
+    const provisioningTask = supabase.functions
+      .invoke("provision-phone-number", {
+        body: {
+          accountId: accountData.id,
+          email: data.email,
+          name: data.name,
+          phone: data.phone,
+          areaCode: data.zipCode.slice(0, 3),
+          companyName: data.companyName,
+        },
+      })
+      .then((response) => {
+        if (response.error) {
+          logError("Async phone provisioning failed", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: response.error
+          });
+        } else {
+          logInfo("Async phone provisioning completed", {
+            ...baseLogOptions,
+            accountId: currentAccountId
+          });
+        }
+      })
+      .catch((error) => {
+        logError("Async phone provisioning error", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error
+        });
+      });
 
     // Don't await - let it run in background
     if (typeof (globalThis as any).EdgeRuntime !== "undefined" &&
@@ -523,7 +632,7 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 10: Log Success for Analytics
+    // STEP 13: Log Success for Analytics
     // ═══════════════════════════════════════════════════════════════
 
     if (data.source === "website") {
@@ -551,13 +660,12 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 11: Return Success Response
+    // STEP 14: Return Success Response (IMMEDIATELY)
     // ═══════════════════════════════════════════════════════════════
 
-    // Customize message based on source
     const successMessage = isWebsiteTrial
-      ? "Trial started! Your AI receptionist is being created..."
-      : "Account created! Your AI assistant and phone number are being set up...";
+      ? "Trial started! Your AI assistant is ready. Your phone number is being set up..."
+      : "Account created! Your AI assistant is ready. Your phone number is being set up...";
 
     return new Response(
       JSON.stringify({
@@ -572,7 +680,8 @@ serve(async (req) => {
         plan_type: data.planType,
         source: data.source,
         subscription_status: subscriptionStatus,
-        provisioning_status: "provisioning",
+        vapi_assistant_id: vapiAssistantId,
+        phone_provisioning_status: "pending",
         message: successMessage,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -582,7 +691,7 @@ serve(async (req) => {
     logError("Trial creation failed", {
       ...baseLogOptions,
       accountId: currentAccountId,
-      error,
+      error
     });
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";

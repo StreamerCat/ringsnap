@@ -1,3 +1,21 @@
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DEPRECATED: This function is deprecated in favor of create-trial
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * This function has been replaced by the unified create-trial function which
+ * handles both homepage and /sales signup flows with the same logic.
+ *
+ * NEW PATTERN:
+ *   - Vapi ASSISTANT created SYNCHRONOUSLY (fast, ~2-3 seconds)
+ *   - Vapi PHONE NUMBER created ASYNCHRONOUSLY (slow, 1-2 minutes)
+ *
+ * Please use create-trial instead. This function is kept for backward
+ * compatibility only.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
