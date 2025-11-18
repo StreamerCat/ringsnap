@@ -221,37 +221,47 @@ function SalesSignupFormInner() {
 
       const paymentMethodId = paymentMethod.id;
 
-      // Call edge function
+      // Call edge function - using unified create-trial with source='sales'
       const { data: result, error: functionError } = await supabase.functions.invoke(
-        'create-sales-account',
+        'create-trial',
         {
           body: {
-            customerInfo: {
-              name: data.name,
-              email: data.email,
-              phone: data.phone,
-              companyName: data.companyName,
-              website: data.website,
-              trade: data.trade,
-              serviceArea: data.serviceArea,
-              businessHours: parseBusinessHours(data.businessHours),
-              emergencyPolicy: data.emergencyPolicy,
-              salesRepName: data.salesRepName,
-              planType: data.planType,
-              zipCode: data.zipCode?.trim() ?? "",
-              assistantGender: data.assistantGender,
-              referralCode: data.referralCode?.trim() ?? ""
-            },
-            paymentMethodId
+            // Required fields
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            companyName: data.companyName,
+            trade: data.trade,
+            zipCode: data.zipCode?.trim() ?? "",
+            planType: data.planType,
+            paymentMethodId: paymentMethodId,
+
+            // Source tracking (CRITICAL)
+            source: 'sales',
+            salesRepName: data.salesRepName,
+
+            // Optional business details
+            website: data.website || "",
+            serviceArea: data.serviceArea || "",
+            businessHours: JSON.stringify(parseBusinessHours(data.businessHours)),
+            emergencyPolicy: data.emergencyPolicy || "",
+
+            // Assistant configuration
+            assistantGender: data.assistantGender,
+            wantsAdvancedVoice: false,
+
+            // Optional metadata
+            referralCode: data.referralCode?.trim() ?? ""
           }
         }
       );
 
       if (functionError) throw functionError;
 
-      const typedResult = result as CreateSalesAccountResponse;
+      // Adapt create-trial response to expected format
+      const typedResult = result as any;
 
-      if (!typedResult || !typedResult.tempPassword) {
+      if (!typedResult || !typedResult.password) {
         throw new Error('Missing credentials in account creation response.');
       }
 
@@ -260,10 +270,10 @@ function SalesSignupFormInner() {
         customerEmail: data.email,
         customerPhone: data.phone,
         companyName: data.companyName,
-        ringSnapNumber: typedResult.ringSnapNumber ?? null,
-        tempPassword: typedResult.tempPassword,
-        accountId: typedResult.accountId ?? null,
-        subscriptionStatus: typedResult.subscriptionStatus ?? 'active',
+        ringSnapNumber: null, // Provisioning is async, phone not ready yet
+        tempPassword: typedResult.password,
+        accountId: typedResult.account_id ?? null,
+        subscriptionStatus: 'active', // Sales accounts are immediately active
         planType: data.planType,
         salesRepName: data.salesRepName,
       };
@@ -272,18 +282,13 @@ function SalesSignupFormInner() {
       setShowSuccessModal(true);
 
       // Show appropriate toast based on provisioning status
-      if (typedResult.provisioningMessage) {
-        toast({
-          title: "Account created with warnings",
-          description: typedResult.provisioningMessage,
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Account created successfully",
-          description: "Review the forwarding instructions and share them with your customer.",
-        });
-      }
+      const provisioningMessage = typedResult.message || 'Your AI assistant and phone number are being set up. The customer will receive an email when ready.';
+
+      toast({
+        title: "Account created successfully",
+        description: provisioningMessage,
+        variant: "default",
+      });
 
     } catch (err) {
       console.error('Signup error:', err);

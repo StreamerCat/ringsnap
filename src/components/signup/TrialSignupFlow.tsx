@@ -198,28 +198,37 @@ export const TrialSignupFlow = ({
       const phoneNumber = form.getValues("phone");
       const extractedAreaCode = extractAreaCodeFromPhone(phoneNumber);
 
-      // Prepare request body
+      // Prepare request body - matching create-trial schema
       const requestBody = {
-        ...form.getValues(),
-        areaCode: extractedAreaCode, // Use extracted area code from phone number
+        name: form.getValues("name"),
+        email: form.getValues("email"),
+        phone: form.getValues("phone"),
+        companyName: form.getValues("companyName"),
+        website: form.getValues("companyWebsite") || "",
+        trade: form.getValues("trade") || "",
+        zipCode: extractedAreaCode + "00", // Convert 3-digit area code to 5-digit zip (approximation)
+        planType: form.getValues("planType"),
         paymentMethodId: paymentMethod.id,
         source,
+        assistantGender: "female",
+        wantsAdvancedVoice: false,
       };
 
       // DETAILED LOGGING FOR DEBUGGING
-      console.log("📞 Calling edge function with request body:");
+      console.log("📞 Calling create-trial edge function with request body:");
       console.log("  - name:", requestBody.name);
       console.log("  - email:", requestBody.email);
       console.log("  - phone:", requestBody.phone);
-      console.log("  - areaCode:", requestBody.areaCode);
       console.log("  - companyName:", requestBody.companyName);
+      console.log("  - website:", requestBody.website);
+      console.log("  - trade:", requestBody.trade);
+      console.log("  - zipCode:", requestBody.zipCode);
       console.log("  - planType:", requestBody.planType, "(type:", typeof requestBody.planType, ")");
       console.log("  - paymentMethodId:", requestBody.paymentMethodId);
-      console.log("  - acceptTerms:", requestBody.acceptTerms);
       console.log("  - source:", requestBody.source);
 
       // Call edge function
-      const { data, error } = await supabase.functions.invoke('free-trial-signup', {
+      const { data, error } = await supabase.functions.invoke('create-trial', {
         body: requestBody,
       });
 

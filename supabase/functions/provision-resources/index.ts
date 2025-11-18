@@ -221,34 +221,22 @@ serve(async (req) => {
       }
     }
 
-    // 3. Create Stripe Customer (trial mode)
-    let stripeCustomerId = null;
-    
-    if (STRIPE_SECRET_KEY) {
-      const stripeResponse = await fetch('https://api.stripe.com/v1/customers', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          email: email,
-          name: name,
-          phone: phone,
-          'metadata[account_id]': accountId,
-          'metadata[company_name]': account.company_name,
-        }),
-      });
+    // NOTE: Stripe customer already created during signup
+    // We just use the existing stripe_customer_id from the account record
+    const stripeCustomerId = account.stripe_customer_id;
 
-      if (stripeResponse.ok) {
-        const stripeData = await stripeResponse.json();
-        stripeCustomerId = stripeData.id;
-        logInfo('Stripe customer created', {
-          ...baseLogOptions,
-          accountId,
-          context: { stripeCustomerId }
-        });
-      }
+    if (stripeCustomerId) {
+      logInfo('Using existing Stripe customer', {
+        ...baseLogOptions,
+        accountId,
+        context: { stripeCustomerId }
+      });
+    } else {
+      logWarn('No Stripe customer ID found on account', {
+        ...baseLogOptions,
+        accountId,
+        context: { note: 'This may be expected for some account types' }
+      });
     }
 
     // 4. Generate referral code
@@ -293,17 +281,23 @@ serve(async (req) => {
     }
 
     // 7. Update account with provisioning results
+    const accountUpdate: Record<string, any> = {
+      provisioning_status: 'completed',
+      onboarding_completed: true,
+      vapi_phone_number: phoneNumber,
+      vapi_assistant_id: vapiAssistantId,
+      monthly_minutes_limit: monthlyMinutesLimit,
+      phone_number_status: phoneNumber ? 'active' : 'pending',
+    };
+
+    // Only set stripe_customer_id if it doesn't already exist
+    if (stripeCustomerId && !account.stripe_customer_id) {
+      accountUpdate.stripe_customer_id = stripeCustomerId;
+    }
+
     await supabase
       .from('accounts')
-      .update({
-        provisioning_status: 'completed',
-        onboarding_completed: true,
-        vapi_phone_number: phoneNumber,
-        vapi_assistant_id: vapiAssistantId,
-        stripe_customer_id: stripeCustomerId,
-        monthly_minutes_limit: monthlyMinutesLimit,
-        phone_number_status: phoneNumber ? 'active' : 'pending',
-      })
+      .update(accountUpdate)
       .eq('id', accountId);
 
     logInfo('Account updated successfully', {

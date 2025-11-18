@@ -195,43 +195,47 @@ function WizardInner() {
         return;
       }
 
-      // Call edge function to create account
-      const { data, error } = await supabase.functions.invoke("create-sales-account", {
+      // Call edge function to create account - using unified create-trial with source='sales'
+      const { data, error } = await supabase.functions.invoke("create-trial", {
         body: {
-          customerInfo: {
-            name: form.getValues("customerName"),
-            email: form.getValues("customerEmail"),
-            phone: form.getValues("customerPhone"),
-            companyName: form.getValues("companyName"),
-            trade: form.getValues("trade"),
-            serviceArea: form.getValues("serviceArea"),
-            businessHours: parseBusinessHours(form.getValues("businessHours")),
-            emergencyPolicy: form.getValues("emergencyPolicy"),
-            salesRepName: form.getValues("salesRepName"),
-            planType: form.getValues("planType"),
-            zipCode: form.getValues("zipCode"),
-            assistantGender: form.getValues("assistantGender"),
-          },
+          // Required fields
+          name: form.getValues("customerName"),
+          email: form.getValues("customerEmail"),
+          phone: form.getValues("customerPhone"),
+          companyName: form.getValues("companyName"),
+          trade: form.getValues("trade"),
+          zipCode: form.getValues("zipCode"),
+          planType: form.getValues("planType"),
           paymentMethodId: paymentMethod.id,
+
+          // Source tracking (CRITICAL)
+          source: 'sales',
+          salesRepName: form.getValues("salesRepName"),
+
+          // Optional business details
+          serviceArea: form.getValues("serviceArea") || "",
+          businessHours: JSON.stringify(parseBusinessHours(form.getValues("businessHours"))),
+          emergencyPolicy: form.getValues("emergencyPolicy") || "",
+
+          // Assistant configuration
+          assistantGender: form.getValues("assistantGender") || "female",
+          wantsAdvancedVoice: false,
         },
       });
 
       if (error) throw error;
 
-      // Store backend response
-      form.setValue("accountId", data.accountId);
-      form.setValue("userId", data.userId);
-      form.setValue("stripeCustomerId", data.stripeCustomerId);
-      form.setValue("subscriptionId", data.subscriptionId);
-      form.setValue("tempPassword", data.tempPassword);
-      form.setValue("vapiPhoneNumber", data.vapiPhoneNumber);
-      form.setValue("vapiAssistantId", data.vapiAssistantId);
+      // Store backend response - adapt create-trial response format
+      form.setValue("accountId", data.account_id);
+      form.setValue("userId", data.user_id);
+      form.setValue("stripeCustomerId", data.stripe_customer_id);
+      form.setValue("subscriptionId", data.subscription_id);
+      form.setValue("tempPassword", data.password);
+      form.setValue("vapiPhoneNumber", null); // Provisioning is async
+      form.setValue("vapiAssistantId", null); // Provisioning is async
 
-      if (data.provisioned) {
-        toast.success("Payment successful! Your phone number is being activated.");
-      } else {
-        toast.success("Payment successful! Your account is being set up.");
-      }
+      // Sales accounts are created immediately as active
+      toast.success("Payment successful! Your account is being set up. The customer will receive an email when the phone number is ready.");
 
       setCurrentStep(WizardStep.SetupComplete);
     } catch (err) {
