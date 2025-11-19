@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from '../_shared/cors.ts';
 import { buildTeamInviteEmail } from '../_shared/email-templates.ts';
 import { sendEmail } from '../_shared/resend-client.ts';
