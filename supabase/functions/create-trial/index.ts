@@ -186,6 +186,7 @@ serve(async (req) => {
   let currentAccountId: string | null = null;
   let currentUserId: string | null = null;
   let stripeCustomerId: string | null = null;
+  let currentStep = "start";
 
   try {
     console.log("[create-trial] Start", { correlationId });
@@ -193,6 +194,8 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════
+
+    currentStep = "initialization";
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -214,6 +217,7 @@ serve(async (req) => {
     // INPUT VALIDATION
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "parse-body";
     const rawData = await req.json();
     let data: z.infer<typeof createTrialSchema>;
 
@@ -257,6 +261,7 @@ serve(async (req) => {
     // VALIDATION: Phone and email checks
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "validate-phone-email";
     if (!isValidPhoneNumber(data.phone)) {
       console.log("[create-trial] Invalid phone number", { phone: data.phone });
       return new Response(
@@ -292,6 +297,7 @@ serve(async (req) => {
     // ANTI-ABUSE: Rate limiting (website signups only)
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "rate-limit-checks";
     if (data.source === "website") {
       const clientIP =
         req.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -377,6 +383,7 @@ serve(async (req) => {
     // STEP 1: Create Stripe Customer
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "create-stripe-customer";
     console.log("[create-trial] Creating Stripe customer", { email: data.email });
 
     const customer = await stripe.customers.create({
@@ -392,6 +399,8 @@ serve(async (req) => {
     });
 
     stripeCustomerId = customer.id;
+
+    console.log("[create-trial] Stripe customer created", { stripeCustomerId: customer.id });
 
     console.log("[create-trial] After Stripe customer creation", {
       stripe_customer_id: customer.id,
@@ -410,6 +419,7 @@ serve(async (req) => {
     // STEP 2: Attach Payment Method
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "attach-payment-method";
     console.log("[create-trial] Attaching payment method", {
       paymentMethodId: data.paymentMethodId,
     });
@@ -435,6 +445,7 @@ serve(async (req) => {
     // STEP 3: Create Subscription (3-day trial)
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "create-stripe-subscription";
     console.log("[create-trial] Creating Stripe subscription", {
       planType: data.planType,
     });
@@ -451,6 +462,8 @@ serve(async (req) => {
         plan_type: data.planType,
       },
     });
+
+    console.log("[create-trial] Stripe subscription created", { stripeSubscriptionId: subscription.id });
 
     console.log("[create-trial] After Stripe subscription creation", {
       stripe_subscription_id: subscription.id,
@@ -471,6 +484,7 @@ serve(async (req) => {
     // STEP 4: Create Auth User
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "create-auth-user";
     console.log("[create-trial] Creating auth user", { email: data.email });
 
     const tempPassword = generateSecurePassword();
@@ -524,6 +538,8 @@ serve(async (req) => {
 
     currentUserId = authData.user.id;
 
+    console.log("[create-trial] Auth user ready", { authUserId: authData.user.id });
+
     console.log("[create-trial] After auth user creation", {
       auth_user_id: authData.user.id,
     });
@@ -537,6 +553,7 @@ serve(async (req) => {
     // STEP 5: Create Account Record
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "insert-account";
     console.log("[create-trial] Creating account record", {
       companyName: data.companyName,
     });
@@ -553,44 +570,46 @@ serve(async (req) => {
       }
     }
 
+    const accountPayload = {
+      company_name: data.companyName,
+      company_website: data.website || null,
+      trade: data.trade,
+      service_area: data.serviceArea || null,
+      business_hours: businessHoursValue,
+      emergency_policy: data.emergencyPolicy || null,
+      assistant_gender: data.assistantGender,
+      wants_advanced_voice: data.wantsAdvancedVoice,
+
+      subscription_status: "trial",
+      trial_start_date: new Date().toISOString(),
+      trial_end_date: trialEndDate,
+
+      stripe_customer_id: customer.id,
+      stripe_subscription_id: subscription.id,
+      plan_type: data.planType,
+
+      source: data.source,
+      sales_rep_name: data.salesRepName || null,
+
+      provisioning_status: "pending",
+      phone_number_status: "pending",
+      phone_number_area_code: data.zipCode?.slice(0, 3) || null,
+      billing_state: billingState,
+      zip_code: data.zipCode || null,
+    };
+
+    console.log("[create-trial] accounts payload", accountPayload);
+
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
-      .insert({
-        company_name: data.companyName,
-        company_website: data.website || null,
-        trade: data.trade,
-        service_area: data.serviceArea || null,
-        business_hours: businessHoursValue,
-        emergency_policy: data.emergencyPolicy || null,
-        assistant_gender: data.assistantGender,
-        wants_advanced_voice: data.wantsAdvancedVoice,
-
-        subscription_status: "trial",
-        trial_start_date: new Date().toISOString(),
-        trial_end_date: trialEndDate,
-
-        stripe_customer_id: customer.id,
-        stripe_subscription_id: subscription.id,
-        plan_type: data.planType,
-
-        source: data.source,
-        sales_rep_name: data.salesRepName || null,
-
-        provisioning_status: "pending",
-        phone_number_status: "pending",
-        phone_number_area_code: data.zipCode?.slice(0, 3) || null,
-        billing_state: billingState,
-        zip_code: data.zipCode || null,
-      })
-      .select()
+      .insert(accountPayload)
+      .select("*")
       .single();
 
     if (accountError) {
-      console.log("[create-trial] Account creation failed", {
-        error: accountError.message,
-        details: accountError.details,
-        hint: accountError.hint,
-        code: accountError.code,
+      console.error("[create-trial] accounts insert failed", {
+        error: accountError,
+        payload: accountPayload,
       });
 
       logError("Account creation failed", {
@@ -602,12 +621,17 @@ serve(async (req) => {
           details: accountError.details,
           hint: accountError.hint,
           code: accountError.code,
+          payload: accountPayload,
         },
       });
-      throw new Error(`Account creation failed: ${accountError.message}`);
+      throw new Error(
+        `ACCOUNTS_INSERT_FAILED: code=${accountError.code ?? "unknown"} message=${accountError.message}`
+      );
     }
 
     currentAccountId = accountData.id;
+
+    console.log("[create-trial] Account created", { accountId: accountData.id });
 
     console.log("[create-trial] After account insert", {
       account_id: accountData.id,
@@ -624,6 +648,7 @@ serve(async (req) => {
     // STEP 6: Create Profile Record
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "insert-profile";
     console.log("[create-trial] Creating profile record", {
       profile_id: authData.user.id,
       account_id: accountData.id,
@@ -650,6 +675,8 @@ serve(async (req) => {
       throw profileError;
     }
 
+    console.log("[create-trial] Profile ready", { profileId: authData.user.id });
+
     console.log("[create-trial] After profile insert", {
       profile_id: authData.user.id,
     });
@@ -663,6 +690,7 @@ serve(async (req) => {
     // STEP 7: Assign Owner Role
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "assign-owner-role";
     console.log("[create-trial] Assigning owner role");
 
     const { error: roleError } = await supabase.from("user_roles").insert({
@@ -692,6 +720,7 @@ serve(async (req) => {
     // STEP 8: Link Lead (if provided)
     // ═══════════════════════════════════════════════════════════════
 
+    currentStep = "link-lead";
     if (data.leadId) {
       console.log("[create-trial] Linking lead", { lead_id: data.leadId });
 
@@ -750,7 +779,10 @@ serve(async (req) => {
     let phoneE164: string | null = null;
     let vapiProvisioningStatus = "pending";
 
-    if (VAPI_API_KEY) {
+    const ENABLE_VAPI = false; // TEMP for debugging
+
+    if (ENABLE_VAPI && VAPI_API_KEY) {
+      currentStep = "vapi-assistant";
       try {
         console.log("[create-trial] Before Vapi assistant create", {
           account_id: accountData.id,
@@ -865,6 +897,7 @@ serve(async (req) => {
         // STEP 11: VAPI PHONE NUMBER PROVISIONING (BEST EFFORT)
         // ═══════════════════════════════════════════════════════════════
 
+        currentStep = "vapi-phone";
         console.log("[create-trial] Before Vapi phone provisioning");
 
         const areaCode = data.zipCode?.slice(0, 3) || "415";
@@ -1007,6 +1040,9 @@ serve(async (req) => {
 
         vapiProvisioningStatus = "failed";
       }
+    } else if (!ENABLE_VAPI) {
+      console.log("[create-trial] Vapi provisioning temporarily disabled for debugging");
+      vapiProvisioningStatus = "pending";
     } else {
       console.log("[create-trial] VAPI_API_KEY not configured, skipping Vapi provisioning");
       logWarn("VAPI_API_KEY not configured", {
@@ -1036,8 +1072,15 @@ serve(async (req) => {
     // RETURN SUCCESS RESPONSE
     // ═══════════════════════════════════════════════════════════════
 
+    console.log("[create-trial] Completed successfully", { accountId: accountData.id });
+
     return new Response(
       JSON.stringify({
+        success: true,
+        accountId: accountData.id,
+        stripeCustomerId: customer.id,
+        stripeSubscriptionId: subscription.id,
+        // Additional fields for compatibility
         ok: true,
         user_id: authData.user.id,
         account_id: accountData.id,
@@ -1065,10 +1108,12 @@ serve(async (req) => {
     );
   } catch (error: any) {
     // Top-level error handler
-    console.error("[create-trial] Fatal error", {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
+    console.error("[create-trial] Unhandled error", {
+      step: currentStep,
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+      raw: error,
       account_id: currentAccountId,
       user_id: currentUserId,
       stripe_customer_id: stripeCustomerId,
@@ -1078,13 +1123,16 @@ serve(async (req) => {
       ...baseLogOptions,
       accountId: currentAccountId,
       error,
+      context: { step: currentStep },
     });
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     return new Response(
       JSON.stringify({
-        error: "Internal error in create-trial",
+        error: "INTERNAL_ERROR",
+        step: currentStep,
+        message: error?.message ?? null,
         detail: errorMessage,
       }),
       {
