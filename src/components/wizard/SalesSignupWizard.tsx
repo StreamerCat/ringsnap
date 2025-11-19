@@ -155,34 +155,43 @@ function WizardInner() {
     // Capture lead after BusinessDetails step (when we have customer contact info)
     if (currentStep === WizardStep.BusinessDetails && !leadId) {
       try {
-        console.log("📝 Capturing lead for sales signup...");
+        const leadPayload = {
+          email: form.getValues("customerEmail"),
+          full_name: form.getValues("customerName"),
+          phone: form.getValues("customerPhone"),
+          source: "sales",
+          signup_flow: "sales",
+          ip_address: null,
+          user_agent: navigator.userAgent,
+        };
+
+        console.log("[sales signup] Inserting into signup_leads", { payload: leadPayload });
+
         const { data: lead, error: leadError } = await supabase
           .from("signup_leads")
-          .insert({
-            email: form.getValues("customerEmail"),
-            full_name: form.getValues("customerName"),
-            phone: form.getValues("customerPhone"),
-            source: "sales",
-            signup_flow: "sales",
-            ip_address: null,
-            user_agent: navigator.userAgent,
-          })
+          .insert(leadPayload)
           .select()
           .single();
 
         if (leadError) {
-          console.error("❌ Lead capture failed:", leadError);
-          toast.error("Failed to save lead information. Please try again.");
-          return;
+          console.error("[sales signup] signup_leads insert failed", {
+            error: leadError,
+            payload: leadPayload
+          });
+          // Don't block the user - lead capture is optional
+          console.warn("[sales signup] Continuing without lead tracking");
+        } else {
+          console.log("[sales signup] signup_leads created successfully", {
+            leadId: lead.id,
+            email: lead.email
+          });
+          setLeadId(lead.id);
+          toast.success("Customer information saved!");
         }
-
-        console.log("✅ Sales lead captured:", lead.id);
-        setLeadId(lead.id);
-        toast.success("Customer information saved!");
       } catch (err) {
-        console.error("❌ Lead capture error:", err);
-        toast.error("Failed to save lead information. Please try again.");
-        return;
+        console.error("[sales signup] Unexpected error during lead capture:", err);
+        // Don't block the user - lead capture is optional
+        console.warn("[sales signup] Continuing without lead tracking");
       }
     }
 
