@@ -146,34 +146,43 @@ export const TrialSignupFlow = ({
     // STEP 1: Capture lead after validation
     if (currentStep === 1 && !leadId) {
       try {
-        console.log("📝 Capturing lead for step 1...");
+        const leadPayload = {
+          email: form.getValues("email"),
+          full_name: form.getValues("name"),
+          phone: form.getValues("phone"),
+          source: source,
+          signup_flow: "trial",
+          ip_address: null,
+          user_agent: navigator.userAgent,
+        };
+
+        console.log("[signup step 1] Inserting into signup_leads", { payload: leadPayload });
+
         const { data: lead, error: leadError } = await supabase
           .from("signup_leads")
-          .insert({
-            email: form.getValues("email"),
-            full_name: form.getValues("name"),
-            phone: form.getValues("phone"),
-            source: source,
-            signup_flow: "trial",
-            ip_address: null,
-            user_agent: navigator.userAgent,
-          })
+          .insert(leadPayload)
           .select()
           .single();
 
         if (leadError) {
-          console.error("❌ Lead capture failed:", leadError);
-          toast.error("Failed to save your information. Please try again.");
-          return;
+          console.error("[signup step 1] signup_leads insert failed", {
+            error: leadError,
+            payload: leadPayload
+          });
+          // Don't block the user - lead capture is optional
+          console.warn("[signup step 1] Continuing without lead tracking");
+        } else {
+          console.log("[signup step 1] signup_leads created successfully", {
+            leadId: lead.id,
+            email: lead.email
+          });
+          setLeadId(lead.id);
+          toast.success("Information saved!");
         }
-
-        console.log("✅ Lead captured:", lead.id);
-        setLeadId(lead.id);
-        toast.success("Information saved!");
       } catch (err) {
-        console.error("❌ Lead capture error:", err);
-        toast.error("Failed to save your information. Please try again.");
-        return;
+        console.error("[signup step 1] Unexpected error during lead capture:", err);
+        // Don't block the user - lead capture is optional
+        console.warn("[signup step 1] Continuing without lead tracking");
       }
     }
 

@@ -91,7 +91,7 @@ const createTrialSchema = z.object({
   // Optional metadata
   referralCode: z.string().length(8).optional().or(z.literal("")),
   deviceFingerprint: z.string().max(500).optional(),
-  leadId: z.string().uuid().optional(), // Link to signup_leads table
+  leadId: z.string().uuid().nullable().optional(), // Link to signup_leads table (nullable)
 });
 
 /**
@@ -744,8 +744,10 @@ serve(async (req) => {
           error: leadLinkError,
         });
       } else {
-        console.log("[create-trial] After lead linking");
+        console.log("[create-trial] Lead linked successfully", { lead_id: data.leadId });
       }
+    } else {
+      console.log("[create-trial] No leadId provided, skipping lead linkage");
     }
 
     // ═══════════════════════════════════════════════════════════════

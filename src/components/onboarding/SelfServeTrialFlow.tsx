@@ -134,29 +134,43 @@ export function SelfServeTrialFlow({
     const { name, email, phone } = form.getValues();
 
     try {
-      // Insert into signup_leads table to track partial signups
+      const leadPayload = {
+        email: email,
+        full_name: name,
+        phone: phone,
+        source: "website",
+        signup_flow: "self_serve_trial",
+        ip_address: null,
+        user_agent: navigator.userAgent,
+      };
+
+      console.log("[self-serve trial] Inserting into signup_leads", { payload: leadPayload });
+
       const { data: lead, error } = await supabase
         .from("signup_leads")
-        .insert({
-          email: email,
-          full_name: name,
-          phone: phone,
-          source: "website",
-          signup_flow: "self_serve_trial",
-          ip_address: null,
-          user_agent: navigator.userAgent,
-        })
+        .insert(leadPayload)
         .select()
         .single();
 
-      if (!error && lead) {
+      if (error) {
+        console.error("[self-serve trial] signup_leads insert failed", {
+          error: error,
+          payload: leadPayload
+        });
+        // Don't block the user - lead capture is optional
+        console.warn("[self-serve trial] Continuing without lead tracking");
+      } else {
         setLeadCaptured(true);
         setLeadId(lead.id);
-        console.log("Lead captured successfully in signup_leads:", lead.id);
+        console.log("[self-serve trial] signup_leads created successfully", {
+          leadId: lead.id,
+          email: lead.email
+        });
       }
     } catch (error) {
       // Don't block the user if lead capture fails
-      console.error("Lead capture error (non-blocking):", error);
+      console.error("[self-serve trial] Unexpected error during lead capture:", error);
+      console.warn("[self-serve trial] Continuing without lead tracking");
     }
   };
 
