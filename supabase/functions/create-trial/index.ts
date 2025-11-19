@@ -91,8 +91,27 @@ const createTrialSchema = z.object({
   // Optional metadata
   referralCode: z.string().length(8).optional().or(z.literal("")),
   deviceFingerprint: z.string().max(500).optional(),
-  leadId: z.string().uuid().nullable().optional(), // Link to signup_leads table (nullable)
+  leadId: z.union([z.string().uuid(), z.null(), z.undefined()]).optional(), // Link to signup_leads table (truly optional)
 });
+
+/**
+ * Normalize payload to handle null/empty values for optional fields
+ * Converts null or "" to undefined for cleaner validation
+ */
+function normalizePayload(rawPayload: any): any {
+  const normalized = { ...rawPayload };
+
+  // Convert null or empty string to undefined for optional fields
+  const optionalFields = ['leadId', 'referralCode', 'deviceFingerprint', 'website', 'serviceArea', 'zipCode', 'businessHours', 'emergencyPolicy', 'primaryGoal', 'salesRepName'];
+
+  for (const field of optionalFields) {
+    if (normalized[field] === null || normalized[field] === "") {
+      normalized[field] = undefined;
+    }
+  }
+
+  return normalized;
+}
 
 /**
  * Generate secure random password for user account
@@ -219,14 +238,30 @@ serve(async (req) => {
 
     currentStep = "parse-body";
     const rawData = await req.json();
+
+    // Log raw request body for debugging
+    logInfo("Raw request body received", {
+      ...baseLogOptions,
+      context: {
+        email: rawData.email,
+        source: rawData.source,
+        planType: rawData.planType,
+        leadId: rawData.leadId,
+        hasPaymentMethod: !!rawData.paymentMethodId,
+      },
+    });
+
+    // Normalize payload to handle null/empty values
+    const normalizedData = normalizePayload(rawData);
+
     let data: z.infer<typeof createTrialSchema>;
 
     try {
-      data = createTrialSchema.parse(rawData);
+      data = createTrialSchema.parse(normalizedData);
     } catch (zodError: any) {
       logWarn("Validation error in create-trial", {
         ...baseLogOptions,
-        context: { errors: zodError.errors },
+        context: { errors: zodError.errors, rawLeadId: rawData.leadId },
       });
 
       return new Response(
@@ -245,6 +280,16 @@ serve(async (req) => {
       email: data.email,
       source: data.source,
       planType: data.planType,
+    });
+
+    logInfo("Payload validated successfully", {
+      ...baseLogOptions,
+      context: {
+        email: data.email,
+        source: data.source,
+        planType: data.planType,
+        hasLeadId: !!data.leadId,
+      },
     });
 
     logInfo("Creating trial account", {
