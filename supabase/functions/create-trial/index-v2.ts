@@ -40,6 +40,10 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
+import {
+  sendSelfServiceOnboardingEmail,
+  sendSalesGuidedOnboardingEmail,
+} from "../_shared/email-service.ts";
 
 const FUNCTION_NAME = "create-trial-v2";
 const ENABLE_VAPI_PROVISIONING = Deno.env.get("ENABLE_VAPI_PROVISIONING") === "true";
@@ -742,20 +746,69 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // PHASE 2: SEND ACCOUNT SETUP EMAIL (Async, non-blocking)
+    // PHASE 3: SEND ACCOUNT SETUP EMAIL (Async, non-blocking)
     // ═══════════════════════════════════════════════════════════════
 
     currentStep = "send-email";
 
-    // TODO Phase 3: Implement sendAccountSetupEmail()
-    // For now, log that we would send email
-    logInfo("Account setup email would be sent here (Phase 3)", {
-      ...baseLogOptions,
-      context: {
-        email: data.email,
-        accountId: accountResult.account_id
+    try {
+      if (data.signup_channel === "self_service") {
+        const emailResult = await sendSelfServiceOnboardingEmail(supabase, {
+          accountId: accountResult.account_id,
+          email: data.email,
+          name: data.name,
+          companyName: data.companyName,
+          correlationId,
+        });
+
+        if (emailResult.success) {
+          logInfo("Self-service onboarding email sent", {
+            ...baseLogOptions,
+            context: { email: data.email, messageId: emailResult.messageId }
+          });
+        } else {
+          logWarn("Failed to send self-service onboarding email (non-critical)", {
+            ...baseLogOptions,
+            error: emailResult.error
+          });
+        }
+      } else if (data.signup_channel === "sales_guided") {
+        // Get sales rep name for personalized email
+        let salesRepName = "Your Sales Representative";
+        if (data.sales_rep_id) {
+          const { data: salesRep } = await supabase.auth.admin.getUserById(data.sales_rep_id);
+          salesRepName = salesRep?.user_metadata?.name || salesRep?.email || salesRepName;
+        }
+
+        const emailResult = await sendSalesGuidedOnboardingEmail(supabase, {
+          accountId: accountResult.account_id,
+          email: data.email,
+          name: data.name,
+          companyName: data.companyName,
+          salesRepName,
+          correlationId,
+        });
+
+        if (emailResult.success) {
+          logInfo("Sales-guided onboarding email sent", {
+            ...baseLogOptions,
+            context: { email: data.email, messageId: emailResult.messageId }
+          });
+        } else {
+          logWarn("Failed to send sales-guided onboarding email (non-critical)", {
+            ...baseLogOptions,
+            error: emailResult.error
+          });
+        }
       }
-    });
+      // For enterprise channel, custom email logic can be added here
+    } catch (emailError) {
+      // Email failure is non-critical - account already created
+      logWarn("Email service error (non-critical)", {
+        ...baseLogOptions,
+        error: emailError
+      });
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // PHASE 2: QUEUE VAPI PROVISIONING (Async, non-blocking)
@@ -876,8 +929,8 @@ serve(async (req) => {
       user_id: accountResult.user_id,
       email: data.email,
 
-      // Password (only for sales-guided - Phase 3 will remove this)
-      password: data.signup_channel === "sales_guided" ? tempPassword : null,
+      // Password removed in Phase 3 - customers receive magic link via email
+      password: null,
 
       // Stripe info
       stripe_customer_id: stripeCustomerId,
