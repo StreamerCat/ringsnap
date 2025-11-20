@@ -37,6 +37,41 @@ import { createClient } from "@supabase/supabase-js";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
 
+/**
+ * Retry a function with exponential backoff
+ * @param fn - Function to retry
+ * @param maxRetries - Maximum number of retry attempts
+ * @param baseDelayMs - Base delay in milliseconds
+ * @param operationName - Name of operation for logging
+ * @returns Result from function
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 1000,
+  operationName: string = "operation"
+): Promise<T> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (attempt < maxRetries) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        console.log(
+          `[provision-phone-number] Retry ${operationName} attempt ${attempt + 1}/${maxRetries} after ${delayMs}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError || new Error(`${operationName} failed after ${maxRetries} retries`);
+}
+
 const FUNCTION_NAME = "provision-phone-number";
 const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
 const RESEND_API_KEY = Deno.env.get("RESEND_PROD_KEY");
@@ -82,6 +117,16 @@ serve(async (req) => {
       .update({ phone_number_status: "provisioning" })
       .eq("id", accountId);
 
+    // Log state transition: vapi_queued → vapi_phone_pending
+    await supabase.rpc("log_state_transition", {
+      p_account_id: accountId,
+      p_from_stage: "vapi_queued",
+      p_to_stage: "vapi_phone_pending",
+      p_triggered_by: FUNCTION_NAME,
+      p_correlation_id: correlationId,
+      p_metadata: { area_code: areaCode }
+    });
+
     // Fetch account details
     const { data: account, error: accountError } = await supabase
       .from("accounts")
@@ -126,65 +171,95 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Create Vapi Phone Number (SLOW OPERATION)
+    // STEP 1: Create Vapi Phone Number (SLOW OPERATION with retry)
     // ═══════════════════════════════════════════════════════════════
 
     let vapiPhoneId = null;
     let phoneNumber = null;
 
     if (VAPI_API_KEY && areaCode) {
-      logInfo("Requesting Vapi phone number", {
+      logInfo("Requesting Vapi phone number with retry logic", {
         ...baseLogOptions,
         accountId,
         context: { areaCode }
       });
 
-      const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${VAPI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          provider: "vapi",
-          name: `${companyName} - Primary`,
-          fallbackDestination: {
-            type: "number",
-            number: phone || "+14155551234",
-          },
-          numberDesiredAreaCode: areaCode,
-        }),
-      });
+      try {
+        const phoneData = await retryWithBackoff(
+          async () => {
+            const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${VAPI_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                provider: "vapi",
+                name: `${companyName} - Primary`,
+                fallbackDestination: {
+                  type: "number",
+                  number: phone || "+14155551234",
+                },
+                numberDesiredAreaCode: areaCode,
+              }),
+            });
 
-      if (!phoneResponse.ok) {
-        const errorText = await phoneResponse.text();
+            if (!phoneResponse.ok) {
+              const errorText = await phoneResponse.text();
+              throw new Error(`Vapi API error: ${errorText}`);
+            }
+
+            return await phoneResponse.json();
+          },
+          3, // Max 3 retries
+          2000, // Start with 2 second delay
+          "create_vapi_phone_number"
+        );
+
+        vapiPhoneId = phoneData.id;
+        phoneNumber = phoneData.number;
+
+        logInfo("Vapi phone number created", {
+          ...baseLogOptions,
+          accountId,
+          context: { vapiPhoneId, phoneNumber }
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logError("Failed to create phone number after retries", {
+          ...baseLogOptions,
+          accountId,
+          error
+        });
+
         await supabase
           .from("accounts")
           .update({
             phone_number_status: "failed",
-            provisioning_error: `Phone creation failed: ${errorText}`,
+            provisioning_error: `Phone creation failed: ${errorMessage}`,
           })
           .eq("id", accountId);
-        throw new Error(`Failed to create phone number: ${errorText}`);
+
+        // Log failed state transition
+        await supabase.rpc("log_state_transition", {
+          p_account_id: accountId,
+          p_from_stage: "vapi_phone_pending",
+          p_to_stage: "failed_vapi",
+          p_triggered_by: FUNCTION_NAME,
+          p_correlation_id: correlationId,
+          p_metadata: { error: errorMessage }
+        });
+
+        throw error;
       }
-
-      const phoneData = await phoneResponse.json();
-      vapiPhoneId = phoneData.id;
-      phoneNumber = phoneData.number;
-
-      logInfo("Vapi phone number created", {
-        ...baseLogOptions,
-        accountId,
-        context: { vapiPhoneId, phoneNumber }
-      });
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Link Phone Number to Existing Assistant
+    // STEP 2: Link Phone Number to Existing Assistant (with retry)
     // ═══════════════════════════════════════════════════════════════
 
     if (vapiPhoneId && account.vapi_assistant_id) {
-      logInfo("Linking phone to assistant", {
+      logInfo("Linking phone to assistant with retry logic", {
         ...baseLogOptions,
         accountId,
         context: {
@@ -193,32 +268,45 @@ serve(async (req) => {
         }
       });
 
-      const linkResponse = await fetch(
-        `https://api.vapi.ai/phone-number/${vapiPhoneId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Authorization": `Bearer ${VAPI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            assistantId: account.vapi_assistant_id,
-          }),
-        }
-      );
+      try {
+        await retryWithBackoff(
+          async () => {
+            const linkResponse = await fetch(
+              `https://api.vapi.ai/phone-number/${vapiPhoneId}`,
+              {
+                method: "PATCH",
+                headers: {
+                  "Authorization": `Bearer ${VAPI_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  assistantId: account.vapi_assistant_id,
+                }),
+              }
+            );
 
-      if (!linkResponse.ok) {
-        const errorText = await linkResponse.text();
-        logWarn("Failed to link phone to assistant", {
-          ...baseLogOptions,
-          accountId,
-          context: { error: errorText }
-        });
-        // Don't throw - phone is created, linkage can be fixed manually
-      } else {
+            if (!linkResponse.ok) {
+              const errorText = await linkResponse.text();
+              throw new Error(`Failed to link phone: ${errorText}`);
+            }
+
+            return await linkResponse.json();
+          },
+          3, // Max 3 retries
+          1000, // Start with 1 second delay
+          "link_phone_to_assistant"
+        );
+
         logInfo("Phone linked to assistant successfully", {
           ...baseLogOptions,
           accountId
+        });
+      } catch (error) {
+        // Don't throw - phone is created, linkage can be fixed manually
+        logWarn("Failed to link phone to assistant after retries (non-critical)", {
+          ...baseLogOptions,
+          accountId,
+          error
         });
       }
     }
@@ -289,6 +377,30 @@ serve(async (req) => {
       ...baseLogOptions,
       accountId,
       context: { phoneNumber }
+    });
+
+    // Log state transition: vapi_phone_pending → vapi_phone_active → fully_provisioned
+    await supabase.rpc("log_state_transition", {
+      p_account_id: accountId,
+      p_from_stage: "vapi_phone_pending",
+      p_to_stage: "vapi_phone_active",
+      p_triggered_by: FUNCTION_NAME,
+      p_correlation_id: correlationId,
+      p_metadata: {
+        vapi_phone_id: vapiPhoneId,
+        phone_number: phoneNumber
+      }
+    });
+
+    await supabase.rpc("log_state_transition", {
+      p_account_id: accountId,
+      p_from_stage: "vapi_phone_active",
+      p_to_stage: "fully_provisioned",
+      p_triggered_by: FUNCTION_NAME,
+      p_correlation_id: correlationId,
+      p_metadata: {
+        referral_code: referralCode
+      }
     });
 
     // Update provisioning job status
