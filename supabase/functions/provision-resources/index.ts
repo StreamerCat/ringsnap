@@ -89,18 +89,19 @@ serve(async (req) => {
 
     const monthlyMinutesLimit = planDef?.monthly_minutes_limit || 150;
 
-    // 1. Create VAPI Phone Number
+    // 1. Create VAPI Phone Number (with area code fallback)
     let vapiPhoneId = null;
     let phoneNumber = null;
-    
+
     if (VAPI_API_KEY && areaCode) {
-      logInfo('Requesting VAPI phone number', {
+      logInfo('Requesting VAPI phone number with area code', {
         ...baseLogOptions,
         accountId,
         context: { areaCode }
       });
 
-      const phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
+      // Option A: Try with area code first, fallback to no area code if unavailable
+      let phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${VAPI_API_KEY}`,
@@ -113,31 +114,86 @@ serve(async (req) => {
             type: 'number',
             number: phone || '+14155551234',
           },
-          ...(areaCode && { numberDesiredAreaCode: areaCode })
+          numberDesiredAreaCode: areaCode
         }),
       });
 
+      // Check if area code is not available
       if (!phoneResponse.ok) {
         const errorText = await phoneResponse.text();
-        await supabase
-          .from('accounts')
-          .update({
-            provisioning_status: 'failed',
-            provisioning_error: `VAPI phone creation failed: ${errorText}`,
-          })
-          .eq('id', accountId);
-        throw new Error(`Failed to create phone number: ${errorText}`);
+        const isAreaCodeError = errorText.toLowerCase().includes('not available') ||
+                               errorText.toLowerCase().includes('area code') ||
+                               errorText.toLowerCase().includes('no numbers available');
+
+        if (isAreaCodeError) {
+          logWarn('Area code not available, retrying without area code constraint', {
+            ...baseLogOptions,
+            accountId,
+            context: {
+              requestedAreaCode: areaCode,
+              error: errorText
+            }
+          });
+
+          // Retry WITHOUT area code - let Vapi assign any available number
+          phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${VAPI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              provider: 'vapi',
+              name: `${account.company_name} - Primary`,
+              fallbackDestination: {
+                type: 'number',
+                number: phone || '+14155551234',
+              },
+              // No numberDesiredAreaCode - accept any available number
+            }),
+          });
+
+          if (!phoneResponse.ok) {
+            const fallbackErrorText = await phoneResponse.text();
+            await supabase
+              .from('accounts')
+              .update({
+                provisioning_status: 'failed',
+                provisioning_error: `VAPI phone creation failed even without area code constraint: ${fallbackErrorText}`,
+              })
+              .eq('id', accountId);
+            throw new Error(`Failed to create phone number: ${fallbackErrorText}`);
+          }
+
+          logInfo('VAPI phone number created without area code constraint (fallback)', {
+            ...baseLogOptions,
+            accountId,
+            context: { requestedAreaCode: areaCode }
+          });
+        } else {
+          // Non-area-code error, fail immediately
+          await supabase
+            .from('accounts')
+            .update({
+              provisioning_status: 'failed',
+              provisioning_error: `VAPI phone creation failed: ${errorText}`,
+            })
+            .eq('id', accountId);
+          throw new Error(`Failed to create phone number: ${errorText}`);
+        }
       }
 
       const phoneData = await phoneResponse.json();
       vapiPhoneId = phoneData.id;
       phoneNumber = phoneData.number;
-      logInfo('VAPI phone number created', {
+      logInfo('VAPI phone number created successfully', {
         ...baseLogOptions,
         accountId,
         context: {
           vapiPhoneId,
-          phoneDigits: phoneNumber
+          phoneDigits: phoneNumber,
+          requestedAreaCode: areaCode,
+          actualAreaCode: phoneNumber.slice(2, 5) // Extract area code from +1XXXXXXXXXX
         }
       });
     }

@@ -185,44 +185,110 @@ serve(async (req) => {
       });
 
       try {
-        const phoneData = await retryWithBackoff(
-          async () => {
-            const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${VAPI_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                provider: "vapi",
-                name: `${companyName} - Primary`,
-                fallbackDestination: {
-                  type: "number",
-                  number: phone || "+14155551234",
+        // Option A: Try with area code first, fallback to no area code if unavailable
+        let phoneData;
+        try {
+          phoneData = await retryWithBackoff(
+            async () => {
+              const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${VAPI_API_KEY}`,
+                  "Content-Type": "application/json",
                 },
-                numberDesiredAreaCode: areaCode,
-              }),
+                body: JSON.stringify({
+                  provider: "vapi",
+                  name: `${companyName} - Primary`,
+                  fallbackDestination: {
+                    type: "number",
+                    number: phone || "+14155551234",
+                  },
+                  numberDesiredAreaCode: areaCode,
+                }),
+              });
+
+              if (!phoneResponse.ok) {
+                const errorText = await phoneResponse.text();
+                throw new Error(`Vapi API error: ${errorText}`);
+              }
+
+              return await phoneResponse.json();
+            },
+            3, // Max 3 retries
+            2000, // Start with 2 second delay
+            "create_vapi_phone_number_with_area_code"
+          );
+        } catch (areaCodeError) {
+          const errorMessage = areaCodeError instanceof Error ? areaCodeError.message : String(areaCodeError);
+          const isAreaCodeError = errorMessage.toLowerCase().includes('not available') ||
+                                 errorMessage.toLowerCase().includes('area code') ||
+                                 errorMessage.toLowerCase().includes('no numbers available');
+
+          if (isAreaCodeError) {
+            logWarn("Area code not available, retrying without area code constraint", {
+              ...baseLogOptions,
+              accountId,
+              context: {
+                requestedAreaCode: areaCode,
+                error: errorMessage
+              }
             });
 
-            if (!phoneResponse.ok) {
-              const errorText = await phoneResponse.text();
-              throw new Error(`Vapi API error: ${errorText}`);
-            }
+            // Retry WITHOUT area code - let Vapi assign any available number
+            phoneData = await retryWithBackoff(
+              async () => {
+                const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${VAPI_API_KEY}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    provider: "vapi",
+                    name: `${companyName} - Primary`,
+                    fallbackDestination: {
+                      type: "number",
+                      number: phone || "+14155551234",
+                    },
+                    // No numberDesiredAreaCode - accept any available number
+                  }),
+                });
 
-            return await phoneResponse.json();
-          },
-          3, // Max 3 retries
-          2000, // Start with 2 second delay
-          "create_vapi_phone_number"
-        );
+                if (!phoneResponse.ok) {
+                  const errorText = await phoneResponse.text();
+                  throw new Error(`Vapi API error (no area code): ${errorText}`);
+                }
+
+                return await phoneResponse.json();
+              },
+              3, // Max 3 retries
+              2000, // Start with 2 second delay
+              "create_vapi_phone_number_without_area_code"
+            );
+
+            logInfo("Phone number created without area code constraint (fallback)", {
+              ...baseLogOptions,
+              accountId,
+              context: { requestedAreaCode: areaCode }
+            });
+          } else {
+            // Non-area-code error, rethrow
+            throw areaCodeError;
+          }
+        }
 
         vapiPhoneId = phoneData.id;
         phoneNumber = phoneData.number;
 
-        logInfo("Vapi phone number created", {
+        logInfo("Vapi phone number created successfully", {
           ...baseLogOptions,
           accountId,
-          context: { vapiPhoneId, phoneNumber }
+          context: {
+            vapiPhoneId,
+            phoneNumber,
+            requestedAreaCode: areaCode,
+            actualAreaCode: phoneNumber.slice(2, 5) // Extract area code from +1XXXXXXXXXX
+          }
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
