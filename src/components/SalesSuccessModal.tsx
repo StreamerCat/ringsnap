@@ -23,7 +23,7 @@ export interface SalesSuccessModalData {
   customerPhone: string;
   companyName: string;
   ringSnapNumber?: string | null;
-  tempPassword: string;
+  tempPassword?: string | null; // Optional - Phase 3: customers receive magic link email instead
   accountId?: string | null;
   subscriptionStatus?: string | null;
   planType?: string | null;
@@ -42,7 +42,6 @@ const formatPhone = (phone: string) => {
 };
 
 export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuccessModalProps) => {
-  const [copiedPassword, setCopiedPassword] = useState(false);
   const { sendInstructions, isSending } = useEmailInstructions();
   const navigate = useNavigate();
 
@@ -56,25 +55,13 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
     return null;
   }
 
-  const handleCopyPassword = async () => {
-    try {
-      await navigator.clipboard.writeText(data.tempPassword);
-      setCopiedPassword(true);
-      toast.success("Temporary password copied");
-      setTimeout(() => setCopiedPassword(false), 2000);
-    } catch (error) {
-      console.error("Failed to copy password", error);
-      toast.error("Unable to copy password");
-    }
-  };
-
   const handleEmailInstructions = () => {
     sendInstructions({
       email: data.customerEmail,
       phoneNumber: data.ringSnapNumber,
       companyName: data.companyName,
       customerName: data.customerName,
-      tempPassword: data.tempPassword,
+      tempPassword: data.tempPassword, // Optional - will be undefined if not provided
     });
   };
 
@@ -96,7 +83,7 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
             Account Ready for {data.companyName}
           </DialogTitle>
           <DialogDescription className="text-base">
-            Share the credentials below with {data.customerName}. Their AI line is ready for forwarding and testing.
+            {data.customerName} will receive an email to complete their account setup. Their AI line is ready for forwarding and testing.
           </DialogDescription>
         </DialogHeader>
 
@@ -106,9 +93,9 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1.5">
-                    <CardTitle className="text-xl">Login Credentials</CardTitle>
+                    <CardTitle className="text-xl">Account Access</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Email and temporary password to access the RingSnap dashboard.
+                      Customer will receive an email with a secure login link.
                     </p>
                   </div>
                   {data.subscriptionStatus && (
@@ -130,22 +117,16 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
                   </Badge>
                 </div>
                 <Separator />
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Temporary Password</p>
-                    <p className="font-mono text-lg break-all">{data.tempPassword}</p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Mail className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Setup Email Sent</p>
+                      <p className="text-sm text-muted-foreground">
+                        {data.customerName} will receive a secure magic link at <span className="font-semibold">{data.customerEmail}</span> to set their password and access their dashboard.
+                      </p>
+                    </div>
                   </div>
-                  <Button variant="outline" onClick={handleCopyPassword} className="sm:w-auto w-full">
-                    {copiedPassword ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />Copy Password
-                      </>
-                    )}
-                  </Button>
                 </div>
                 <Separator />
                 <div className="grid gap-2 text-sm text-muted-foreground">
@@ -163,14 +144,17 @@ export const SalesSuccessModal = ({ open, onOpenChange, onDone, data }: SalesSuc
 
             <Card className="bg-muted/40">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Share Next Steps</CardTitle>
+                <CardTitle className="text-lg">Next Steps for Customer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  1. Forward their current business line to their RingSnap number using the quick instructions on the right.
+                  1. <strong>Check email</strong> for magic link to set password and access dashboard.
                 </p>
-                <p>2. Make a live test call to confirm the AI answers professionally.</p>
-                <p>3. Ask them to log in and personalize greeting, hours, and lead routing.</p>
+                <p>
+                  2. <strong>Forward business line</strong> to their RingSnap number using the instructions on the right.
+                </p>
+                <p>3. <strong>Test the AI</strong> with a live call to confirm professional greeting.</p>
+                <p>4. <strong>Personalize settings</strong> including greeting, hours, and lead routing in dashboard.</p>
               </CardContent>
             </Card>
           </div>
