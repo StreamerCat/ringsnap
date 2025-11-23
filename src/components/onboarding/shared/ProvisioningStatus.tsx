@@ -16,8 +16,13 @@ interface ProvisioningStatusProps {
 
 /**
  * Shared provisioning status component
- * Polls account provisioning status and shows progress
+ * Uses Realtime subscriptions with polling fallback
  * Used in both self-serve and sales-guided flows
+ *
+ * Features:
+ * - Realtime subscriptions for instant updates
+ * - Polling fallback if Realtime disconnects
+ * - 5-minute timeout with support contact
  *
  * @example Self-serve usage (detailed progress)
  * <ProvisioningStatus
@@ -27,10 +32,10 @@ interface ProvisioningStatusProps {
  *     setStep(8);
  *   }}
  *   showProgress={true}
- *   pollingInterval={3000}
+ *   pollingInterval={10000}
  * />
  *
- * @example Sales usage (faster polling)
+ * @example Sales usage (faster polling fallback)
  * <ProvisioningStatus
  *   accountId={accountId}
  *   onComplete={(phoneNumber) => {
@@ -38,7 +43,7 @@ interface ProvisioningStatusProps {
  *     setStep(5);
  *   }}
  *   showProgress={true}
- *   pollingInterval={2000}
+ *   pollingInterval={5000}
  * />
  */
 export function ProvisioningStatus({
@@ -46,7 +51,7 @@ export function ProvisioningStatus({
   onComplete,
   onError,
   showProgress = true,
-  pollingInterval = 3000,
+  pollingInterval = 10000, // Increased default (Realtime is primary)
   disabled = false,
 }: ProvisioningStatusProps) {
   const [status, setStatus] = useState<"idle" | "provisioning" | "active" | "failed">("provisioning");
@@ -54,11 +59,57 @@ export function ProvisioningStatus({
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
 
-  // Poll provisioning status
+  const TIMEOUT_SECONDS = 300; // 5 minutes
+
+  // Handle account status updates
+  const handleStatusUpdate = (
+    provisioningStatus: string,
+    vapiPhoneNumber: string | null,
+    provisioningError: string | null
+  ) => {
+    setStatus(provisioningStatus as any);
+
+    // Update progress
+    if (provisioningStatus === "processing" && showProgress) {
+      setProgress((prev) => Math.min(prev + 10, 60));
+    } else if (provisioningStatus === "provisioning" && showProgress) {
+      setProgress((prev) => Math.min(prev + 5, 70));
+    }
+
+    // Handle completion
+    if (provisioningStatus === "completed" && vapiPhoneNumber) {
+      setProgress(100);
+      setPhoneNumber(vapiPhoneNumber);
+      onComplete(vapiPhoneNumber);
+    }
+
+    // Handle active status (backward compat)
+    if (provisioningStatus === "active" && vapiPhoneNumber) {
+      setProgress(100);
+      setPhoneNumber(vapiPhoneNumber);
+      onComplete(vapiPhoneNumber);
+    }
+
+    // Handle failure
+    if (provisioningStatus === "failed") {
+      const errorMsg = provisioningError || "Provisioning failed. Please contact support.";
+      setError(errorMsg);
+      onError?.(errorMsg);
+    }
+  };
+
+  // Realtime subscription + polling fallback
   useEffect(() => {
     if (disabled) return;
 
+    let intervalId: number | null = null;
+    let timeIntervalId: number | null = null;
+    let timeoutId: number | null = null;
+
+    // Initial poll
     const pollStatus = async () => {
       try {
         const { data, error: queryError } = await supabase
@@ -69,56 +120,81 @@ export function ProvisioningStatus({
 
         if (queryError) throw queryError;
 
-        setStatus(data.provisioning_status);
-
-        // Update progress (simulate progress for UX)
-        if (data.provisioning_status === "provisioning" && showProgress) {
-          setProgress((prev) => Math.min(prev + 5, 95));
-        }
-
-        // Handle completion
-        if (data.provisioning_status === "active" && data.vapi_phone_number) {
-          setProgress(100);
-          setPhoneNumber(data.vapi_phone_number);
-          onComplete(data.vapi_phone_number);
-          clearInterval(intervalId);
-          clearInterval(timeIntervalId);
-        }
-
-        // Handle failure
-        if (data.provisioning_status === "failed") {
-          const errorMsg = data.provisioning_error || "Provisioning failed. Please contact support.";
-          setError(errorMsg);
-          onError?.(errorMsg);
-          clearInterval(intervalId);
-          clearInterval(timeIntervalId);
-        }
+        handleStatusUpdate(
+          data.provisioning_status,
+          data.vapi_phone_number,
+          data.provisioning_error
+        );
       } catch (err) {
         console.error("Error polling provisioning status:", err);
-        const errorMsg = err instanceof Error ? err.message : "Failed to check status";
-        setError(errorMsg);
-        onError?.(errorMsg);
-        clearInterval(intervalId);
-        clearInterval(timeIntervalId);
+        if (!realtimeConnected) {
+          const errorMsg = err instanceof Error ? err.message : "Failed to check status";
+          setError(errorMsg);
+          onError?.(errorMsg);
+        }
       }
     };
 
-    // Start polling
-    const intervalId = window.setInterval(pollStatus, pollingInterval);
+    // Set up Realtime subscription
+    const channel = supabase
+      .channel(`account-${accountId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "accounts",
+          filter: `id=eq.${accountId}`,
+        },
+        (payload: any) => {
+          console.log("[ProvisioningStatus] Realtime update received", payload);
+          setRealtimeConnected(true);
+          handleStatusUpdate(
+            payload.new.provisioning_status,
+            payload.new.vapi_phone_number,
+            payload.new.provisioning_error
+          );
+        }
+      )
+      .subscribe((status) => {
+        console.log("[ProvisioningStatus] Subscription status:", status);
+        if (status === "SUBSCRIBED") {
+          setRealtimeConnected(true);
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setRealtimeConnected(false);
+          console.warn("[ProvisioningStatus] Realtime disconnected, polling fallback active");
+        }
+      });
+
+    // Start polling fallback (slower interval when Realtime is active)
+    intervalId = window.setInterval(pollStatus, pollingInterval);
 
     // Track elapsed time
-    const timeIntervalId = window.setInterval(() => {
-      setElapsedTime((prev) => prev + 1);
+    timeIntervalId = window.setInterval(() => {
+      setElapsedTime((prev) => {
+        const newTime = prev + 1;
+        if (newTime >= TIMEOUT_SECONDS) {
+          setTimedOut(true);
+        }
+        return newTime;
+      });
     }, 1000);
+
+    // Set timeout for provisioning
+    timeoutId = window.setTimeout(() => {
+      setTimedOut(true);
+    }, TIMEOUT_SECONDS * 1000);
 
     // Initial poll
     pollStatus();
 
     return () => {
-      clearInterval(intervalId);
-      clearInterval(timeIntervalId);
+      if (intervalId) clearInterval(intervalId);
+      if (timeIntervalId) clearInterval(timeIntervalId);
+      if (timeoutId) clearTimeout(timeoutId);
+      channel.unsubscribe();
     };
-  }, [accountId, pollingInterval, disabled, showProgress, onComplete, onError]);
+  }, [accountId, pollingInterval, disabled, showProgress, onComplete, onError, realtimeConnected]);
 
   const handleRetry = async () => {
     setStatus("provisioning");
@@ -168,7 +244,7 @@ export function ProvisioningStatus({
   return (
     <div className="text-center space-y-6">
       {/* Provisioning State */}
-      {status === "provisioning" && (
+      {(status === "provisioning" || status === "processing") && !timedOut && (
         <>
           <Loader2 className="h-16 w-16 animate-spin mx-auto text-primary" />
           <div className="space-y-2">
@@ -182,6 +258,16 @@ export function ProvisioningStatus({
                 <p className="text-sm text-muted-foreground">
                   Elapsed time: {formatTime(elapsedTime)}
                 </p>
+                {realtimeConnected && (
+                  <p className="text-xs text-green-600">
+                    ● Live updates active
+                  </p>
+                )}
+                {!realtimeConnected && elapsedTime > 10 && (
+                  <p className="text-xs text-amber-600">
+                    ● Using fallback polling
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -200,8 +286,30 @@ export function ProvisioningStatus({
         </>
       )}
 
+      {/* Timeout State */}
+      {timedOut && status !== "active" && status !== "completed" && (
+        <>
+          <AlertCircle className="h-16 w-16 text-amber-500 mx-auto" />
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-amber-600">Setup is taking longer than expected</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Your account is still being set up in the background. Please check back in a few minutes, or contact support for assistance.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Button onClick={() => window.location.reload()} variant="outline" size="lg">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh Page
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Support: help@ringsnap.ai
+            </p>
+          </div>
+        </>
+      )}
+
       {/* Success State */}
-      {status === "active" && phoneNumber && (
+      {(status === "active" || status === "completed") && phoneNumber && (
         <>
           <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
           <div className="space-y-2">
