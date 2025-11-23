@@ -167,11 +167,17 @@ function WizardInner() {
 
         console.log("[sales signup] Inserting into signup_leads", { payload: leadPayload });
 
-        const { data: lead, error: leadError } = await supabase
-          .from("signup_leads")
-          .insert(leadPayload)
-          .select()
-          .single();
+        // TEMPORARY FIX (go-green): Disable direct client-side inserts
+        // All writes MUST flow through edge functions only until backend is green
+        console.warn("[go-green] Direct insert to signup_leads disabled. Backend writes only.");
+        const lead = null;
+        const leadError = null;
+
+        // const { data: lead, error: leadError } = await supabase
+        //   .from("signup_leads")
+        //   .insert(leadPayload)
+        //   .select()
+        //   .single();
 
         if (leadError) {
           console.error("[sales signup] signup_leads insert failed", {
@@ -180,7 +186,7 @@ function WizardInner() {
           });
           // Don't block the user - lead capture is optional
           console.warn("[sales signup] Continuing without lead tracking");
-        } else {
+        } else if (lead) {
           console.log("[sales signup] signup_leads created successfully", {
             leadId: lead.id,
             email: lead.email

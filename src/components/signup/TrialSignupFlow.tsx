@@ -158,11 +158,17 @@ export const TrialSignupFlow = ({
 
         console.log("[signup step 1] Inserting into signup_leads", { payload: leadPayload });
 
-        const { data: lead, error: leadError } = await supabase
-          .from("signup_leads")
-          .insert(leadPayload)
-          .select()
-          .single();
+        // TEMPORARY FIX (go-green): Disable direct client-side inserts
+        // All writes MUST flow through edge functions only until backend is green
+        console.warn("[go-green] Direct insert to signup_leads disabled. Backend writes only.");
+        const lead = null;
+        const leadError = null;
+
+        // const { data: lead, error: leadError } = await supabase
+        //   .from("signup_leads")
+        //   .insert(leadPayload)
+        //   .select()
+        //   .single();
 
         if (leadError) {
           console.error("[signup step 1] signup_leads insert failed", {
@@ -171,7 +177,7 @@ export const TrialSignupFlow = ({
           });
           // Don't block the user - lead capture is optional
           console.warn("[signup step 1] Continuing without lead tracking");
-        } else {
+        } else if (lead) {
           console.log("[signup step 1] signup_leads created successfully", {
             leadId: lead.id,
             email: lead.email

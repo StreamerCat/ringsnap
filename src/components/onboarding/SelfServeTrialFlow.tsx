@@ -146,11 +146,17 @@ export function SelfServeTrialFlow({
 
       console.log("[self-serve trial] Inserting into signup_leads", { payload: leadPayload });
 
-      const { data: lead, error } = await supabase
-        .from("signup_leads")
-        .insert(leadPayload)
-        .select()
-        .single();
+      // TEMPORARY FIX (go-green): Disable direct client-side inserts
+      // All writes MUST flow through edge functions only until backend is green
+      console.warn("[go-green] Direct insert to signup_leads disabled. Backend writes only.");
+      const lead = null;
+      const error = null;
+
+      // const { data: lead, error } = await supabase
+      //   .from("signup_leads")
+      //   .insert(leadPayload)
+      //   .select()
+      //   .single();
 
       if (error) {
         console.error("[self-serve trial] signup_leads insert failed", {
@@ -159,7 +165,7 @@ export function SelfServeTrialFlow({
         });
         // Don't block the user - lead capture is optional
         console.warn("[self-serve trial] Continuing without lead tracking");
-      } else {
+      } else if (lead) {
         setLeadCaptured(true);
         setLeadId(lead.id);
         console.log("[self-serve trial] signup_leads created successfully", {

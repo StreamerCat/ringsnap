@@ -635,6 +635,21 @@ serve(async (req) => {
 
     let accountResult: any;
 
+    // DETAILED LOGGING: Before account creation
+    console.error("DB_CALL", {
+      step: "create_account_transaction",
+      operation: "BEFORE_CALL",
+      payload: {
+        p_email: data.email,
+        p_stripe_customer_id: customer.id,
+        p_stripe_subscription_id: subscription.id,
+        p_signup_channel: data.source,
+        p_sales_rep_id: null,
+        p_account_data: accountData,
+        p_correlation_id: correlationId,
+      },
+    });
+
     try {
       // Use atomic account creation function
       const { data: accountTxResult, error: accountTxError } = await supabase.rpc(
@@ -650,6 +665,22 @@ serve(async (req) => {
           p_correlation_id: correlationId,
         }
       );
+
+      // DETAILED LOGGING: After account creation
+      console.error("DB_RESULT", {
+        step: "create_account_transaction",
+        operation: "AFTER_CALL",
+        hasError: !!accountTxError,
+        hasData: !!accountTxResult,
+        error: accountTxError ? {
+          message: accountTxError.message,
+          details: accountTxError.details,
+          hint: accountTxError.hint,
+          code: accountTxError.code,
+          fullError: accountTxError,
+        } : null,
+        result: accountTxResult,
+      });
 
       if (accountTxError) {
         // Check if duplicate email
@@ -718,6 +749,20 @@ serve(async (req) => {
     if (data.leadId) {
       console.log("[create-trial] Linking lead", { lead_id: data.leadId });
 
+      // DETAILED LOGGING: Before lead update
+      console.error("DB_CALL", {
+        step: "link_lead",
+        operation: "BEFORE_UPDATE",
+        table: "signup_leads",
+        payload: {
+          auth_user_id: currentUserId,
+          account_id: currentAccountId,
+          profile_id: currentUserId,
+          completed_at: new Date().toISOString(),
+          leadId: data.leadId,
+        },
+      });
+
       const { error: leadLinkError } = await supabase
         .from("signup_leads")
         .update({
@@ -727,6 +772,21 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
         })
         .eq("id", data.leadId);
+
+      // DETAILED LOGGING: After lead update
+      console.error("DB_RESULT", {
+        step: "link_lead",
+        operation: "AFTER_UPDATE",
+        table: "signup_leads",
+        hasError: !!leadLinkError,
+        error: leadLinkError ? {
+          message: leadLinkError.message,
+          details: leadLinkError.details,
+          hint: leadLinkError.hint,
+          code: leadLinkError.code,
+          fullError: leadLinkError,
+        } : null,
+      });
 
       if (leadLinkError) {
         console.log("[create-trial] Lead linking failed (non-critical)", {
@@ -752,12 +812,41 @@ serve(async (req) => {
         req.headers.get("cf-connecting-ip") ||
         "unknown";
 
-      await supabase.from("signup_attempts").insert({
+      // DETAILED LOGGING: Before signup_attempts insert
+      console.error("DB_CALL", {
+        step: "log_signup_success",
+        operation: "BEFORE_INSERT",
+        table: "signup_attempts",
+        payload: {
+          email: data.email,
+          phone: data.phone,
+          ip_address: clientIP,
+          device_fingerprint: data.deviceFingerprint,
+          success: true,
+        },
+      });
+
+      const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
         email: data.email,
         phone: data.phone,
         ip_address: clientIP,
         device_fingerprint: data.deviceFingerprint,
         success: true,
+      });
+
+      // DETAILED LOGGING: After signup_attempts insert
+      console.error("DB_RESULT", {
+        step: "log_signup_success",
+        operation: "AFTER_INSERT",
+        table: "signup_attempts",
+        hasError: !!signupAttemptError,
+        error: signupAttemptError ? {
+          message: signupAttemptError.message,
+          details: signupAttemptError.details,
+          hint: signupAttemptError.hint,
+          code: signupAttemptError.code,
+          fullError: signupAttemptError,
+        } : null,
       });
     }
 
@@ -782,6 +871,21 @@ serve(async (req) => {
       primary_goal: data.primaryGoal,
     };
 
+    // DETAILED LOGGING: Before provisioning_jobs insert
+    console.error("DB_CALL", {
+      step: "enqueue_provisioning",
+      operation: "BEFORE_INSERT",
+      table: "provisioning_jobs",
+      payload: {
+        account_id: currentAccountId,
+        user_id: currentUserId,
+        job_type: "provision_phone",
+        status: "queued",
+        metadata: jobMetadata,
+        correlation_id: correlationId,
+      },
+    });
+
     const { error: jobError } = await supabase.from("provisioning_jobs").insert({
       account_id: currentAccountId,
       user_id: currentUserId,
@@ -789,6 +893,21 @@ serve(async (req) => {
       status: "queued",
       metadata: jobMetadata,
       correlation_id: correlationId,
+    });
+
+    // DETAILED LOGGING: After provisioning_jobs insert
+    console.error("DB_RESULT", {
+      step: "enqueue_provisioning",
+      operation: "AFTER_INSERT",
+      table: "provisioning_jobs",
+      hasError: !!jobError,
+      error: jobError ? {
+        message: jobError.message,
+        details: jobError.details,
+        hint: jobError.hint,
+        code: jobError.code,
+        fullError: jobError,
+      } : null,
     });
 
     if (jobError) {
