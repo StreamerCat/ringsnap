@@ -1,31 +1,31 @@
 /*
  * ═══════════════════════════════════════════════════════════════════════════
- * FUNCTION: create-trial
+ * FUNCTION: create-trial (REFACTORED FOR ASYNC PROVISIONING)
  *
- * PURPOSE: Create new trial or paid accounts for both homepage and /sales signup flows
+ * PURPOSE: Create new trial or paid accounts with idempotency and async provisioning
  *
- * CORE FLOW (Always completes):
- *   1. Input validation
- *   2. Anti-abuse checks (website only)
- *   3. Create Stripe customer
- *   4. Attach payment method
- *   5. Create Stripe subscription
- *   6. Create auth user
- *   7. Create account record
- *   8. Create profile record
- *   9. Assign owner role
- *   10. Link lead (if provided)
+ * CORE FLOW (Idempotent & Atomic):
+ *   1. Check idempotency key (return cached response if duplicate)
+ *   2. Input validation
+ *   3. Anti-abuse checks (website only)
+ *   4. Create Stripe customer (with idempotency)
+ *   5. Attach payment method
+ *   6. Create Stripe subscription (with idempotency)
+ *   7. Create account atomically (user + account + profile + roles)
+ *   8. Link lead (if provided)
+ *   9. Enqueue async provisioning job
+ *   10. Return success with provisioning_status='pending'
  *
- * VAPI PROVISIONING (Best effort, non-blocking):
- *   11. Create Vapi assistant
- *   12. Insert vapi_assistants record
- *   13. Provision Vapi phone number
- *   14. Insert phone_numbers record
- *   15. Update account with Vapi linkage
+ * COMPENSATION LOGIC:
+ *   - If account creation fails after Stripe setup:
+ *     → Cancel Stripe subscription
+ *     → Delete Stripe customer
+ *     → Clean up partial data
  *
- * ERROR HANDLING:
- *   - Core flow errors: Return 400/409/429/500 with clear message
- *   - Vapi errors: Log detailed info, set provisioning_status='failed', return success
+ * ASYNC PROVISIONING:
+ *   - Vapi provisioning moved to separate provision-vapi worker
+ *   - Worker polls provisioning_jobs table
+ *   - Implements retry with exponential backoff
  *
  * ═══════════════════════════════════════════════════════════════════════════
  */
@@ -37,15 +37,12 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
-import { buildVapiPrompt } from "../_shared/template-builder.ts";
 
 const FUNCTION_NAME = "create-trial";
-const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
-const VAPI_BASE_URL = "https://api.vapi.ai";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
 };
 
 /**
@@ -91,18 +88,18 @@ const createTrialSchema = z.object({
   // Optional metadata
   referralCode: z.string().length(8).optional().or(z.literal("")),
   deviceFingerprint: z.string().max(500).optional(),
-  leadId: z.union([z.string().uuid(), z.null(), z.undefined()]).optional(), // Link to signup_leads table (truly optional)
+  leadId: z.union([z.string().uuid(), z.null(), z.undefined()]).optional(),
 });
 
 /**
  * Normalize payload to handle null/empty values for optional fields
- * Converts null or "" to undefined for cleaner validation
  */
 function normalizePayload(rawPayload: any): any {
   const normalized = { ...rawPayload };
-
-  // Convert null or empty string to undefined for optional fields
-  const optionalFields = ['leadId', 'referralCode', 'deviceFingerprint', 'website', 'serviceArea', 'zipCode', 'businessHours', 'emergencyPolicy', 'primaryGoal', 'salesRepName'];
+  const optionalFields = [
+    'leadId', 'referralCode', 'deviceFingerprint', 'website', 'serviceArea',
+    'zipCode', 'businessHours', 'emergencyPolicy', 'primaryGoal', 'salesRepName'
+  ];
 
   for (const field of optionalFields) {
     if (normalized[field] === null || normalized[field] === "") {
@@ -114,7 +111,7 @@ function normalizePayload(rawPayload: any): any {
 }
 
 /**
- * Generate secure random password for user account
+ * Generate secure random password
  */
 function generateSecurePassword(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
@@ -141,17 +138,13 @@ function getStripePriceId(planType: string): string {
 }
 
 /**
- * Derive US state from ZIP code (simplified mapping)
+ * Derive US state from ZIP code
  */
 function getStateFromZip(zipCode: string): string {
   const zip = parseInt(zipCode.substring(0, 3));
 
-  // Simplified ZIP to state mapping
   if (zip >= 300 && zip <= 319) return "GA";
-  if (zip >= 320 && zip <= 327) return "FL";
-  if (zip >= 328 && zip <= 339) return "FL";
-  if (zip >= 340 && zip <= 342) return "FL";
-  if (zip >= 344 && zip <= 349) return "FL";
+  if (zip >= 320 && zip <= 349) return "FL";
   if (zip >= 350 && zip <= 369) return "AL";
   if (zip >= 370 && zip <= 385) return "TN";
   if (zip >= 386 && zip <= 397) return "MS";
@@ -190,6 +183,52 @@ function getStateFromZip(zipCode: string): string {
   return "CA"; // Default fallback
 }
 
+/**
+ * Hash request body for duplicate detection
+ */
+async function hashRequest(body: any): Promise<string> {
+  const normalized = JSON.stringify(body, Object.keys(body).sort());
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Cleanup Stripe resources on failure (compensation logic)
+ */
+async function cleanupStripeResources(
+  stripe: Stripe,
+  customerId: string | null,
+  subscriptionId: string | null,
+  logOptions: any
+): Promise<void> {
+  try {
+    if (subscriptionId) {
+      logWarn("Canceling Stripe subscription due to account creation failure", {
+        ...logOptions,
+        context: { subscriptionId },
+      });
+      await stripe.subscriptions.cancel(subscriptionId);
+    }
+
+    if (customerId) {
+      logWarn("Deleting Stripe customer due to account creation failure", {
+        ...logOptions,
+        context: { customerId },
+      });
+      await stripe.customers.del(customerId);
+    }
+  } catch (cleanupError: any) {
+    logError("Stripe cleanup failed (non-critical)", {
+      ...logOptions,
+      error: cleanupError,
+      context: { customerId, subscriptionId },
+    });
+  }
+}
+
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
@@ -205,6 +244,7 @@ serve(async (req) => {
   let currentAccountId: string | null = null;
   let currentUserId: string | null = null;
   let stripeCustomerId: string | null = null;
+  let stripeSubscriptionId: string | null = null;
   let currentStep = "start";
 
   try {
@@ -233,13 +273,57 @@ serve(async (req) => {
     console.log("[create-trial] Clients initialized");
 
     // ═══════════════════════════════════════════════════════════════
+    // IDEMPOTENCY CHECK
+    // ═══════════════════════════════════════════════════════════════
+
+    currentStep = "idempotency-check";
+
+    const idempotencyKey = req.headers.get("idempotency-key") || req.headers.get("Idempotency-Key");
+
+    if (idempotencyKey) {
+      logInfo("Checking idempotency key", {
+        ...baseLogOptions,
+        context: { idempotencyKey },
+      });
+
+      const { data: existingResult, error: idempotencyError } = await supabase
+        .from("idempotency_results")
+        .select("status_code, response_body, response_headers")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+
+      if (idempotencyError) {
+        logWarn("Idempotency check failed (continuing)", {
+          ...baseLogOptions,
+          error: idempotencyError,
+        });
+      } else if (existingResult) {
+        logInfo("Returning cached response for duplicate request", {
+          ...baseLogOptions,
+          context: { idempotencyKey, statusCode: existingResult.status_code },
+        });
+
+        return new Response(
+          JSON.stringify(existingResult.response_body),
+          {
+            status: existingResult.status_code,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+              "X-Idempotency-Replay": "true",
+            },
+          }
+        );
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // INPUT VALIDATION
     // ═══════════════════════════════════════════════════════════════
 
     currentStep = "parse-body";
     const rawData = await req.json();
 
-    // Log raw request body for debugging
     logInfo("Raw request body received", {
       ...baseLogOptions,
       context: {
@@ -251,9 +335,7 @@ serve(async (req) => {
       },
     });
 
-    // Normalize payload to handle null/empty values
     const normalizedData = normalizePayload(rawData);
-
     let data: z.infer<typeof createTrialSchema>;
 
     try {
@@ -280,16 +362,6 @@ serve(async (req) => {
       email: data.email,
       source: data.source,
       planType: data.planType,
-    });
-
-    logInfo("Payload validated successfully", {
-      ...baseLogOptions,
-      context: {
-        email: data.email,
-        source: data.source,
-        planType: data.planType,
-        hasLeadId: !!data.leadId,
-      },
     });
 
     logInfo("Creating trial account", {
@@ -425,11 +497,13 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Create Stripe Customer
+    // STRIPE: Create Customer (with idempotency)
     // ═══════════════════════════════════════════════════════════════
 
     currentStep = "create-stripe-customer";
     console.log("[create-trial] Creating Stripe customer", { email: data.email });
+
+    const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
     const customer = await stripe.customers.create({
       email: data.email,
@@ -441,15 +515,13 @@ serve(async (req) => {
         source: data.source,
         sales_rep: data.salesRepName || "",
       },
+    }, {
+      idempotencyKey: `${stripeIdempotencyPrefix}-customer`,
     });
 
     stripeCustomerId = customer.id;
 
     console.log("[create-trial] Stripe customer created", { stripeCustomerId: customer.id });
-
-    console.log("[create-trial] After Stripe customer creation", {
-      stripe_customer_id: customer.id,
-    });
 
     logInfo("Stripe customer created", {
       ...baseLogOptions,
@@ -461,7 +533,7 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Attach Payment Method
+    // STRIPE: Attach Payment Method
     // ═══════════════════════════════════════════════════════════════
 
     currentStep = "attach-payment-method";
@@ -479,7 +551,7 @@ serve(async (req) => {
       },
     });
 
-    console.log("[create-trial] After payment method attachment");
+    console.log("[create-trial] Payment method attached");
 
     logInfo("Payment method attached", {
       ...baseLogOptions,
@@ -487,7 +559,7 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Create Subscription (3-day trial)
+    // STRIPE: Create Subscription (with idempotency)
     // ═══════════════════════════════════════════════════════════════
 
     currentStep = "create-stripe-subscription";
@@ -506,14 +578,13 @@ serve(async (req) => {
         sales_rep: data.salesRepName || "",
         plan_type: data.planType,
       },
+    }, {
+      idempotencyKey: `${stripeIdempotencyPrefix}-subscription`,
     });
+
+    stripeSubscriptionId = subscription.id;
 
     console.log("[create-trial] Stripe subscription created", { stripeSubscriptionId: subscription.id });
-
-    console.log("[create-trial] After Stripe subscription creation", {
-      stripe_subscription_id: subscription.id,
-      status: subscription.status,
-    });
 
     logInfo("Stripe subscription created", {
       ...baseLogOptions,
@@ -526,83 +597,13 @@ serve(async (req) => {
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 4: Create Auth User
+    // DATABASE: Atomic Account Creation
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "create-auth-user";
-    console.log("[create-trial] Creating auth user", { email: data.email });
+    currentStep = "create-account-atomic";
+    console.log("[create-trial] Creating account atomically");
 
     const tempPassword = generateSecurePassword();
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: data.email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        name: data.name,
-        phone: data.phone,
-        company_name: data.companyName,
-        trade: data.trade,
-        source: data.source,
-        sales_rep_name: data.salesRepName,
-      },
-    });
-
-    if (authError) {
-      // Check if duplicate email
-      if (
-        authError.message?.toLowerCase().includes("already") ||
-        authError.message?.toLowerCase().includes("duplicate")
-      ) {
-        console.log("[create-trial] Email already registered", { email: data.email });
-        logWarn("Email already registered", {
-          ...baseLogOptions,
-          context: { email: data.email },
-        });
-
-        return new Response(
-          JSON.stringify({
-            error: "This email is already registered. Please sign in instead.",
-          }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      console.log("[create-trial] Auth user creation failed", {
-        error: authError.message,
-      });
-      logError("Auth user creation failed", {
-        ...baseLogOptions,
-        error: authError,
-        context: { email: data.email },
-      });
-      throw authError;
-    }
-
-    currentUserId = authData.user.id;
-
-    console.log("[create-trial] Auth user ready", { authUserId: authData.user.id });
-
-    console.log("[create-trial] After auth user creation", {
-      auth_user_id: authData.user.id,
-    });
-
-    logInfo("Auth user created", {
-      ...baseLogOptions,
-      context: { userId: authData.user.id, email: data.email },
-    });
-
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 5: Create Account Record
-    // ═══════════════════════════════════════════════════════════════
-
-    currentStep = "insert-account";
-    console.log("[create-trial] Creating account record", {
-      companyName: data.companyName,
-    });
-
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
     const billingState = data.zipCode ? getStateFromZip(data.zipCode) : "CA";
 
@@ -615,154 +616,102 @@ serve(async (req) => {
       }
     }
 
-    const accountPayload = {
-      company_name: data.companyName,
-      company_website: data.website || null,
-      trade: data.trade,
-      service_area: data.serviceArea || null,
-      business_hours: businessHoursValue,
-      emergency_policy: data.emergencyPolicy || null,
-      assistant_gender: data.assistantGender,
-      wants_advanced_voice: data.wantsAdvancedVoice,
-
-      subscription_status: "trial",
-      trial_start_date: new Date().toISOString(),
-      trial_end_date: trialEndDate,
-
-      stripe_customer_id: customer.id,
-      stripe_subscription_id: subscription.id,
-      plan_type: data.planType,
-
-      source: data.source,
-      sales_rep_name: data.salesRepName || null,
-
-      provisioning_status: "pending",
-      phone_number_status: "pending",
-      phone_number_area_code: data.zipCode?.slice(0, 3) || null,
-      billing_state: billingState,
-      zip_code: data.zipCode || null,
-    };
-
-    console.log("[create-trial] accounts payload", accountPayload);
-
-    const { data: accountData, error: accountError } = await supabase
-      .from("accounts")
-      .insert(accountPayload)
-      .select("*")
-      .single();
-
-    if (accountError) {
-      console.error("[create-trial] accounts insert failed", {
-        error: accountError,
-        payload: accountPayload,
-      });
-
-      logError("Account creation failed", {
-        ...baseLogOptions,
-        error: accountError,
-        context: {
-          userId: authData.user.id,
-          message: accountError.message,
-          details: accountError.details,
-          hint: accountError.hint,
-          code: accountError.code,
-          payload: accountPayload,
-        },
-      });
-      throw new Error(
-        `ACCOUNTS_INSERT_FAILED: code=${accountError.code ?? "unknown"} message=${accountError.message}`
-      );
-    }
-
-    currentAccountId = accountData.id;
-
-    console.log("[create-trial] Account created", { accountId: accountData.id });
-
-    console.log("[create-trial] After account insert", {
-      account_id: accountData.id,
-      subscription_status: accountData.subscription_status,
-    });
-
-    logInfo("Account created", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: { source: data.source },
-    });
-
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 6: Create Profile Record
-    // ═══════════════════════════════════════════════════════════════
-
-    currentStep = "insert-profile";
-    console.log("[create-trial] Creating profile record", {
-      profile_id: authData.user.id,
-      account_id: accountData.id,
-    });
-
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      account_id: accountData.id,
+    const accountData = {
       name: data.name,
       phone: data.phone,
-      is_primary: true,
-      source: data.source,
-    });
+      company_name: data.companyName,
+      trade: data.trade,
+      plan_type: data.planType,
+      phone_number_area_code: data.zipCode?.slice(0, 3) || null,
+      zip_code: data.zipCode || null,
+      business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
+      assistant_gender: data.assistantGender,
+      wants_advanced_voice: data.wantsAdvancedVoice,
+      company_website: data.website || null,
+      service_area: data.serviceArea || null,
+      emergency_policy: data.emergencyPolicy || null,
+      billing_state: billingState,
+    };
 
-    if (profileError) {
-      console.log("[create-trial] Profile creation failed", {
-        error: profileError.message,
+    let accountResult: any;
+
+    try {
+      // Use atomic account creation function
+      const { data: accountTxResult, error: accountTxError } = await supabase.rpc(
+        "create_account_transaction",
+        {
+          p_email: data.email,
+          p_password: tempPassword,
+          p_stripe_customer_id: customer.id,
+          p_stripe_subscription_id: subscription.id,
+          p_signup_channel: data.source,
+          p_sales_rep_id: null, // TODO: Link sales rep if available
+          p_account_data: accountData,
+          p_correlation_id: correlationId,
+        }
+      );
+
+      if (accountTxError) {
+        // Check if duplicate email
+        if (
+          accountTxError.message?.toLowerCase().includes("already") ||
+          accountTxError.message?.toLowerCase().includes("duplicate")
+        ) {
+          console.log("[create-trial] Email already registered", { email: data.email });
+          logWarn("Email already registered", {
+            ...baseLogOptions,
+            context: { email: data.email },
+          });
+
+          // Cleanup Stripe resources
+          await cleanupStripeResources(stripe, customer.id, subscription.id, baseLogOptions);
+
+          return new Response(
+            JSON.stringify({
+              error: "This email is already registered. Please sign in instead.",
+            }),
+            {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        throw accountTxError;
+      }
+
+      accountResult = accountTxResult;
+      currentAccountId = accountResult.account_id;
+      currentUserId = accountResult.user_id;
+
+      console.log("[create-trial] Account created atomically", {
+        accountId: currentAccountId,
+        userId: currentUserId,
       });
-      logError("Profile creation failed", {
+
+      logInfo("Account created atomically", {
         ...baseLogOptions,
         accountId: currentAccountId,
-        error: profileError,
+        context: { source: data.source },
       });
-      throw profileError;
+    } catch (accountError: any) {
+      console.error("[create-trial] Account creation failed", {
+        error: accountError.message,
+      });
+
+      logError("Account creation failed - running compensation", {
+        ...baseLogOptions,
+        error: accountError,
+      });
+
+      // COMPENSATION: Cleanup Stripe resources
+      await cleanupStripeResources(stripe, customer.id, subscription.id, baseLogOptions);
+
+      throw new Error(`Account creation failed: ${accountError.message}`);
     }
 
-    console.log("[create-trial] Profile ready", { profileId: authData.user.id });
-
-    console.log("[create-trial] After profile insert", {
-      profile_id: authData.user.id,
-    });
-
-    logInfo("Profile created", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-    });
-
     // ═══════════════════════════════════════════════════════════════
-    // STEP 7: Assign Owner Role
-    // ═══════════════════════════════════════════════════════════════
-
-    currentStep = "assign-owner-role";
-    console.log("[create-trial] Assigning owner role");
-
-    const { error: roleError } = await supabase.from("user_roles").insert({
-      user_id: authData.user.id,
-      role: "owner",
-    });
-
-    if (roleError) {
-      console.log("[create-trial] Owner role assignment failed (non-critical)", {
-        error: roleError.message,
-      });
-      logWarn("User role assignment failed (non-critical)", {
-        ...baseLogOptions,
-        accountId: currentAccountId,
-        error: roleError,
-      });
-      // Don't throw - not critical
-    } else {
-      console.log("[create-trial] After owner role assignment");
-      logInfo("Owner role assigned", {
-        ...baseLogOptions,
-        accountId: currentAccountId,
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 8: Link Lead (if provided)
+    // LINK LEAD (if provided)
     // ═══════════════════════════════════════════════════════════════
 
     currentStep = "link-lead";
@@ -772,9 +721,9 @@ serve(async (req) => {
       const { error: leadLinkError } = await supabase
         .from("signup_leads")
         .update({
-          auth_user_id: authData.user.id,
-          account_id: accountData.id,
-          profile_id: authData.user.id,
+          auth_user_id: currentUserId,
+          account_id: currentAccountId,
+          profile_id: currentUserId,
           completed_at: new Date().toISOString(),
         })
         .eq("id", data.leadId);
@@ -791,12 +740,10 @@ serve(async (req) => {
       } else {
         console.log("[create-trial] Lead linked successfully", { lead_id: data.leadId });
       }
-    } else {
-      console.log("[create-trial] No leadId provided, skipping lead linkage");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 9: Log Success for Analytics
+    // LOG SIGNUP SUCCESS
     // ═══════════════════════════════════════════════════════════════
 
     if (data.source === "website") {
@@ -814,294 +761,53 @@ serve(async (req) => {
       });
     }
 
-    console.log("[create-trial] Core signup completed successfully");
-
     // ═══════════════════════════════════════════════════════════════
-    // STEP 10: VAPI ASSISTANT PROVISIONING (BEST EFFORT)
+    // ENQUEUE ASYNC PROVISIONING JOB
     // ═══════════════════════════════════════════════════════════════
 
-    let vapiAssistantId: string | null = null;
-    let vapiAssistantDbId: string | null = null;
-    let phoneNumberDbId: string | null = null;
-    let phoneE164: string | null = null;
-    let vapiProvisioningStatus = "pending";
+    currentStep = "enqueue-provisioning";
+    console.log("[create-trial] Enqueuing provisioning job");
 
-    const ENABLE_VAPI = false; // TEMP for debugging
+    const jobMetadata = {
+      company_name: data.companyName,
+      trade: data.trade,
+      service_area: data.serviceArea || "",
+      business_hours: data.businessHours || "Monday-Friday 8am-5pm",
+      emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
+      company_website: data.website || "",
+      assistant_gender: data.assistantGender,
+      wants_advanced_voice: data.wantsAdvancedVoice,
+      area_code: data.zipCode?.slice(0, 3) || "415",
+      fallback_phone: data.phone,
+      primary_goal: data.primaryGoal,
+    };
 
-    if (ENABLE_VAPI && VAPI_API_KEY) {
-      currentStep = "vapi-assistant";
-      try {
-        console.log("[create-trial] Before Vapi assistant create", {
-          account_id: accountData.id,
-          company_name: data.companyName,
-        });
+    const { error: jobError } = await supabase.from("provisioning_jobs").insert({
+      account_id: currentAccountId,
+      user_id: currentUserId,
+      job_type: "provision_phone",
+      status: "queued",
+      metadata: jobMetadata,
+      correlation_id: correlationId,
+    });
 
-        // Build Vapi prompt
-        const prompt = await buildVapiPrompt({
-          company_name: data.companyName,
-          trade: data.trade,
-          service_area: data.serviceArea || "",
-          business_hours: data.businessHours || "Monday-Friday 8am-5pm",
-          emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
-          company_website: data.website || "",
-          custom_instructions: "",
-        });
-
-        const voiceId = data.assistantGender === "male" ? "michael" : "sarah";
-
-        // Vapi assistant payload
-        const assistantPayload = {
-          name: `${data.companyName} Assistant`,
-          model: {
-            provider: "openai",
-            model: "gpt-4",
-            messages: [
-              {
-                role: "system",
-                content: prompt,
-              },
-            ],
-          },
-          voice: {
-            provider: "11labs",
-            voiceId: voiceId,
-          },
-          firstMessage: `Thank you for calling ${data.companyName}! How can I help you today?`,
-        };
-
-        console.log("[create-trial] Vapi request", {
-          url: `${VAPI_BASE_URL}/assistant`,
-          method: "POST",
-          company_name: data.companyName,
-          voice: voiceId,
-        });
-
-        // Call Vapi API to create assistant
-        const vapiResponse = await fetch(`${VAPI_BASE_URL}/assistant`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${VAPI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(assistantPayload),
-        });
-
-        console.log("[create-trial] Vapi response status", {
-          status: vapiResponse.status,
-          statusText: vapiResponse.statusText,
-        });
-
-        if (!vapiResponse.ok) {
-          const errorText = await vapiResponse.text();
-          console.log("[create-trial] Vapi error body", { errorBody: errorText });
-          throw new Error(
-            `Failed to create Vapi assistant: ${vapiResponse.status} ${vapiResponse.statusText}`
-          );
-        }
-
-        const vapiAssistant = await vapiResponse.json();
-        vapiAssistantId = vapiAssistant.id;
-
-        console.log("[create-trial] After Vapi assistant create", {
-          vapi_assistant_id: vapiAssistantId,
-        });
-
-        logInfo("Vapi assistant created", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: { vapiAssistantId },
-        });
-
-        // Insert vapi_assistants record
-        console.log("[create-trial] Inserting vapi_assistants record");
-
-        const { data: assistantRow, error: assistantDbError } = await supabase
-          .from("vapi_assistants")
-          .insert({
-            account_id: accountData.id,
-            vapi_assistant_id: vapiAssistantId,
-            config: vapiAssistant,
-          })
-          .select("*")
-          .single();
-
-        if (assistantDbError) {
-          console.log("[create-trial] Failed to insert vapi_assistants", {
-            error: assistantDbError.message,
-            details: assistantDbError.details,
-            hint: assistantDbError.hint,
-          });
-          throw new Error(`Failed to insert vapi_assistants: ${assistantDbError.message}`);
-        }
-
-        vapiAssistantDbId = assistantRow.id;
-
-        console.log("[create-trial] After vapi_assistants insert", {
-          vapi_assistant_db_id: assistantRow.id,
-        });
-
-        // ═══════════════════════════════════════════════════════════════
-        // STEP 11: VAPI PHONE NUMBER PROVISIONING (BEST EFFORT)
-        // ═══════════════════════════════════════════════════════════════
-
-        currentStep = "vapi-phone";
-        console.log("[create-trial] Before Vapi phone provisioning");
-
-        const areaCode = data.zipCode?.slice(0, 3) || "415";
-
-        const phonePayload = {
-          assistantId: vapiAssistantId,
-          fallbackDestination: {
-            type: "number",
-            number: data.phone,
-          },
-          areaCode: areaCode,
-        };
-
-        console.log("[create-trial] Vapi phone request", {
-          url: `${VAPI_BASE_URL}/phone-number`,
-          method: "POST",
-          area_code: areaCode,
-        });
-
-        const phoneResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${VAPI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(phonePayload),
-        });
-
-        console.log("[create-trial] Vapi phone response status", {
-          status: phoneResponse.status,
-          statusText: phoneResponse.statusText,
-        });
-
-        if (!phoneResponse.ok) {
-          const errorText = await phoneResponse.text();
-          console.log("[create-trial] Vapi phone error body", {
-            errorBody: errorText,
-          });
-          throw new Error(
-            `Failed to provision Vapi phone: ${phoneResponse.status} ${phoneResponse.statusText}`
-          );
-        }
-
-        const vapiPhone = await phoneResponse.json();
-        phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
-        const vapiPhoneId = vapiPhone.id;
-
-        console.log("[create-trial] After Vapi phone provisioning", {
-          phone_e164: phoneE164,
-          vapi_phone_id: vapiPhoneId,
-        });
-
-        logInfo("Vapi phone provisioned", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: { phoneE164, vapiPhoneId },
-        });
-
-        // Insert phone_numbers record with minimal schema-aligned payload
-        console.log("[create-trial] Inserting phone_numbers record");
-
-        const { data: phoneRow, error: phoneDbError } = await supabase
-          .from("phone_numbers")
-          .insert({
-            account_id: accountData.id,
-            phone_number: phoneE164,
-            area_code: areaCode,
-            vapi_phone_id: vapiPhoneId,
-            vapi_id: vapiPhoneId,
-            purpose: "primary",
-            status: "active",
-            is_primary: true,
-            activated_at: new Date().toISOString(),
-            raw: vapiPhone,
-          })
-          .select("*")
-          .single();
-
-        if (phoneDbError) {
-          console.log("[create-trial] Failed to insert phone_numbers", {
-            error: phoneDbError.message,
-            details: phoneDbError.details,
-            hint: phoneDbError.hint,
-          });
-          throw new Error(`Failed to insert phone_numbers: ${phoneDbError.message}`);
-        }
-
-        phoneNumberDbId = phoneRow.id;
-
-        console.log("[create-trial] After phone_numbers insert", {
-          phone_number_db_id: phoneRow.id,
-        });
-
-        // Update account with Vapi linkage
-        console.log("[create-trial] Updating account with Vapi linkage");
-
-        const { error: accountUpdateError } = await supabase
-          .from("accounts")
-          .update({
-            vapi_assistant_id: vapiAssistantId,
-            vapi_phone_number: phoneE164,
-            phone_number_e164: phoneE164,
-            vapi_phone_number_id: vapiPhoneId,
-            phone_number_status: "active",
-            phone_provisioned_at: new Date().toISOString(),
-            provisioning_status: "completed",
-          })
-          .eq("id", accountData.id);
-
-        if (accountUpdateError) {
-          console.log("[create-trial] Account update failed (non-critical)", {
-            error: accountUpdateError.message,
-          });
-        } else {
-          console.log("[create-trial] After account update with Vapi fields");
-          vapiProvisioningStatus = "completed";
-        }
-      } catch (vapiError: any) {
-        // Vapi provisioning failed, but core signup succeeded
-        console.error("[create-trial] Vapi provisioning failed", {
-          error: vapiError.name,
-          message: vapiError.message,
-          stack: vapiError.stack,
-        });
-
-        logError("Vapi provisioning failed (non-critical)", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: vapiError,
-        });
-
-        // Update account to reflect provisioning failure
-        await supabase
-          .from("accounts")
-          .update({
-            provisioning_status: "failed",
-            provisioning_error: vapiError.message?.substring(0, 500) || "Unknown error",
-          })
-          .eq("id", accountData.id);
-
-        vapiProvisioningStatus = "failed";
-      }
-    } else if (!ENABLE_VAPI) {
-      console.log("[create-trial] Vapi provisioning temporarily disabled for debugging");
-      vapiProvisioningStatus = "pending";
+    if (jobError) {
+      logError("Failed to enqueue provisioning job (non-critical)", {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        error: jobError,
+      });
     } else {
-      console.log("[create-trial] VAPI_API_KEY not configured, skipping Vapi provisioning");
-      logWarn("VAPI_API_KEY not configured", {
+      console.log("[create-trial] Provisioning job enqueued");
+      logInfo("Provisioning job enqueued", {
         ...baseLogOptions,
         accountId: currentAccountId,
       });
-      vapiProvisioningStatus = "failed";
     }
 
     console.log("[create-trial] Done", {
-      account_id: accountData.id,
-      provisioning_status: vapiProvisioningStatus,
+      account_id: currentAccountId,
+      provisioning_status: "pending",
     });
 
     logInfo("Trial created successfully", {
@@ -1111,43 +817,68 @@ serve(async (req) => {
         source: data.source,
         planType: data.planType,
         subscriptionId: subscription.id,
-        vapiProvisioningStatus,
+        provisioningStatus: "pending",
       },
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // RETURN SUCCESS RESPONSE
+    // BUILD SUCCESS RESPONSE
     // ═══════════════════════════════════════════════════════════════
 
-    console.log("[create-trial] Completed successfully", { accountId: accountData.id });
+    const successResponse = {
+      success: true,
+      accountId: currentAccountId,
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: subscription.id,
+      // Backward compatibility fields
+      ok: true,
+      user_id: currentUserId,
+      account_id: currentAccountId,
+      email: data.email,
+      password: tempPassword,
+      stripe_customer_id: customer.id,
+      subscription_id: subscription.id,
+      trial_end_date: trialEndDate,
+      plan_type: data.planType,
+      source: data.source,
+      provisioning_status: "pending",
+      vapi_assistant_id: null,
+      phone_number: null,
+      message: "Trial started! Your AI receptionist is being set up...",
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // CACHE RESPONSE FOR IDEMPOTENCY
+    // ═══════════════════════════════════════════════════════════════
+
+    if (idempotencyKey) {
+      const requestHash = await hashRequest(rawData);
+      const clientIP =
+        req.headers.get("x-forwarded-for")?.split(",")[0] ||
+        req.headers.get("cf-connecting-ip") ||
+        "unknown";
+
+      await supabase.from("idempotency_results").insert({
+        idempotency_key: idempotencyKey,
+        request_hash: requestHash,
+        request_path: "/create-trial",
+        status_code: 200,
+        response_body: successResponse,
+        response_headers: { "Content-Type": "application/json" },
+        account_id: currentAccountId,
+        user_id: currentUserId,
+        stripe_customer_id: customer.id,
+        stripe_subscription_id: subscription.id,
+        correlation_id: correlationId,
+        source_ip: clientIP,
+        user_agent: req.headers.get("user-agent") || null,
+      });
+    }
+
+    console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        accountId: accountData.id,
-        stripeCustomerId: customer.id,
-        stripeSubscriptionId: subscription.id,
-        // Additional fields for compatibility
-        ok: true,
-        user_id: authData.user.id,
-        account_id: accountData.id,
-        email: data.email,
-        password: tempPassword,
-        stripe_customer_id: customer.id,
-        subscription_id: subscription.id,
-        trial_end_date: trialEndDate,
-        plan_type: data.planType,
-        source: data.source,
-        provisioning_status: vapiProvisioningStatus,
-        vapi_assistant_id: vapiAssistantId,
-        phone_number: phoneE164,
-        message:
-          vapiProvisioningStatus === "completed"
-            ? "Trial started! Your AI receptionist is ready."
-            : vapiProvisioningStatus === "pending"
-            ? "Trial started! Your AI receptionist is being set up..."
-            : "Trial started! Note: AI provisioning needs attention.",
-      }),
+      JSON.stringify(successResponse),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1160,10 +891,10 @@ serve(async (req) => {
       message: error?.message,
       stack: error?.stack,
       name: error?.name,
-      raw: error,
       account_id: currentAccountId,
       user_id: currentUserId,
       stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
     });
 
     logError("Trial creation failed", {
