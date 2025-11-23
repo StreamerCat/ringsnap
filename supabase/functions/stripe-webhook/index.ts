@@ -295,14 +295,120 @@ serve(async (req) => {
     const signature = req.headers.get('stripe-signature');
     const body = await req.text();
 
-    // TODO: Verify webhook signature when STRIPE_WEBHOOK_SECRET is configured
-    // For now, parse the event directly
+    // Verify webhook signature if STRIPE_WEBHOOK_SECRET is configured
+    if (STRIPE_WEBHOOK_SECRET) {
+      if (!signature) {
+        logError('Missing stripe-signature header', baseLogOptions);
+        return new Response(
+          JSON.stringify({ error: 'Missing signature' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Parse signature header
+      const signatureObj: Record<string, string> = {};
+      signature.split(',').forEach((pair) => {
+        const [key, value] = pair.split('=');
+        signatureObj[key] = value;
+      });
+
+      const timestamp = signatureObj.t;
+      const signatureV1 = signatureObj.v1;
+
+      if (!timestamp || !signatureV1) {
+        logError('Invalid stripe-signature format', baseLogOptions);
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature format' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verify timestamp (prevent replay attacks - reject events older than 5 minutes)
+      const currentTime = Math.floor(Date.now() / 1000);
+      const eventTime = parseInt(timestamp, 10);
+      const timeDiff = currentTime - eventTime;
+
+      if (timeDiff > 300) {
+        logError('Webhook timestamp too old', {
+          ...baseLogOptions,
+          context: { timeDiff, timestamp },
+        });
+        return new Response(
+          JSON.stringify({ error: 'Timestamp too old' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Compute expected signature
+      const signedPayload = `${timestamp}.${body}`;
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(STRIPE_WEBHOOK_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signatureBuffer = await crypto.subtle.sign(
+        'HMAC',
+        key,
+        encoder.encode(signedPayload)
+      );
+      const signatureArray = Array.from(new Uint8Array(signatureBuffer));
+      const expectedSignature = signatureArray
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      // Compare signatures (constant-time comparison)
+      if (expectedSignature !== signatureV1) {
+        logError('Invalid webhook signature', baseLogOptions);
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      logInfo('Webhook signature verified', baseLogOptions);
+    } else {
+      logInfo('Webhook signature validation skipped (STRIPE_WEBHOOK_SECRET not configured)', baseLogOptions);
+    }
+
     const event = JSON.parse(body);
 
     logInfo('Stripe webhook received', {
       ...baseLogOptions,
-      context: { eventType: event.type }
+      context: { eventType: event.type, eventId: event.id }
     });
+
+    // Check for duplicate event (idempotency)
+    const { data: isDuplicate, error: idempotencyError } = await supabase.rpc(
+      'record_stripe_event',
+      {
+        p_stripe_event_id: event.id,
+        p_event_type: event.type,
+        p_event_data: event,
+        p_stripe_customer_id: event.data?.object?.customer || null,
+        p_correlation_id: correlationId,
+      }
+    );
+
+    if (idempotencyError) {
+      logError('Failed to check event idempotency', {
+        ...baseLogOptions,
+        error: idempotencyError,
+        context: { eventId: event.id },
+      });
+      // Continue processing despite idempotency check failure
+    } else if (isDuplicate) {
+      logInfo('Duplicate event ignored', {
+        ...baseLogOptions,
+        context: { eventType: event.type, eventId: event.id },
+      });
+      return new Response(
+        JSON.stringify({ received: true, duplicate: true }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     switch (event.type) {
       case 'invoice.payment_succeeded': {
@@ -566,6 +672,13 @@ serve(async (req) => {
           context: { eventType: event.type }
         });
     }
+
+    // Mark event as processed
+    await supabase.rpc('mark_stripe_event_processed', {
+      p_stripe_event_id: event.id,
+      p_account_id: currentAccountId,
+      p_error: null,
+    });
 
     return new Response(JSON.stringify({ received: true }), {
       status: 200,
