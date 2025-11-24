@@ -230,10 +230,12 @@ async function cleanupStripeResources(
 }
 
 serve(async (req) => {
+  const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
+    request_id,
   };
 
   // Handle CORS preflight
@@ -248,14 +250,11 @@ serve(async (req) => {
   let phase = "start";
 
   try {
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // ═══════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════
-
-    phase = "initialization";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -271,15 +270,9 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    phase = "clients-initialized";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
     // ═══════════════════════════════════════════════════════════════
     // IDEMPOTENCY CHECK
     // ═══════════════════════════════════════════════════════════════
-
-    phase = "idempotency-check";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const idempotencyKey = req.headers.get("idempotency-key") || req.headers.get("Idempotency-Key");
 
@@ -289,34 +282,39 @@ serve(async (req) => {
         context: { idempotencyKey },
       });
 
-      const { data: existingResult, error: idempotencyError } = await supabase
-        .from("idempotency_results")
-        .select("status_code, response_body, response_headers")
-        .eq("idempotency_key", idempotencyKey)
-        .maybeSingle();
+      try {
+        const { data: existingResult, error: idempotencyError } = await supabase
+          .from("idempotency_results")
+          .select("status_code, response_body, response_headers")
+          .eq("idempotency_key", idempotencyKey)
+          .maybeSingle();
 
-      if (idempotencyError) {
-        logWarn("Idempotency check failed (continuing)", {
-          ...baseLogOptions,
-          error: idempotencyError,
-        });
-      } else if (existingResult) {
-        logInfo("Returning cached response for duplicate request", {
-          ...baseLogOptions,
-          context: { idempotencyKey, statusCode: existingResult.status_code },
-        });
+        if (idempotencyError) {
+          logWarn("Idempotency check failed (continuing)", {
+            ...baseLogOptions,
+            error: idempotencyError,
+          });
+        } else if (existingResult) {
+          logInfo("Returning cached response for duplicate request", {
+            ...baseLogOptions,
+            context: { idempotencyKey, statusCode: existingResult.status_code },
+          });
 
-        return new Response(
-          JSON.stringify(existingResult.response_body),
-          {
-            status: existingResult.status_code,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-              "X-Idempotency-Replay": "true",
-            },
-          }
-        );
+          return new Response(
+            JSON.stringify(existingResult.response_body),
+            {
+              status: existingResult.status_code,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+                "X-Idempotency-Replay": "true",
+              },
+            }
+          );
+        }
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "idempotency_check", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Idempotency check error (continuing)", { ...baseLogOptions, error: err });
       }
     }
 
@@ -324,9 +322,19 @@ serve(async (req) => {
     // INPUT VALIDATION
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "body-parsed";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-    const rawData = await req.json();
+    phase = "validate_input";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+    let rawData: any;
+    try {
+      rawData = await req.json();
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: "Invalid JSON body" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     logInfo("Raw request body received", {
       ...baseLogOptions,
@@ -362,9 +370,6 @@ serve(async (req) => {
       );
     }
 
-    phase = "input-validated";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
     logInfo("Creating trial account", {
       ...baseLogOptions,
       context: {
@@ -379,8 +384,6 @@ serve(async (req) => {
     // VALIDATION: Phone and email checks
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "validate-phone-email";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     if (!isValidPhoneNumber(data.phone)) {
       console.log("[create-trial] Invalid phone number", { phone: data.phone });
       return new Response(
@@ -410,15 +413,13 @@ serve(async (req) => {
       );
     }
 
-    phase = "phone-email-validated";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
     // ═══════════════════════════════════════════════════════════════
     // ANTI-ABUSE: Rate limiting (website signups only)
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "rate-limit-checks";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "anti_abuse";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
     if (data.source === "website") {
       const clientIP =
         req.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -428,184 +429,210 @@ serve(async (req) => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { count: ipAttempts } = await supabase
-        .from("signup_attempts")
-        .select("*", { count: "exact", head: true })
-        .eq("ip_address", clientIP)
-        .eq("success", true)
-        .gte("created_at", thirtyDaysAgo.toISOString());
+      try {
+        const { count: ipAttempts } = await supabase
+          .from("signup_attempts")
+          .select("*", { count: "exact", head: true })
+          .eq("ip_address", clientIP)
+          .eq("success", true)
+          .gte("created_at", thirtyDaysAgo.toISOString());
 
-      if (ipAttempts && ipAttempts >= 3) {
-        console.log("[create-trial] IP rate limit exceeded", { clientIP, ipAttempts });
-        logWarn("IP rate limit exceeded", {
-          ...baseLogOptions,
-          context: { clientIP, ipAttempts },
-        });
+        if (ipAttempts && ipAttempts >= 3) {
+          console.log("[create-trial] IP rate limit exceeded", { clientIP, ipAttempts });
+          logWarn("IP rate limit exceeded", {
+            ...baseLogOptions,
+            context: { clientIP, ipAttempts },
+          });
 
-        await supabase.from("signup_attempts").insert({
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: false,
-          blocked_reason: "IP rate limit exceeded (3 trials per 30 days)",
-        });
+          await supabase.from("signup_attempts").insert({
+            email: data.email,
+            phone: data.phone,
+            ip_address: clientIP,
+            device_fingerprint: data.deviceFingerprint,
+            success: false,
+            blocked_reason: "IP rate limit exceeded (3 trials per 30 days)",
+          });
 
-        return new Response(
-          JSON.stringify({
-            error: "Trial limit reached for this location. Please contact support.",
-          }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+          return new Response(
+            JSON.stringify({
+              error: "Trial limit reached for this location. Please contact support.",
+            }),
+            {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        logWarn("IP rate limit check error (continuing)", { ...baseLogOptions, error: err });
       }
 
       // Check phone number reuse
-      const { data: recentPhoneUse } = await supabase
-        .from("profiles")
-        .select("created_at")
-        .eq("phone", data.phone)
-        .gte("created_at", thirtyDaysAgo.toISOString())
-        .maybeSingle();
+      try {
+        const { data: recentPhoneUse } = await supabase
+          .from("profiles")
+          .select("created_at")
+          .eq("phone", data.phone)
+          .gte("created_at", thirtyDaysAgo.toISOString())
+          .maybeSingle();
 
-      if (recentPhoneUse) {
-        console.log("[create-trial] Phone number recently used", { phone: data.phone });
-        logWarn("Phone number recently used", {
-          ...baseLogOptions,
-          context: { phone: data.phone },
-        });
+        if (recentPhoneUse) {
+          console.log("[create-trial] Phone number recently used", { phone: data.phone });
+          logWarn("Phone number recently used", {
+            ...baseLogOptions,
+            context: { phone: data.phone },
+          });
 
-        await supabase.from("signup_attempts").insert({
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: false,
-          blocked_reason: "Phone number used within 30 days",
-        });
+          await supabase.from("signup_attempts").insert({
+            email: data.email,
+            phone: data.phone,
+            ip_address: clientIP,
+            device_fingerprint: data.deviceFingerprint,
+            success: false,
+            blocked_reason: "Phone number used within 30 days",
+          });
 
-        return new Response(
-          JSON.stringify({
-            error: "This phone number was recently used for a trial",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+          return new Response(
+            JSON.stringify({
+              error: "This phone number was recently used for a trial",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        logWarn("Phone reuse check error (continuing)", { ...baseLogOptions, error: err });
       }
-
-      phase = "rate-limit-passed";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
     // STRIPE: Create Customer (with idempotency)
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "stripe-customer-creating";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "stripe_customer";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
-    const customer = await stripe.customers.create({
-      email: data.email,
-      name: data.name,
-      phone: data.phone,
-      metadata: {
-        company_name: data.companyName,
-        trade: data.trade,
-        source: data.source,
-        sales_rep: data.salesRepName || "",
-      },
-    }, {
-      idempotencyKey: `${stripeIdempotencyPrefix}-customer`,
-    });
-
-    stripeCustomerId = customer.id;
-
-    phase = "stripe-customer-created";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    logInfo("Stripe customer created", {
-      ...baseLogOptions,
-      context: {
-        customerId: customer.id,
-        source: data.source,
+    let customer: Stripe.Customer;
+    try {
+      customer = await stripe.customers.create({
         email: data.email,
-      },
-    });
+        name: data.name,
+        phone: data.phone,
+        metadata: {
+          company_name: data.companyName,
+          trade: data.trade,
+          source: data.source,
+          sales_rep: data.salesRepName || "",
+        },
+      }, {
+        idempotencyKey: `${stripeIdempotencyPrefix}-customer`,
+      });
+
+      stripeCustomerId = customer.id;
+
+      logInfo("Stripe customer created", {
+        ...baseLogOptions,
+        context: {
+          customerId: customer.id,
+          source: data.source,
+          email: data.email,
+        },
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // STRIPE: Attach Payment Method
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "payment-method-attaching";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "stripe_payment_method";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    await stripe.paymentMethods.attach(data.paymentMethodId, {
-      customer: customer.id,
-    });
+    try {
+      await stripe.paymentMethods.attach(data.paymentMethodId, {
+        customer: customer.id,
+      });
 
-    await stripe.customers.update(customer.id, {
-      invoice_settings: {
-        default_payment_method: data.paymentMethodId,
-      },
-    });
+      await stripe.customers.update(customer.id, {
+        invoice_settings: {
+          default_payment_method: data.paymentMethodId,
+        },
+      });
 
-    phase = "payment-method-attached";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    logInfo("Payment method attached", {
-      ...baseLogOptions,
-      context: { customerId: customer.id },
-    });
+      logInfo("Payment method attached", {
+        ...baseLogOptions,
+        context: { customerId: customer.id },
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // STRIPE: Create Subscription (with idempotency)
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "stripe-subscription-creating";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "stripe_subscription";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const priceId = getStripePriceId(data.planType);
-    const subscription = await stripe.subscriptions.create({
-      customer: customer.id,
-      items: [{ price: priceId }],
-      trial_period_days: 3,
-      payment_behavior: "default_incomplete",
-      metadata: {
-        source: data.source,
-        sales_rep: data.salesRepName || "",
-        plan_type: data.planType,
-      },
-    }, {
-      idempotencyKey: `${stripeIdempotencyPrefix}-subscription`,
-    });
+    let subscription: Stripe.Subscription;
+    try {
+      const priceId = getStripePriceId(data.planType);
+      subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: priceId }],
+        trial_period_days: 3,
+        payment_behavior: "default_incomplete",
+        metadata: {
+          source: data.source,
+          sales_rep: data.salesRepName || "",
+          plan_type: data.planType,
+        },
+      }, {
+        idempotencyKey: `${stripeIdempotencyPrefix}-subscription`,
+      });
 
-    stripeSubscriptionId = subscription.id;
+      stripeSubscriptionId = subscription.id;
 
-    phase = "stripe-subscription-created";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    logInfo("Stripe subscription created", {
-      ...baseLogOptions,
-      context: {
-        subscriptionId: subscription.id,
-        planType: data.planType,
-        source: data.source,
-        status: subscription.status,
-      },
-    });
+      logInfo("Stripe subscription created", {
+        ...baseLogOptions,
+        context: {
+          subscriptionId: subscription.id,
+          planType: data.planType,
+          source: data.source,
+          status: subscription.status,
+        },
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // DATABASE: Atomic Account Creation
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "account-creating";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "account_insert";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     const tempPassword = generateSecurePassword();
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -793,17 +820,13 @@ serve(async (req) => {
       currentAccountId = accountResult.account_id;
       currentUserId = accountResult.user_id;
 
-      phase = "account-created";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
       logInfo("Account created atomically", {
         ...baseLogOptions,
         accountId: currentAccountId,
         context: { source: data.source },
       });
     } catch (accountError: any) {
-      phase = "account-creation-failed";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+      console.error(JSON.stringify({ request_id, phase, message: accountError.message, stack: accountError.stack, raw: accountError }));
 
       logError("Account creation failed - running compensation", {
         ...baseLogOptions,
@@ -813,15 +836,19 @@ serve(async (req) => {
       // COMPENSATION: Cleanup Stripe resources
       await cleanupStripeResources(stripe, customer.id, subscription.id, baseLogOptions);
 
-      throw new Error(`Account creation failed: ${accountError.message}`);
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: accountError.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ═══════════════════════════════════════════════════════════════
     // LINK LEAD (if provided)
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "link-lead";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "lead_link";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
     if (data.leadId) {
 
       // DETAILED LOGGING: Before lead update
@@ -838,43 +865,45 @@ serve(async (req) => {
         },
       });
 
-      const { error: leadLinkError } = await supabase
-        .from("signup_leads")
-        .update({
-          auth_user_id: currentUserId,
-          account_id: currentAccountId,
-          profile_id: currentUserId,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", data.leadId);
+      try {
+        const { error: leadLinkError } = await supabase
+          .from("signup_leads")
+          .update({
+            auth_user_id: currentUserId,
+            account_id: currentAccountId,
+            profile_id: currentUserId,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", data.leadId);
 
-      // DETAILED LOGGING: After lead update
-      console.error("DB_RESULT", {
-        step: "link_lead",
-        operation: "AFTER_UPDATE",
-        table: "signup_leads",
-        hasError: !!leadLinkError,
-        error: leadLinkError ? {
-          message: leadLinkError.message,
-          details: leadLinkError.details,
-          hint: leadLinkError.hint,
-          code: leadLinkError.code,
-          fullError: leadLinkError,
-        } : null,
-      });
+        // DETAILED LOGGING: After lead update
+        console.error("DB_RESULT", {
+          step: "link_lead",
+          operation: "AFTER_UPDATE",
+          table: "signup_leads",
+          hasError: !!leadLinkError,
+          error: leadLinkError ? {
+            message: leadLinkError.message,
+            details: leadLinkError.details,
+            hint: leadLinkError.hint,
+            code: leadLinkError.code,
+            fullError: leadLinkError,
+          } : null,
+        });
 
-      if (leadLinkError) {
-        console.log("[create-trial] Lead linking failed (non-critical)", {
-          error: leadLinkError.message,
-        });
-        logWarn("Lead linking failed (non-critical)", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: leadLinkError,
-        });
-      } else {
-        phase = "lead-linked";
-        console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+        if (leadLinkError) {
+          console.log("[create-trial] Lead linking failed (non-critical)", {
+            error: leadLinkError.message,
+          });
+          logWarn("Lead linking failed (non-critical)", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: leadLinkError,
+          });
+        }
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "lead_link", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
 
@@ -882,8 +911,6 @@ serve(async (req) => {
     // LOG SIGNUP SUCCESS
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "log-signup-attempt";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     if (data.source === "website") {
       const clientIP =
         req.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -904,107 +931,126 @@ serve(async (req) => {
         },
       });
 
-      const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
-        email: data.email,
-        phone: data.phone,
-        ip_address: clientIP,
-        device_fingerprint: data.deviceFingerprint,
-        success: true,
-      });
+      try {
+        const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
+          email: data.email,
+          phone: data.phone,
+          ip_address: clientIP,
+          device_fingerprint: data.deviceFingerprint,
+          success: true,
+        });
 
-      // DETAILED LOGGING: After signup_attempts insert
-      console.error("DB_RESULT", {
-        step: "log_signup_success",
-        operation: "AFTER_INSERT",
-        table: "signup_attempts",
-        hasError: !!signupAttemptError,
-        error: signupAttemptError ? {
-          message: signupAttemptError.message,
-          details: signupAttemptError.details,
-          hint: signupAttemptError.hint,
-          code: signupAttemptError.code,
-          fullError: signupAttemptError,
-        } : null,
-      });
+        // DETAILED LOGGING: After signup_attempts insert
+        console.error("DB_RESULT", {
+          step: "log_signup_success",
+          operation: "AFTER_INSERT",
+          table: "signup_attempts",
+          hasError: !!signupAttemptError,
+          error: signupAttemptError ? {
+            message: signupAttemptError.message,
+            details: signupAttemptError.details,
+            hint: signupAttemptError.hint,
+            code: signupAttemptError.code,
+            fullError: signupAttemptError,
+          } : null,
+        });
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "log_signup_success", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════
     // ENQUEUE ASYNC PROVISIONING JOB
     // ═══════════════════════════════════════════════════════════════
 
-    phase = "enqueue-provisioning";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "vapi_provision_start";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const jobMetadata = {
-      company_name: data.companyName,
-      trade: data.trade,
-      service_area: data.serviceArea || "",
-      business_hours: data.businessHours || "Monday-Friday 8am-5pm",
-      emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
-      company_website: data.website || "",
-      assistant_gender: data.assistantGender,
-      wants_advanced_voice: data.wantsAdvancedVoice,
-      area_code: data.zipCode?.slice(0, 3) || "415",
-      fallback_phone: data.phone,
-      primary_goal: data.primaryGoal,
-    };
+    // Check for VAPI kill switch
+    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
 
-    // DETAILED LOGGING: Before provisioning_jobs insert
-    console.error("DB_CALL", {
-      step: "enqueue_provisioning",
-      operation: "BEFORE_INSERT",
-      table: "provisioning_jobs",
-      payload: {
-        account_id: currentAccountId,
-        user_id: currentUserId,
-        job_type: "provision_phone",
-        status: "queued",
-        metadata: jobMetadata,
-        correlation_id: correlationId,
-      },
-    });
-
-    const { error: jobError } = await supabase.from("provisioning_jobs").insert({
-      account_id: currentAccountId,
-      user_id: currentUserId,
-      job_type: "provision_phone",
-      status: "queued",
-      metadata: jobMetadata,
-      correlation_id: correlationId,
-    });
-
-    // DETAILED LOGGING: After provisioning_jobs insert
-    console.error("DB_RESULT", {
-      step: "enqueue_provisioning",
-      operation: "AFTER_INSERT",
-      table: "provisioning_jobs",
-      hasError: !!jobError,
-      error: jobError ? {
-        message: jobError.message,
-        details: jobError.details,
-        hint: jobError.hint,
-        code: jobError.code,
-        fullError: jobError,
-      } : null,
-    });
-
-    if (jobError) {
-      logError("Failed to enqueue provisioning job (non-critical)", {
+    if (disableVapiProvisioning) {
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
+      logInfo("VAPI provisioning disabled by env var", {
         ...baseLogOptions,
         accountId: currentAccountId,
-        error: jobError,
       });
     } else {
-      phase = "provisioning-enqueued";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-      logInfo("Provisioning job enqueued", {
-        ...baseLogOptions,
-        accountId: currentAccountId,
+      const jobMetadata = {
+        company_name: data.companyName,
+        trade: data.trade,
+        service_area: data.serviceArea || "",
+        business_hours: data.businessHours || "Monday-Friday 8am-5pm",
+        emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
+        company_website: data.website || "",
+        assistant_gender: data.assistantGender,
+        wants_advanced_voice: data.wantsAdvancedVoice,
+        area_code: data.zipCode?.slice(0, 3) || "415",
+        fallback_phone: data.phone,
+        primary_goal: data.primaryGoal,
+      };
+
+      // DETAILED LOGGING: Before provisioning_jobs insert
+      console.error("DB_CALL", {
+        step: "enqueue_provisioning",
+        operation: "BEFORE_INSERT",
+        table: "provisioning_jobs",
+        payload: {
+          account_id: currentAccountId,
+          user_id: currentUserId,
+          job_type: "provision_phone",
+          status: "queued",
+          metadata: jobMetadata,
+          correlation_id: correlationId,
+        },
       });
+
+      try {
+        const { error: jobError } = await supabase.from("provisioning_jobs").insert({
+          account_id: currentAccountId,
+          user_id: currentUserId,
+          job_type: "provision_phone",
+          status: "queued",
+          metadata: jobMetadata,
+          correlation_id: correlationId,
+        });
+
+        // DETAILED LOGGING: After provisioning_jobs insert
+        console.error("DB_RESULT", {
+          step: "enqueue_provisioning",
+          operation: "AFTER_INSERT",
+          table: "provisioning_jobs",
+          hasError: !!jobError,
+          error: jobError ? {
+            message: jobError.message,
+            details: jobError.details,
+            hint: jobError.hint,
+            code: jobError.code,
+            fullError: jobError,
+          } : null,
+        });
+
+        if (jobError) {
+          logError("Failed to enqueue provisioning job (non-critical)", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: jobError,
+          });
+        } else {
+          logInfo("Provisioning job enqueued", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+          });
+        }
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "vapi_provision_start", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
+      }
     }
 
-    phase = "completed";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "done";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     logInfo("Trial created successfully", {
       ...baseLogOptions,
@@ -1048,27 +1094,32 @@ serve(async (req) => {
     // ═══════════════════════════════════════════════════════════════
 
     if (idempotencyKey) {
-      const requestHash = await hashRequest(rawData);
-      const clientIP =
-        req.headers.get("x-forwarded-for")?.split(",")[0] ||
-        req.headers.get("cf-connecting-ip") ||
-        "unknown";
+      try {
+        const requestHash = await hashRequest(rawData);
+        const clientIP =
+          req.headers.get("x-forwarded-for")?.split(",")[0] ||
+          req.headers.get("cf-connecting-ip") ||
+          "unknown";
 
-      await supabase.from("idempotency_results").insert({
-        idempotency_key: idempotencyKey,
-        request_hash: requestHash,
-        request_path: "/create-trial",
-        status_code: 200,
-        response_body: successResponse,
-        response_headers: { "Content-Type": "application/json" },
-        account_id: currentAccountId,
-        user_id: currentUserId,
-        stripe_customer_id: customer.id,
-        stripe_subscription_id: subscription.id,
-        correlation_id: correlationId,
-        source_ip: clientIP,
-        user_agent: req.headers.get("user-agent") || null,
-      });
+        await supabase.from("idempotency_results").insert({
+          idempotency_key: idempotencyKey,
+          request_hash: requestHash,
+          request_path: "/create-trial",
+          status_code: 200,
+          response_body: successResponse,
+          response_headers: { "Content-Type": "application/json" },
+          account_id: currentAccountId,
+          user_id: currentUserId,
+          stripe_customer_id: customer.id,
+          stripe_subscription_id: subscription.id,
+          correlation_id: correlationId,
+          source_ip: clientIP,
+          user_agent: req.headers.get("user-agent") || null,
+        });
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "idempotency_cache", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
+      }
     }
 
     console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
@@ -1082,16 +1133,17 @@ serve(async (req) => {
     );
   } catch (error: any) {
     // Top-level error handler
-    console.error(`[${FUNCTION_NAME}] fatal error`, {
+    console.error(JSON.stringify({
+      request_id,
       phase,
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
+      message: error?.message ?? "Unknown error",
+      stack: error?.stack ?? "",
+      raw: error,
       account_id: currentAccountId,
       user_id: currentUserId,
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId,
-    });
+    }));
 
     logError("Trial creation failed", {
       ...baseLogOptions,
@@ -1104,8 +1156,10 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        error: String(error?.message ?? errorMessage),
+        success: false,
+        request_id,
         phase,
+        message: String(error?.message ?? errorMessage),
       }),
       {
         status: 500,

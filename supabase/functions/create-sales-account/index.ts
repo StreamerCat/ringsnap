@@ -14,8 +14,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
-  const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+  const baseLogOptions = {
+    functionName: FUNCTION_NAME,
+    correlationId,
+    request_id,
+  };
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -23,27 +28,42 @@ serve(async (req) => {
   }
 
   let currentAccountId: string | null = null;
+  let currentUserId: string | null = null;
+  let stripeCustomerId: string | null = null;
+  let stripeSubscriptionId: string | null = null;
   let phase = "start";
 
   try {
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // Initialize Stripe with secret key
-    phase = "initialization";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
-      apiVersion: '2023-10-16',
-    });
+    let stripe: Stripe;
+    try {
+      stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+        apiVersion: '2023-10-16',
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Initialize Supabase with service role key (bypasses RLS)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    phase = "clients-initialized";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    let supabaseAdmin: any;
+    try {
+      supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Define validation schema
     const customerInfoSchema = z.object({
@@ -68,9 +88,19 @@ serve(async (req) => {
     });
 
     // Parse and validate request body
-    phase = "body-parsed";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-    const rawData = await req.json();
+    phase = "validate_input";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+    let rawData: any;
+    try {
+      rawData = await req.json();
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: "Invalid JSON body" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     let validatedData;
     try {
@@ -84,9 +114,6 @@ serve(async (req) => {
         }
       );
     }
-
-    phase = "input-validated";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const { customerInfo, paymentMethodId } = validatedData;
 
@@ -137,135 +164,152 @@ serve(async (req) => {
       }
     });
 
-    let stripeCustomerId = null;
-    let subscriptionId = null;
-
     // Step 1: Create Stripe customer and subscription
-    phase = "stripe-customer-creating";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "stripe_customer";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const customer = await stripe.customers.create({
-      email: customerInfo.email,
-      name: customerInfo.name,
-      phone: customerInfo.phone,
-      metadata: {
-        company_name: customerInfo.companyName,
-        trade: customerInfo.trade,
-        sales_rep: customerInfo.salesRepName,
-        source: 'sales-team'
-      }
-    });
-    stripeCustomerId = customer.id;
+    let customer: Stripe.Customer;
+    try {
+      customer = await stripe.customers.create({
+        email: customerInfo.email,
+        name: customerInfo.name,
+        phone: customerInfo.phone,
+        metadata: {
+          company_name: customerInfo.companyName,
+          trade: customerInfo.trade,
+          sales_rep: customerInfo.salesRepName,
+          source: 'sales-team'
+        }
+      });
+      stripeCustomerId = customer.id;
 
-    phase = "stripe-customer-created";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    logInfo('Stripe customer created', {
-      ...baseLogOptions,
-      context: { stripeCustomerId, email: customerInfo.email }
-    });
+      logInfo('Stripe customer created', {
+        ...baseLogOptions,
+        context: { stripeCustomerId, email: customerInfo.email }
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Attach payment method
-    phase = "payment-method-attaching";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "stripe_payment_method";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    await stripe.paymentMethods.attach(paymentMethodId, {
-      customer: stripeCustomerId,
-    });
+    try {
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: stripeCustomerId,
+      });
 
-    // Set as default payment method
-    await stripe.customers.update(stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: paymentMethodId,
-      },
-    });
-
-    phase = "payment-method-attached";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+      // Set as default payment method
+      await stripe.customers.update(stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Create subscription based on plan_type
-    phase = "stripe-subscription-creating";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "stripe_subscription";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const priceId = getPriceIdForPlan(customerInfo.planType);
-    const subscription = await stripe.subscriptions.create({
-      customer: stripeCustomerId,
-      items: [{ price: priceId }],
-      metadata: {
-        sales_rep: customerInfo.salesRepName,
-        plan_type: customerInfo.planType
+    let subscription: Stripe.Subscription;
+    try {
+      const priceId = getPriceIdForPlan(customerInfo.planType);
+      subscription = await stripe.subscriptions.create({
+        customer: stripeCustomerId,
+        items: [{ price: priceId }],
+        metadata: {
+          sales_rep: customerInfo.salesRepName,
+          plan_type: customerInfo.planType
+        }
+      });
+      stripeSubscriptionId = subscription.id;
+
+      logInfo('Subscription created', {
+        ...baseLogOptions,
+        context: { subscriptionId: subscription.id, planType: customerInfo.planType, status: subscription.status }
+      });
+
+      if (subscription.status !== 'active') {
+        throw new Error(`Subscription not active. Status: ${subscription.status}`);
       }
-    });
-    subscriptionId = subscription.id;
-
-    phase = "stripe-subscription-created";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    logInfo('Subscription created', {
-      ...baseLogOptions,
-      context: { subscriptionId, planType: customerInfo.planType, status: subscription.status }
-    });
-
-    if (subscription.status !== 'active') {
-      throw new Error(`Subscription not active. Status: ${subscription.status}`);
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Step 2: Generate secure temporary password
-    phase = "generate-password";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     const tempPassword = generateSecurePassword();
 
     // Step 3: Create Supabase auth user with metadata
-    phase = "auth-user-creating";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "auth_user";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: customerInfo.email,
-      password: tempPassword,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        name: customerInfo.name,
-        phone: customerInfo.phone,
-        company_name: customerInfo.companyName,
-        trade: customerInfo.trade,
-        service_area: customerInfo.serviceArea,
-        business_hours: customerInfo.businessHours,
-        emergency_policy: customerInfo.emergencyPolicy,
-        sales_rep_name: customerInfo.salesRepName,
-        plan_type: customerInfo.planType,
-        source: 'sales-team',
-        stripe_customer_id: stripeCustomerId,
-        wants_advanced_voice: false
-      }
-    });
-
-    if (authError) {
-      phase = "auth-user-creation-failed";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-      logError('Auth user creation failed', {
-        ...baseLogOptions,
-        error: authError,
-        context: { email: customerInfo.email }
+    let authData: any;
+    try {
+      const { data: authResult, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: customerInfo.email,
+        password: tempPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          name: customerInfo.name,
+          phone: customerInfo.phone,
+          company_name: customerInfo.companyName,
+          trade: customerInfo.trade,
+          service_area: customerInfo.serviceArea,
+          business_hours: customerInfo.businessHours,
+          emergency_policy: customerInfo.emergencyPolicy,
+          sales_rep_name: customerInfo.salesRepName,
+          plan_type: customerInfo.planType,
+          source: 'sales-team',
+          stripe_customer_id: stripeCustomerId,
+          wants_advanced_voice: false
+        }
       });
-      throw authError;
+
+      if (authError) {
+        console.error(JSON.stringify({ request_id, phase, message: authError.message, stack: "", raw: authError }));
+        logError('Auth user creation failed', {
+          ...baseLogOptions,
+          error: authError,
+          context: { email: customerInfo.email }
+        });
+        throw authError;
+      }
+
+      authData = authResult;
+      currentUserId = authData.user.id;
+
+      logInfo('Auth user created', {
+        ...baseLogOptions,
+        context: { userId: authData.user.id, email: customerInfo.email }
+      });
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
-    phase = "auth-user-created";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-    logInfo('Auth user created', {
-      ...baseLogOptions,
-      context: { userId: authData.user.id, email: customerInfo.email }
-    });
 
     // Step 4: Database trigger will automatically create:
     // - accounts table entry
     // - profiles table entry
     // - account_members table entry (owner role)
     // However, we need to verify this succeeds and create manually if it fails
-
-    phase = "wait-for-trigger";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo('Waiting for database trigger to complete', {
       ...baseLogOptions,
@@ -281,41 +325,48 @@ serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Step 5: Fetch profile and check if account was created by trigger
-    phase = "profile-fetching";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "profile_insert";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('account_id, id, name')
-      .eq('id', authData.user.id)
-      .single();
+    let profile: any;
+    try {
+      const { data: profileData, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('account_id, id, name')
+        .eq('id', authData.user.id)
+        .single();
 
-    if (profileError) {
-      phase = "profile-fetch-failed";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-      logError('Failed to fetch profile after user creation', {
-        ...baseLogOptions,
-        error: profileError,
-        context: { userId: authData.user.id }
-      });
-      throw new Error(`Profile fetch failed: ${profileError.message}`);
+      if (profileError) {
+        console.error(JSON.stringify({ request_id, phase, message: profileError.message, stack: "", raw: profileError }));
+        logError('Failed to fetch profile after user creation', {
+          ...baseLogOptions,
+          error: profileError,
+          context: { userId: authData.user.id }
+        });
+        throw new Error(`Profile fetch failed: ${profileError.message}`);
+      }
+
+      if (!profileData) {
+        logError('Profile not found after user creation', {
+          ...baseLogOptions,
+          context: { userId: authData.user.id }
+        });
+        throw new Error('Profile record not found - database trigger failed completely');
+      }
+
+      profile = profileData;
+    } catch (err: any) {
+      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+      return new Response(
+        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
-    if (!profile) {
-      logError('Profile not found after user creation', {
-        ...baseLogOptions,
-        context: { userId: authData.user.id }
-      });
-      throw new Error('Profile record not found - database trigger failed completely');
-    }
-
-    phase = "profile-fetched";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     // Check if trigger created the account
     if (!profile.account_id) {
-      phase = "account-creating-manual";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+      phase = "account_insert";
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
       logWarn('Trigger did not create account - creating manually', {
         ...baseLogOptions,
@@ -335,91 +386,102 @@ serve(async (req) => {
         ? getStateFromZip(customerInfo.zipCode.trim())
         : null;
 
-      const { data: newAccount, error: accountCreateError } = await supabaseAdmin
-        .from('accounts')
-        .insert({
-          company_name: customerInfo.companyName,
-          company_domain: null,
-          trade: customerInfo.trade,
-          assistant_gender: customerInfo.assistantGender,
-          wants_advanced_voice: false,
-          subscription_status: 'active',
-          trial_start_date: null,
-          trial_end_date: null,
-          provisioning_status: 'pending',
-          stripe_customer_id: stripeCustomerId,
-          stripe_subscription_id: subscriptionId,
-          sales_rep_name: customerInfo.salesRepName,
-          service_area: customerInfo.serviceArea,
-          business_hours: customerInfo.businessHours,
-          emergency_policy: customerInfo.emergencyPolicy,
-          plan_type: customerInfo.planType,
-          phone_number_area_code: areaCode,
-          billing_state: billingState
-        })
-        .select('id')
-        .single();
+      try {
+        const { data: newAccount, error: accountCreateError } = await supabaseAdmin
+          .from('accounts')
+          .insert({
+            company_name: customerInfo.companyName,
+            company_domain: null,
+            trade: customerInfo.trade,
+            assistant_gender: customerInfo.assistantGender,
+            wants_advanced_voice: false,
+            subscription_status: 'active',
+            trial_start_date: null,
+            trial_end_date: null,
+            provisioning_status: 'pending',
+            stripe_customer_id: stripeCustomerId,
+            stripe_subscription_id: stripeSubscriptionId,
+            sales_rep_name: customerInfo.salesRepName,
+            service_area: customerInfo.serviceArea,
+            business_hours: customerInfo.businessHours,
+            emergency_policy: customerInfo.emergencyPolicy,
+            plan_type: customerInfo.planType,
+            phone_number_area_code: areaCode,
+            billing_state: billingState
+          })
+          .select('id')
+          .single();
 
-      if (accountCreateError || !newAccount) {
-        logError('Failed to manually create account', {
+        if (accountCreateError || !newAccount) {
+          console.error(JSON.stringify({ request_id, phase, message: accountCreateError?.message ?? "Unknown", stack: "", raw: accountCreateError }));
+          logError('Failed to manually create account', {
+            ...baseLogOptions,
+            error: accountCreateError,
+            context: {
+              userId: authData.user.id,
+              companyName: customerInfo.companyName,
+              planType: customerInfo.planType,
+              errorDetails: JSON.stringify(accountCreateError)
+            }
+          });
+          throw new Error(`Account creation failed: ${accountCreateError?.message || 'Unknown error'}`);
+        }
+
+        currentAccountId = newAccount.id;
+
+        logInfo('Account created manually', {
           ...baseLogOptions,
-          error: accountCreateError,
-          context: {
-            userId: authData.user.id,
-            companyName: customerInfo.companyName,
-            planType: customerInfo.planType,
-            errorDetails: JSON.stringify(accountCreateError)
+          accountId: currentAccountId
+        });
+
+        // Update profile with the new account_id
+        phase = "role_assign";
+        console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+        try {
+          const { error: profileUpdateError } = await supabaseAdmin
+            .from('profiles')
+            .update({ account_id: currentAccountId, is_primary: true })
+            .eq('id', authData.user.id);
+
+          if (profileUpdateError) {
+            logError('Failed to link profile to manually created account', {
+              ...baseLogOptions,
+              accountId: currentAccountId,
+              error: profileUpdateError
+            });
           }
-        });
-        throw new Error(`Account creation failed: ${accountCreateError?.message || 'Unknown error'}`);
-      }
 
-      currentAccountId = newAccount.id;
+          // Create account_members entry
+          const { error: memberError } = await supabaseAdmin
+            .from('account_members')
+            .insert({
+              user_id: authData.user.id,
+              account_id: currentAccountId,
+              role: 'owner'
+            });
 
-      phase = "account-created";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-      logInfo('Account created manually', {
-        ...baseLogOptions,
-        accountId: currentAccountId
-      });
-
-      // Update profile with the new account_id
-      const { error: profileUpdateError } = await supabaseAdmin
-        .from('profiles')
-        .update({ account_id: currentAccountId, is_primary: true })
-        .eq('id', authData.user.id);
-
-      if (profileUpdateError) {
-        logError('Failed to link profile to manually created account', {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: profileUpdateError
-        });
-      }
-
-      // Create account_members entry
-      const { error: memberError } = await supabaseAdmin
-        .from('account_members')
-        .insert({
-          user_id: authData.user.id,
-          account_id: currentAccountId,
-          role: 'owner'
-        });
-
-      if (memberError) {
-        logWarn('Failed to create account_members entry', {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: memberError
-        });
+          if (memberError) {
+            logWarn('Failed to create account_members entry', {
+              ...baseLogOptions,
+              accountId: currentAccountId,
+              error: memberError
+            });
+          }
+        } catch (err: any) {
+          console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+          logWarn("Role assignment error (non-critical)", { ...baseLogOptions, error: err });
+        }
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        return new Response(
+          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     } else {
       // Trigger successfully created the account
       currentAccountId = profile.account_id;
-
-      phase = "account-exists-from-trigger";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
       logInfo('Account created by trigger', {
         ...baseLogOptions,
@@ -429,8 +491,9 @@ serve(async (req) => {
 
     // If trigger created the account, we need to update it with sales-specific fields
     if (profile.account_id) {
-      phase = "account-updating";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+      phase = "account_insert";
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
       const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
         ? getAreaCodeFromZip(customerInfo.zipCode.trim())
         : '212';
@@ -449,56 +512,62 @@ serve(async (req) => {
         }
       });
 
-      const { error: updateError } = await supabaseAdmin
-        .from('accounts')
-        .update({
-          stripe_customer_id: stripeCustomerId,
-          stripe_subscription_id: subscriptionId,
-          sales_rep_name: customerInfo.salesRepName,
-          service_area: customerInfo.serviceArea,
-          business_hours: customerInfo.businessHours,
-          emergency_policy: customerInfo.emergencyPolicy,
-          assistant_gender: customerInfo.assistantGender,
-          plan_type: customerInfo.planType,
-          subscription_status: 'active',  // Override trigger's 'trial' status
-          phone_number_area_code: areaCode,
-          billing_state: billingState,
-          trial_start_date: null,  // Sales accounts don't have trials
-          trial_end_date: null
-        })
-        .eq('id', currentAccountId);
+      try {
+        const { error: updateError } = await supabaseAdmin
+          .from('accounts')
+          .update({
+            stripe_customer_id: stripeCustomerId,
+            stripe_subscription_id: stripeSubscriptionId,
+            sales_rep_name: customerInfo.salesRepName,
+            service_area: customerInfo.serviceArea,
+            business_hours: customerInfo.businessHours,
+            emergency_policy: customerInfo.emergencyPolicy,
+            assistant_gender: customerInfo.assistantGender,
+            plan_type: customerInfo.planType,
+            subscription_status: 'active',  // Override trigger's 'trial' status
+            phone_number_area_code: areaCode,
+            billing_state: billingState,
+            trial_start_date: null,  // Sales accounts don't have trials
+            trial_end_date: null
+          })
+          .eq('id', currentAccountId);
 
-      if (updateError) {
-        logError('Failed to update account with sales data', {
+        if (updateError) {
+          console.error(JSON.stringify({ request_id, phase, message: updateError.message, stack: "", raw: updateError }));
+          logError('Failed to update account with sales data', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: updateError,
+            context: {
+              stripeCustomerId,
+              subscriptionId: stripeSubscriptionId,
+              planType: customerInfo.planType
+            }
+          });
+          throw new Error(`Account update failed: ${updateError.message}`);
+        }
+
+        logInfo('Account updated with sales data', {
           ...baseLogOptions,
           accountId: currentAccountId,
-          error: updateError,
           context: {
-            stripeCustomerId,
-            subscriptionId,
-            planType: customerInfo.planType
+            salesRepName: customerInfo.salesRepName,
+            planType: customerInfo.planType,
+            subscriptionStatus: 'active'
           }
         });
-        throw new Error(`Account update failed: ${updateError.message}`);
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        return new Response(
+          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-
-      phase = "account-updated";
-      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
-
-      logInfo('Account updated with sales data', {
-        ...baseLogOptions,
-        accountId: currentAccountId,
-        context: {
-          salesRepName: customerInfo.salesRepName,
-          planType: customerInfo.planType,
-          subscriptionStatus: 'active'
-        }
-      });
     }
 
     // Step 5.5: Handle referral code if provided
-    phase = "referral-processing";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "lead_link";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     if (customerInfo.referralCode && customerInfo.referralCode.trim().length === 8) {
       try {
@@ -538,8 +607,9 @@ serve(async (req) => {
             context: { referralCode: customerInfo.referralCode }
           });
         }
-      } catch (referralError) {
+      } catch (referralError: any) {
         // Log but don't fail the signup
+        console.error(JSON.stringify({ request_id, phase: "lead_link", message: referralError.message, stack: referralError.stack, raw: referralError }));
         logError('Referral tracking failed (non-critical)', {
           ...baseLogOptions,
           accountId: currentAccountId,
@@ -551,25 +621,37 @@ serve(async (req) => {
     // Step 6: Queue provisioning for async processing
     // Phone number provisioning takes 1-2 minutes, so we don't wait for it
     // Instead, mark account as pending and let background job handle it
-    phase = "provisioning-queued";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "vapi_provision_start";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    logInfo('Queueing async provisioning for sales account', {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: {
-        email: customerInfo.email,
-        phone: customerInfo.phone,
-        areaCode: customerInfo.zipCode ? getAreaCodeFromZip(customerInfo.zipCode.trim()) : '212'
-      }
-    });
+    // Check for VAPI kill switch
+    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+
+    let provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
+
+    if (disableVapiProvisioning) {
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
+      logInfo("VAPI provisioning disabled by env var", {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+      });
+    } else {
+      logInfo('Queueing async provisioning for sales account', {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: {
+          email: customerInfo.email,
+          phone: customerInfo.phone,
+          areaCode: customerInfo.zipCode ? getAreaCodeFromZip(customerInfo.zipCode.trim()) : '212'
+        }
+      });
+    }
 
     // Account is already marked with provisioning_status='pending' during creation
     // No synchronous provisioning - return success immediately
-    const provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
 
-    phase = "completed";
-    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+    phase = "done";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     logInfo('Sales account created successfully - provisioning queued', {
       ...baseLogOptions,
@@ -588,7 +670,7 @@ serve(async (req) => {
       accountId: currentAccountId,
       planType: customerInfo.planType,
       stripeCustomerId,
-      subscriptionId,
+      subscriptionId: stripeSubscriptionId,
       tempPassword,
       subscriptionStatus: 'active',
       ringSnapNumber: null,  // Will be populated when provisioning completes
@@ -614,18 +696,32 @@ serve(async (req) => {
       }
     );
 
-  } catch (error) {
-    console.error(`[${FUNCTION_NAME}] fatal error`, error);
+  } catch (error: any) {
+    console.error(JSON.stringify({
+      request_id,
+      phase,
+      message: error?.message ?? "Unknown error",
+      stack: error?.stack ?? "",
+      raw: error,
+      account_id: currentAccountId,
+      user_id: currentUserId,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+    }));
+
     logError('Sales account creation error', {
       ...baseLogOptions,
       accountId: currentAccountId,
       error
     });
+
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({
-        error: String(errorMessage),
-        phase
+        success: false,
+        request_id,
+        phase,
+        message: String(errorMessage),
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
