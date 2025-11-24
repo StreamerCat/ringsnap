@@ -5,7 +5,7 @@
 
 set -e
 
-SUPABASE_URL="https://lytnlrkdccqmxgdmdxef.supabase.co"
+SUPABASE_URL="https://rmyvvbqnccpfeyowidrq.supabase.co"
 ENDPOINT="$SUPABASE_URL/functions/v1/vapi-demo-call"
 
 echo "🔍 Testing VAPI Demo Edge Function"
@@ -56,7 +56,7 @@ case $HTTP_STATUS in
     echo "📋 Solution:"
     echo "   1. Deploy the edge function:"
     echo "      npx supabase login"
-    echo "      npx supabase link --project-ref lytnlrkdccqmxgdmdxef"
+    echo "      npx supabase link --project-ref rmyvvbqnccpfeyowidrq"
     echo "      npx supabase functions deploy vapi-demo-call"
     echo ""
     echo "   2. After deployment, run this script again"
@@ -79,7 +79,7 @@ case $HTTP_STATUS in
       echo "   npx supabase secrets set VAPI_DEMO_ASSISTANT_ID=\"your-id-here\""
       echo ""
       echo "Or set them in the Supabase Dashboard:"
-      echo "   https://supabase.com/dashboard/project/lytnlrkdccqmxgdmdxef"
+      echo "   https://supabase.com/dashboard/project/rmyvvbqnccpfeyowidrq"
       echo "   → Edge Functions → vapi-demo-call → Secrets tab"
     else
       echo "🔧 Issue: Unknown server error"
