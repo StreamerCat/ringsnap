@@ -17,8 +17,7 @@ const env = import.meta.env as Record<string, string | undefined>;
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? env.VITE_SUPABASE_URL;
 const supabaseAnonKey =
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  env.VITE_SUPABASE_ANON_KEY ??
-  env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  env.VITE_SUPABASE_ANON_KEY;
 
 const isConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -28,7 +27,7 @@ if (!isConfigured) {
     "The app cannot function without these variables.\n" +
     "Please set the following in your deployment platform:\n" +
     "  - VITE_SUPABASE_URL\n" +
-    "  - VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY"
+    "  - VITE_SUPABASE_ANON_KEY"
   );
 }
 
@@ -57,7 +56,7 @@ try {
             <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px;">Missing Configuration:</p>
             <ul style="color: #7f1d1d; margin: 0; padding-left: 20px;">
               <li>VITE_SUPABASE_URL</li>
-              <li>VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)</li>
+              <li>VITE_SUPABASE_ANON_KEY</li>
             </ul>
           </div>
           <p style="color: #6b7280; font-size: 14px;">Check the browser console for more details.</p>
