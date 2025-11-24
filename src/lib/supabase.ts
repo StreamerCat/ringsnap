@@ -9,8 +9,7 @@ const env = import.meta.env as Record<string, string | undefined>;
 const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? env.VITE_SUPABASE_URL;
 const supabaseAnonKey =
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  env.VITE_SUPABASE_ANON_KEY ??
-  env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  env.VITE_SUPABASE_ANON_KEY;
 
 // Export configuration status for components to check
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
@@ -20,7 +19,7 @@ if (!isSupabaseConfigured) {
     "❌ Supabase environment variables are not configured!\n" +
     "Required variables:\n" +
     "  - VITE_SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)\n" +
-    "  - VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)\n" +
+    "  - VITE_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)\n" +
     "Current values:\n" +
     `  - supabaseUrl: ${supabaseUrl || 'undefined'}\n` +
     `  - supabaseAnonKey: ${supabaseAnonKey ? '[REDACTED - exists]' : 'undefined'}`

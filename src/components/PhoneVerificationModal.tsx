@@ -56,12 +56,13 @@ export function PhoneVerificationModal({ open, onOpenChange, phone, onSuccess }:
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
       const response = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ phone, code })
@@ -93,12 +94,13 @@ export function PhoneVerificationModal({ open, onOpenChange, phone, onSuccess }:
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
       const response = await fetch(`${supabaseUrl}/functions/v1/send-verification-code`, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey': supabaseAnonKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ phone })
