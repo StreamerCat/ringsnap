@@ -16,15 +16,22 @@ const corsHeaders = {
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   let currentAccountId: string | null = null;
+  let phase = "start";
 
   try {
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     // Initialize Stripe with secret key
+    phase = "initialization";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2023-10-16',
     });
@@ -34,6 +41,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    phase = "clients-initialized";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     // Define validation schema
     const customerInfoSchema = z.object({
@@ -58,7 +68,10 @@ serve(async (req) => {
     });
 
     // Parse and validate request body
+    phase = "body-parsed";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     const rawData = await req.json();
+
     let validatedData;
     try {
       validatedData = salesAccountSchema.parse(rawData);
@@ -71,6 +84,9 @@ serve(async (req) => {
         }
       );
     }
+
+    phase = "input-validated";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const { customerInfo, paymentMethodId } = validatedData;
 
@@ -100,6 +116,9 @@ serve(async (req) => {
     let subscriptionId = null;
 
     // Step 1: Create Stripe customer and subscription
+    phase = "stripe-customer-creating";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     const customer = await stripe.customers.create({
       email: customerInfo.email,
       name: customerInfo.name,
@@ -112,12 +131,19 @@ serve(async (req) => {
       }
     });
     stripeCustomerId = customer.id;
+
+    phase = "stripe-customer-created";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     logInfo('Stripe customer created', {
       ...baseLogOptions,
       context: { stripeCustomerId, email: customerInfo.email }
     });
 
     // Attach payment method
+    phase = "payment-method-attaching";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     await stripe.paymentMethods.attach(paymentMethodId, {
       customer: stripeCustomerId,
     });
@@ -129,7 +155,13 @@ serve(async (req) => {
       },
     });
 
+    phase = "payment-method-attached";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     // Create subscription based on plan_type
+    phase = "stripe-subscription-creating";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     const priceId = getPriceIdForPlan(customerInfo.planType);
     const subscription = await stripe.subscriptions.create({
       customer: stripeCustomerId,
@@ -140,6 +172,10 @@ serve(async (req) => {
       }
     });
     subscriptionId = subscription.id;
+
+    phase = "stripe-subscription-created";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     logInfo('Subscription created', {
       ...baseLogOptions,
       context: { subscriptionId, planType: customerInfo.planType, status: subscription.status }
@@ -150,9 +186,14 @@ serve(async (req) => {
     }
 
     // Step 2: Generate secure temporary password
+    phase = "generate-password";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     const tempPassword = generateSecurePassword();
 
     // Step 3: Create Supabase auth user with metadata
+    phase = "auth-user-creating";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: customerInfo.email,
       password: tempPassword,
@@ -174,6 +215,8 @@ serve(async (req) => {
     });
 
     if (authError) {
+      phase = "auth-user-creation-failed";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
       logError('Auth user creation failed', {
         ...baseLogOptions,
         error: authError,
@@ -181,6 +224,9 @@ serve(async (req) => {
       });
       throw authError;
     }
+
+    phase = "auth-user-created";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo('Auth user created', {
       ...baseLogOptions,
@@ -192,6 +238,9 @@ serve(async (req) => {
     // - profiles table entry
     // - account_members table entry (owner role)
     // However, we need to verify this succeeds and create manually if it fails
+
+    phase = "wait-for-trigger";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo('Waiting for database trigger to complete', {
       ...baseLogOptions,
@@ -207,6 +256,9 @@ serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Step 5: Fetch profile and check if account was created by trigger
+    phase = "profile-fetching";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('account_id, id, name')
@@ -214,6 +266,8 @@ serve(async (req) => {
       .single();
 
     if (profileError) {
+      phase = "profile-fetch-failed";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
       logError('Failed to fetch profile after user creation', {
         ...baseLogOptions,
         error: profileError,
@@ -230,8 +284,14 @@ serve(async (req) => {
       throw new Error('Profile record not found - database trigger failed completely');
     }
 
+    phase = "profile-fetched";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     // Check if trigger created the account
     if (!profile.account_id) {
+      phase = "account-creating-manual";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
       logWarn('Trigger did not create account - creating manually', {
         ...baseLogOptions,
         context: {
@@ -290,6 +350,9 @@ serve(async (req) => {
 
       currentAccountId = newAccount.id;
 
+      phase = "account-created";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
       logInfo('Account created manually', {
         ...baseLogOptions,
         accountId: currentAccountId
@@ -329,6 +392,9 @@ serve(async (req) => {
       // Trigger successfully created the account
       currentAccountId = profile.account_id;
 
+      phase = "account-exists-from-trigger";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
       logInfo('Account created by trigger', {
         ...baseLogOptions,
         accountId: currentAccountId
@@ -337,6 +403,8 @@ serve(async (req) => {
 
     // If trigger created the account, we need to update it with sales-specific fields
     if (profile.account_id) {
+      phase = "account-updating";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
       const areaCode = (customerInfo.zipCode && customerInfo.zipCode.trim())
         ? getAreaCodeFromZip(customerInfo.zipCode.trim())
         : '212';
@@ -387,6 +455,9 @@ serve(async (req) => {
         throw new Error(`Account update failed: ${updateError.message}`);
       }
 
+      phase = "account-updated";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
       logInfo('Account updated with sales data', {
         ...baseLogOptions,
         accountId: currentAccountId,
@@ -399,6 +470,9 @@ serve(async (req) => {
     }
 
     // Step 5.5: Handle referral code if provided
+    phase = "referral-processing";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     if (customerInfo.referralCode && customerInfo.referralCode.trim().length === 8) {
       try {
         // Look up the referral code to find the referrer
@@ -450,6 +524,9 @@ serve(async (req) => {
     // Step 6: Queue provisioning for async processing
     // Phone number provisioning takes 1-2 minutes, so we don't wait for it
     // Instead, mark account as pending and let background job handle it
+    phase = "provisioning-queued";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
+
     logInfo('Queueing async provisioning for sales account', {
       ...baseLogOptions,
       accountId: currentAccountId,
@@ -463,6 +540,9 @@ serve(async (req) => {
     // Account is already marked with provisioning_status='pending' during creation
     // No synchronous provisioning - return success immediately
     const provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
+
+    phase = "completed";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo('Sales account created successfully - provisioning queued', {
       ...baseLogOptions,
@@ -508,17 +588,17 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    console.error(`[${FUNCTION_NAME}] fatal error`, error);
     logError('Sales account creation error', {
       ...baseLogOptions,
       accountId: currentAccountId,
       error
     });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorDetails = error instanceof Error ? error.stack : 'Unknown error';
     return new Response(
       JSON.stringify({
-        error: errorMessage,
-        details: errorDetails
+        error: String(errorMessage),
+        phase
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
