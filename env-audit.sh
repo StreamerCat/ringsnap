@@ -1,84 +1,79 @@
-cat > env-audit.sh <<'EOF'
 #!/usr/bin/env bash
+set -euo pipefail
 
 echo "ENV AUDIT RUNNING"
+ROOT_DIR="$(pwd)"
+echo "Repo root: $ROOT_DIR"
 echo
 
-ROOT="$(pwd)"
-echo "pwd: $ROOT"
-echo
-
-########################################
-# 1) Local .env files
-########################################
-echo "==== 1) Local .env files ===="
-for f in .env .env.local .env.production .env.development .env.example .env.provisioning.example; do
-  if [ -f "$f" ]; then
-    echo "--- $f ---"
-    sed -E 's/=.*/=***redacted***/' "$f" | grep -v '^\s*$' || true
-    echo
-  fi
-done
-
-########################################
-# 2) Variables referenced in code
-########################################
-echo "==== 2) Code references to env vars ===="
-grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
-  -e 'VITE_SUPABASE_URL' \
-  -e 'VITE_SUPABASE_ANON_KEY' \
-  -e 'VITE_SUPABASE_PUBLISHABLE_KEY' \
-  -e 'NEXT_PUBLIC_SUPABASE_URL' \
-  -e 'NEXT_PUBLIC_SUPABASE_ANON_KEY' \
-  -e 'SUPABASE_URL' \
-  -e 'SUPABASE_SERVICE_ROLE_KEY' \
-  src app supabase 2>/dev/null || echo "(no matches)"
-echo
-
-########################################
-# 3) Redirects pointing to old Supabase projects
-########################################
-echo "==== 3) Redirects ===="
-if [ -f ./public/_redirects ]; then
-  echo "--- public/_redirects ---"
-  cat ./public/_redirects
+# Load .env if present (WITHOUT echoing secrets)
+if [ -f ".env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+  echo "Loaded .env"
 else
-  echo "(no _redirects file found)"
+  echo "No .env found"
 fi
 echo
 
-########################################
-# 4) Hardcoded Supabase project refs
-########################################
-echo "==== 4) Hardcoded Supabase refs in repo ===="
-grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
-  -e '\.supabase\.co' \
-  -e 'project-ref' \
-  -e 'SUPABASE_URL=' \
-  . 2>/dev/null || echo "(no matches)"
+echo "== Required environment variables (presence only) =="
+required_vars=(
+  "VITE_SUPABASE_URL"
+  "VITE_SUPABASE_PUBLISHABLE_KEY"
+  "SUPABASE_URL"
+  "SUPABASE_SERVICE_ROLE_KEY"
+  "STRIPE_SECRET_KEY"
+  "STRIPE_WEBHOOK_SECRET"
+  "VAPI_API_KEY"
+  "SITE_URL"
+)
+for v in "${required_vars[@]}"; do
+  if [ "${!v-}" != "" ]; then
+    echo "  ✅ $v is set"
+  else
+    echo "  ❌ $v is NOT set"
+  fi
+done
 echo
 
-########################################
-# 5) Summary
-########################################
-echo "==== 5) Summary of required env vars ===="
-cat <<'SUMMARY'
-Frontend (Netlify / Vite bundle):
-- VITE_SUPABASE_URL
-- VITE_SUPABASE_PUBLISHABLE_KEY
+echo "== Supabase project refs found in repo =="
+# Find all supabase.co hostnames, extract project refs
+refs=$(grep -RhoE "https://[a-z0-9-]+\.supabase\.co" . \
+  --exclude-dir=node_modules --exclude-dir=.git --exclude=*.lock --exclude=*.png --exclude=*.jpg --exclude=*.svg \
+  | sed -E 's|https://([a-z0-9-]+)\.supabase\.co|\1|' \
+  | sort -u)
 
-Backend (Netlify serverless + Supabase functions):
-- SUPABASE_URL
-- SUPABASE_SERVICE_ROLE_KEY
-
-Notes:
-- DO NOT expose service role in Vite builds.
-- Ensure only ONE Supabase project exists in all code.
-- Ensure redirects do not point to old projects.
-SUMMARY
-
+if [ -z "$refs" ]; then
+  echo "  (none found)"
+else
+  echo "$refs" | awk '{print "  - " $0}'
+fi
 echo
-echo "ENV AUDIT COMPLETE"
-EOF
 
-chmod +x env-audit.sh
+echo "== Any hardcoded Supabase URLs or refs in runtime code? =="
+grep -RInE "supabase\.co|PROJECT_REF|VITE_SUPABASE_URL|SUPABASE_URL" src supabase app scripts \
+  --exclude-dir=node_modules --exclude-dir=.git \
+  | head -n 120
+echo "  (showing first 120 matches)"
+echo
+
+echo "== Check for accidental exposure of service role key to client =="
+# Any VITE_/NEXT_PUBLIC_ service role keys are dangerous
+grep -RInE "(VITE_|NEXT_PUBLIC_).*(SERVICE_ROLE|SERVICE_KEY)" . \
+  --exclude-dir=node_modules --exclude-dir=.git \
+  | head -n 50 || true
+echo
+
+echo "== Verify local Supabase CLI link (if available) =="
+if command -v supabase >/dev/null 2>&1; then
+  supabase status 2>/dev/null || echo "supabase status failed (not linked or not running locally)"
+  echo
+  supabase link --project-ref "${SUPABASE_PROJECT_REF-}" 2>/dev/null || true
+else
+  echo "Supabase CLI not installed in this environment."
+fi
+echo
+
+echo "== Done =="
