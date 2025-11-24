@@ -1,6 +1,5 @@
 cat > env-audit.sh <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
 
 echo "ENV AUDIT RUNNING"
 echo
@@ -9,18 +8,22 @@ ROOT="$(pwd)"
 echo "pwd: $ROOT"
 echo
 
+########################################
+# 1) Local .env files
+########################################
 echo "==== 1) Local .env files ===="
 for f in .env .env.local .env.production .env.development .env.example .env.provisioning.example; do
   if [ -f "$f" ]; then
     echo "--- $f ---"
-    # show keys only, not values
     sed -E 's/=.*/=***redacted***/' "$f" | grep -v '^\s*$' || true
     echo
   fi
 done
 
-echo "==== 2) Vite/Next public vars referenced in code ===="
-echo "Looking for VITE_ and NEXT_PUBLIC_ usage..."
+########################################
+# 2) Variables referenced in code
+########################################
+echo "==== 2) Code references to env vars ===="
 grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
   -e 'VITE_SUPABASE_URL' \
   -e 'VITE_SUPABASE_ANON_KEY' \
@@ -29,37 +32,49 @@ grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
   -e 'NEXT_PUBLIC_SUPABASE_ANON_KEY' \
   -e 'SUPABASE_URL' \
   -e 'SUPABASE_SERVICE_ROLE_KEY' \
-  src app supabase || true
+  src app supabase 2>/dev/null || echo "(no matches)"
 echo
 
-echo "==== 3) Netlify redirects pointing to old projects ===="
+########################################
+# 3) Redirects pointing to old Supabase projects
+########################################
+echo "==== 3) Redirects ===="
 if [ -f ./public/_redirects ]; then
   echo "--- public/_redirects ---"
   cat ./public/_redirects
-  echo
+else
+  echo "(no _redirects file found)"
 fi
+echo
 
-echo "==== 4) Supabase project refs hardcoded ===="
+########################################
+# 4) Hardcoded Supabase project refs
+########################################
+echo "==== 4) Hardcoded Supabase refs in repo ===="
 grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
   -e '\.supabase\.co' \
   -e 'project-ref' \
   -e 'SUPABASE_URL=' \
-  -e 'VITE_SUPABASE_URL=' \
-  . || true
+  . 2>/dev/null || echo "(no matches)"
 echo
 
-echo "==== 5) Summary of what SHOULD exist ===="
+########################################
+# 5) Summary
+########################################
+echo "==== 5) Summary of required env vars ===="
 cat <<'SUMMARY'
-Frontend (Netlify + client bundle):
+Frontend (Netlify / Vite bundle):
 - VITE_SUPABASE_URL
-- VITE_SUPABASE_PUBLISHABLE_KEY   (this IS the anon/public key)
-Optional if you use Next instead of Vite:
-- NEXT_PUBLIC_SUPABASE_URL
-- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- VITE_SUPABASE_PUBLISHABLE_KEY
 
-Server-only (Netlify functions, Supabase Edge Functions, scripts):
-- SUPABASE_URL                    (same value as VITE_SUPABASE_URL, but server side)
-- SUPABASE_SERVICE_ROLE_KEY       (NEVER prefixed with VITE_ or NEXT_PUBLIC_)
+Backend (Netlify serverless + Supabase functions):
+- SUPABASE_URL
+- SUPABASE_SERVICE_ROLE_KEY
+
+Notes:
+- DO NOT expose service role in Vite builds.
+- Ensure only ONE Supabase project exists in all code.
+- Ensure redirects do not point to old projects.
 SUMMARY
 
 echo
