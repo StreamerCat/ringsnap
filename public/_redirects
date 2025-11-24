@@ -1,9 +1,9 @@
 # API Proxy
-/api/webhooks/stripe     https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/stripe-ingest     200
-/api/webhooks/vapi       https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/clever-api        200
-/api/assistant/toggle    https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/assistant-toggle  200
-/api/billing/checkout    https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/billing-checkout  200
-/api/billing/portal      https://jwoprcqnvheuljjxwrbu.supabase.co/functions/v1/billing-portal    200
+/api/webhooks/stripe     https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/stripe-ingest     200
+/api/webhooks/vapi       https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/clever-api        200
+/api/assistant/toggle    https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/assistant-toggle  200
+/api/billing/checkout    https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-checkout  200
+/api/billing/portal      https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-portal    200
 /api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu              200
 
 # SPA fallback - must be last
