@@ -245,16 +245,17 @@ serve(async (req) => {
   let currentUserId: string | null = null;
   let stripeCustomerId: string | null = null;
   let stripeSubscriptionId: string | null = null;
-  let currentStep = "start";
+  let phase = "start";
 
   try {
-    console.log("[create-trial] Start", { correlationId });
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     // ═══════════════════════════════════════════════════════════════
     // INITIALIZATION
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "initialization";
+    phase = "initialization";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -270,13 +271,15 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    console.log("[create-trial] Clients initialized");
+    phase = "clients-initialized";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     // ═══════════════════════════════════════════════════════════════
     // IDEMPOTENCY CHECK
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "idempotency-check";
+    phase = "idempotency-check";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const idempotencyKey = req.headers.get("idempotency-key") || req.headers.get("Idempotency-Key");
 
@@ -321,7 +324,8 @@ serve(async (req) => {
     // INPUT VALIDATION
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "parse-body";
+    phase = "body-parsed";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     const rawData = await req.json();
 
     logInfo("Raw request body received", {
@@ -358,11 +362,8 @@ serve(async (req) => {
       );
     }
 
-    console.log("[create-trial] Input validated", {
-      email: data.email,
-      source: data.source,
-      planType: data.planType,
-    });
+    phase = "input-validated";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo("Creating trial account", {
       ...baseLogOptions,
@@ -378,7 +379,8 @@ serve(async (req) => {
     // VALIDATION: Phone and email checks
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "validate-phone-email";
+    phase = "validate-phone-email";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     if (!isValidPhoneNumber(data.phone)) {
       console.log("[create-trial] Invalid phone number", { phone: data.phone });
       return new Response(
@@ -408,13 +410,15 @@ serve(async (req) => {
       );
     }
 
-    console.log("[create-trial] Phone and email validated");
+    phase = "phone-email-validated";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     // ═══════════════════════════════════════════════════════════════
     // ANTI-ABUSE: Rate limiting (website signups only)
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "rate-limit-checks";
+    phase = "rate-limit-checks";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     if (data.source === "website") {
       const clientIP =
         req.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -493,15 +497,16 @@ serve(async (req) => {
         );
       }
 
-      console.log("[create-trial] Rate limit checks passed");
+      phase = "rate-limit-passed";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
     // STRIPE: Create Customer (with idempotency)
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "create-stripe-customer";
-    console.log("[create-trial] Creating Stripe customer", { email: data.email });
+    phase = "stripe-customer-creating";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
@@ -521,7 +526,8 @@ serve(async (req) => {
 
     stripeCustomerId = customer.id;
 
-    console.log("[create-trial] Stripe customer created", { stripeCustomerId: customer.id });
+    phase = "stripe-customer-created";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo("Stripe customer created", {
       ...baseLogOptions,
@@ -536,10 +542,8 @@ serve(async (req) => {
     // STRIPE: Attach Payment Method
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "attach-payment-method";
-    console.log("[create-trial] Attaching payment method", {
-      paymentMethodId: data.paymentMethodId,
-    });
+    phase = "payment-method-attaching";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     await stripe.paymentMethods.attach(data.paymentMethodId, {
       customer: customer.id,
@@ -551,7 +555,8 @@ serve(async (req) => {
       },
     });
 
-    console.log("[create-trial] Payment method attached");
+    phase = "payment-method-attached";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo("Payment method attached", {
       ...baseLogOptions,
@@ -562,10 +567,8 @@ serve(async (req) => {
     // STRIPE: Create Subscription (with idempotency)
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "create-stripe-subscription";
-    console.log("[create-trial] Creating Stripe subscription", {
-      planType: data.planType,
-    });
+    phase = "stripe-subscription-creating";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const priceId = getStripePriceId(data.planType);
     const subscription = await stripe.subscriptions.create({
@@ -584,7 +587,8 @@ serve(async (req) => {
 
     stripeSubscriptionId = subscription.id;
 
-    console.log("[create-trial] Stripe subscription created", { stripeSubscriptionId: subscription.id });
+    phase = "stripe-subscription-created";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo("Stripe subscription created", {
       ...baseLogOptions,
@@ -600,8 +604,8 @@ serve(async (req) => {
     // DATABASE: Atomic Account Creation
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "create-account-atomic";
-    console.log("[create-trial] Creating account atomically");
+    phase = "account-creating";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const tempPassword = generateSecurePassword();
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -715,10 +719,8 @@ serve(async (req) => {
       currentAccountId = accountResult.account_id;
       currentUserId = accountResult.user_id;
 
-      console.log("[create-trial] Account created atomically", {
-        accountId: currentAccountId,
-        userId: currentUserId,
-      });
+      phase = "account-created";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
       logInfo("Account created atomically", {
         ...baseLogOptions,
@@ -726,9 +728,8 @@ serve(async (req) => {
         context: { source: data.source },
       });
     } catch (accountError: any) {
-      console.error("[create-trial] Account creation failed", {
-        error: accountError.message,
-      });
+      phase = "account-creation-failed";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
       logError("Account creation failed - running compensation", {
         ...baseLogOptions,
@@ -745,9 +746,9 @@ serve(async (req) => {
     // LINK LEAD (if provided)
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "link-lead";
+    phase = "link-lead";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     if (data.leadId) {
-      console.log("[create-trial] Linking lead", { lead_id: data.leadId });
 
       // DETAILED LOGGING: Before lead update
       console.error("DB_CALL", {
@@ -798,7 +799,8 @@ serve(async (req) => {
           error: leadLinkError,
         });
       } else {
-        console.log("[create-trial] Lead linked successfully", { lead_id: data.leadId });
+        phase = "lead-linked";
+        console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
       }
     }
 
@@ -806,6 +808,8 @@ serve(async (req) => {
     // LOG SIGNUP SUCCESS
     // ═══════════════════════════════════════════════════════════════
 
+    phase = "log-signup-attempt";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
     if (data.source === "website") {
       const clientIP =
         req.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -854,8 +858,8 @@ serve(async (req) => {
     // ENQUEUE ASYNC PROVISIONING JOB
     // ═══════════════════════════════════════════════════════════════
 
-    currentStep = "enqueue-provisioning";
-    console.log("[create-trial] Enqueuing provisioning job");
+    phase = "enqueue-provisioning";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     const jobMetadata = {
       company_name: data.companyName,
@@ -917,17 +921,16 @@ serve(async (req) => {
         error: jobError,
       });
     } else {
-      console.log("[create-trial] Provisioning job enqueued");
+      phase = "provisioning-enqueued";
+      console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
       logInfo("Provisioning job enqueued", {
         ...baseLogOptions,
         accountId: currentAccountId,
       });
     }
 
-    console.log("[create-trial] Done", {
-      account_id: currentAccountId,
-      provisioning_status: "pending",
-    });
+    phase = "completed";
+    console.log(`[${FUNCTION_NAME}] phase: ${phase}`);
 
     logInfo("Trial created successfully", {
       ...baseLogOptions,
@@ -1005,8 +1008,8 @@ serve(async (req) => {
     );
   } catch (error: any) {
     // Top-level error handler
-    console.error("[create-trial] Unhandled error", {
-      step: currentStep,
+    console.error(`[${FUNCTION_NAME}] fatal error`, {
+      phase,
       message: error?.message,
       stack: error?.stack,
       name: error?.name,
@@ -1020,17 +1023,15 @@ serve(async (req) => {
       ...baseLogOptions,
       accountId: currentAccountId,
       error,
-      context: { step: currentStep },
+      context: { phase },
     });
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     return new Response(
       JSON.stringify({
-        error: "INTERNAL_ERROR",
-        step: currentStep,
-        message: error?.message ?? null,
-        detail: errorMessage,
+        error: String(error?.message ?? errorMessage),
+        phase,
       }),
       {
         status: 500,
