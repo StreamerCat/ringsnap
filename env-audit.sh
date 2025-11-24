@@ -1,75 +1,69 @@
+cat > env-audit.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-EXPECTED_REF="rmyvvbqnccpfeyowidrq"
-EXPECTED_URL="https://${EXPECTED_REF}.supabase.co"
+echo "ENV AUDIT RUNNING"
+echo
 
-echo ""
-echo "=============================="
-echo " RingSnap Environment Audit"
-echo " Expected ref:  ${EXPECTED_REF}"
-echo " Expected url:  ${EXPECTED_URL}"
-echo "=============================="
-echo ""
+ROOT="$(pwd)"
+echo "pwd: $ROOT"
+echo
 
-echo "1) Local env files"
-for f in .env .env.local .env.development .env.production .env.example .env.provisioning.example; do
+echo "==== 1) Local .env files ===="
+for f in .env .env.local .env.production .env.development .env.example .env.provisioning.example; do
   if [ -f "$f" ]; then
-    echo ""
-    echo "---- $f ----"
-    grep -E "SUPABASE_URL|VITE_SUPABASE_URL|PUBLISHABLE_KEY|ANON_KEY|SERVICE_ROLE_KEY|PROJECT_REF" "$f" || true
+    echo "--- $f ---"
+    # show keys only, not values
+    sed -E 's/=.*/=***redacted***/' "$f" | grep -v '^\s*$' || true
+    echo
   fi
 done
 
-echo ""
-echo "2) Search for Supabase URLs in repo"
+echo "==== 2) Vite/Next public vars referenced in code ===="
+echo "Looking for VITE_ and NEXT_PUBLIC_ usage..."
 grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
-  -E "supabase\.co|SUPABASE_URL|VITE_SUPABASE_URL|PROJECT_REF" . || true
+  -e 'VITE_SUPABASE_URL' \
+  -e 'VITE_SUPABASE_ANON_KEY' \
+  -e 'VITE_SUPABASE_PUBLISHABLE_KEY' \
+  -e 'NEXT_PUBLIC_SUPABASE_URL' \
+  -e 'NEXT_PUBLIC_SUPABASE_ANON_KEY' \
+  -e 'SUPABASE_URL' \
+  -e 'SUPABASE_SERVICE_ROLE_KEY' \
+  src app supabase || true
+echo
 
-echo ""
-echo "3) Search for old project refs (common drift)"
-grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
-  -E "lytnlrkdccqmxgdmdxef|jwoprcqnvheuljjxwrbu|placeholder\.supabase\.co" . || true
-
-echo ""
-echo "4) Check Supabase CLI linked project"
-if command -v supabase >/dev/null 2>&1; then
-  echo "supabase status:"
-  supabase status || true
-
-  echo ""
-  echo "supabase projects linked in .supabase/config.toml:"
-  if [ -f ".supabase/config.toml" ]; then
-    cat .supabase/config.toml
-  else
-    echo "No .supabase/config.toml found."
-  fi
-else
-  echo "Supabase CLI not installed, skipping CLI checks."
+echo "==== 3) Netlify redirects pointing to old projects ===="
+if [ -f ./public/_redirects ]; then
+  echo "--- public/_redirects ---"
+  cat ./public/_redirects
+  echo
 fi
 
-echo ""
-echo "5) Check Netlify redirects for wrong targets"
-if [ -f "public/_redirects" ]; then
-  echo "public/_redirects:"
-  cat public/_redirects
-else
-  echo "No public/_redirects found."
-fi
-
-echo ""
-echo "6) Check Stripe/Vapi webhook URLs in docs and config"
+echo "==== 4) Supabase project refs hardcoded ===="
 grep -RIn --exclude-dir=node_modules --exclude-dir=.git \
-  -E "stripe-webhook|webhook|vapi|functions\.supabase\.co" . || true
+  -e '\.supabase\.co' \
+  -e 'project-ref' \
+  -e 'SUPABASE_URL=' \
+  -e 'VITE_SUPABASE_URL=' \
+  . || true
+echo
 
-echo ""
-echo "=============================="
-echo " Audit complete."
-echo "=============================="
-echo ""
-echo "If you see ANY URL or ref that is not:"
-echo "  ${EXPECTED_URL}"
-echo "or ref not equal to:"
-echo "  ${EXPECTED_REF}"
-echo "that is a live drift point."
-echo ""
+echo "==== 5) Summary of what SHOULD exist ===="
+cat <<'SUMMARY'
+Frontend (Netlify + client bundle):
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_PUBLISHABLE_KEY   (this IS the anon/public key)
+Optional if you use Next instead of Vite:
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+Server-only (Netlify functions, Supabase Edge Functions, scripts):
+- SUPABASE_URL                    (same value as VITE_SUPABASE_URL, but server side)
+- SUPABASE_SERVICE_ROLE_KEY       (NEVER prefixed with VITE_ or NEXT_PUBLIC_)
+SUMMARY
+
+echo
+echo "ENV AUDIT COMPLETE"
+EOF
+
+chmod +x env-audit.sh
