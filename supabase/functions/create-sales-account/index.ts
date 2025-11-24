@@ -90,6 +90,31 @@ serve(async (req) => {
 
     const { customerInfo, paymentMethodId } = validatedData;
 
+    // Normalize plan_type to match SQL constraint (starter|professional|premium)
+    const rawPlan = (customerInfo.planType || "starter")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    customerInfo.planType =
+      rawPlan === "pro" ? "professional" :
+      rawPlan === "professional" ? "professional" :
+      rawPlan === "premium" ? "premium" :
+      "starter";
+
+    // Normalize assistant_gender to match SQL constraint (male|female)
+    const rawGender = (customerInfo.assistantGender || "female")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    customerInfo.assistantGender =
+      rawGender === "male" ? "male" : "female";
+
+    // Log normalized values
+    console.log(`[${FUNCTION_NAME}] normalized plan_type =`, customerInfo.planType);
+    console.log(`[${FUNCTION_NAME}] normalized assistant_gender =`, customerInfo.assistantGender);
+
     if (!paymentMethodId) {
       logError('Missing payment method', {
         ...baseLogOptions,
@@ -316,6 +341,7 @@ serve(async (req) => {
           company_name: customerInfo.companyName,
           company_domain: null,
           trade: customerInfo.trade,
+          assistant_gender: customerInfo.assistantGender,
           wants_advanced_voice: false,
           subscription_status: 'active',
           trial_start_date: null,
@@ -432,6 +458,7 @@ serve(async (req) => {
           service_area: customerInfo.serviceArea,
           business_hours: customerInfo.businessHours,
           emergency_policy: customerInfo.emergencyPolicy,
+          assistant_gender: customerInfo.assistantGender,
           plan_type: customerInfo.planType,
           subscription_status: 'active',  // Override trigger's 'trial' status
           phone_number_area_code: areaCode,

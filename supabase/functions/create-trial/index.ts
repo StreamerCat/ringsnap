@@ -637,6 +637,32 @@ serve(async (req) => {
       billing_state: billingState,
     };
 
+    // Normalize plan_type to match SQL constraint (starter|professional|premium)
+    const rawPlan = (accountData.plan_type || "starter")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    accountData.plan_type =
+      rawPlan === "pro" ? "professional" :
+      rawPlan === "professional" ? "professional" :
+      rawPlan === "premium" ? "premium" :
+      "starter";
+
+    // Normalize assistant_gender to match SQL constraint (male|female)
+    const rawGender = (accountData.assistant_gender || "female")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    accountData.assistant_gender =
+      rawGender === "male" ? "male" : "female";
+
+    // Log normalized values before RPC
+    console.log(`[${FUNCTION_NAME}] normalized plan_type =`, accountData.plan_type);
+    console.log(`[${FUNCTION_NAME}] normalized assistant_gender =`, accountData.assistant_gender);
+    console.log(`[${FUNCTION_NAME}] final accountData keys =`, Object.keys(accountData));
+
     let accountResult: any;
 
     // DETAILED LOGGING: Before account creation
