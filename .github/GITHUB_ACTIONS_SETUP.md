@@ -35,7 +35,7 @@ This guide walks you through setting up automated Supabase function deployment v
 | `SUPABASE_PROJECT_REF` | `rmyvvbqnccpfeyowidrq` |
 | `SUPABASE_DB_PASSWORD` | Your database password (from project creation) |
 | `SUPABASE_URL` | `https://rmyvvbqnccpfeyowidrq.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteXZ2YnFuY2NwZmV5b3dpZHJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mjc4NDQ2MywiZXhwIjoyMDc4MzYwNDYzfQ.js8G1sw5IDjeO1QuYpx8y-FGuMd1Udzen9Gwpkl-HDo` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_cmcj5XSZAYXLggpgot0wIA_g_a7JNYf` |
 | `STRIPE_SECRET_KEY` | `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` |
 | `STRIPE_PRICE_STARTER` | `price_1SMav5IdevV48BnpEEIRKvk5` |
 | `STRIPE_PRICE_PROFESSIONAL` | `price_1SMaw9IdevV48BnpJkUs1UY0` |
