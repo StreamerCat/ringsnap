@@ -699,8 +699,34 @@ serve(async (req) => {
       });
 
       if (txError) {
-        throw txError;
+        console.error("[RPC ERROR]", {
+          code: txError.code,
+          message: txError.message,
+          details: txError.details,
+          hint: txError.hint,
+        });
+
+        const safeMsg = `RPC_FAILED: ${txError.code} | ${txError.message ?? "unknown error"}`;
+
+        let err: Error;
+        try {
+          // @ts-ignore
+          err = new Error(safeMsg, { cause: txError });
+        } catch {
+          err = new Error(safeMsg);
+          ;(err as any).cause = txError;
+        }
+
+        ;(err as any).rpc = {
+          code: txError.code,
+          details: txError.details,
+          hint: txError.hint,
+          original: txError,
+        };
+
+        throw err;
       }
+
 
       accountResult = txResult;
 

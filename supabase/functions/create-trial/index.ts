@@ -696,6 +696,35 @@ serve(async (req) => {
         }
       );
 
+      if (accountTxError) {
+        console.error("[RPC ERROR]", {
+          code: accountTxError.code,
+          message: accountTxError.message,
+          details: accountTxError.details,
+          hint: accountTxError.hint,
+        });
+
+        const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
+
+        let err: Error;
+        try {
+          // @ts-ignore
+          err = new Error(safeMsg, { cause: accountTxError });
+        } catch {
+          err = new Error(safeMsg);
+          ;(err as any).cause = accountTxError;
+        }
+
+        ;(err as any).rpc = {
+          code: accountTxError.code,
+          details: accountTxError.details,
+          hint: accountTxError.hint,
+          original: accountTxError,
+        };
+
+        throw err;
+      }
+
       // DETAILED LOGGING: After account creation
       console.error("DB_RESULT", {
         step: "create_account_transaction",
@@ -713,7 +742,7 @@ serve(async (req) => {
       });
 
       if (accountTxError) {
-        // Check if duplicate email
+        // Check for duplicate email first
         if (
           accountTxError.message?.toLowerCase().includes("already") ||
           accountTxError.message?.toLowerCase().includes("duplicate")
@@ -723,10 +752,7 @@ serve(async (req) => {
             ...baseLogOptions,
             context: { email: data.email },
           });
-
-          // Cleanup Stripe resources
           await cleanupStripeResources(stripe, customer.id, subscription.id, baseLogOptions);
-
           return new Response(
             JSON.stringify({
               error: "This email is already registered. Please sign in instead.",
@@ -738,7 +764,29 @@ serve(async (req) => {
           );
         }
 
-        throw accountTxError;
+        // Generic RPC error handling
+        console.error("[RPC ERROR]", {
+          code: accountTxError.code,
+          message: accountTxError.message,
+          details: accountTxError.details,
+          hint: accountTxError.hint,
+        });
+        const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
+        let err: Error;
+        try {
+          // @ts-ignore
+          err = new Error(safeMsg, { cause: accountTxError });
+        } catch {
+          err = new Error(safeMsg);
+          ;(err as any).cause = accountTxError;
+        }
+        ;(err as any).rpc = {
+          code: accountTxError.code,
+          details: accountTxError.details,
+          hint: accountTxError.hint,
+          original: accountTxError,
+        };
+        throw err;
       }
 
       accountResult = accountTxResult;
