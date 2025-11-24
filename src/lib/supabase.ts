@@ -14,25 +14,35 @@ const supabaseAnonKey =
 // Export configuration status for components to check
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-if (!isSupabaseConfigured) {
-  console.error(
-    "❌ Supabase environment variables are not configured!\n" +
+// Runtime guard: throw error if anon key is missing in production
+if (!supabaseUrl || !supabaseAnonKey) {
+  const errorMsg =
+    "❌ CRITICAL: Supabase environment variables are not configured!\n" +
     "Required variables:\n" +
     "  - VITE_SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)\n" +
     "  - VITE_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)\n" +
     "Current values:\n" +
     `  - supabaseUrl: ${supabaseUrl || 'undefined'}\n` +
-    `  - supabaseAnonKey: ${supabaseAnonKey ? '[REDACTED - exists]' : 'undefined'}`
+    `  - supabaseAnonKey: ${supabaseAnonKey ? '[REDACTED - exists]' : 'undefined'}\n\n` +
+    "Edge function calls will fail with 401 errors if anon key is not provided.";
+
+  console.error(errorMsg);
+
+  // Throw error to prevent initialization with invalid credentials
+  // This ensures the issue is caught early rather than silent failures
+  throw new Error(
+    "Supabase client cannot be initialized: Missing required environment variables. " +
+    "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your deployment environment."
   );
 }
 
 const storage = typeof window === "undefined" ? undefined : window.localStorage;
 
-// Create client with valid values or safe fallbacks
-// Note: Fallback values will cause API calls to fail, but won't crash during initialization
+// Create client with valid values (no fallbacks)
+// If we reach here, both supabaseUrl and supabaseAnonKey are guaranteed to exist
 export const supabase = createClient<Database>(
-  supabaseUrl || "https://placeholder.supabase.co",
-  supabaseAnonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MTY3MjMyMDAsImV4cCI6MTk2NzI5OTIwMH0.placeholder",
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       storage,
