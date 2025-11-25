@@ -1,6 +1,7 @@
 /**
  * Supabase browser client shared across the RingSnap SPA.
- * Uses the public anon key so it is safe to load in the browser.
+ * Supports both legacy anon keys and new publishable keys.
+ * Safe to load in the browser - never uses secret/service_role keys.
  */
 
 import { createClient } from "@supabase/supabase-js";
