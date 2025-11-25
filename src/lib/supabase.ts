@@ -18,6 +18,11 @@ const supabaseAnonKey =
   env.VITE_SUPABASE_ANON_KEY ??
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// TEMP DEBUG LOGS — REMOVE AFTER FIX
+console.log("[DEBUG] SUPABASE URL:", supabaseUrl);
+console.log("[DEBUG] SUPABASE KEY EXISTS:", !!supabaseKey);
+console.log("[DEBUG] SUPABASE KEY PREFIX:", supabaseKey?.slice(0, 12));
+
 // Export configuration status for components to optionally branch on
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
