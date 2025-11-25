@@ -5,3 +5,9 @@
 [build.environment]
   # Stripe publishable key is meant to be public; tell Netlify not to treat it as a secret
   SECRETS_SCAN_OMIT_KEYS = "VITE_STRIPE_PUBLISHABLE_KEY"
+
+# SPA fallback - serve index.html for all routes so React Router can handle routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
