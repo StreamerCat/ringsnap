@@ -8,7 +8,10 @@ import { withAuthGuard } from "@/lib/auth/useUser";
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Start from "./pages/Start";
 import Onboarding from "./pages/Onboarding";
+import OnboardingChat from "./pages/OnboardingChat";
+import SetupStatus from "./pages/SetupStatus";
 import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales";
 import FormPreview from "./pages/FormPreview";
@@ -40,7 +43,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/start" element={<Start />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/onboarding-chat" element={<OnboardingChat />} />
+          <Route path="/setup-status" element={<SetupStatus />} />
           {/* Redirect legacy login routes to unified auth */}
           <Route path="/login" element={<Navigate to="/auth/login" replace />} />
           <Route path="/reset-password" element={<Navigate to="/auth/login" replace />} />

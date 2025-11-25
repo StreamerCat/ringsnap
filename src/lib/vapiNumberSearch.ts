@@ -88,16 +88,17 @@ export async function searchAvailablePhoneNumbers(
   }
 
   const supabaseUrl = ensureEnvironment(import.meta.env.VITE_SUPABASE_URL, "VITE_SUPABASE_URL");
-  const supabaseAnonKey = ensureEnvironment(
-    import.meta.env.VITE_SUPABASE_ANON_KEY,
-    "VITE_SUPABASE_ANON_KEY"
+  // Support both new publishable keys and legacy anon keys
+  const supabaseKey = ensureEnvironment(
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY,
+    "VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY"
   );
 
   const response = await fetch(`${supabaseUrl}/functions/v1/search-vapi-numbers`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${supabaseAnonKey}`,
-      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      apikey: supabaseKey,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ areaCode: normalizedAreaCode, limit }),
