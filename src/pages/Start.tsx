@@ -78,7 +78,7 @@ export default function Start() {
             phone: '', // Will be collected in onboarding
             source: 'hybrid_onboarding'
           },
-          emailRedirectTo: `${window.location.origin}/onboarding`
+          emailRedirectTo: `${window.location.origin}/onboarding-chat`
         }
       });
 
@@ -88,26 +88,33 @@ export default function Start() {
         throw new Error("Signup succeeded but user not found");
       }
 
-      // The trigger function handle_new_user_signup will create:
-      // - accounts record
-      // - profiles record
-      // - user_roles record
+      // Check if we have a session (user is auto-logged in)
+      if (data.session) {
+        // User is authenticated! The trigger function handle_new_user_signup will create:
+        // - accounts record
+        // - profiles record
+        // - user_roles record
 
-      // Now update the onboarding_status to 'not_started'
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ onboarding_status: 'not_started' })
-        .eq('id', data.user.id);
+        // Now update the onboarding_status to 'not_started'
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ onboarding_status: 'not_started' })
+          .eq('id', data.user.id);
 
-      if (updateError) {
-        console.error("Failed to set onboarding status:", updateError);
-        // Don't fail the signup for this
+        if (updateError) {
+          console.error("Failed to set onboarding status:", updateError);
+          // Don't fail the signup for this
+        }
+
+        toast.success("Account created! Let's set up your assistant.");
+
+        // Redirect to onboarding chat
+        navigate('/onboarding-chat');
+      } else {
+        // Edge case: session is null but user exists (email confirmation required)
+        // This should be rare since email confirmation is disabled
+        toast.info("Please check your email to confirm your account.");
       }
-
-      toast.success("Account created! Let's set up your assistant.");
-
-      // Redirect to onboarding
-      navigate('/onboarding-chat');
     } catch (error: any) {
       console.error("Signup error:", error);
       let message = "Failed to create account";
