@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
+import { supabaseUrl, supabaseKey } from "@/lib/supabase";
 
 interface PhoneVerificationModalProps {
   open: boolean;
@@ -55,9 +56,9 @@ export function PhoneVerificationModal({ open, onOpenChange, phone, onSuccess }:
     setError(null);
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      // Support both new publishable keys and legacy anon keys
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Supabase configuration is missing");
+      }
 
       const response = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
         method: "POST",
@@ -94,9 +95,9 @@ export function PhoneVerificationModal({ open, onOpenChange, phone, onSuccess }:
     setError(null);
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      // Support both new publishable keys and legacy anon keys
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Supabase configuration is missing");
+      }
 
       const response = await fetch(`${supabaseUrl}/functions/v1/send-verification-code`, {
         method: "POST",

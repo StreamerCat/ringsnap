@@ -11,39 +11,25 @@ import type { Database } from "@/integrations/supabase/types";
 const env = import.meta.env as Record<string, string | undefined>;
 
 // URL must always be the project URL
-const supabaseUrl =
+export const supabaseUrl =
   env.VITE_SUPABASE_URL ??
   env.NEXT_PUBLIC_SUPABASE_URL;
 
 // KEY: prefer new publishable key, then legacy anon variants
-const supabaseKey =
+export const supabaseKey =
   env.VITE_SUPABASE_PUBLISHABLE_KEY ??
   env.VITE_SUPABASE_ANON_KEY ??
   env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// TEMP DEBUG LOGS — REMOVE AFTER CONFIRMED WORKING
-console.log("[DEBUG] SUPABASE URL:", supabaseUrl);
-console.log("[DEBUG] SUPABASE KEY EXISTS:", !!supabaseKey);
-console.log("[DEBUG] SUPABASE KEY PREFIX:", supabaseKey?.slice(0, 12));
 
 // Export configuration status for components to optionally branch on
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
 if (!isSupabaseConfigured) {
   console.error(
-    [
-      "❌ Supabase environment variables are not configured correctly!",
-      "Required variables (one of each pair must be set):",
-      "  - VITE_SUPABASE_URL                 or NEXT_PUBLIC_SUPABASE_URL",
-      "  - VITE_SUPABASE_PUBLISHABLE_KEY     or VITE_SUPABASE_ANON_KEY",
-      "    (or NEXT_PUBLIC_* equivalents)",
-      "Current values:",
-      `  - supabaseUrl: ${supabaseUrl || "undefined"}`,
-      `  - supabaseKey: ${
-        supabaseKey ? "[REDACTED - exists]" : "undefined"
-      }`,
-    ].join("\n")
+    "Supabase environment variables are not configured correctly. " +
+    "Expected VITE_SUPABASE_URL and either VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY. " +
+    "(NEXT_PUBLIC_* variants are also supported for compatibility.)"
   );
 }
 

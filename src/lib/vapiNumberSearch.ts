@@ -1,3 +1,5 @@
+import { supabaseUrl, supabaseKey } from "@/lib/supabase";
+
 export interface PhoneNumberSearchParams {
   areaCode: string;
   limit?: number;
@@ -18,13 +20,6 @@ export interface NumberSearchResult {
   source?: string;
   suggestions?: string[];
   error?: string;
-}
-
-function ensureEnvironment(variable: string | undefined, name: string): string {
-  if (!variable) {
-    throw new Error(`Missing ${name} environment variable`);
-  }
-  return variable;
 }
 
 function extractNumbers(payload: unknown): PhoneNumberOption[] {
@@ -87,12 +82,9 @@ export async function searchAvailablePhoneNumbers(
     throw new Error("Area code must include three digits");
   }
 
-  const supabaseUrl = ensureEnvironment(import.meta.env.VITE_SUPABASE_URL, "VITE_SUPABASE_URL");
-  // Support both new publishable keys and legacy anon keys
-  const supabaseKey = ensureEnvironment(
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY,
-    "VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY"
-  );
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Supabase configuration is missing. Please check environment variables.");
+  }
 
   const response = await fetch(`${supabaseUrl}/functions/v1/search-vapi-numbers`, {
     method: "POST",
