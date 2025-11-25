@@ -408,7 +408,6 @@ export default function OnboardingChat() {
       );
 
       // Call provision-account edge function
-      // TODO: This will be implemented in Phase 5
       const { data, error } = await supabase.functions.invoke("provision-account", {
         body: {
           account_id: accountId,
