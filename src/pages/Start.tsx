@@ -149,12 +149,34 @@ export default function Start() {
           <div className="flex justify-center mb-2">
             <Sparkles className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold">Start Your Free Trial</CardTitle>
+          <CardTitle className="text-3xl font-bold">Welcome to RingSnap</CardTitle>
           <CardDescription className="text-base">
-            Get your AI phone assistant up and running in 2 minutes
+            Choose how you'd like to get started
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="space-y-4 mb-6">
+            <Button
+              onClick={() => navigate('/signup')}
+              className="w-full"
+              size="lg"
+              variant="default"
+            >
+              <Sparkles className="mr-2 h-5 w-5" />
+              Start with AI Assistant (Recommended)
+            </Button>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or
+                </span>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSignup} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -206,6 +228,7 @@ export default function Start() {
               className="w-full"
               disabled={isLoading}
               size="lg"
+              variant="outline"
             >
               {isLoading ? (
                 <>
@@ -213,7 +236,7 @@ export default function Start() {
                   Creating account...
                 </>
               ) : (
-                'Continue'
+                'Quick Signup (Skip AI)'
               )}
             </Button>
           </form>

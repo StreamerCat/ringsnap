@@ -7,7 +7,7 @@ epics:
     tasks:
       - id: ai-signup.chat-ui
         type: frontend
-        status: planned
+        status: done
         desc: Implement conversational signup UI on /onboarding using the signup-flow agent; provide clear entry point and link to fallback form.
         acceptance_ref: signup-trial.ai-assisted
 
