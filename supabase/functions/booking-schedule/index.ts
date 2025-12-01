@@ -65,7 +65,7 @@ serve(async (req: Request) => {
   const correlationId = `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
   const baseLogOptions = {
-    function: FUNCTION_NAME,
+    functionName: FUNCTION_NAME,
     correlationId,
   };
 
@@ -126,7 +126,8 @@ serve(async (req: Request) => {
     if (accountError || !account) {
       logError("Account not found", {
         ...baseLogOptions,
-        context: { account_id: data.account_id, error: accountError },
+        context: { account_id: data.account_id },
+        error: accountError
       });
 
       return new Response(
@@ -175,7 +176,7 @@ serve(async (req: Request) => {
     if (appointmentError || !appointment) {
       logError("Failed to create appointment", {
         ...baseLogOptions,
-        context: { error: appointmentError },
+        error: appointmentError
       });
 
       return new Response(
@@ -297,7 +298,8 @@ serve(async (req: Request) => {
   } catch (error: any) {
     logError("Unexpected error in booking-schedule", {
       ...baseLogOptions,
-      context: { error: error.message, stack: error.stack },
+      context: { stack: error.stack },
+      error
     });
 
     return new Response(

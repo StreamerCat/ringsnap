@@ -1,4 +1,4 @@
-import { serve } from "std/server";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
 import { hashToken, isUserNotFoundError } from "../_shared/auth-utils.ts";

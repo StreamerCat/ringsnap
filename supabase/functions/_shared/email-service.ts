@@ -74,7 +74,7 @@ export async function sendMagicLinkEmail(
     console.log(`[email-service] Magic link sent to ${params.email}`);
     return {
       success: true,
-      messageId: data?.messageId,
+      messageId: data?.messageId ?? undefined,
     };
   } catch (err) {
     console.error("[email-service] Unexpected error sending magic link:", err);
@@ -319,19 +319,6 @@ export async function sendSelfServiceOnboardingEmail(
       return result;
     }
 
-    // Log state transition: stripe_linked → email_sent
-    await supabase.rpc("log_state_transition", {
-      p_account_id: params.accountId,
-      p_from_stage: "stripe_linked",
-      p_to_stage: "email_sent",
-      p_triggered_by: "email-service",
-      p_correlation_id: params.correlationId,
-      p_metadata: {
-        email: params.email,
-        message_id: result.messageId,
-      },
-    });
-
     // Log delivery success
     await logEmailDelivery(supabase, {
       accountId: params.accountId,
@@ -402,20 +389,6 @@ export async function sendSalesGuidedOnboardingEmail(
 
       return result;
     }
-
-    // Log state transition
-    await supabase.rpc("log_state_transition", {
-      p_account_id: params.accountId,
-      p_from_stage: "stripe_linked",
-      p_to_stage: "email_sent",
-      p_triggered_by: "email-service",
-      p_correlation_id: params.correlationId,
-      p_metadata: {
-        email: params.email,
-        sales_rep_name: params.salesRepName,
-        message_id: result.messageId,
-      },
-    });
 
     await logEmailDelivery(supabase, {
       accountId: params.accountId,
