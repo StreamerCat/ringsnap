@@ -20,9 +20,10 @@ import { PhoneNumberCard } from "@/components/PhoneNumberCard";
 import { AssistantCard } from "@/components/AssistantCard";
 import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
 import { ReferralShareInterface } from "@/components/ReferralShareInterface";
-import { 
-  Phone, Users, Settings, CreditCard, Gift, TrendingUp, 
-  Clock, AlertCircle, CheckCircle, Loader2, Sparkles, Check
+import { OperatorOverview } from "@/components/dashboard/OperatorOverview";
+import {
+  Phone, Users, Settings, CreditCard, Gift, TrendingUp,
+  Clock, AlertCircle, CheckCircle, Loader2, Sparkles, Check, Calendar
 } from "lucide-react";
 
 export default function CustomerDashboard() {
@@ -31,7 +32,7 @@ export default function CustomerDashboard() {
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "today");
   const [account, setAccount] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([]);
@@ -381,7 +382,11 @@ export default function CustomerDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 lg:grid-cols-7 mb-8">
+          <TabsList className="grid grid-cols-4 lg:grid-cols-8 mb-8">
+            <TabsTrigger value="today">
+              <Calendar className="h-4 w-4 mr-2" />
+              Today
+            </TabsTrigger>
             <TabsTrigger value="overview">
               <TrendingUp className="h-4 w-4 mr-2" />
               Overview
@@ -411,6 +416,11 @@ export default function CustomerDashboard() {
               Referrals
             </TabsTrigger>
           </TabsList>
+
+          {/* Today Tab - Operator Dashboard */}
+          <TabsContent value="today" className="space-y-6">
+            <OperatorOverview accountId={account.id} />
+          </TabsContent>
 
           {/* Team Tab */}
           <TabsContent value="team" className="space-y-6">
