@@ -83,14 +83,27 @@ interface CallValueCalculatorProps {
   showPdfDownload?: boolean;
   companyName?: string;
   onPdfDownload?: (metrics: any) => void;
+  preselectedTrade?: string;
 }
 
 export const CallValueCalculator = ({
   showPdfDownload = false,
   companyName = "",
-  onPdfDownload
+  onPdfDownload,
+  preselectedTrade
 }: CallValueCalculatorProps = {}) => {
-  const [selectedPreset, setSelectedPreset] = useState<keyof typeof tradePresets>("plumbing");
+  // Map preselectedTrade to preset key
+  const getPresetKey = (trade?: string): keyof typeof tradePresets => {
+    if (!trade) return "plumbing";
+    const tradeLower = trade.toLowerCase();
+    if (tradeLower === "plumbing") return "plumbing";
+    if (tradeLower === "hvac") return "hvac";
+    if (tradeLower === "electrical") return "electrical";
+    if (tradeLower === "roofing") return "roofing";
+    return "plumbing";
+  };
+  
+  const [selectedPreset, setSelectedPreset] = useState<keyof typeof tradePresets>(getPresetKey(preselectedTrade));
   const [email, setEmail] = useState("");
   const [formState, setFormState] = useState<"idle" | "submitted">("idle");
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);

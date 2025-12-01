@@ -32,6 +32,11 @@ import SecuritySettings from "./pages/SecuritySettings";
 import AuthCallback from "./pages/AuthCallback";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+// Trade pages
+import Plumbers from "./pages/trades/Plumbers";
+import HVAC from "./pages/trades/HVAC";
+import Electricians from "./pages/trades/Electricians";
+import Roofing from "./pages/trades/Roofing";
 
 const queryClient = new QueryClient();
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
@@ -75,6 +80,11 @@ const App = () => (
           {/* Legal pages */}
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+          {/* Trade-specific landing pages */}
+          <Route path="/plumbers" element={<Plumbers />} />
+          <Route path="/hvac" element={<HVAC />} />
+          <Route path="/electricians" element={<Electricians />} />
+          <Route path="/roofing" element={<Roofing />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
