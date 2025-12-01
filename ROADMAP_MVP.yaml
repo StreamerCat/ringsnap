@@ -132,7 +132,7 @@ epics:
 
       - id: env.runtime-checks
         type: backend
-        status: planned
+        status: done
         desc: Add startup checks in core edge functions to assert required env vars are present; log and fail fast if not.
         acceptance_ref: env.config-consistent
 
