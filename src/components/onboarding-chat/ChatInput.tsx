@@ -9,6 +9,7 @@ export interface ChatInputProps {
   disabled?: boolean;
   type?: "text" | "email" | "tel" | "url";
   autoFocus?: boolean;
+  allowEmpty?: boolean;
 }
 
 export function ChatInput({
@@ -16,13 +17,14 @@ export function ChatInput({
   placeholder = "Type your answer...",
   disabled,
   type = "text",
-  autoFocus = true
+  autoFocus = true,
+  allowEmpty = false
 }: ChatInputProps) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (value.trim() && !disabled) {
+    if ((allowEmpty || value.trim()) && !disabled) {
       onSubmit(value.trim());
       setValue("");
     }
@@ -42,7 +44,7 @@ export function ChatInput({
       <Button
         type="submit"
         size="icon"
-        disabled={!value.trim() || disabled}
+        disabled={(!allowEmpty && !value.trim()) || disabled}
       >
         <Send className="h-4 w-4" />
       </Button>

@@ -9,6 +9,7 @@ import { withAuthGuard } from "@/lib/auth/useUser";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Start from "./pages/Start";
+import AISignupWrapper from "./pages/AISignupWrapper";
 import Onboarding from "./pages/Onboarding";
 import OnboardingChat from "./pages/OnboardingChat";
 import SetupStatus from "./pages/SetupStatus";
@@ -44,6 +45,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/start" element={<Start />} />
+          <Route path="/signup" element={<AISignupWrapper />} />
+          <Route path="/signup/form" element={<Onboarding />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/onboarding-chat" element={<OnboardingChat />} />
           <Route path="/setup-status" element={<SetupStatus />} />

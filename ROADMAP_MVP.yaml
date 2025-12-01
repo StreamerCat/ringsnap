@@ -7,19 +7,19 @@ epics:
     tasks:
       - id: ai-signup.chat-ui
         type: frontend
-        status: planned
+        status: done
         desc: Implement conversational signup UI on /onboarding using the signup-flow agent; provide clear entry point and link to fallback form.
         acceptance_ref: signup-trial.ai-assisted
 
       - id: ai-signup.conversation-to-payload
         type: frontend
-        status: planned
+        status: done
         desc: Map AI conversation outputs into a structured create-trial payload (name, email, phone, companyName, trade, companyWebsite, primaryGoal, planType=starter, paymentMethodId).
         acceptance_ref: signup-trial.ai-assisted
 
       - id: ai-signup.backend-lead-capture
         type: backend
-        status: planned
+        status: done
         desc: Implement a backend edge function to store signup leads using AI-collected data whenever create-trial fails or is aborted.
         acceptance_ref: signup-trial.ai-assisted
 
@@ -51,7 +51,7 @@ epics:
     tasks:
       - id: leads.schema-and-migration
         type: backend
-        status: planned
+        status: done
         desc: Create customer_leads table and RLS policies to store leads sourced from phone calls.
         acceptance_ref: calls-to-leads.happy-path
 
