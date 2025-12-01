@@ -93,7 +93,7 @@ serve(async (req) => {
     }
 
     // Log usage
-    await supabase
+    const { data: usageLog, error: usageLogError } = await supabase
       .from('usage_logs')
       .insert({
         account_id: accountId,
@@ -101,7 +101,31 @@ serve(async (req) => {
         cost_cents: Math.round((call.cost || 0) * 100),
         call_metadata: call,
         is_overage: isOverage
+      })
+      .select('id')
+      .single();
+
+    if (usageLogError) {
+      logError('Failed to insert usage log', {
+        ...baseLogOptions,
+        accountId,
+        error: usageLogError
       });
+    }
+
+    // Create customer lead from call (best-effort, don't block usage tracking)
+    if (usageLog && call) {
+      try {
+        await createCustomerLead(supabase, accountId, call, usageLog.id, baseLogOptions);
+      } catch (leadError) {
+        logError('Failed to create customer lead (non-blocking)', {
+          ...baseLogOptions,
+          accountId,
+          error: leadError
+        });
+        // Don't throw - lead creation failure shouldn't block usage tracking
+      }
+    }
 
     // Check warning thresholds and send emails
     const totalUsed = isOverage ? monthlyLimit : currentMonthlyUsed + durationMinutes;
@@ -217,4 +241,108 @@ async function sendOverageNotification(
   });
   // TODO: Integrate with Resend
   // Email content: "You're now in overage billing at ${overageRateDollars}/minute"
+}
+
+/**
+ * Create customer lead from Vapi call
+ * Extracts customer information from call metadata and creates a lead record
+ */
+async function createCustomerLead(
+  supabase: any,
+  accountId: string,
+  call: any,
+  usageLogId: string,
+  logOptions: Pick<LogOptions, 'functionName' | 'correlationId'>
+) {
+  // Extract customer phone from call
+  // Vapi stores customer phone in call.customer.number or call.phoneNumber
+  const customerPhone = call.customer?.number || call.phoneNumber || call.phoneNumberE164;
+
+  if (!customerPhone) {
+    logInfo('No customer phone in call, skipping lead creation', {
+      ...logOptions,
+      accountId,
+      context: { callId: call.id }
+    });
+    return;
+  }
+
+  // Extract customer name if available
+  const customerName = call.customer?.name || null;
+
+  // Extract call summary/transcript if available
+  const callSummary = call.summary || call.transcript || null;
+  const callTranscript = call.transcript || null;
+
+  // Try to infer intent from call metadata or summary
+  let intent = 'unknown';
+  const summaryLower = (callSummary || '').toLowerCase();
+  if (summaryLower.includes('appointment') || summaryLower.includes('schedule') || summaryLower.includes('book')) {
+    intent = 'appointment';
+  } else if (summaryLower.includes('quote') || summaryLower.includes('estimate') || summaryLower.includes('price')) {
+    intent = 'quote';
+  } else if (summaryLower.includes('question') || summaryLower.includes('ask') || summaryLower.includes('inquiry')) {
+    intent = 'question';
+  }
+
+  // Determine urgency from call metadata
+  let urgency = 'medium';
+  if (summaryLower.includes('emergency') || summaryLower.includes('urgent') || summaryLower.includes('asap')) {
+    urgency = 'emergency';
+  } else if (summaryLower.includes('soon') || summaryLower.includes('today')) {
+    urgency = 'high';
+  }
+
+  logInfo('Creating customer lead from call', {
+    ...logOptions,
+    accountId,
+    context: {
+      callId: call.id,
+      customerPhone,
+      hasName: !!customerName,
+      intent,
+      urgency
+    }
+  });
+
+  // Insert customer lead
+  const { data: lead, error: leadError } = await supabase
+    .from('customer_leads')
+    .insert({
+      account_id: accountId,
+      call_id: call.id,
+      usage_log_id: usageLogId,
+      customer_phone: customerPhone,
+      customer_name: customerName,
+      lead_source: 'phone_call',
+      lead_status: 'new',
+      intent: intent,
+      call_summary: callSummary,
+      call_transcript: callTranscript,
+      call_duration_seconds: call.duration || 0,
+      urgency: urgency,
+      metadata: {
+        vapi_call_id: call.id,
+        call_type: call.type,
+        ended_reason: call.endedReason,
+        cost_cents: Math.round((call.cost || 0) * 100)
+      }
+    })
+    .select('id')
+    .single();
+
+  if (leadError) {
+    throw leadError;
+  }
+
+  logInfo('Customer lead created successfully', {
+    ...logOptions,
+    accountId,
+    context: {
+      lead_id: lead.id,
+      callId: call.id,
+      customerPhone,
+      intent
+    }
+  });
 }

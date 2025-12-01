@@ -37,7 +37,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { logError, logInfo } from "../_shared/logging.ts";
+import { logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { sendSMS } from "../_shared/sms.ts";
 
 const FUNCTION_NAME = "booking-schedule";
 
@@ -209,18 +210,46 @@ serve(async (req: Request) => {
           `Preferred time: ${data.preferred_time_range || "Not specified"}\n` +
           `Reply to confirm or call customer directly.`;
 
-        // TODO: Integrate with SMS provider (Twilio, Vapi SMS, etc.)
-        // For now, log the SMS that would be sent
-        logInfo("SMS notification (mock)", {
-          ...baseLogOptions,
-          context: {
+        // Send SMS notification (best-effort, don't block appointment creation)
+        try {
+          const smsResult = await sendSMS({
             to: destinationPhone,
             message: smsMessage,
-          },
-        });
+            functionName: FUNCTION_NAME,
+            correlationId,
+          });
 
-        // TODO: Uncomment when SMS provider is configured
-        // await sendSMS(destinationPhone, smsMessage);
+          if (smsResult.success) {
+            logInfo("SMS notification sent", {
+              ...baseLogOptions,
+              context: {
+                to: destinationPhone,
+                messageId: smsResult.messageId,
+                appointment_id: appointment.id,
+              },
+            });
+          } else {
+            logWarn("SMS notification failed (non-blocking)", {
+              ...baseLogOptions,
+              context: {
+                to: destinationPhone,
+                error: smsResult.error,
+                appointment_id: appointment.id,
+              },
+            });
+          }
+        } catch (smsError) {
+          logError("SMS send exception (non-blocking)", {
+            ...baseLogOptions,
+            error: smsError instanceof Error ? smsError : new Error(String(smsError)),
+            context: { appointment_id: appointment.id },
+          });
+        }
+      } else {
+        logWarn("No destination phone configured for account", {
+          ...baseLogOptions,
+          context: { account_id: data.account_id, appointment_id: appointment.id },
+        });
       }
 
       return new Response(
@@ -263,13 +292,45 @@ serve(async (req: Request) => {
 
         smsMessage += `\nReply to confirm or call customer directly.`;
 
-        // TODO: Send SMS (same as above)
-        logInfo("SMS notification with calendar link (mock)", {
-          ...baseLogOptions,
-          context: {
+        // Send SMS notification (best-effort, don't block appointment creation)
+        try {
+          const smsResult = await sendSMS({
             to: destinationPhone,
             message: smsMessage,
-          },
+            functionName: FUNCTION_NAME,
+            correlationId,
+          });
+
+          if (smsResult.success) {
+            logInfo("SMS notification with calendar link sent", {
+              ...baseLogOptions,
+              context: {
+                to: destinationPhone,
+                messageId: smsResult.messageId,
+                appointment_id: appointment.id,
+              },
+            });
+          } else {
+            logWarn("SMS notification failed (non-blocking)", {
+              ...baseLogOptions,
+              context: {
+                to: destinationPhone,
+                error: smsResult.error,
+                appointment_id: appointment.id,
+              },
+            });
+          }
+        } catch (smsError) {
+          logError("SMS send exception (non-blocking)", {
+            ...baseLogOptions,
+            error: smsError instanceof Error ? smsError : new Error(String(smsError)),
+            context: { appointment_id: appointment.id },
+          });
+        }
+      } else {
+        logWarn("No destination phone configured for account", {
+          ...baseLogOptions,
+          context: { account_id: data.account_id, appointment_id: appointment.id },
         });
       }
 

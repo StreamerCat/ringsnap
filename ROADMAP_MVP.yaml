@@ -57,7 +57,7 @@ epics:
 
       - id: leads.sync-usage-extension
         type: backend
-        status: planned
+        status: done
         desc: Extend sync-usage post-call webhook to create a customer lead for each completed call with a valid account and customer phone.
         acceptance_ref: calls-to-leads.happy-path
 
@@ -76,13 +76,13 @@ epics:
     tasks:
       - id: booking.sms-provider-integration
         type: backend
-        status: planned
+        status: done
         desc: Integrate a real SMS provider (Twilio or Vapi SMS) via shared utility in supabase/functions/_shared.
         acceptance_ref: booking-phase1.sms-fallback
 
       - id: booking.enable-sms-in-booking-schedule
         type: backend
-        status: planned
+        status: done
         desc: Replace stubbed SMS logging in booking-schedule with real SMS sends, logging success/failure.
         acceptance_ref: booking-phase1.sms-fallback
 
@@ -101,13 +101,13 @@ epics:
     tasks:
       - id: dashboard.operator-queries
         type: backend
-        status: planned
+        status: done
         desc: Create lightweight queries or views to fetch calls today, new leads today, and pending appointments by account_id.
         acceptance_ref: dashboard.operator-daily-clarity
 
       - id: dashboard.operator-ui
         type: frontend
-        status: planned
+        status: done
         desc: Build an operator-facing dashboard page showing calls, leads, and pending appointments above the fold.
         acceptance_ref: dashboard.operator-daily-clarity
 
@@ -126,7 +126,7 @@ epics:
     tasks:
       - id: env.canonical-naming
         type: infrastructure
-        status: planned
+        status: done
         desc: Standardize env var names for Supabase, Stripe, Vapi, SMS, and Resend; update .env.example and code to use a single canonical name per service.
         acceptance_ref: env.config-consistent
 
@@ -138,6 +138,6 @@ epics:
 
       - id: env.deploy-checklist
         type: documentation
-        status: planned
+        status: done
         desc: Write a deployment checklist documenting all required env vars per environment (local, staging, production).
         acceptance_ref: env.config-consistent
