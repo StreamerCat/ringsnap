@@ -232,7 +232,7 @@ async function rollbackStripeResources(
         p_stripe_customer_id: customerId,
         p_stripe_subscription_id: subscriptionId,
         p_correlation_id: correlationId,
-        p_error: cleanupError.message,
+        p_error: (cleanupError as Error)?.message || String(cleanupError),
         p_failure_reason: failureReason,
         p_metadata: {}
       });
@@ -572,7 +572,7 @@ serve(async (req) => {
       await rollbackStripeResources(
         stripe,
         supabase,
-        stripeCustomerId,
+        stripeCustomerId!,
         null,
         correlationId,
         "payment_method_attach_failed"
@@ -630,7 +630,7 @@ serve(async (req) => {
       await rollbackStripeResources(
         stripe,
         supabase,
-        stripeCustomerId,
+        stripeCustomerId!,
         null,
         correlationId,
         "subscription_creation_failed"
@@ -753,7 +753,7 @@ serve(async (req) => {
       await rollbackStripeResources(
         stripe,
         supabase,
-        stripeCustomerId,
+        stripeCustomerId!,
         stripeSubscriptionId,
         correlationId,
         "db_transaction_failed"
@@ -779,7 +779,7 @@ serve(async (req) => {
 
     try {
       if (data.signup_channel === "self_service") {
-        const emailResult = await sendSelfServiceOnboardingEmail(supabase, {
+        const emailResult = await sendSelfServiceOnboardingEmail(supabase as any, {
           accountId: accountResult.account_id,
           email: data.email,
           name: data.name,
@@ -793,17 +793,22 @@ serve(async (req) => {
             context: { email: data.email, messageId: emailResult.messageId }
           });
         } else {
-          logWarn("Failed to send self-service onboarding email (non-critical)", {
+          logError("Failed to send self-service onboarding email (non-critical)", {
             ...baseLogOptions,
-            error: emailResult.error
+            error: new Error(emailResult.error)
           });
         }
       } else if (data.signup_channel === "sales_guided") {
         // Get sales rep name for personalized email
         let salesRepName = "Your Sales Representative";
         if (data.sales_rep_id) {
-          const { data: salesRep } = await supabase.auth.admin.getUserById(data.sales_rep_id);
-          salesRepName = salesRep?.user_metadata?.name || salesRep?.email || salesRepName;
+          const { data: salesRepData } = await supabase.auth.admin.listUsers({
+            filter: `id.eq.${data.sales_rep_id}`
+          });
+          const salesRep = salesRepData?.users?.[0];
+          if (salesRep) {
+            salesRepName = (salesRep.user_metadata?.name as string) || salesRep.email || salesRepName;
+          }
         }
 
         const emailResult = await sendSalesGuidedOnboardingEmail(supabase, {

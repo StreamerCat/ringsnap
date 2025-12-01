@@ -413,6 +413,18 @@ async function processJob(job: any, supabase: any): Promise<void> {
       p_status: "completed",
     });
 
+    // Update user's onboarding status to active (hybrid onboarding flow)
+    if (job.user_id) {
+      await supabase.from("profiles").update({
+        onboarding_status: "active",
+      }).eq("id", job.user_id);
+
+      logInfo("Updated onboarding status to active", {
+        ...baseLogOptions,
+        context: { userId: job.user_id },
+      });
+    }
+
     // Mark job as completed
     await supabase.from("provisioning_jobs").update({
       status: "completed",
@@ -479,6 +491,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         p_status: "failed",
         p_error: `Provisioning failed permanently after ${MAX_RETRY_ATTEMPTS} attempts: ${error.message}`,
       });
+
+      // Update user's onboarding status to provision_failed (hybrid onboarding flow)
+      if (job.user_id) {
+        await supabase.from("profiles").update({
+          onboarding_status: "provision_failed",
+        }).eq("id", job.user_id);
+      }
 
       logError("Provisioning job failed permanently", {
         ...baseLogOptions,

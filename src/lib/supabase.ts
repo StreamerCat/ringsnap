@@ -1,54 +1,62 @@
 /**
  * Supabase browser client shared across the RingSnap SPA.
- * Uses the public anon key so it is safe to load in the browser.
+ * Supports both legacy anon keys and new publishable keys.
+ * Safe to load in the browser - never uses secret/service_role keys.
  */
+
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+// Prefer Vite-style envs (VITE_*) but also support NEXT_PUBLIC_* for compatibility
 const env = import.meta.env as Record<string, string | undefined>;
-const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? env.VITE_SUPABASE_URL;
-const supabaseAnonKey =
-  env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  env.VITE_SUPABASE_ANON_KEY;
 
-// Export configuration status for components to check
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+// URL must always be the project URL
+export const supabaseUrl =
+  env.VITE_SUPABASE_URL ??
+  env.NEXT_PUBLIC_SUPABASE_URL;
 
-// Runtime guard: throw error if anon key is missing in production
-if (!supabaseUrl || !supabaseAnonKey) {
-  const errorMsg =
-    "❌ CRITICAL: Supabase environment variables are not configured!\n" +
-    "Required variables:\n" +
-    "  - VITE_SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)\n" +
-    "  - VITE_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)\n" +
-    "Current values:\n" +
-    `  - supabaseUrl: ${supabaseUrl || 'undefined'}\n` +
-    `  - supabaseAnonKey: ${supabaseAnonKey ? '[REDACTED - exists]' : 'undefined'}\n\n` +
-    "Edge function calls will fail with 401 errors if anon key is not provided.";
+// KEY: prefer new publishable key, then legacy anon variants
+export const supabaseKey =
+  env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+  env.VITE_SUPABASE_ANON_KEY ??
+  env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  console.error(errorMsg);
+// Export configuration status for components to optionally branch on
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
-  // Throw error to prevent initialization with invalid credentials
-  // This ensures the issue is caught early rather than silent failures
-  throw new Error(
-    "Supabase client cannot be initialized: Missing required environment variables. " +
-    "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your deployment environment."
+if (!isSupabaseConfigured) {
+  console.error(
+    "Supabase environment variables are not configured correctly. " +
+    "Expected VITE_SUPABASE_URL and either VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY. " +
+    "(NEXT_PUBLIC_* variants are also supported for compatibility.)"
   );
 }
 
-const storage = typeof window === "undefined" ? undefined : window.localStorage;
+// Use localStorage only in the browser
+const storage =
+  typeof window === "undefined" ? undefined : window.localStorage;
 
-// Create client with valid values (no fallbacks)
-// If we reach here, both supabaseUrl and supabaseAnonKey are guaranteed to exist
+/**
+ * Create the Supabase client.
+ *
+ * Note:
+ * - If env vars are missing, we fall back to placeholders so the app can still
+ *   render without crashing. API calls will fail against the placeholder URL/key,
+ *   but the error will be clear in the console.
+ * - In staging/production you should always set the real values:
+ *   - VITE_SUPABASE_URL
+ *   - VITE_SUPABASE_PUBLISHABLE_KEY (or legacy VITE_SUPABASE_ANON_KEY)
+ */
 export const supabase = createClient<Database>(
-  supabaseUrl,
-  supabaseAnonKey,
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseKey || "sb-placeholder-key",
   {
     auth: {
       storage,
       persistSession: storage !== undefined,
       autoRefreshToken: true,
-      flowType: 'pkce',
+      flowType: "pkce",
     },
   }
 );

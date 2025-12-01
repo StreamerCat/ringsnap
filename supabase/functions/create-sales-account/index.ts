@@ -462,15 +462,15 @@ serve(async (req) => {
             });
 
           if (memberError) {
-            logWarn('Failed to create account_members entry', {
+            logError('Failed to create account_members entry', {
               ...baseLogOptions,
-              accountId: currentAccountId,
+              context: { accountId: currentAccountId },
               error: memberError
             });
           }
         } catch (err: any) {
           console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-          logWarn("Role assignment error (non-critical)", { ...baseLogOptions, error: err });
+          logError("Role assignment error (non-critical)", { ...baseLogOptions, error: err });
         }
       } catch (err: any) {
         console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));

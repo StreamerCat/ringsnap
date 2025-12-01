@@ -15,3 +15,20 @@ const zipToAreaCode: { [key: string]: string } = {
     const prefix = zipCode.substring(0, 3);
     return zipToAreaCode[prefix];
   }
+
+  // Simple state lookup from zip code prefix
+  const zipToState: { [key: string]: string } = {
+    '902': 'CA', // Beverly Hills
+    '921': 'CA', // San Diego
+    '941': 'CA', // San Francisco
+    '802': 'CO', // Denver
+    '331': 'FL', // Miami
+    '606': 'IL', // Chicago
+    '100': 'NY', // New York
+    '770': 'GA', // Atlanta
+  };
+
+  export function getStateFromZip(zipCode: string): string | undefined {
+    const prefix = zipCode.substring(0, 3);
+    return zipToState[prefix];
+  }

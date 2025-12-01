@@ -202,15 +202,17 @@ export function ProvisioningStatus({
     setProgress(10);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data: profile } = await supabase
         .from("profiles")
-        .select("name, phone, email")
+        .select("name, phone")
         .eq("account_id", accountId)
         .single();
 
       const { data: account } = await supabase
         .from("accounts")
-        .select("areaCode, company_name, trade, assistant_gender")
+        .select("phone_number_area_code, company_name, trade, assistant_gender")
         .eq("id", accountId)
         .single();
 
@@ -218,10 +220,10 @@ export function ProvisioningStatus({
       const { error: retryError } = await supabase.functions.invoke("provision-resources", {
         body: {
           accountId,
-          email: profile?.email,
+          email: user?.email,
           name: profile?.name,
           phone: profile?.phone,
-          areaCode: account?.areaCode,
+          areaCode: account?.phone_number_area_code,
           companyName: account?.company_name,
           trade: account?.trade,
           assistantGender: account?.assistant_gender,

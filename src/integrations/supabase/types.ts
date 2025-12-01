@@ -470,6 +470,7 @@ export type Database = {
           id: string
           is_primary: boolean | null
           name: string | null
+          onboarding_status: string | null
           phone: string | null
           source: string | null
           updated_at: string | null
@@ -480,6 +481,7 @@ export type Database = {
           id: string
           is_primary?: boolean | null
           name?: string | null
+          onboarding_status?: string | null
           phone?: string | null
           source?: string | null
           updated_at?: string | null
@@ -490,6 +492,7 @@ export type Database = {
           id?: string
           is_primary?: boolean | null
           name?: string | null
+          onboarding_status?: string | null
           phone?: string | null
           source?: string | null
           updated_at?: string | null
