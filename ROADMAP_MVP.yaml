@@ -57,7 +57,7 @@ epics:
 
       - id: leads.sync-usage-extension
         type: backend
-        status: planned
+        status: done
         desc: Extend sync-usage post-call webhook to create a customer lead for each completed call with a valid account and customer phone.
         acceptance_ref: calls-to-leads.happy-path
 
