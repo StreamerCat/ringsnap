@@ -19,7 +19,7 @@ epics:
 
       - id: ai-signup.backend-lead-capture
         type: backend
-        status: planned
+        status: done
         desc: Implement a backend edge function to store signup leads using AI-collected data whenever create-trial fails or is aborted.
         acceptance_ref: signup-trial.ai-assisted
 
