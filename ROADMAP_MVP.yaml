@@ -101,7 +101,7 @@ epics:
     tasks:
       - id: dashboard.operator-queries
         type: backend
-        status: planned
+        status: done
         desc: Create lightweight queries or views to fetch calls today, new leads today, and pending appointments by account_id.
         acceptance_ref: dashboard.operator-daily-clarity
 
