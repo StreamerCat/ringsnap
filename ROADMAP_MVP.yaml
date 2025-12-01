@@ -51,7 +51,7 @@ epics:
     tasks:
       - id: leads.schema-and-migration
         type: backend
-        status: planned
+        status: done
         desc: Create customer_leads table and RLS policies to store leads sourced from phone calls.
         acceptance_ref: calls-to-leads.happy-path
 
