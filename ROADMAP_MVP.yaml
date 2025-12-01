@@ -76,13 +76,13 @@ epics:
     tasks:
       - id: booking.sms-provider-integration
         type: backend
-        status: planned
+        status: done
         desc: Integrate a real SMS provider (Twilio or Vapi SMS) via shared utility in supabase/functions/_shared.
         acceptance_ref: booking-phase1.sms-fallback
 
       - id: booking.enable-sms-in-booking-schedule
         type: backend
-        status: planned
+        status: done
         desc: Replace stubbed SMS logging in booking-schedule with real SMS sends, logging success/failure.
         acceptance_ref: booking-phase1.sms-fallback
 
