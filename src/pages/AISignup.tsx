@@ -354,8 +354,34 @@ export default function AISignup() {
       setStep("payment"); // Go back to payment step
       toast.error(error.message || "Signup failed. Please try again.");
 
-      // TODO: Call backend lead capture function here
-      // This will be implemented in task ai-signup.backend-lead-capture
+      // Capture lead for failed signup
+      try {
+        const leadPayload = {
+          email: signupData.email,
+          full_name: signupData.name,
+          phone: signupData.phone,
+          source: "website",
+          signup_flow: "ai-assisted",
+          metadata: {
+            companyName: signupData.companyName,
+            trade: signupData.trade,
+            website: signupData.companyWebsite,
+            primaryGoal: signupData.primaryGoal,
+            planType: "starter",
+          },
+          failure_reason: error.message || "Unknown error",
+          failure_phase: "create-trial",
+        };
+
+        await supabase.functions.invoke("capture-signup-lead", {
+          body: leadPayload,
+        });
+
+        console.log("Lead captured for failed signup");
+      } catch (leadError) {
+        console.error("Failed to capture lead:", leadError);
+        // Don't show error to user - lead capture is best-effort
+      }
     }
   };
 
