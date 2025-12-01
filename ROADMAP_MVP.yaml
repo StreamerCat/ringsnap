@@ -126,7 +126,7 @@ epics:
     tasks:
       - id: env.canonical-naming
         type: infrastructure
-        status: planned
+        status: done
         desc: Standardize env var names for Supabase, Stripe, Vapi, SMS, and Resend; update .env.example and code to use a single canonical name per service.
         acceptance_ref: env.config-consistent
 
@@ -138,6 +138,6 @@ epics:
 
       - id: env.deploy-checklist
         type: documentation
-        status: planned
+        status: done
         desc: Write a deployment checklist documenting all required env vars per environment (local, staging, production).
         acceptance_ref: env.config-consistent
