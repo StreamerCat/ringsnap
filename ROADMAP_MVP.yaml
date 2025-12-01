@@ -107,7 +107,7 @@ epics:
 
       - id: dashboard.operator-ui
         type: frontend
-        status: planned
+        status: done
         desc: Build an operator-facing dashboard page showing calls, leads, and pending appointments above the fold.
         acceptance_ref: dashboard.operator-daily-clarity
 
