@@ -37,6 +37,7 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
+import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 
 const FUNCTION_NAME = "create-trial";
 
@@ -241,6 +242,25 @@ serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Validate required environment variables
+  try {
+    const requiredVars = getRequiredEnv(['SUPABASE', 'STRIPE', 'VAPI']);
+    requiredVars.push('STRIPE_PRICE_STARTER', 'STRIPE_PRICE_PROFESSIONAL', 'STRIPE_PRICE_PREMIUM');
+    assertEnv(requiredVars, FUNCTION_NAME);
+  } catch (envError: any) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Service configuration error. Please contact support.",
+        details: envError.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 
   let currentAccountId: string | null = null;

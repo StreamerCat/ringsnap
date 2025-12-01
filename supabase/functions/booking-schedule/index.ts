@@ -39,6 +39,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { sendSMS } from "../_shared/sms.ts";
+import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 
 const FUNCTION_NAME = "booking-schedule";
 
@@ -69,6 +70,24 @@ serve(async (req: Request) => {
     functionName: FUNCTION_NAME,
     correlationId,
   };
+
+  // Validate required environment variables
+  try {
+    const requiredVars = getRequiredEnv(['SUPABASE', 'TWILIO']);
+    assertEnv(requiredVars, FUNCTION_NAME);
+  } catch (envError: any) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Service configuration error. Please contact support.",
+        details: envError.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
 
   try {
     logInfo("Starting booking request", { ...baseLogOptions });
