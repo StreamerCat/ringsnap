@@ -13,7 +13,7 @@ epics:
 
       - id: ai-signup.conversation-to-payload
         type: frontend
-        status: planned
+        status: done
         desc: Map AI conversation outputs into a structured create-trial payload (name, email, phone, companyName, trade, companyWebsite, primaryGoal, planType=starter, paymentMethodId).
         acceptance_ref: signup-trial.ai-assisted
 
