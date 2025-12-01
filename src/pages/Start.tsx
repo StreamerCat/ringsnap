@@ -1,136 +1,253 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { Loader2, Sparkles } from "lucide-react";
+/**
+ * STEP 1: Minimal Trial Signup
+ *
+ * Collects only the essential fields needed to:
+ * - Create Supabase auth user
+ * - Create account + profile in DB
+ * - Create Stripe customer + subscription
+ * - Capture payment method
+ *
+ * After success, user proceeds to Step 2 (/onboarding-chat) for assistant configuration.
+ */
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Loader2, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 
-export default function Start() {
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PaymentForm } from '@/components/onboarding/shared/PaymentForm';
+import { supabase } from '@/lib/supabase';
+import { buildStep1Payload, inferWebsiteFromEmail, normalizeTrade } from '@/lib/normalization';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
+
+function StartForm() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const stripe = useStripe();
+  const elements = useElements();
+
+  // Form state
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [trade, setTrade] = useState('');
+  const [website, setWebsite] = useState('');
+  const [zipCode, setZipCode] = useState('');
+
+  // Payment state
+  const [cardComplete, setCardComplete] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Check if already logged in
-  const checkIfAlreadyLoggedIn = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Already logged in, check if they need onboarding
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('onboarding_status')
-          .eq('id', user.id)
-          .single();
+  // Lead tracking
+  const leadId = searchParams.get('leadId') || undefined;
 
-        if (profile?.onboarding_status === 'active') {
-          navigate('/dashboard');
-        } else {
-          navigate('/onboarding-chat');
+  // Check if already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Already logged in - check onboarding status
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('onboarding_status')
+            .eq('id', user.id)
+            .single();
+
+          if (profile?.onboarding_status === 'active') {
+            navigate('/dashboard');
+          } else {
+            navigate('/onboarding-chat');
+          }
         }
+      } catch (error) {
+        console.error('Auth check error:', error);
+      } finally {
+        setIsCheckingAuth(false);
       }
-    } catch (error) {
-      console.error("Auth check error:", error);
-    } finally {
-      setIsCheckingAuth(false);
-    }
+    };
+
+    checkAuth();
   }, [navigate]);
 
+  // Auto-infer website from email
   useEffect(() => {
-    checkIfAlreadyLoggedIn();
-  }, [checkIfAlreadyLoggedIn]);
+    if (email && !website) {
+      const inferred = inferWebsiteFromEmail(email);
+      if (inferred) {
+        setWebsite(inferred);
+      }
+    }
+  }, [email, website]);
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
-    if (!email || !email.includes("@")) {
-      toast.error("Please enter a valid email address");
+    if (!name.trim()) {
+      toast.error('Please enter your name');
       return;
     }
 
-    if (!password || password.length < 8) {
-      toast.error("Password must be at least 8 characters");
+    if (!email.trim() || !email.includes('@')) {
+      toast.error('Please enter a valid email address');
       return;
     }
 
-    if (password !== confirmPassword) {
-      toast.error("Passwords don't match");
+    if (!phone.trim()) {
+      toast.error('Please enter your phone number');
       return;
     }
 
-    setIsLoading(true);
+    if (!companyName.trim()) {
+      toast.error('Please enter your company name');
+      return;
+    }
+
+    if (!trade.trim()) {
+      toast.error('Please enter your trade or service type');
+      return;
+    }
+
+    if (!cardComplete) {
+      toast.error('Please complete your payment information');
+      return;
+    }
+
+    if (!termsAccepted) {
+      toast.error('Please accept the Terms of Service');
+      return;
+    }
+
+    if (!stripe || !elements) {
+      toast.error('Payment system not ready. Please refresh and try again.');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      // Sign up with Supabase auth
-      const { data, error } = await supabase.auth.signUp({
-        email: email.toLowerCase().trim(),
-        password,
-        options: {
-          data: {
-            name: '', // Will be collected in onboarding
-            phone: '', // Will be collected in onboarding
-            source: 'hybrid_onboarding'
-          },
-          emailRedirectTo: `${window.location.origin}/onboarding-chat`
-        }
+      // Create payment method
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+
+      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+        },
       });
 
-      if (error) throw error;
-
-      if (!data.user) {
-        throw new Error("Signup succeeded but user not found");
+      if (pmError) {
+        throw new Error(pmError.message || 'Failed to process payment method');
       }
 
-      // Check if we have a session (user is auto-logged in)
-      if (data.session) {
-        // User is authenticated! The trigger function handle_new_user_signup will create:
-        // - accounts record
-        // - profiles record
-        // - user_roles record
+      if (!paymentMethod) {
+        throw new Error('Payment method creation failed');
+      }
 
-        // Now update the onboarding_status to 'not_started'
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ onboarding_status: 'not_started' })
-          .eq('id', data.user.id);
+      // Build payload for create-trial
+      const payload = buildStep1Payload({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        companyName: companyName.trim(),
+        trade: trade.trim(),
+        website: website.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
+        paymentMethodId: paymentMethod.id,
+        planType: 'starter',
+        source: 'website',
+        leadId,
+      });
 
-        if (updateError) {
-          console.error("Failed to set onboarding status:", updateError);
+      console.log('[Start] Calling create-trial with payload:', {
+        ...payload,
+        paymentMethodId: '***',
+      });
+
+      // Call create-trial edge function
+      const { data, error } = await supabase.functions.invoke('create-trial', {
+        body: payload,
+      });
+
+      if (error) {
+        console.error('[Start] create-trial error:', error);
+        throw new Error(error.message || 'Failed to create trial account');
+      }
+
+      if (!data || !data.success) {
+        console.error('[Start] create-trial failed:', data);
+        throw new Error(data?.message || 'Failed to create trial account');
+      }
+
+      console.log('[Start] Trial created successfully:', {
+        accountId: data.account_id,
+        userId: data.user_id,
+      });
+
+      // Log in the user with the returned credentials
+      if (data.email && data.password) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+
+        if (signInError) {
+          console.warn('[Start] Auto sign-in failed (non-critical):', signInError);
           // Don't fail the signup for this
         }
-
-        toast.success("Account created! Let's set up your assistant.");
-
-        // Redirect to onboarding chat
-        navigate('/onboarding-chat');
-      } else {
-        // Edge case: session is null but user exists (email confirmation required)
-        // This should be rare since email confirmation is disabled
-        toast.info("Please check your email to confirm your account.");
       }
-    } catch (error: any) {
-      console.error("Signup error:", error);
-      let message = "Failed to create account";
 
-      // Provide helpful error messages
-      if (error?.message?.includes("already registered")) {
-        message = "This email is already registered. Try logging in instead.";
-      } else if (error?.message?.includes("invalid email")) {
-        message = "Please enter a valid email address";
-      } else if (error?.message) {
-        message = error.message;
+      toast.success('Trial started! Let\'s configure your AI assistant.');
+
+      // Redirect to Step 2 (assistant configuration)
+      navigate('/onboarding-chat', {
+        state: {
+          accountId: data.account_id,
+          fromStep1: true,
+        },
+      });
+    } catch (error: any) {
+      console.error('[Start] Signup error:', error);
+
+      let message = 'Failed to start trial. Please try again.';
+
+      if (error.message) {
+        if (error.message.includes('already registered') || error.message.includes('already exists')) {
+          message = 'This email is already registered. Please sign in instead.';
+        } else if (error.message.includes('disposable')) {
+          message = 'Please use a valid business or personal email address.';
+        } else if (error.message.includes('phone')) {
+          message = error.message;
+        } else if (error.message.includes('card') || error.message.includes('payment')) {
+          message = 'Payment failed. Please check your card details.';
+        } else {
+          message = error.message;
+        }
       }
 
       toast.error(message);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -143,107 +260,210 @@ export default function Start() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-2">
-            <Sparkles className="h-12 w-12 text-primary" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted px-4 py-8">
+      <Card className="w-full max-w-2xl">
+        <CardHeader className="space-y-2">
+          <div className="flex items-center justify-center mb-2">
+            <Sparkles className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold">Welcome to RingSnap</CardTitle>
-          <CardDescription className="text-base">
-            Choose how you'd like to get started
+          <CardTitle className="text-3xl font-bold text-center">
+            Start Your 3-Day Free Trial
+          </CardTitle>
+          <CardDescription className="text-center text-base">
+            No charge today. Cancel anytime during your trial.
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          <div className="space-y-4 mb-6">
-            <Button
-              onClick={() => navigate('/signup')}
-              className="w-full"
-              size="lg"
-              variant="default"
-            >
-              <Sparkles className="mr-2 h-5 w-5" />
-              Start with AI Assistant (Recommended)
-            </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Contact Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                Contact Information
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Your Name *</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Smith"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="john@yourcompany.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">ZIP Code (Optional)</Label>
+                  <Input
+                    id="zipCode"
+                    type="text"
+                    placeholder="12345"
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                    disabled={isSubmitting}
+                    maxLength={5}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Used for local phone number provisioning
+                  </p>
+                </div>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or
-                </span>
+            </div>
+
+            {/* Business Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                Business Information
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Company Name *</Label>
+                  <Input
+                    id="companyName"
+                    type="text"
+                    placeholder="Acme Plumbing"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="trade">Trade/Service *</Label>
+                  <Input
+                    id="trade"
+                    type="text"
+                    placeholder="Plumbing, HVAC, Electrical, etc."
+                    value={trade}
+                    onChange={(e) => setTrade(e.target.value)}
+                    disabled={isSubmitting}
+                    required
+                  />
+                  {trade && (
+                    <p className="text-xs text-muted-foreground">
+                      Normalized: {normalizeTrade(trade)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="website">Website (Optional)</Label>
+                  <Input
+                    id="website"
+                    type="url"
+                    placeholder="https://yourcompany.com"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    We'll use this to personalize your AI assistant
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                autoComplete="email"
-                required
+            {/* Payment Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                Payment Information
+              </h3>
+
+              <div className="bg-muted/50 border rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-medium">Starter Plan - $297/month</p>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• 3-day free trial (no charge today)</li>
+                      <li>• 24/7 AI receptionist</li>
+                      <li>• Dedicated phone number</li>
+                      <li>• Cancel anytime</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <PaymentForm
+                onCardChange={(complete, error) => {
+                  setCardComplete(complete);
+                  setCardError(error);
+                }}
+                showTerms={true}
+                termsAccepted={termsAccepted}
+                onTermsChange={setTermsAccepted}
+                disabled={isSubmitting}
               />
+
+              {cardError && (
+                <p className="text-sm text-destructive">{cardError}</p>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-                autoComplete="new-password"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                At least 8 characters
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isLoading}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-
+            {/* Submit Button */}
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading}
               size="lg"
-              variant="outline"
+              disabled={isSubmitting || !cardComplete || !termsAccepted}
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Creating Your Trial...
                 </>
               ) : (
-                'Quick Signup (Skip AI)'
+                <>
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </>
               )}
             </Button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              You won't be charged until after your 3-day trial ends
+            </p>
           </form>
 
-          <div className="mt-6 text-center text-sm">
-            <p className="text-muted-foreground">
-              Already have an account?{" "}
+          {/* Sign In Link */}
+          <div className="mt-6 text-center border-t pt-6">
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{' '}
               <Button
                 variant="link"
                 className="p-0 h-auto font-semibold"
@@ -253,16 +473,16 @@ export default function Start() {
               </Button>
             </p>
           </div>
-
-          <div className="mt-4 text-center">
-            <p className="text-xs text-muted-foreground">
-              By continuing, you agree to our{" "}
-              <a href="/terms" className="underline">Terms</a> and{" "}
-              <a href="/privacy" className="underline">Privacy Policy</a>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function Start() {
+  return (
+    <Elements stripe={stripePromise}>
+      <StartForm />
+    </Elements>
   );
 }
