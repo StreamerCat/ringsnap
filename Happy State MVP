@@ -1,0 +1,188 @@
+# RingSnap – Happy State MVP (AI-Assisted Signup)
+
+Last updated: 2025-12-01
+
+This document defines what “good enough to sell, demo, and sleep at night” means for RingSnap **given the current implementation and the new AI-assisted signup flow**.
+
+It is based on the audit in branch `claude/audit-codebase-state-0191kr7cWoPTYSnyhVUv3Qdz` (commit `e7c6bdd`) and the AI onboarding design discussed in recent planning.
+
+All agents and developers should treat this as the canonical definition of MVP completeness.
+
+---
+
+## 0. Reality Snapshot
+
+_(same as before, but add this line to the bullets)_
+
+- ✅ AI-assisted onboarding flow is being introduced to replace the heavy traditional form for initial signup and configuration; the old multi-step form remains as a fallback / safety net.
+
+---
+
+## 1. Core MVP User Journeys
+
+These are the journeys that MUST be stable for RingSnap to be demoable and sellable.
+
+### 1.1 AI-Assisted Trial Signup (Web + Sales)
+
+**Story**
+
+A contractor hits the site (or is guided by a sales rep) and is greeted by an **AI concierge**, not a giant form.
+
+The AI:
+
+- Greets them in natural language.
+- Asks a few smart questions.
+- Derives trade, company, website, and goals.
+- Confirms their details.
+- Then triggers the existing `create-trial` backend flow.
+
+The user:
+
+- Feels like they’re talking to a person, not fighting a form.
+- Only sees small, focused input elements when needed (email, phone, card).
+- Is always on the **Starter** plan for trial (no plan confusion upfront).
+
+**Current State**
+
+- `create-trial` is already mature and should not be redesigned.
+- Traditional multi-step form (`TrialSignupFlow.tsx`) exists and is wired to `create-trial`.
+- Step-1 lead capture is disabled as part of the “go-green” rollout.
+- AI-assisted flow has been scoped in planning and partially implemented, but is not yet the canonical path.
+
+**MVP Happy Path (`signup-trial.ai-assisted`)**
+
+1. **Entry**
+
+   - User lands on `/onboarding` or `/start`.
+   - Sees an AI chat panel (web-based assistant; can be powered by Claude, @signup-flow-agent, etc.) plus minimal UI.
+   - Above the fold: very simple value prop and a “Start with AI” button (with a “Use form instead” fallback link).
+
+2. **Conversation**
+
+   The AI collects, in 2–5 short prompts:
+
+   - Name
+   - Email
+   - Mobile phone
+   - Company name
+   - Trade / business type (e.g. plumber, HVAC, roofer)
+   - Service area or zip
+   - Primary goal (book appointments, capture leads, answer questions)
+
+   Rules:
+
+   - If the email domain looks like a business (not gmail / yahoo), AI **infers company website** as `https://<domain>` and confirms it with the user.
+   - If the domain is generic (gmail, etc.), AI explicitly asks: *“Do you have a website yet?”* and captures it if present, otherwise marks it as null.
+
+3. **Plan & Payment simplification**
+
+   - AI does **not** ask the user to choose between multiple plans for trial.
+   - For MVP, everyone starts on **Starter**.
+   - AI explains this clearly: *“We’ll start you on a Starter trial. You can upgrade later from inside the app.”*
+   - When collecting payment (if you keep payment-to-start):
+     - The card collection UI is a small, focused Stripe element.
+     - AI introduces it and confirms when it’s done.
+
+4. **Backend integration**
+
+   When the AI has all required fields, the frontend:
+
+   - Builds a structured `create-trial` payload from the conversation:
+     - `name`, `email`, `phone`, `companyName`, `trade`, `companyWebsite`, `zipCode` / service area, `primaryGoal`.
+     - `planType` is set to `"starter"` **by the frontend**.
+     - `paymentMethodId` is taken from Stripe.
+     - `source` is `"website"` or `"sales"` as appropriate.
+   - Sends this payload to the existing `create-trial` edge function.
+
+   `create-trial` behaves as before:
+
+   - Validates with Zod.
+   - Anti-abuse checks.
+   - Stripe customer + trial subscription.
+   - Atomic account creation (auth + account + profile + user_roles).
+   - Schedules async `provision-vapi` job.
+
+5. **Post-signup**
+
+   - On success, the app redirects to an AI-assisted onboarding screen (see 1.2) or to an operator dashboard placeholder.
+   - The AI confirms in chat what happened (e.g. *“You’re all set. I’ve created your account and started provisioning your AI receptionist.”*).
+
+**Failure Requirements**
+
+- If **any** step of `create-trial` fails:
+  - A lead record is still created via a backend function using the conversation data:
+    - `name`, `email`, `phone`, `companyName`, `trade`, `primaryGoal`, and any notes.
+  - The AI explains the issue to the user in plain language and invites them to:
+    - Try again later, or
+    - Book a call with sales.
+  - The failure is logged with:
+    - `correlationId`,
+    - `phase`,
+    - sanitized error details.
+
+- If AI parsing fails or data is ambiguous:
+  - The flow gracefully falls back to **a small inline form** that shows what the AI thinks and lets the user correct fields before calling `create-trial`.
+
+**Fallback Path**
+
+- The old multi-step form (`TrialSignupFlow.tsx`) remains as a direct link:
+  - `/signup?mode=form`
+  - It uses the same API and payload but is not the primary UX.
+
+---
+
+### 1.2 AI-Assisted Onboarding (Post-Signup Configuration)
+
+**Story**
+
+Immediately after signup, the same AI that guided the trial signup:
+
+- Confirms basic business details.
+- Sets preferences that matter for the Vapi assistant and booking.
+- Prepares for the two-phase calendar strategy.
+
+**Current State**
+
+- Hybrid onboarding schema exists (`hybrid_onboarding_schema.sql`).
+- Booking preferences and service hours are modeled (`accounts` fields and `is_within_service_hours` function).
+- `booking-schedule` function is in place.
+- No unified AI wrapper yet for onboarding.
+
+**MVP Happy Path (`onboarding.ai-assistant`)**
+
+After `create-trial` succeeds:
+
+1. AI welcomes the user back in-app and:
+
+   - Confirms trade and service area.
+   - Asks for inbound number behavior (e.g. forwards to cell, forwards to office, AI answers first, etc.).
+   - Asks for basic booking preference:
+     - “Do you want us to send you appointment requests by text for now?”
+     - This sets `booking_mode` (e.g. `sms_only`) and `destination_phone`.
+
+2. AI configures:
+
+   - Basic Vapi persona / script fields (using existing provisioning logic).
+   - Booking preferences to work with Phase 1 SMS fallback.
+
+3. AI **does not** require full calendar integration yet, but can:
+
+   - Mention: *“Later, you’ll be able to connect Google / Outlook calendar so we can book directly.”*
+   - Optionally surface a non-blocking “Connect Calendar” button (Phase 2 roadmap).
+
+---
+
+_(Other journeys – calls→leads, booking Phase 1 SMS, operator dashboard, env guardrails – stay as we already wrote them.)_
+
+---
+
+## 2. Acceptance Criteria IDs (updated list)
+
+Add / adjust:
+
+- `signup-trial.ai-assisted`
+- `onboarding.ai-assistant`
+- `calls-to-leads.happy-path`
+- `booking-phase1.sms-fallback`
+- `dashboard.operator-daily-clarity`
+- `env.config-consistent`

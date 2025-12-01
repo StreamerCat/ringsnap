@@ -1,0 +1,143 @@
+epics:
+  - id: ai-signup-and-onboarding
+    title: AI-assisted signup and onboarding
+    priority: 1
+    status: planned
+    user_journey_ref: signup-trial.ai-assisted
+    tasks:
+      - id: ai-signup.chat-ui
+        type: frontend
+        status: planned
+        desc: Implement conversational signup UI on /onboarding using the signup-flow agent; provide clear entry point and link to fallback form.
+        acceptance_ref: signup-trial.ai-assisted
+
+      - id: ai-signup.conversation-to-payload
+        type: frontend
+        status: planned
+        desc: Map AI conversation outputs into a structured create-trial payload (name, email, phone, companyName, trade, companyWebsite, primaryGoal, planType=starter, paymentMethodId).
+        acceptance_ref: signup-trial.ai-assisted
+
+      - id: ai-signup.backend-lead-capture
+        type: backend
+        status: planned
+        desc: Implement a backend edge function to store signup leads using AI-collected data whenever create-trial fails or is aborted.
+        acceptance_ref: signup-trial.ai-assisted
+
+      - id: ai-signup.fallback-form-integration
+        type: frontend
+        status: planned
+        desc: Wire legacy TrialSignupFlow.tsx as a fallback path from the AI flow with prefilled fields from the conversation.
+        acceptance_ref: signup-trial.ai-assisted
+
+      - id: ai-onboarding.preferences
+        type: backend
+        status: planned
+        user_journey_ref: onboarding.ai-assistant
+        desc: Use AI to configure basic Vapi persona fields and booking preferences (booking_mode, destination_phone) right after signup.
+        acceptance_ref: onboarding.ai-assistant
+
+      - id: ai-onboarding.tests-and-logs
+        type: backend
+        status: planned
+        desc: Add tests and logs to ensure AI onboarding writes correct account preferences and handles failures without blocking account use.
+        acceptance_ref: onboarding.ai-assistant
+
+
+  - id: calls-to-leads-core
+    title: Core call → lead pipeline
+    priority: 2
+    status: planned
+    user_journey_ref: calls-to-leads
+    tasks:
+      - id: leads.schema-and-migration
+        type: backend
+        status: planned
+        desc: Create customer_leads table and RLS policies to store leads sourced from phone calls.
+        acceptance_ref: calls-to-leads.happy-path
+
+      - id: leads.sync-usage-extension
+        type: backend
+        status: planned
+        desc: Extend sync-usage post-call webhook to create a customer lead for each completed call with a valid account and customer phone.
+        acceptance_ref: calls-to-leads.happy-path
+
+      - id: leads.tests-and-logging
+        type: backend
+        status: planned
+        desc: Add tests and structured logging for call → usage_logs → customer_leads pipeline.
+        acceptance_ref: calls-to-leads.happy-path
+
+
+  - id: booking-phase1-sms
+    title: Booking Phase 1 – SMS fallback without calendar
+    priority: 3
+    status: planned
+    user_journey_ref: booking-phase1
+    tasks:
+      - id: booking.sms-provider-integration
+        type: backend
+        status: planned
+        desc: Integrate a real SMS provider (Twilio or Vapi SMS) via shared utility in supabase/functions/_shared.
+        acceptance_ref: booking-phase1.sms-fallback
+
+      - id: booking.enable-sms-in-booking-schedule
+        type: backend
+        status: planned
+        desc: Replace stubbed SMS logging in booking-schedule with real SMS sends, logging success/failure.
+        acceptance_ref: booking-phase1.sms-fallback
+
+      - id: booking.e2e-test
+        type: backend
+        status: planned
+        desc: Add an integration/e2e test that calls booking-schedule and verifies an appointment row is created and SMS is sent.
+        acceptance_ref: booking-phase1.sms-fallback
+
+
+  - id: operator-dashboard-v1
+    title: Operator dashboard – daily clarity for contractors
+    priority: 4
+    status: planned
+    user_journey_ref: dashboard-operator
+    tasks:
+      - id: dashboard.operator-queries
+        type: backend
+        status: planned
+        desc: Create lightweight queries or views to fetch calls today, new leads today, and pending appointments by account_id.
+        acceptance_ref: dashboard.operator-daily-clarity
+
+      - id: dashboard.operator-ui
+        type: frontend
+        status: planned
+        desc: Build an operator-facing dashboard page showing calls, leads, and pending appointments above the fold.
+        acceptance_ref: dashboard.operator-daily-clarity
+
+      - id: dashboard.operator-e2e
+        type: backend
+        status: planned
+        desc: Create an e2e test to verify an operator can log in and see non-empty dashboard data for seeded fixtures.
+        acceptance_ref: dashboard.operator-daily-clarity
+
+
+  - id: env-standardization
+    title: Environment config standardization and validation
+    priority: 5
+    status: planned
+    user_journey_ref: env-config
+    tasks:
+      - id: env.canonical-naming
+        type: infrastructure
+        status: planned
+        desc: Standardize env var names for Supabase, Stripe, Vapi, SMS, and Resend; update .env.example and code to use a single canonical name per service.
+        acceptance_ref: env.config-consistent
+
+      - id: env.runtime-checks
+        type: backend
+        status: planned
+        desc: Add startup checks in core edge functions to assert required env vars are present; log and fail fast if not.
+        acceptance_ref: env.config-consistent
+
+      - id: env.deploy-checklist
+        type: documentation
+        status: planned
+        desc: Write a deployment checklist documenting all required env vars per environment (local, staging, production).
+        acceptance_ref: env.config-consistent
