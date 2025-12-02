@@ -65,8 +65,9 @@ export default function OnboardingChat() {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          toast.error("Please sign in to continue");
-          navigate("/start");
+          // This should not happen due to withAuthGuard, but as a fallback:
+          toast.error("Session not found. Please sign in again.");
+          navigate("/auth/login");
           return;
         }
 
@@ -81,7 +82,7 @@ export default function OnboardingChat() {
 
         if (profileError || !profile) {
           toast.error("Failed to load your profile");
-          navigate("/start");
+          navigate("/start"); // Or a more appropriate error page
           return;
         }
 
@@ -110,8 +111,8 @@ export default function OnboardingChat() {
         );
       } catch (error) {
         console.error("Onboarding init error:", error);
-        toast.error("Something went wrong");
-        navigate("/start");
+        toast.error("Something went wrong during setup.");
+        navigate("/start"); // Or a more appropriate error page
       }
     };
 
