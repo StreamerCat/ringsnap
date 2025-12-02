@@ -92,9 +92,8 @@ export default function OnboardingChat() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        if (!profile) {
-          console.error("Profile fetch error after retries:", lastError);
-          toast.error("Failed to load your profile. Please try again.");
+        if (profileError || !profile) {
+          toast.error("Failed to load your profile");
           navigate("/start"); // Or a more appropriate error page
           return;
         }
