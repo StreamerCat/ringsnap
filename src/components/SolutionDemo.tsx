@@ -1,12 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Zap, Calendar, PhoneForwarded, MessageCircle, Clock, Brain, Shield, DollarSign } from "lucide-react";
-import { useState } from "react";
-import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
+import { useNavigate } from "react-router-dom";
 import { VoiceDemoWidget } from "./VoiceDemoWidget";
 
 export const SolutionDemo = () => {
-  const [showSignupForm, setShowSignupForm] = useState(false);
+  const navigate = useNavigate();
   const scrollToVapiDemo = () => {
     document.getElementById("vapi-chat-container")?.scrollIntoView({
       behavior: "smooth",
@@ -107,7 +106,7 @@ export const SolutionDemo = () => {
             size="lg"
             variant="gradient"
             className="text-lg h-14 px-8 rounded-full"
-            onClick={() => setShowSignupForm(true)}
+            onClick={() => navigate('/start')}
           >
             Start Free Trial
           </Button>
@@ -120,8 +119,6 @@ export const SolutionDemo = () => {
             Hear How It Works
           </Button>
         </div>
-
-        <UnifiedSignupRouter mode="trial" open={showSignupForm} onOpenChange={setShowSignupForm} source="solution-demo" />
 
         {/* Outcome Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">

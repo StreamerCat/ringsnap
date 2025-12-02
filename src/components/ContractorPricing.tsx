@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Check, Zap, Phone, Crown, Calculator, CheckCircle, Clock, Lock, Star, PhoneCall } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
+import { useNavigate } from "react-router-dom";
 
 export const ContractorPricing = () => {
-  const [showSignupForm, setShowSignupForm] = useState(false);
+  const navigate = useNavigate();
   const comparisonData = [
     { option: "Full-time Receptionist", cost: "$3,000-4,000/month", issues: "Benefits, sick days, 9-5 only" },
     { option: "Answering Service", cost: "$500-1,200/month", issues: "Robotic, can't book appointments" },
@@ -190,15 +189,15 @@ export const ContractorPricing = () => {
                 </ul>
 
                 {/* CTA */}
-                <Button 
+                <Button
                   className={`w-full h-12 text-lg rounded-full transition-all ${
-                    tier.badge 
-                      ? 'bg-primary text-white hover:opacity-90 shadow-md' 
+                    tier.badge
+                      ? 'bg-primary text-white hover:opacity-90 shadow-md'
                       : 'bg-white border-2 hover:shadow-md'
                   }`}
                   style={tier.badge ? {} : {borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
                   size="lg"
-                  onClick={() => setShowSignupForm(true)}
+                  onClick={() => navigate('/start')}
                 >
                   {tier.cta}
                 </Button>
@@ -338,10 +337,10 @@ export const ContractorPricing = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="text-base h-12 px-6 font-semibold rounded-full bg-primary text-white hover:opacity-90 shadow-lg"
-              onClick={() => setShowSignupForm(true)}
+              onClick={() => navigate('/start')}
             >
               <PhoneCall className="mr-2 w-4 h-4" />
               Start Free Trial
@@ -370,13 +369,6 @@ export const ContractorPricing = () => {
             </span>
           </div>
         </div>
-
-        <UnifiedSignupRouter
-          mode="trial"
-          open={showSignupForm}
-          onOpenChange={setShowSignupForm}
-          source="pricing"
-        />
       </div>
     </section>
   );
