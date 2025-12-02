@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, Calculator } from "lucide-react";
-import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
+import { useNavigate } from "react-router-dom";
 
 export const MobileFooterCTA = () => {
   const [showCTA, setShowCTA] = useState(false);
-  const [showSignupForm, setShowSignupForm] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -32,15 +32,15 @@ export const MobileFooterCTA = () => {
       }}
     >
       <div className="container mx-auto px-4 pt-4 pb-4 flex gap-3">
-        <Button 
-          className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md text-sm font-semibold" 
+        <Button
+          className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md text-sm font-semibold"
           aria-label="Start your free 3-day trial with RingSnap AI receptionist"
-          onClick={() => setShowSignupForm(true)}
+          onClick={() => navigate('/start')}
         >
           <PhoneCall className="w-4 h-4" />
-          <span className="ml-1.5">Trial</span>
+          <span className="ml-1.5">Start Trial</span>
         </Button>
-        <Button 
+        <Button
           className="flex-1 h-12 rounded-full bg-white border-2 active:scale-95 transition-transform shadow-sm text-sm font-semibold"
           style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
           aria-label="Calculate potential revenue from missed calls with RingSnap"
@@ -50,13 +50,6 @@ export const MobileFooterCTA = () => {
           <span className="ml-1.5">Calculate</span>
         </Button>
       </div>
-
-      <UnifiedSignupRouter
-        mode="trial"
-        open={showSignupForm}
-        onOpenChange={setShowSignupForm}
-        source="mobile-footer"
-      />
     </div>
   );
 };

@@ -9,8 +9,8 @@ import { withAuthGuard } from "@/lib/auth/useUser";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Start from "./pages/Start";
-import AISignupWrapper from "./pages/AISignupWrapper";
-import Onboarding from "./pages/Onboarding";
+import SignupRedirect from "./pages/SignupRedirect";
+import OnboardingRedirect from "./pages/OnboardingRedirect";
 import OnboardingChat from "./pages/OnboardingChat";
 import SetupStatus from "./pages/SetupStatus";
 import ResetPassword from "./pages/ResetPassword";
@@ -49,12 +49,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          {/* Canonical signup/onboarding flow */}
           <Route path="/start" element={<Start />} />
-          <Route path="/signup" element={<AISignupWrapper />} />
-          <Route path="/signup/form" element={<Onboarding />} />
-          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/onboarding-chat" element={<OnboardingChat />} />
           <Route path="/setup-status" element={<SetupStatus />} />
+          {/* Legacy signup routes - redirect to canonical paths */}
+          <Route path="/signup" element={<SignupRedirect />} />
+          <Route path="/signup/form" element={<SignupRedirect />} />
+          <Route path="/onboarding" element={<OnboardingRedirect />} />
           {/* Redirect legacy login routes to unified auth */}
           <Route path="/login" element={<Navigate to="/auth/login" replace />} />
           <Route path="/reset-password" element={<Navigate to="/auth/login" replace />} />

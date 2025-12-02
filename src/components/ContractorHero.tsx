@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import logo from "@/assets/RS_logo_color.svg";
-import { UnifiedSignupRouter } from "./signup/UnifiedSignupRouter";
+
 export const ContractorHero = () => {
-  const [showSignupForm, setShowSignupForm] = useState(false);
+  const navigate = useNavigate();
   const scrollToVapiDemo = () => {
     document.getElementById('vapi-chat-container')?.scrollIntoView({
       behavior: 'smooth'
@@ -48,7 +48,7 @@ export const ContractorHero = () => {
               
               {/* Gradient CTAs */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={() => setShowSignupForm(true)}>
+                <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={() => navigate('/start')}>
                   <PhoneCall className="mr-2" />
                   Start Free
                 </Button>
@@ -150,8 +150,6 @@ export const ContractorHero = () => {
           </div>
           
         </div>
-
-        <UnifiedSignupRouter mode="trial" open={showSignupForm} onOpenChange={setShowSignupForm} source="hero" />
       </div>
     </section>;
 };
