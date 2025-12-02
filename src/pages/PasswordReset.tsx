@@ -1,18 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 
 export default function PasswordReset() {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [recoverySession, setRecoverySession] = useState<Session | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        if (session) {
+          setRecoverySession(session);
+        } else {
+          setError("Invalid or expired password reset link. Please try again.");
+          setTimeout(() => navigate("/login"), 3000);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +47,14 @@ export default function PasswordReset() {
       return;
     }
 
+    if (!recoverySession) {
+      toast.error("No valid recovery session. Please request a new reset link.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Update password using Supabase auth
       const { error } = await supabase.auth.updateUser({
         password
       });
@@ -38,31 +62,34 @@ export default function PasswordReset() {
       if (error) throw error;
 
       toast.success("Password reset successfully! Please log in with your new password.");
-
-      // Always redirect to login after password reset
-      navigate("/auth/login");
+      navigate("/login");
 
     } catch (error: any) {
       console.error("Password update error:", error);
-
-      // Provide helpful error messages
-      let message = "Failed to update password";
-      if (error?.message?.includes("session")) {
-        message = "Reset link expired. Please request a new password reset.";
-      } else if (error?.message) {
-        message = error.message;
-      }
-
+      const message = error?.message || "Failed to update password. Please try again.";
       toast.error(message);
-
-      // If session expired, redirect back to login
-      if (error?.message?.includes("session")) {
-        setTimeout(() => navigate("/auth/login"), 2000);
-      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center text-destructive">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center">{error}</p>
+            <Button className="w-full mt-4" onClick={() => navigate("/login")}>
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted px-4">
@@ -126,7 +153,7 @@ export default function PasswordReset() {
             <div className="text-center">
               <Button
                 variant="link"
-                onClick={() => navigate("/auth/login")}
+                onClick={() => navigate("/login")}
                 disabled={isLoading}
               >
                 Back to Login

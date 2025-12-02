@@ -13,7 +13,6 @@ import SignupRedirect from "./pages/SignupRedirect";
 import OnboardingRedirect from "./pages/OnboardingRedirect";
 import OnboardingChat from "./pages/OnboardingChat";
 import SetupStatus from "./pages/SetupStatus";
-import ResetPassword from "./pages/ResetPassword";
 import Sales from "./pages/Sales";
 import FormPreview from "./pages/FormPreview";
 import TrialFlowPreview from "./pages/TrialFlowPreview";
@@ -58,16 +57,14 @@ const App = () => (
           <Route path="/signup" element={<SignupRedirect />} />
           <Route path="/signup/form" element={<SignupRedirect />} />
           <Route path="/onboarding" element={<OnboardingRedirect />} />
-          {/* Redirect legacy login routes to unified auth */}
-          <Route path="/login" element={<Navigate to="/auth/login" replace />} />
-          <Route path="/reset-password" element={<Navigate to="/auth/login" replace />} />
           {/* Auth routes */}
+          <Route path="/login" element={<AuthLogin />} />
+          <Route path="/reset-password" element={<PasswordReset />} />
           <Route path="/auth/login" element={<AuthLogin />} />
           <Route path="/signin" element={<AuthLogin />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth/magic-callback" element={<MagicCallback />} />
           <Route path="/auth/staff-invite" element={<StaffInvite />} />
-          <Route path="/auth/reset" element={<PasswordReset />} />
           {/* Settings */}
           <Route path="/settings/security" element={<SecuritySettings />} />
           {/* App routes */}
