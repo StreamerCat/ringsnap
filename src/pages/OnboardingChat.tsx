@@ -73,12 +73,24 @@ export default function OnboardingChat() {
 
         setUserId(user.id);
 
-        // Get profile and account
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("account_id, onboarding_status")
-          .eq("id", user.id)
-          .single();
+        // Get profile and account with retry logic for just-created users
+        let profile = null;
+        let lastError = null;
+        for (let i = 0; i < 3; i++) {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("account_id, onboarding_status")
+            .eq("id", user.id)
+            .single();
+
+          if (data) {
+            profile = data;
+            break;
+          }
+          lastError = error;
+          // Wait 1 second before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
 
         if (profileError || !profile) {
           toast.error("Failed to load your profile");
