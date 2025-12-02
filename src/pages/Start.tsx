@@ -30,6 +30,8 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 import { useUser } from '@/lib/auth/useUser';
 
 function StartForm() {
+  type SignupStep = 1 | 2;
+  const [step, setStep] = useState<SignupStep>(1);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stripe = useStripe();
@@ -54,7 +56,53 @@ function StartForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Lead tracking
-  const leadId = searchParams.get('leadId') || undefined;
+  const [leadId, setLeadId] = useState<string | undefined>(searchParams.get('leadId') || undefined);
+
+  const handleStep1Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Basic validation for Step 1
+    if (!name.trim()) {
+      toast.error('Please enter your name');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    if (!phone.trim()) {
+      toast.error('Please enter your phone number');
+      return;
+    }
+    if (!companyName.trim()) {
+      toast.error('Please enter your company name');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('capture-signup-lead', {
+        body: {
+          email: email.trim(),
+          full_name: name.trim(),
+          phone: phone.trim(),
+          metadata: {
+            companyName: companyName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        // Non-fatal error, log and continue
+        console.error('Lead capture error:', error);
+      } else if (data.lead_id) {
+        setLeadId(data.lead_id);
+      }
+    } catch (err) {
+      console.error('Failed to invoke lead capture function', err);
+    }
+
+    setStep(2);
+  };
 
   // Check if already logged in
   useEffect(() => {
@@ -97,30 +145,20 @@ function StartForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (step === 1) {
+      handleStep1Submit(e);
+    } else {
+      handleStep2Submit(e);
+    }
+  };
+
+  const handleStep2Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     // Validation
-    if (!name.trim()) {
-      toast.error('Please enter your name');
-      return;
-    }
-
-    if (!email.trim() || !email.includes('@')) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-
-    if (!phone.trim()) {
-      toast.error('Please enter your phone number');
-      return;
-    }
-
-    if (!companyName.trim()) {
-      toast.error('Please enter your company name');
-      return;
-    }
-
-    if (!trade.trim()) {
-      toast.error('Please enter your trade or service type');
+    if (!name.trim() || !email.trim() || !email.includes('@') || !phone.trim() || !companyName.trim()) {
+      toast.error('Please complete all contact information fields.');
+      setStep(1);
       return;
     }
 
@@ -269,10 +307,12 @@ function StartForm() {
             <Sparkles className="h-10 w-10 text-primary" />
           </div>
           <CardTitle className="text-3xl font-bold text-center">
-            Start Your 3-Day Free Trial
+            {step === 1 ? 'Start your 3-day free trial' : 'Secure your trial'}
           </CardTitle>
           <CardDescription className="text-center text-base">
-            No charge today. Cancel anytime during your trial.
+            {step === 1
+              ? 'Step 1 of 2 · Takes about 60 seconds. No charge today.'
+              : 'Step 2 of 2 · Add a card to start your 3-day free trial. You will not be charged today.'}
           </CardDescription>
         </CardHeader>
 
@@ -326,32 +366,6 @@ function StartForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="zipCode">ZIP Code (Optional)</Label>
-                  <Input
-                    id="zipCode"
-                    type="text"
-                    placeholder="12345"
-                    value={zipCode}
-                    onChange={(e) => setZipCode(e.target.value)}
-                    disabled={isSubmitting}
-                    maxLength={5}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Used for local phone number provisioning
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Business Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Business Information
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
                   <Label htmlFor="companyName">Company Name *</Label>
                   <Input
                     id="companyName"
@@ -363,95 +377,124 @@ function StartForm() {
                     required
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="trade">Trade/Service *</Label>
-                  <Input
-                    id="trade"
-                    type="text"
-                    placeholder="Plumbing, HVAC, Electrical, etc."
-                    value={trade}
-                    onChange={(e) => setTrade(e.target.value)}
-                    disabled={isSubmitting}
-                    required
-                  />
-                  {trade && (
-                    <p className="text-xs text-muted-foreground">
-                      Normalized: {normalizeTrade(trade)}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="website">Website (Optional)</Label>
-                  <Input
-                    id="website"
-                    type="url"
-                    placeholder="https://yourcompany.com"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    We'll use this to personalize your AI assistant
-                  </p>
-                </div>
               </div>
             </div>
 
-            {/* Payment Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Payment Information
-              </h3>
+            {step === 2 && (
+              <>
+                {/* Business Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                    Business Information
+                  </h3>
 
-              <div className="bg-muted/50 border rounded-lg p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-medium">Starter Plan - $297/month</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• 3-day free trial (no charge today)</li>
-                      <li>• 24/7 AI receptionist</li>
-                      <li>• Dedicated phone number</li>
-                      <li>• Cancel anytime</li>
-                    </ul>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="trade">Trade/Service (Optional)</Label>
+                      <Input
+                        id="trade"
+                        type="text"
+                        placeholder="Plumbing, HVAC, Electrical, etc."
+                        value={trade}
+                        onChange={(e) => setTrade(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                      {trade && (
+                        <p className="text-xs text-muted-foreground">
+                          Normalized: {normalizeTrade(trade)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="zipCode">ZIP Code (Optional)</Label>
+                      <Input
+                        id="zipCode"
+                        type="text"
+                        placeholder="12345"
+                        value={zipCode}
+                        onChange={(e) => setZipCode(e.target.value)}
+                        disabled={isSubmitting}
+                        maxLength={5}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Used for local phone number provisioning
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="website">Website (Optional)</Label>
+                      <Input
+                        id="website"
+                        type="url"
+                        placeholder="https://yourcompany.com"
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        We'll use this to personalize your AI assistant
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <PaymentForm
-                onCardChange={(complete, error) => {
-                  setCardComplete(complete);
-                  setCardError(error);
-                }}
-                showTerms={true}
-                termsAccepted={termsAccepted}
-                onTermsChange={setTermsAccepted}
-                disabled={isSubmitting}
-              />
+                {/* Payment Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                    Payment Information
+                  </h3>
 
-              {cardError && (
-                <p className="text-sm text-destructive">{cardError}</p>
-              )}
-            </div>
+                  <div className="bg-muted/50 border rounded-lg p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-medium">Starter Plan - $297/month</p>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          <li>• 3-day free trial (no charge today)</li>
+                          <li>• 24/7 AI receptionist</li>
+                          <li>• Dedicated phone number</li>
+                          <li>• Cancel anytime</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <PaymentForm
+                    onCardChange={(complete, error) => {
+                      setCardComplete(complete);
+                      setCardError(error);
+                    }}
+                    showTerms={true}
+                    termsAccepted={termsAccepted}
+                    onTermsChange={setTermsAccepted}
+                    disabled={isSubmitting}
+                  />
+
+                  {cardError && (
+                    <p className="text-sm text-destructive">{cardError}</p>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Submit Button */}
             <Button
               type="submit"
               className="w-full"
               size="lg"
-              disabled={isSubmitting || !cardComplete || !termsAccepted}
+              disabled={isSubmitting || (step === 2 && (!cardComplete || !termsAccepted))}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating Your Trial...
+                  {step === 1 ? 'Continuing...' : 'Creating Your Trial...'}
                 </>
               ) : (
                 <>
-                  Start Free Trial
+                  {step === 1 ? 'Continue to payment' : 'Start Free Trial'}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </>
               )}

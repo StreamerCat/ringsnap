@@ -119,7 +119,7 @@ export default function OnboardingChat() {
         await showTypingDelay(1000);
         addMessage(
           "assistant",
-          "Welcome! I'm here to help you set up your AI phone assistant. This will only take about 2 minutes. Ready to get started?"
+          "Welcome to RingSnap. Your free trial is active. I’ll help you set up your AI phone assistant now. This takes about 2 minutes. Ready to get started?"
         );
       } catch (error) {
         console.error("Onboarding init error:", error);
@@ -393,6 +393,7 @@ export default function OnboardingChat() {
             <li>Voice: {voiceGender === "male" ? "Male" : "Female"}, {assistantTone} tone</li>
             <li>Booking: {mode === "sms_only" ? "SMS confirmation" : "Direct calendar (coming soon)"}</li>
           </ul>
+          <p className="mt-2 text-sm text-muted-foreground">You can change these settings anytime from your dashboard.</p>
           <p className="mt-3">Ready to activate your assistant? This will take about 30 seconds.</p>
         </>
       );

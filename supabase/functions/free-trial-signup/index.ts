@@ -1,3 +1,4 @@
+// DEPRECATED: This function is no longer used. Use 'create-trial' instead.
 /*
  * ═══════════════════════════════════════════════════════════════════════════
  * DEPRECATED: This function is deprecated in favor of create-trial

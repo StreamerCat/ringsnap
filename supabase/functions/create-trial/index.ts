@@ -58,7 +58,7 @@ const createTrialSchema = z.object({
 
   // Business basics (required for both flows)
   companyName: z.string().trim().min(1, "Company name required").max(200, "Company name too long"),
-  trade: z.string().min(1, "Trade required").max(100, "Trade too long"),
+  trade: z.string().max(100, "Trade too long").optional().or(z.literal("")),
 
   // Business extended (optional - self-serve provides more detail)
   website: z.string().url("Invalid website URL").optional().or(z.literal("")),
@@ -77,9 +77,7 @@ const createTrialSchema = z.object({
   wantsAdvancedVoice: z.boolean().optional().default(false),
 
   // Plan & payment
-  planType: z.enum(["starter", "professional", "premium"], {
-    required_error: "Plan type required",
-  }),
+  planType: z.enum(["starter", "professional", "premium"]).optional().default("starter"),
   paymentMethodId: z.string().min(1, "Payment method required"),
 
   // Source tracking (CRITICAL - differentiates flows)
