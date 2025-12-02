@@ -65,23 +65,37 @@ export default function OnboardingChat() {
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          toast.error("Please sign in to continue");
-          navigate("/start");
+          // This should not happen due to withAuthGuard, but as a fallback:
+          toast.error("Session not found. Please sign in again.");
+          navigate("/auth/login");
           return;
         }
 
         setUserId(user.id);
 
-        // Get profile and account
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("account_id, onboarding_status")
-          .eq("id", user.id)
-          .single();
+        // Get profile and account with retry logic for just-created users
+        let profile = null;
+        let lastError = null;
+        for (let i = 0; i < 3; i++) {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("account_id, onboarding_status")
+            .eq("id", user.id)
+            .single();
 
-        if (profileError || !profile) {
-          toast.error("Failed to load your profile");
-          navigate("/start");
+          if (data) {
+            profile = data;
+            break;
+          }
+          lastError = error;
+          // Wait 1 second before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        if (!profile) {
+          console.error("Profile fetch error after retries:", lastError);
+          toast.error("Failed to load your profile. Please try again.");
+          navigate("/start"); // Or a more appropriate error page
           return;
         }
 
@@ -110,8 +124,8 @@ export default function OnboardingChat() {
         );
       } catch (error) {
         console.error("Onboarding init error:", error);
-        toast.error("Something went wrong");
-        navigate("/start");
+        toast.error("Something went wrong during setup.");
+        navigate("/start"); // Or a more appropriate error page
       }
     };
 
