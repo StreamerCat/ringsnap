@@ -132,9 +132,8 @@ Deno.serve(async (req) => {
     // Only send password reset for newly created users (saves email credits)
     if (isNewUser) {
       try {
-        await supabase.functions.invoke('send-password-reset', {
-          body: { email }
-        });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {});
+        if (error) throw error;
         console.log(`Password reset email sent to ${email}`);
       } catch (emailError) {
         console.error('Error sending password reset email:', emailError);
