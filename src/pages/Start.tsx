@@ -27,11 +27,14 @@ import { buildStep1Payload, inferWebsiteFromEmail, normalizeTrade } from '@/lib/
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
+import { useUser } from '@/lib/auth/useUser';
+
 function StartForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stripe = useStripe();
   const elements = useElements();
+  const { user, isLoading: isCheckingAuth } = useUser();
 
   // Form state
   const [name, setName] = useState('');
@@ -49,17 +52,15 @@ function StartForm() {
 
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Lead tracking
   const leadId = searchParams.get('leadId') || undefined;
 
   // Check if already logged in
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+    const checkOnboardingStatus = async () => {
+      if (user) {
+        try {
           // Already logged in - check onboarding status
           const { data: profile } = await supabase
             .from('profiles')
@@ -68,20 +69,21 @@ function StartForm() {
             .single();
 
           if (profile?.onboarding_status === 'active') {
-            navigate('/dashboard');
+            navigate('/dashboard', { replace: true });
           } else {
-            navigate('/onboarding-chat');
+            navigate('/onboarding-chat', { replace: true });
           }
+        } catch (error) {
+          console.error('Onboarding status check error:', error);
+          // Allow to proceed with signup if status check fails
         }
-      } catch (error) {
-        console.error('Auth check error:', error);
-      } finally {
-        setIsCheckingAuth(false);
       }
     };
 
-    checkAuth();
-  }, [navigate]);
+    if (!isCheckingAuth) {
+      checkOnboardingStatus();
+    }
+  }, [user, isCheckingAuth, navigate]);
 
   // Auto-infer website from email
   useEffect(() => {
