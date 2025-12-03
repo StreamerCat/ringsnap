@@ -1,67 +1,70 @@
 /**
- * STEP 1: Minimal Trial Signup
+ * STEP 1: Minimal Lead Capture (Two-Step Signup Flow)
  *
- * Collects only the essential fields needed to:
- * - Create Supabase auth user
- * - Create account + profile in DB
- * - Create Stripe customer + subscription
- * - Capture payment method
+ * Collects only name + email to:
+ * - Create lead record in database (via capture-signup-lead)
+ * - Store lead_id for Step 2
+ * - Redirect to /onboarding-chat for full configuration + payment
  *
- * After success, user proceeds to Step 2 (/onboarding-chat) for assistant configuration.
+ * Copy follows Alex Hormozi principles:
+ * - Concrete outcomes with numbers
+ * - Emphasize missed revenue from unanswered calls
+ * - Clear benefit-focused CTAs
+ * - Reduce friction and risk
  */
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Loader2, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+import { Loader2, Phone, ArrowRight, CheckCircle, Shield, Clock, Zap } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PaymentForm } from '@/components/onboarding/shared/PaymentForm';
+import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
-import { buildStep1Payload, inferWebsiteFromEmail, normalizeTrade } from '@/lib/normalization';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
-
 import { useUser } from '@/lib/auth/useUser';
 
-function StartForm() {
+// Store lead_id in localStorage for persistence
+const LEAD_ID_KEY = 'ringsnap_lead_id';
+
+function getStoredLeadId(): string | null {
+  try {
+    return localStorage.getItem(LEAD_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeLeadId(leadId: string): void {
+  try {
+    localStorage.setItem(LEAD_ID_KEY, leadId);
+  } catch {
+    // localStorage not available
+  }
+}
+
+export default function Start() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const stripe = useStripe();
-  const elements = useElements();
   const { user, isLoading: isCheckingAuth } = useUser();
 
   // Form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [trade, setTrade] = useState('');
-  const [website, setWebsite] = useState('');
-  const [zipCode, setZipCode] = useState('');
-
-  // Payment state
-  const [cardComplete, setCardComplete] = useState(false);
-  const [cardError, setCardError] = useState<string | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Lead tracking
-  const leadId = searchParams.get('leadId') || undefined;
+  // Get existing lead_id from URL or localStorage
+  const existingLeadId = searchParams.get('lead_id') || getStoredLeadId();
 
-  // Check if already logged in
+  // Check if already logged in or has existing lead
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
+    const checkStatus = async () => {
+      // If user is already logged in, redirect appropriately
       if (user) {
         try {
-          // Already logged in - check onboarding status
           const { data: profile } = await supabase
             .from('profiles')
             .select('onboarding_status')
@@ -73,175 +76,145 @@ function StartForm() {
           } else {
             navigate('/onboarding-chat', { replace: true });
           }
+          return;
         } catch (error) {
-          console.error('Onboarding status check error:', error);
-          // Allow to proceed with signup if status check fails
+          console.error('Status check error:', error);
+        }
+      }
+
+      // If we have an existing lead_id, offer to continue
+      if (existingLeadId) {
+        // Check if lead exists and is not yet converted
+        try {
+          const { data: lead } = await supabase
+            .from('signup_leads')
+            .select('id, email, full_name, completed_at')
+            .eq('id', existingLeadId)
+            .maybeSingle();
+
+          if (lead && !lead.completed_at) {
+            // Lead exists and not yet completed - redirect to Step 2
+            navigate(`/onboarding-chat?lead_id=${existingLeadId}`, { replace: true });
+            return;
+          }
+        } catch {
+          // Ignore - will create new lead if needed
         }
       }
     };
 
     if (!isCheckingAuth) {
-      checkOnboardingStatus();
+      checkStatus();
     }
-  }, [user, isCheckingAuth, navigate]);
+  }, [user, isCheckingAuth, navigate, existingLeadId]);
 
-  // Auto-infer website from email
-  useEffect(() => {
-    if (email && !website) {
-      const inferred = inferWebsiteFromEmail(email);
-      if (inferred) {
-        setWebsite(inferred);
-      }
-    }
-  }, [email, website]);
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateName = (name: string): boolean => {
+    // At least 2 characters, letters and spaces only
+    return name.trim().length >= 2 && /^[a-zA-Z\s'-]+$/.test(name.trim());
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
     // Validation
-    if (!name.trim()) {
+    if (!trimmedName) {
       toast.error('Please enter your name');
       return;
     }
 
-    if (!email.trim() || !email.includes('@')) {
+    if (!validateName(trimmedName)) {
+      toast.error('Name should only contain letters and spaces');
+      return;
+    }
+
+    if (!trimmedEmail) {
+      toast.error('Please enter your email');
+      return;
+    }
+
+    if (!validateEmail(trimmedEmail)) {
       toast.error('Please enter a valid email address');
-      return;
-    }
-
-    if (!phone.trim()) {
-      toast.error('Please enter your phone number');
-      return;
-    }
-
-    if (!companyName.trim()) {
-      toast.error('Please enter your company name');
-      return;
-    }
-
-    if (!trade.trim()) {
-      toast.error('Please enter your trade or service type');
-      return;
-    }
-
-    if (!cardComplete) {
-      toast.error('Please complete your payment information');
-      return;
-    }
-
-    if (!termsAccepted) {
-      toast.error('Please accept the Terms of Service');
-      return;
-    }
-
-    if (!stripe || !elements) {
-      toast.error('Payment system not ready. Please refresh and try again.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Create payment method
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card element not found');
-      }
+      console.log('[Start] Capturing lead:', { name: trimmedName, email: trimmedEmail });
 
-      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone: phone.trim(),
+      // Get UTM params and other metadata
+      const utmSource = searchParams.get('utm_source') || undefined;
+      const utmCampaign = searchParams.get('utm_campaign') || undefined;
+      const utmMedium = searchParams.get('utm_medium') || undefined;
+
+      // Call capture-signup-lead to create/update lead
+      const { data, error } = await supabase.functions.invoke('capture-signup-lead', {
+        body: {
+          email: trimmedEmail,
+          full_name: trimmedName,
+          source: 'website',
+          signup_flow: 'two-step-v2',
+          metadata: {
+            utm_source: utmSource,
+            utm_campaign: utmCampaign,
+            utm_medium: utmMedium,
+            referrer: document.referrer || undefined,
+            step: 'lead_capture',
+          },
         },
-      });
-
-      if (pmError) {
-        throw new Error(pmError.message || 'Failed to process payment method');
-      }
-
-      if (!paymentMethod) {
-        throw new Error('Payment method creation failed');
-      }
-
-      // Build payload for create-trial
-      const payload = buildStep1Payload({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        companyName: companyName.trim(),
-        trade: trade.trim(),
-        website: website.trim() || undefined,
-        zipCode: zipCode.trim() || undefined,
-        paymentMethodId: paymentMethod.id,
-        planType: 'starter',
-        source: 'website',
-        leadId,
-      });
-
-      console.log('[Start] Calling create-trial with payload:', {
-        ...payload,
-        paymentMethodId: '***',
-      });
-
-      // Call create-trial edge function
-      const { data, error } = await supabase.functions.invoke('create-trial', {
-        body: payload,
       });
 
       if (error) {
-        console.error('[Start] create-trial error:', error);
-        throw new Error(error.message || 'Failed to create trial account');
+        console.error('[Start] capture-signup-lead error:', error);
+        throw new Error(error.message || 'Failed to save your information');
       }
 
       if (!data || !data.success) {
-        console.error('[Start] create-trial failed:', data);
-        throw new Error(data?.message || 'Failed to create trial account');
+        console.error('[Start] capture-signup-lead failed:', data);
+        throw new Error(data?.message || 'Failed to save your information');
       }
 
-      console.log('[Start] Trial created successfully:', {
-        accountId: data.account_id,
-        userId: data.user_id,
-      });
+      const leadId = data.lead_id;
+      console.log('[Start] Lead captured successfully:', { leadId });
 
-      // Log in the user with the returned credentials
-      if (data.email && data.password) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
+      // Store lead_id for persistence
+      storeLeadId(leadId);
 
-        if (signInError) {
-          console.warn('[Start] Auto sign-in failed (non-critical):', signInError);
-          // Don't fail the signup for this
-        }
-      }
+      // Show success feedback
+      toast.success('Great! Loading your setup...');
 
-      toast.success('Trial started! Let\'s configure your AI assistant.');
+      // Small delay for UX, then redirect to Step 2
+      setTimeout(() => {
+        navigate(`/onboarding-chat?lead_id=${leadId}`);
+      }, 500);
 
-      // Redirect to Step 2 (assistant configuration)
-      navigate('/onboarding-chat', {
-        state: {
-          accountId: data.account_id,
-          fromStep1: true,
-        },
-      });
     } catch (error: any) {
-      console.error('[Start] Signup error:', error);
+      console.error('[Start] Error:', error);
 
-      let message = 'Failed to start trial. Please try again.';
+      let message = 'Something went wrong. Please try again.';
 
       if (error.message) {
-        if (error.message.includes('already registered') || error.message.includes('already exists')) {
-          message = 'This email is already registered. Please sign in instead.';
-        } else if (error.message.includes('disposable')) {
-          message = 'Please use a valid business or personal email address.';
-        } else if (error.message.includes('phone')) {
-          message = error.message;
-        } else if (error.message.includes('card') || error.message.includes('payment')) {
-          message = 'Payment failed. Please check your card details.';
+        if (error.message.includes('disposable')) {
+          message = 'Please use a business email address (not a temporary email)';
+        } else if (error.message.includes('already')) {
+          // Lead already exists - this is actually ok, redirect them
+          message = 'You\'ve already started! Redirecting...';
+          const leadId = error.lead_id || getStoredLeadId();
+          if (leadId) {
+            setTimeout(() => {
+              navigate(`/onboarding-chat?lead_id=${leadId}`);
+            }, 1000);
+            toast.info(message);
+            return;
+          }
         } else {
           message = error.message;
         }
@@ -262,32 +235,34 @@ function StartForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted px-4 py-8">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="space-y-2">
-          <div className="flex items-center justify-center mb-2">
-            <Sparkles className="h-10 w-10 text-primary" />
-          </div>
-          <CardTitle className="text-3xl font-bold text-center">
-            Start Your 3-Day Free Trial
-          </CardTitle>
-          <CardDescription className="text-center text-base">
-            No charge today. Cancel anytime during your trial.
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted">
+      {/* Header */}
+      <header className="p-4 md:p-6">
+        <div className="max-w-6xl mx-auto flex items-center gap-2">
+          <Phone className="h-6 w-6 text-primary" />
+          <span className="font-semibold text-lg">RingSnap</span>
+        </div>
+      </header>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Contact Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Contact Information
-              </h3>
+      {/* Main Content */}
+      <main className="flex items-center justify-center px-4 py-8 md:py-16">
+        <div className="w-full max-w-md">
+          <Card className="shadow-xl border-2">
+            <CardContent className="p-6 md:p-8">
+              {/* Headline */}
+              <div className="text-center mb-8">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
+                  Stop Losing $4K+/Month to Unanswered Calls
+                </h1>
+                <p className="text-muted-foreground">
+                  Get your AI receptionist in under 2 minutes
+                </p>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Your Name *</Label>
+                  <Label htmlFor="name">Your name</Label>
                   <Input
                     id="name"
                     type="text"
@@ -295,196 +270,91 @@ function StartForm() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={isSubmitting}
-                    required
+                    className="h-12 text-base"
+                    autoComplete="name"
+                    autoFocus
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email">Work email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="john@yourcompany.com"
+                    placeholder="john@acmeplumbing.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isSubmitting}
-                    required
+                    className="h-12 text-base"
+                    autoComplete="email"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="(555) 123-4567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={isSubmitting}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">ZIP Code (Optional)</Label>
-                  <Input
-                    id="zipCode"
-                    type="text"
-                    placeholder="12345"
-                    value={zipCode}
-                    onChange={(e) => setZipCode(e.target.value)}
-                    disabled={isSubmitting}
-                    maxLength={5}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Used for local phone number provisioning
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    Use your business email for faster approval
                   </p>
                 </div>
-              </div>
-            </div>
 
-            {/* Business Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Business Information
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Company Name *</Label>
-                  <Input
-                    id="companyName"
-                    type="text"
-                    placeholder="Acme Plumbing"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    disabled={isSubmitting}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="trade">Trade/Service *</Label>
-                  <Input
-                    id="trade"
-                    type="text"
-                    placeholder="Plumbing, HVAC, Electrical, etc."
-                    value={trade}
-                    onChange={(e) => setTrade(e.target.value)}
-                    disabled={isSubmitting}
-                    required
-                  />
-                  {trade && (
-                    <p className="text-xs text-muted-foreground">
-                      Normalized: {normalizeTrade(trade)}
-                    </p>
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base font-semibold"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      Start My Free Trial
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
                   )}
-                </div>
+                </Button>
+              </form>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="website">Website (Optional)</Label>
-                  <Input
-                    id="website"
-                    type="url"
-                    placeholder="https://yourcompany.com"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    We'll use this to personalize your AI assistant
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Payment Information
-              </h3>
-
-              <div className="bg-muted/50 border rounded-lg p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-medium">Starter Plan - $297/month</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• 3-day free trial (no charge today)</li>
-                      <li>• 24/7 AI receptionist</li>
-                      <li>• Dedicated phone number</li>
-                      <li>• Cancel anytime</li>
-                    </ul>
+              {/* Trust Badges */}
+              <div className="mt-6 pt-6 border-t">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>No credit card required</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span>Setup in 2 minutes</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="h-4 w-4 text-yellow-600" />
+                    <span>150 minutes included</span>
                   </div>
                 </div>
               </div>
 
-              <PaymentForm
-                onCardChange={(complete, error) => {
-                  setCardComplete(complete);
-                  setCardError(error);
-                }}
-                showTerms={true}
-                termsAccepted={termsAccepted}
-                onTermsChange={setTermsAccepted}
-                disabled={isSubmitting}
-              />
+              {/* Sign In Link */}
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Already have an account?{' '}
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-semibold"
+                    onClick={() => navigate('/auth/login')}
+                  >
+                    Sign in
+                  </Button>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-              {cardError && (
-                <p className="text-sm text-destructive">{cardError}</p>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={isSubmitting || !cardComplete || !termsAccepted}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Creating Your Trial...
-                </>
-              ) : (
-                <>
-                  Start Free Trial
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </>
-              )}
-            </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              You won't be charged until after your 3-day trial ends
-            </p>
-          </form>
-
-          {/* Sign In Link */}
-          <div className="mt-6 text-center border-t pt-6">
+          {/* Social Proof */}
+          <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Already have an account?{' '}
-              <Button
-                variant="link"
-                className="p-0 h-auto font-semibold"
-                onClick={() => navigate('/auth/login')}
-              >
-                Sign in
-              </Button>
+              Trusted by 500+ contractors and home service businesses
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </main>
     </div>
-  );
-}
-
-export default function Start() {
-  return (
-    <Elements stripe={stripePromise}>
-      <StartForm />
-    </Elements>
   );
 }

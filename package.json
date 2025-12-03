@@ -9,6 +9,10 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit",
     "test:voice-demo": "bash scripts/test-voice-demo.sh",
     "test:vapi-demo": "bash scripts/test-voice-demo.sh"
   },
