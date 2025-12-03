@@ -14,10 +14,7 @@ export const TradeTestimonials = ({ config }: TradeTestimonialsProps) => {
         <hr className="section-divider mb-8 sm:mb-12" />
         
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <div 
-            className="w-10 h-1 mx-auto mb-4 rounded-full"
-            style={{ background: `hsl(${config.accentColor})` }}
-          />
+          <div className="w-10 h-1 mx-auto mb-4 rounded-full bg-primary" />
           <h2 className="text-h2 mb-4">
             Real {config.name} contractors see these results every day
           </h2>
@@ -33,11 +30,7 @@ export const TradeTestimonials = ({ config }: TradeTestimonialsProps) => {
                 {/* Star Rating */}
                 <div className="flex gap-1">
                   {[...Array(5)].map((_, i) => (
-                    <Star 
-                      key={i} 
-                      className="w-4 sm:w-5 h-4 sm:h-5 fill-current"
-                      style={{ color: `hsl(${config.accentColor})` }}
-                    />
+                    <Star key={i} className="w-4 sm:w-5 h-4 sm:h-5 fill-current text-primary" />
                   ))}
                 </div>
 
@@ -47,40 +40,22 @@ export const TradeTestimonials = ({ config }: TradeTestimonialsProps) => {
                 </blockquote>
 
                 {/* Metric Badge */}
-                <div 
-                  className="p-3 sm:p-4 rounded-lg border"
-                  style={{ 
-                    background: `hsl(${config.accentColor} / 0.1)`,
-                    borderColor: `hsl(${config.accentColor} / 0.2)`
-                  }}
-                >
+                <div className="p-3 sm:p-4 rounded-lg border bg-primary/10 border-primary/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div 
-                        className="text-xl sm:text-2xl font-bold text-metric"
-                        style={{ color: `hsl(${config.accentColor})` }}
-                      >
+                      <div className="text-xl sm:text-2xl font-bold text-metric text-primary">
                         {testimonial.metric}
                       </div>
                       <div className="text-xs text-muted-foreground">{testimonial.metricLabel}</div>
                     </div>
-                    <TrendingUp 
-                      className="w-6 sm:w-8 h-6 sm:h-8"
-                      style={{ color: `hsl(${config.accentColor})` }}
-                    />
+                    <TrendingUp className="w-6 sm:w-8 h-6 sm:h-8 text-primary" />
                   </div>
                 </div>
 
                 {/* Author */}
                 <div className="flex items-center gap-3 pt-4 border-t">
-                  <Avatar 
-                    className="border-2"
-                    style={{ borderColor: `hsl(${config.accentColor})` }}
-                  >
-                    <AvatarFallback 
-                      className="font-bold text-white"
-                      style={{ background: `hsl(${config.accentColor})` }}
-                    >
+                  <Avatar className="border-2 border-primary">
+                    <AvatarFallback className="font-bold text-primary-foreground bg-primary">
                       {testimonial.avatar}
                     </AvatarFallback>
                   </Avatar>
@@ -102,19 +77,13 @@ export const TradeTestimonials = ({ config }: TradeTestimonialsProps) => {
           </p>
           <div className="flex justify-center gap-4">
             <div className="px-6 py-3 rounded-full bg-white border shadow-sm">
-              <div 
-                className="text-2xl font-bold text-metric"
-                style={{ color: `hsl(${config.accentColor})` }}
-              >
+              <div className="text-2xl font-bold text-metric text-primary">
                 {config.stats.emergencyRate}
               </div>
               <div className="text-xs text-muted-foreground">are emergencies</div>
             </div>
             <div className="px-6 py-3 rounded-full bg-white border shadow-sm">
-              <div 
-                className="text-2xl font-bold text-metric"
-                style={{ color: `hsl(${config.accentColor})` }}
-              >
+              <div className="text-2xl font-bold text-metric text-primary">
                 ${config.stats.avgJobValue}
               </div>
               <div className="text-xs text-muted-foreground">avg job value</div>

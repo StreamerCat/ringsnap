@@ -4,6 +4,7 @@ import { ContractorHero } from "@/components/ContractorHero";
 import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SiteHeader } from "@/components/SiteHeader";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -179,7 +180,8 @@ const Index = () => {
         </script>
       </Helmet>
 
-      <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
+      <SiteHeader />
+      <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0 pt-14">
         <h1 className="sr-only">RingSnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
 
         <a 
