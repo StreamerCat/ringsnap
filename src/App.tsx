@@ -39,7 +39,8 @@ import Roofing from "./pages/trades/Roofing";
 
 const queryClient = new QueryClient();
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
-const ProtectedOnboardingChat = withAuthGuard(OnboardingChat);
+// OnboardingChat handles its own auth logic - supports both authenticated users
+// and unauthenticated users with lead_id (two-step signup flow)
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -51,7 +52,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           {/* Canonical signup/onboarding flow */}
           <Route path="/start" element={<Start />} />
-          <Route path="/onboarding-chat" element={<ProtectedOnboardingChat />} />
+          <Route path="/onboarding-chat" element={<OnboardingChat />} />
           <Route path="/setup-status" element={<SetupStatus />} />
           {/* Legacy signup routes - redirect to canonical paths */}
           <Route path="/signup" element={<SignupRedirect />} />
