@@ -56,6 +56,11 @@ const captureLeadSchema = z.object({
 serve(async (req: Request) => {
   const correlationId = extractCorrelationId(req);
 
+  logInfo(FUNCTION_NAME, "capture-signup-lead invoked", {
+    method: req.method,
+    correlationId,
+  });
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
