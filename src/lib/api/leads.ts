@@ -2,56 +2,54 @@
 import { supabase } from "@/lib/supabase";
 
 export type SignupLeadPayload = {
-  email?: string;
+  email: string;
   full_name?: string;
-  name?: string;
   phone?: string;
   source?: string;
   signup_flow?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 };
 
-export type SignupLeadResponse = {
-  success: boolean;
-  message?: string;
-  error?: string;
-  data?: unknown;
-  [key: string]: unknown;
+export type SignupLeadRow = {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  phone?: string | null;
+  source?: string | null;
+  signup_flow?: string | null;
+  [key: string]: any;
 };
 
 export async function captureSignupLead(
   payload: SignupLeadPayload,
-): Promise<SignupLeadResponse> {
-  const normalizedEmail = payload.email?.toLowerCase();
-  const normalizedFullName = payload.full_name ?? payload.name ?? null;
+): Promise<SignupLeadRow> {
+  const { email, full_name, phone, source, signup_flow, ...extraFields } = payload;
 
-  if (!normalizedEmail) {
-    return { success: false, error: "Email is required" };
+  if (!email) {
+    throw new Error("Failed to save your information: Email is required");
   }
 
-  if (!normalizedFullName) {
-    return { success: false, error: "Full name is required" };
-  }
-
-  const { email, full_name, name, phone, source, signup_flow, ...rest } = payload;
+  const normalizedEmail = email.trim().toLowerCase();
 
   const { data, error } = await supabase
     .from("signup_leads")
-    .insert({
-      email: normalizedEmail,
-      full_name: normalizedFullName,
-      phone: phone ?? null,
-      source: source ?? "website",
-      signup_flow: signup_flow ?? null,
-      ...rest,
-    })
-    .select()
+    .insert([
+      {
+        email: normalizedEmail,
+        full_name: full_name?.trim() ?? null,
+        phone: phone?.trim() ?? null,
+        source: source ?? null,
+        signup_flow: signup_flow ?? null,
+        ...extraFields,
+      },
+    ])
+    .select("*")
     .single();
 
   if (error) {
     console.error("[signup_leads] insert error", error);
-    return { success: false, error: error.message };
+    throw new Error(`Failed to save your information: ${error.message}`);
   }
 
-  return { success: true, data };
+  return data as SignupLeadRow;
 }

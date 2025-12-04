@@ -173,7 +173,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
       const mockLeadId = "test-lead-id-123";
 
-      vi.mocked(captureSignupLead).mockResolvedValue({ success: true, lead_id: mockLeadId });
+      vi.mocked(captureSignupLead).mockResolvedValue({ id: mockLeadId, email: "john@acmeplumbing.com" });
 
       render(<TestWrapper />);
 
@@ -202,7 +202,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
       const mockLeadId = "test-lead-id-123";
 
-      vi.mocked(captureSignupLead).mockResolvedValue({ success: true, lead_id: mockLeadId });
+      vi.mocked(captureSignupLead).mockResolvedValue({ id: mockLeadId, email: "john@acmeplumbing.com" });
 
       render(<TestWrapper />);
 
@@ -224,7 +224,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
       const mockLeadId = "test-lead-id-123";
 
-      vi.mocked(captureSignupLead).mockResolvedValue({ success: true, lead_id: mockLeadId });
+      vi.mocked(captureSignupLead).mockResolvedValue({ id: mockLeadId, email: "john@acmeplumbing.com" });
 
       render(<TestWrapper />);
 
@@ -252,7 +252,7 @@ describe("Start Page", () => {
     it("shows error toast when API call fails", async () => {
       const user = userEvent.setup();
 
-      vi.mocked(captureSignupLead).mockResolvedValue({ success: false, message: "Failed to save lead" });
+      vi.mocked(captureSignupLead).mockRejectedValue(new Error("Failed to save lead"));
 
       render(<TestWrapper />);
 
@@ -277,7 +277,7 @@ describe("Start Page", () => {
 
       // Make the API call take some time
       vi.mocked(captureSignupLead).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, lead_id: "123" }), 100))
+        () => new Promise((resolve) => setTimeout(() => resolve({ id: "123", email: "john@example.com" }), 100))
       );
 
       render(<TestWrapper />);
@@ -302,7 +302,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
 
       vi.mocked(captureSignupLead).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, lead_id: "123" }), 100))
+        () => new Promise((resolve) => setTimeout(() => resolve({ id: "123", email: "john@example.com" }), 100))
       );
 
       render(<TestWrapper />);
