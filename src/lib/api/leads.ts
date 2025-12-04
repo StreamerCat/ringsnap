@@ -1,4 +1,6 @@
 // src/lib/api/leads.ts
+import { supabase } from "@/lib/supabase";
+
 export type SignupLeadPayload = {
   email?: string;
   full_name?: string;
@@ -12,59 +14,44 @@ export type SignupLeadPayload = {
 export type SignupLeadResponse = {
   success: boolean;
   message?: string;
+  error?: string;
+  data?: unknown;
   [key: string]: unknown;
-};
-
-const getEnvKey = (): { url: string; key: string } => {
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const publishable = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  const key = publishable ?? anon;
-
-  if (!url) throw new Error("Missing environment variable VITE_SUPABASE_URL");
-  if (!key) {
-    throw new Error(
-      "Missing environment variable VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY",
-    );
-  }
-  return { url, key };
 };
 
 export async function captureSignupLead(
   payload: SignupLeadPayload,
 ): Promise<SignupLeadResponse> {
-  const { url, key } = getEnvKey();
-  const endpoint = `${url.replace(/\/$/, "")}/functions/v1/capture-signup-lead`;
+  const normalizedEmail = payload.email?.toLowerCase();
+  const normalizedFullName = payload.full_name ?? payload.name ?? null;
 
-  const bodyPayload = payload.full_name
-    ? payload
-    : { ...payload, full_name: payload.name ?? "" };
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: key,
-    },
-    body: JSON.stringify(bodyPayload),
-  });
-
-  if (!res.ok) {
-    let errText = `captureSignupLead request failed with status ${res.status}`;
-    try {
-      const errBody = await res.json();
-      errText += `: ${JSON.stringify(errBody)}`;
-    } catch {
-      const txt = await res.text().catch(() => "");
-      if (txt) errText += `: ${txt}`;
-    }
-    throw new Error(errText);
+  if (!normalizedEmail) {
+    return { success: false, error: "Email is required" };
   }
 
-  try {
-    const data = (await res.json()) as SignupLeadResponse;
-    return data;
-  } catch {
-    return { success: true, message: "OK" };
+  if (!normalizedFullName) {
+    return { success: false, error: "Full name is required" };
   }
+
+  const { email, full_name, name, phone, source, signup_flow, ...rest } = payload;
+
+  const { data, error } = await supabase
+    .from("signup_leads")
+    .insert({
+      email: normalizedEmail,
+      full_name: normalizedFullName,
+      phone: phone ?? null,
+      source: source ?? "website",
+      signup_flow: signup_flow ?? null,
+      ...rest,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[signup_leads] insert error", error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, data };
 }
