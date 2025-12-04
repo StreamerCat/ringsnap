@@ -45,7 +45,6 @@ export async function captureSignupLead(
     headers: {
       "Content-Type": "application/json",
       apikey: key,
-      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify(bodyPayload),
   });
