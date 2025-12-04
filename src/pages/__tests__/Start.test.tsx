@@ -217,7 +217,7 @@ describe("Start Page", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(localStorage.getItem("ringsnap_lead_id")).toBe(mockLeadId);
+        expect(localStorage.getItem("ringsnap_signup_lead_id")).toBe(mockLeadId);
       });
     });
 
@@ -245,9 +245,11 @@ describe("Start Page", () => {
         expect(toast.success).toHaveBeenCalledWith("Great! Loading your setup...");
       });
 
-      // Wait for navigation (after 500ms delay)
+      // Wait for navigation (after 500ms delay) - includes email in URL
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith(`/onboarding-chat?lead_id=${mockLeadId}`);
+        expect(mockNavigate).toHaveBeenCalledWith(
+          `/onboarding-chat?lead_id=${mockLeadId}&email=${encodeURIComponent('john@acmeplumbing.com')}`
+        );
       }, { timeout: 1000 });
     });
 
