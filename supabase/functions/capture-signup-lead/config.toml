@@ -1,2 +1,7 @@
-[functions.capture-signup-lead]
-  verify_jwt = false
+[[functions]]
+name = "create-trial"
+verify_jwt = false
+
+[[functions]]
+name = "capture-signup-lead"
+verify_jwt = false
