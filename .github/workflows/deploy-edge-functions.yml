@@ -1,0 +1,67 @@
+name: Deploy Public Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/capture-signup-lead/**'
+      - 'supabase/functions/create-trial/**'
+      - '.github/workflows/deploy-edge-functions.yml'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy-public-functions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy public Edge Functions with JWT disabled
+        run: |
+          # Deploy capture-signup-lead without JWT verification
+          supabase functions deploy capture-signup-lead \
+            --project-ref rmyvvbqnccpfeyowidrq \
+            --no-verify-jwt
+
+          # Deploy create-trial without JWT verification
+          supabase functions deploy create-trial \
+            --project-ref rmyvvbqnccpfeyowidrq \
+            --no-verify-jwt
+
+          echo "✅ Successfully deployed public functions with JWT verification disabled"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Verify JWT settings
+        run: |
+          echo "📋 Listing Edge Functions and their JWT verification status:"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          supabase functions list \
+            --project-ref rmyvvbqnccpfeyowidrq
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Expected: Both capture-signup-lead and create-trial should show verify_jwt: false"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run integration test
+        run: |
+          echo "🧪 Running integration test to verify public access..."
+          node scripts/test-capture-signup-lead.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
