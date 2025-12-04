@@ -1,113 +1,71 @@
-/**
- * Lead Capture API Helper
- *
- * Provides a typed interface for calling the capture-signup-lead Edge Function.
- * Used in Step 1 of the two-step signup flow.
- */
-
-import { supabase } from '@/lib/supabase';
-
-export interface CaptureLeadPayload {
-  email: string;
-  full_name: string;
-  source?: 'website' | 'sales' | 'referral';
+// src/lib/api/leads.ts
+export type SignupLeadPayload = {
+  email?: string;
+  full_name?: string;
+  name?: string;
+  phone?: string;
+  source?: string;
   signup_flow?: string;
-  metadata?: {
-    utm_source?: string;
-    utm_campaign?: string;
-    utm_medium?: string;
-    referrer?: string;
-    step?: string;
-  };
-}
+  [key: string]: unknown;
+};
 
-export interface CaptureLeadResponse {
+export type SignupLeadResponse = {
   success: boolean;
-  lead_id?: string;
   message?: string;
-  error?: string;
-}
+  [key: string]: unknown;
+};
 
-/**
- * Capture a signup lead (Step 1 of two-step signup)
- *
- * @param payload - Lead information to capture
- * @returns Promise with lead_id on success
- * @throws Error if the request fails
- *
- * @example
- * ```ts
- * const { lead_id } = await captureSignupLead({
- *   email: 'john@acme.com',
- *   full_name: 'John Smith',
- *   source: 'website',
- *   signup_flow: 'two-step-v2',
- * });
- * ```
- */
+const getEnvKey = (): { url: string; key: string } => {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const publishable = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const key = publishable ?? anon;
+
+  if (!url) throw new Error("Missing environment variable VITE_SUPABASE_URL");
+  if (!key) {
+    throw new Error(
+      "Missing environment variable VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY",
+    );
+  }
+  return { url, key };
+};
+
 export async function captureSignupLead(
-  payload: CaptureLeadPayload
-): Promise<{ lead_id: string }> {
-  const { data, error } = await supabase.functions.invoke<CaptureLeadResponse>(
-    'capture-signup-lead',
-    {
-      body: {
-        email: payload.email.trim().toLowerCase(),
-        full_name: payload.full_name.trim(),
-        source: payload.source ?? 'website',
-        signup_flow: payload.signup_flow ?? 'two-step-v2',
-        metadata: payload.metadata,
-      },
+  payload: SignupLeadPayload,
+): Promise<SignupLeadResponse> {
+  const { url, key } = getEnvKey();
+  const endpoint = `${url.replace(/\/$/, "")}/functions/v1/capture-signup-lead`;
+
+  const bodyPayload = payload.full_name
+    ? payload
+    : { ...payload, full_name: payload.name ?? "" };
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify(bodyPayload),
+  });
+
+  if (!res.ok) {
+    let errText = `captureSignupLead request failed with status ${res.status}`;
+    try {
+      const errBody = await res.json();
+      errText += `: ${JSON.stringify(errBody)}`;
+    } catch {
+      const txt = await res.text().catch(() => "");
+      if (txt) errText += `: ${txt}`;
     }
-  );
-
-  if (error) {
-    console.error('[captureSignupLead] Edge function error:', error);
-    throw new Error(error.message || 'Failed to capture lead');
+    throw new Error(errText);
   }
 
-  if (!data?.success || !data.lead_id) {
-    console.error('[captureSignupLead] Invalid response:', data);
-    throw new Error(data?.message || data?.error || 'Failed to capture lead');
-  }
-
-  return { lead_id: data.lead_id };
-}
-
-/**
- * localStorage key for storing lead_id between steps
- */
-export const LEAD_ID_STORAGE_KEY = 'ringsnap_signup_lead_id';
-
-/**
- * Store lead_id in localStorage for persistence across page reloads
- */
-export function storeLeadId(leadId: string): void {
   try {
-    localStorage.setItem(LEAD_ID_STORAGE_KEY, leadId);
+    const data = (await res.json()) as SignupLeadResponse;
+    return data;
   } catch {
-    console.warn('[storeLeadId] localStorage not available');
-  }
-}
-
-/**
- * Retrieve lead_id from localStorage
- */
-export function getStoredLeadId(): string | null {
-  try {
-    return localStorage.getItem(LEAD_ID_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Clear stored lead_id (call after successful trial creation)
- */
-export function clearStoredLeadId(): void {
-  try {
-    localStorage.removeItem(LEAD_ID_STORAGE_KEY);
-  } catch {
-    // Ignore
+    return { success: true, message: "OK" };
   }
 }
