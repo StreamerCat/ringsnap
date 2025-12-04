@@ -378,7 +378,7 @@ export default function AISignup() {
 
         console.log("Lead captured for failed signup");
       } catch (leadError) {
-        console.error("Failed to capture lead:", leadError);
+        console.error("[AI Signup] signup lead insert failed", leadError);
         // Don't show error to user - lead capture is best-effort
       }
     }

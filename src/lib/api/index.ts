@@ -7,7 +7,7 @@
 export {
   captureSignupLead,
   type SignupLeadPayload,
-  type SignupLeadResponse,
+  type SignupLeadRow,
 } from './leads';
 
 export {

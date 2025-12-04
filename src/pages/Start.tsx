@@ -157,7 +157,7 @@ export default function Start() {
       const utmMedium = searchParams.get('utm_medium') || undefined;
 
       // Call capture-signup-lead to create/update lead
-      const data = await captureSignupLead({
+      const lead = await captureSignupLead({
         email: trimmedEmail,
         full_name: trimmedName,
         source: 'website',
@@ -171,12 +171,11 @@ export default function Start() {
         },
       });
 
-      if (!data || !data.success) {
-        console.error('[Start] capture-signup-lead failed:', data);
-        throw new Error((data as { message?: string }).message || 'Failed to save your information');
-      }
+      const leadId = lead?.id;
 
-      const leadId = (data as { lead_id?: string }).lead_id;
+      if (!leadId) {
+        throw new Error('Failed to save your information');
+      }
       console.log('[Start] Lead captured successfully:', { leadId });
 
       // Store lead_id for persistence
@@ -191,7 +190,7 @@ export default function Start() {
       }, 500);
 
     } catch (error: any) {
-      console.error('[Start] Error:', error);
+      console.error('[Start] signup lead insert failed', error);
 
       let message = 'Something went wrong. Please try again.';
 
