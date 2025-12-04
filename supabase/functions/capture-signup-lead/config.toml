@@ -1,7 +1,4 @@
-[[functions]]
-name = "create-trial"
-verify_jwt = false
-
-[[functions]]
-name = "capture-signup-lead"
+# Configure gateway access for capture-signup-lead.
+# Per-function config files support top-level settings; nested [[functions]]
+# blocks are ignored by the CLI and cause verify_jwt to fall back to true.
 verify_jwt = false
