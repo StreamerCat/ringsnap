@@ -83,3 +83,9 @@ verify_jwt = false
 
 [functions.sync-usage]
 verify_jwt = true
+
+[functions.capture-signup-lead]
+verify_jwt = false
+
+[functions.create-trial]
+verify_jwt = false
