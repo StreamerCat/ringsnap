@@ -1,0 +1,15 @@
+### Test the capture-signup-lead Edge Function
+#
+# This file can be used with the VS Code REST Client extension.
+# Replace {{SUPABASE_ANON_KEY}} with your actual Supabase anon key.
+
+POST https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/capture-signup-lead
+Content-Type: application/json
+apikey: {{SUPABASE_ANON_KEY}}
+Authorization: Bearer {{SUPABASE_ANON_KEY}}
+
+{
+  "email": "test.user+{{$randomInt}}@example.com",
+  "full_name": "Test User",
+  "source": "http-test-client"
+}
