@@ -1,0 +1,2 @@
+[functions.capture-signup-lead]
+  verify_jwt = false
