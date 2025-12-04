@@ -1,0 +1,3 @@
+[[functions]]
+  name = "capture-signup-lead"
+  verify_jwt = false
