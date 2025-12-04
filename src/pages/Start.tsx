@@ -26,7 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { useUser } from '@/lib/auth/useUser';
 
 // Store lead_id in localStorage for persistence
-const LEAD_ID_KEY = 'ringsnap_lead_id';
+const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
 
 function getStoredLeadId(): string | null {
   try {
@@ -94,7 +94,7 @@ export default function Start() {
 
           if (lead && !lead.completed_at) {
             // Lead exists and not yet completed - redirect to Step 2
-            navigate(`/onboarding-chat?lead_id=${existingLeadId}`, { replace: true });
+            navigate(`/onboarding-chat?lead_id=${existingLeadId}&email=${encodeURIComponent(lead.email)}`, { replace: true });
             return;
           }
         } catch {
@@ -193,7 +193,7 @@ export default function Start() {
 
       // Small delay for UX, then redirect to Step 2
       setTimeout(() => {
-        navigate(`/onboarding-chat?lead_id=${leadId}`);
+        navigate(`/onboarding-chat?lead_id=${leadId}&email=${encodeURIComponent(trimmedEmail)}`);
       }, 500);
 
     } catch (error: any) {
@@ -210,7 +210,7 @@ export default function Start() {
           const leadId = error.lead_id || getStoredLeadId();
           if (leadId) {
             setTimeout(() => {
-              navigate(`/onboarding-chat?lead_id=${leadId}`);
+              navigate(`/onboarding-chat?lead_id=${leadId}&email=${encodeURIComponent(trimmedEmail)}`);
             }, 1000);
             toast.info(message);
             return;

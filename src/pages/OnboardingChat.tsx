@@ -238,7 +238,17 @@ function OnboardingChatInner() {
   const [showCustomTrade, setShowCustomTrade] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lead_id = searchParams.get("lead_id");
+
+  // Get lead_id from URL, fallback to localStorage
+  const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
+  const urlLeadId = searchParams.get("lead_id");
+  const storedLeadId = (() => {
+    try { return localStorage.getItem(LEAD_ID_KEY); } catch { return null; }
+  })();
+  const lead_id = urlLeadId || storedLeadId;
+
+  // Get email from URL (passed from Step 1)
+  const urlEmail = searchParams.get("email");
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -712,29 +722,43 @@ function OnboardingChatInner() {
         throw new Error("Payment method creation failed");
       }
 
-      // Call finalize-trial
-      const { data: result, error: finalizeError } = await supabase.functions.invoke(
-        "finalize-trial",
+      // Convert businessHours object to string for create-trial (expects string)
+      const businessHoursStr = data.businessHours
+        ? JSON.stringify(data.businessHours)
+        : undefined;
+
+      // Call create-trial with leadId
+      const { data: result, error: createTrialError } = await supabase.functions.invoke(
+        "create-trial",
         {
           body: {
-            lead_id: leadData.id,
+            // Required user info
+            name: leadData.full_name || "Customer",
+            email: leadData.email,
             phone: data.phone,
+            // Required business info
             companyName: data.companyName,
             trade: data.trade,
+            // Optional business info
             website: data.website || undefined,
-            businessHours: data.businessHours,
+            businessHours: businessHoursStr,
+            // AI configuration
             assistantGender: data.assistantGender,
-            assistantTone: data.assistantTone,
-            primaryGoal: data.primaryGoal,
+            primaryGoal: data.primaryGoal || undefined,
+            // Plan & payment
             planType: data.planType,
             paymentMethodId: paymentMethod.id,
+            // Source tracking
+            source: "website",
+            // Link to lead
+            leadId: leadData.id,
           },
         }
       );
 
-      if (finalizeError || !result?.success) {
+      if (createTrialError || !result?.success) {
         throw new Error(
-          result?.message || finalizeError?.message || "Failed to create account"
+          result?.message || createTrialError?.message || "Failed to create account"
         );
       }
 
