@@ -6,12 +6,8 @@
 
 export {
   captureSignupLead,
-  storeLeadId,
-  getStoredLeadId,
-  clearStoredLeadId,
-  LEAD_ID_STORAGE_KEY,
-  type CaptureLeadPayload,
-  type CaptureLeadResponse,
+  type SignupLeadPayload,
+  type SignupLeadResponse,
 } from './leads';
 
 export {

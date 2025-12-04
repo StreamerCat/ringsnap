@@ -7,6 +7,7 @@ import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { captureSignupLead } from "@/lib/api/leads";
 import { ChatMessage, TypingIndicator, MessageRole } from "@/components/onboarding-chat/ChatMessage";
 import { ChatButtons } from "@/components/onboarding-chat/ChatButtons";
 import { ChatInput } from "@/components/onboarding-chat/ChatInput";
@@ -373,9 +374,7 @@ export default function AISignup() {
           failure_phase: "create-trial",
         };
 
-        await supabase.functions.invoke("capture-signup-lead", {
-          body: leadPayload,
-        });
+        await captureSignupLead(leadPayload);
 
         console.log("Lead captured for failed signup");
       } catch (leadError) {

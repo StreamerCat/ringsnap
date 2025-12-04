@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
+import { captureSignupLead } from '@/lib/api/leads';
 import { useUser } from '@/lib/auth/useUser';
 
 // Store lead_id in localStorage for persistence
@@ -156,33 +157,26 @@ export default function Start() {
       const utmMedium = searchParams.get('utm_medium') || undefined;
 
       // Call capture-signup-lead to create/update lead
-      const { data, error } = await supabase.functions.invoke('capture-signup-lead', {
-        body: {
-          email: trimmedEmail,
-          full_name: trimmedName,
-          source: 'website',
-          signup_flow: 'two-step-v2',
-          metadata: {
-            utm_source: utmSource,
-            utm_campaign: utmCampaign,
-            utm_medium: utmMedium,
-            referrer: document.referrer || undefined,
-            step: 'lead_capture',
-          },
+      const data = await captureSignupLead({
+        email: trimmedEmail,
+        full_name: trimmedName,
+        source: 'website',
+        signup_flow: 'two-step-v2',
+        metadata: {
+          utm_source: utmSource,
+          utm_campaign: utmCampaign,
+          utm_medium: utmMedium,
+          referrer: document.referrer || undefined,
+          step: 'lead_capture',
         },
       });
 
-      if (error) {
-        console.error('[Start] capture-signup-lead error:', error);
-        throw new Error(error.message || 'Failed to save your information');
-      }
-
       if (!data || !data.success) {
         console.error('[Start] capture-signup-lead failed:', data);
-        throw new Error(data?.message || 'Failed to save your information');
+        throw new Error((data as { message?: string }).message || 'Failed to save your information');
       }
 
-      const leadId = data.lead_id;
+      const leadId = (data as { lead_id?: string }).lead_id;
       console.log('[Start] Lead captured successfully:', { leadId });
 
       // Store lead_id for persistence

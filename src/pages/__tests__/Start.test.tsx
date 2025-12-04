@@ -37,6 +37,10 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/lib/api/leads", () => ({
+  captureSignupLead: vi.fn(),
+}));
+
 // Mock navigate
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -51,6 +55,7 @@ vi.mock("react-router-dom", async () => {
 import Start from "../Start";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { captureSignupLead } from "@/lib/api/leads";
 
 // Wrapper component for testing
 function TestWrapper() {
@@ -168,10 +173,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
       const mockLeadId = "test-lead-id-123";
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { success: true, lead_id: mockLeadId },
-        error: null,
-      });
+      vi.mocked(captureSignupLead).mockResolvedValue({ success: true, lead_id: mockLeadId });
 
       render(<TestWrapper />);
 
@@ -185,14 +187,14 @@ describe("Start Page", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(supabase.functions.invoke).toHaveBeenCalledWith("capture-signup-lead", {
-          body: expect.objectContaining({
+        expect(captureSignupLead).toHaveBeenCalledWith(
+          expect.objectContaining({
             email: "john@acmeplumbing.com",
             full_name: "John Smith",
             source: "website",
             signup_flow: "two-step-v2",
-          }),
-        });
+          })
+        );
       });
     });
 
@@ -200,10 +202,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
       const mockLeadId = "test-lead-id-123";
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { success: true, lead_id: mockLeadId },
-        error: null,
-      });
+      vi.mocked(captureSignupLead).mockResolvedValue({ success: true, lead_id: mockLeadId });
 
       render(<TestWrapper />);
 
@@ -225,10 +224,7 @@ describe("Start Page", () => {
       const user = userEvent.setup();
       const mockLeadId = "test-lead-id-123";
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { success: true, lead_id: mockLeadId },
-        error: null,
-      });
+      vi.mocked(captureSignupLead).mockResolvedValue({ success: true, lead_id: mockLeadId });
 
       render(<TestWrapper />);
 
@@ -256,10 +252,7 @@ describe("Start Page", () => {
     it("shows error toast when API call fails", async () => {
       const user = userEvent.setup();
 
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { success: false, message: "Failed to save lead" },
-        error: null,
-      });
+      vi.mocked(captureSignupLead).mockResolvedValue({ success: false, message: "Failed to save lead" });
 
       render(<TestWrapper />);
 
@@ -283,8 +276,8 @@ describe("Start Page", () => {
       const user = userEvent.setup();
 
       // Make the API call take some time
-      vi.mocked(supabase.functions.invoke).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ data: { success: true, lead_id: "123" }, error: null }), 100))
+      vi.mocked(captureSignupLead).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, lead_id: "123" }), 100))
       );
 
       render(<TestWrapper />);
@@ -308,8 +301,8 @@ describe("Start Page", () => {
     it("shows loading state on button during submission", async () => {
       const user = userEvent.setup();
 
-      vi.mocked(supabase.functions.invoke).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ data: { success: true, lead_id: "123" }, error: null }), 100))
+      vi.mocked(captureSignupLead).mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ success: true, lead_id: "123" }), 100))
       );
 
       render(<TestWrapper />);
