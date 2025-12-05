@@ -243,8 +243,6 @@ function OnboardingChatInner() {
   // Payment state
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
-  const [cardError, setCardError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Account result state
