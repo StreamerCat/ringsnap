@@ -764,10 +764,7 @@ function OnboardingChatInner() {
         throw new Error("Card element not found");
       }
 
-      setStep("processing");
-      await showTypingDelay(500);
-      addMessage("assistant", "Processing your payment...");
-
+      // Tokenize FIRST while CardElement is still mounted
       const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
         type: "card",
         card: cardElement,
@@ -788,6 +785,11 @@ function OnboardingChatInner() {
       if (!paymentMethod) {
         throw new Error("Payment method creation failed");
       }
+
+      // Now safe to change step (which unmounts CardElement)
+      setStep("processing");
+      await showTypingDelay(500);
+      addMessage("assistant", "Payment method verified. Creating your account...");
 
       // Convert businessHours object to string for create-trial (expects string)
       const businessHoursStr = data.businessHours
@@ -855,14 +857,7 @@ function OnboardingChatInner() {
       );
     } catch (error: any) {
       console.error("Payment error:", error);
-      setStep("payment");
-      await showTypingDelay(500);
-      addMessage(
-        "assistant",
-        <div className="space-y-2 text-red-600">
-          <p>{error.message || "Payment failed. Please try again."}</p>
-        </div>
-      );
+
       const userMessage = error.message || "Payment failed";
       let friendlyMessage = "We couldn't process your card. Please check the details and try again.";
 
@@ -872,12 +867,14 @@ function OnboardingChatInner() {
         friendlyMessage = "Your card has expired. Please use a valid card.";
       } else if (userMessage.includes("incorrect_cvc")) {
         friendlyMessage = "The security code (CVC) was incorrect. Please try again.";
+      } else if (userMessage.includes("card_declined")) {
+        friendlyMessage = "Your card was declined. Please try a different card.";
       }
 
-      toast.error(friendlyMessage);
+      setStep("payment"); // Ensure we stay/return to payment step
+      setIsProcessing(false); // Re-enable button
 
-      setStep("payment");
-      await showTypingDelay(500);
+      // Show unified friendly error
       addMessage(
         "assistant",
         <div className="space-y-2 text-red-600">
