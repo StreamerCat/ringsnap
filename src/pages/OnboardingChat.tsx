@@ -1181,7 +1181,7 @@ function OnboardingChatInner() {
                     className="w-full"
                     size="lg"
                     onClick={handlePayment}
-                    disabled={!cardComplete || !termsAccepted || isProcessing}
+                    disabled={isProcessing}
                   >
                     {isProcessing ? (
                       <>
