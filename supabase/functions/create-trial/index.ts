@@ -264,18 +264,17 @@ serve(async (req) => {
   }
 
   let currentAccountId: string | null = null;
-  let currentUserId: string | null = null;
+  let currentUserId: string | null = null; // Restore missing var
+  // Initialize customer/subscription as basic objects to satisfy TS before assignment
+  let customer: any = null;
+  let subscription: any = null;
   let stripeCustomerId: string | null = null;
   let stripeSubscriptionId: string | null = null;
   let phase = "start";
 
   try {
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
-    // ═══════════════════════════════════════════════════════════════
-    // INITIALIZATION
-    // ═══════════════════════════════════════════════════════════════
-
+    // ... Initialization ...
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -285,15 +284,14 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+    // Only init stripe if key exists to avoid crash, though assertEnv checks it later
+    const stripe = stripeKey ? new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
       httpClient: Stripe.createFetchHttpClient(),
-    });
+    }) : null;
 
-    // ═══════════════════════════════════════════════════════════════
-    // IDEMPOTENCY CHECK
-    // ═══════════════════════════════════════════════════════════════
-
+    // ... Idempotency ...
     const idempotencyKey = req.headers.get("idempotency-key") || req.headers.get("Idempotency-Key");
 
     if (idempotencyKey) {
@@ -338,35 +336,17 @@ serve(async (req) => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // INPUT VALIDATION
-    // ═══════════════════════════════════════════════════════════════
-
+    // ... Input Validation ...
     phase = "validate_input";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
     let rawData: any;
     try {
       rawData = await req.json();
     } catch (err: any) {
-      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-      return new Response(
-        JSON.stringify({ success: false, request_id, phase, message: "Invalid JSON body" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error(JSON.stringify({ request_id, phase, message: err.message }));
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: corsHeaders });
     }
 
-    logInfo("Raw request body received", {
-      ...baseLogOptions,
-      context: {
-        email: rawData.email,
-        source: rawData.source,
-        planType: rawData.planType,
-        leadId: rawData.leadId,
-        hasPaymentMethod: !!rawData.paymentMethodId,
-      },
-    });
-
+    // ... Schema Parse ...
     const normalizedData = normalizePayload(rawData);
     let data: z.infer<typeof createTrialSchema>;
 
@@ -446,10 +426,10 @@ serve(async (req) => {
         req.headers.get("cf-connecting-ip") ||
         "unknown";
 
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
       try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const { count: ipAttempts } = await supabase
           .from("signup_attempts")
           .select("*", { count: "exact", head: true })
@@ -490,6 +470,9 @@ serve(async (req) => {
 
       // Check phone number reuse
       try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const { data: recentPhoneUse } = await supabase
           .from("profiles")
           .select("created_at")
@@ -529,31 +512,23 @@ serve(async (req) => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // STRIPE: Create Customer (with idempotency)
-    // ═══════════════════════════════════════════════════════════════
-
-    phase = "stripe_customer";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
+    // STRIPE LOGIC
     const isBypassMode = data.paymentMethodId === "pm_bypass_test";
-    const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
-
-    let customer: Stripe.Customer;
-    let subscription: Stripe.Subscription;
 
     if (isBypassMode) {
       logInfo("BYPASS MODE: Skipping Stripe API calls", baseLogOptions);
-      // Create Mock Objects
-      customer = { id: "cus_bypass_test_" + Date.now() } as any;
-      subscription = { id: "sub_bypass_test_" + Date.now(), status: "active" } as any;
+      customer = { id: `cus_bypass_${Date.now()}` };
+      subscription = { id: `sub_bypass_${Date.now()}`, status: 'active' };
       stripeCustomerId = customer.id;
       stripeSubscriptionId = subscription.id;
-
     } else {
-      // -----------------------------------------------------------------
-      // REAL STRIPE FLOW
-      // -----------------------------------------------------------------
+      // Real Stripe Flow
+      if (!stripe) throw new Error("Stripe not initialized");
+
+      const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
+
+      // Customer
+      phase = "stripe_customer";
       try {
         customer = await stripe.customers.create({
           email: data.email,
@@ -562,15 +537,10 @@ serve(async (req) => {
           metadata: {
             company_name: data.companyName,
             trade: data.trade,
-            source: data.source,
-            sales_rep: data.salesRepName || "",
-          },
-        }, {
-          idempotencyKey: `${stripeIdempotencyPrefix}-customer`,
-        });
-
+            source: data.source
+          }
+        }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
         stripeCustomerId = customer.id;
-
         logInfo("Stripe customer created", {
           ...baseLogOptions,
           context: {
@@ -579,52 +549,27 @@ serve(async (req) => {
             email: data.email,
           },
         });
-      } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-        return new Response(
-          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      } catch (e: any) {
+        throw new Error(`Stripe Customer Create Failed: ${e.message}`);
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // STRIPE: Attach Payment Method
-      // ═══════════════════════════════════════════════════════════════
-
+      // Payment Method
       phase = "stripe_payment_method";
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
       try {
-        await stripe.paymentMethods.attach(data.paymentMethodId, {
-          customer: customer.id,
-        });
-
+        await stripe.paymentMethods.attach(data.paymentMethodId, { customer: customer.id });
         await stripe.customers.update(customer.id, {
-          invoice_settings: {
-            default_payment_method: data.paymentMethodId,
-          },
+          invoice_settings: { default_payment_method: data.paymentMethodId }
         });
-
         logInfo("Payment method attached", {
           ...baseLogOptions,
           context: { customerId: customer.id },
         });
-      } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-        await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
-        return new Response(
-          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      } catch (e: any) {
+        throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // STRIPE: Create Subscription (with idempotency)
-      // ═══════════════════════════════════════════════════════════════
-
+      // Subscription
       phase = "stripe_subscription";
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
       try {
         const priceId = getStripePriceId(data.planType);
         subscription = await stripe.subscriptions.create({
@@ -632,17 +577,9 @@ serve(async (req) => {
           items: [{ price: priceId }],
           trial_period_days: 3,
           payment_behavior: "default_incomplete",
-          metadata: {
-            source: data.source,
-            sales_rep: data.salesRepName || "",
-            plan_type: data.planType,
-          },
-        }, {
-          idempotencyKey: `${stripeIdempotencyPrefix}-subscription`,
-        });
-
+          metadata: { source: data.source, plan_type: data.planType }
+        }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
         stripeSubscriptionId = subscription.id;
-
         logInfo("Stripe subscription created", {
           ...baseLogOptions,
           context: {
@@ -652,20 +589,12 @@ serve(async (req) => {
             status: subscription.status,
           },
         });
-      } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-        await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
-        return new Response(
-          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      } catch (e: any) {
+        throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
       }
-    } // END ELSE (Real Stripe Flow)
+    }
 
-    // ═══════════════════════════════════════════════════════════════
-    // DATABASE: Atomic Account Creation
-    // ═══════════════════════════════════════════════════════════════
-
+    // DATABASE INSERT
     phase = "account_insert";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
@@ -725,16 +654,14 @@ serve(async (req) => {
     console.log(`[${FUNCTION_NAME}] normalized assistant_gender =`, accountData.assistant_gender);
     console.log(`[${FUNCTION_NAME}] final accountData keys =`, Object.keys(accountData));
 
-    let accountResult: any;
-
     // DETAILED LOGGING: Before account creation
     console.error("DB_CALL", {
       step: "create_account_transaction",
       operation: "BEFORE_CALL",
       payload: {
         p_email: data.email,
-        p_stripe_customer_id: customer.id,
-        p_stripe_subscription_id: subscription.id,
+        p_stripe_customer_id: stripeCustomerId,
+        p_stripe_subscription_id: stripeSubscriptionId,
         p_signup_channel: data.source,
         p_sales_rep_id: null,
         p_account_data: accountData,
@@ -742,140 +669,106 @@ serve(async (req) => {
       },
     });
 
-    try {
-      // Use atomic account creation function
-      const { data: accountTxResult, error: accountTxError } = await supabase.rpc(
-        "create_account_transaction",
-        {
-          p_email: data.email,
-          p_password: tempPassword,
-          p_stripe_customer_id: customer.id,
-          p_stripe_subscription_id: subscription.id,
-          p_signup_channel: data.source,
-          p_sales_rep_id: null, // TODO: Link sales rep if available
-          p_account_data: accountData,
-          p_correlation_id: correlationId,
-        }
-      );
+    // Explicitly use stripeCustomerId/stripeSubscriptionId variables
+    const { data: accountTxResult, error: accountTxError } = await supabase.rpc("create_account_transaction", {
+      p_email: data.email,
+      p_password: tempPassword,
+      p_stripe_customer_id: stripeCustomerId,
+      p_stripe_subscription_id: stripeSubscriptionId,
+      p_signup_channel: data.source,
+      p_sales_rep_id: null, // TODO: Link sales rep if available
+      p_account_data: {
+        // ... reconstruct accountData ...
+        name: data.name,
+        phone: data.phone,
+        company_name: data.companyName,
+        trade: data.trade,
+        plan_type: accountData.plan_type, // Use normalized plan_type
+        phone_number_area_code: data.zipCode?.slice(0, 3) || null,
+        zip_code: data.zipCode || null,
+        business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null, // Ensure string if needed
+        assistant_gender: accountData.assistant_gender, // Use normalized gender
+        wants_advanced_voice: data.wantsAdvancedVoice,
+        company_website: data.website || null,
+        service_area: data.serviceArea || null,
+        emergency_policy: data.emergencyPolicy || null,
+        billing_state: billingState,
+      },
+      p_correlation_id: correlationId
+    });
 
-      if (accountTxError) {
-        console.error("[RPC ERROR]", {
-          code: accountTxError.code,
-          message: accountTxError.message,
-          details: accountTxError.details,
-          hint: accountTxError.hint,
+    // DETAILED LOGGING: After account creation
+    console.error("DB_RESULT", {
+      step: "create_account_transaction",
+      operation: "AFTER_CALL",
+      hasError: !!accountTxError,
+      hasData: !!accountTxResult,
+      error: accountTxError ? {
+        message: accountTxError.message,
+        details: accountTxError.details,
+        hint: accountTxError.hint,
+        code: accountTxError.code,
+        fullError: accountTxError,
+      } : null,
+      result: accountTxResult,
+    });
+
+    if (accountTxError) {
+      // Check for duplicate email first
+      if (
+        accountTxError.message?.toLowerCase().includes("already") ||
+        accountTxError.message?.toLowerCase().includes("duplicate")
+      ) {
+        console.log("[create-trial] Email already registered", { email: data.email });
+        logWarn("Email already registered", {
+          ...baseLogOptions,
+          context: { email: data.email },
         });
-
-        const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
-
-        let err: Error;
-        try {
-          // @ts-ignore
-          err = new Error(safeMsg, { cause: accountTxError });
-        } catch {
-          err = new Error(safeMsg);
-          ; (err as any).cause = accountTxError;
-        }
-
-        ; (err as any).rpc = {
-          code: accountTxError.code,
-          details: accountTxError.details,
-          hint: accountTxError.hint,
-          original: accountTxError,
-        };
-
-        throw err;
+        // No Stripe cleanup here, as the account already exists in Supabase
+        return new Response(
+          JSON.stringify({
+            error: "This email is already registered. Please sign in instead.",
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
-      // DETAILED LOGGING: After account creation
-      console.error("DB_RESULT", {
-        step: "create_account_transaction",
-        operation: "AFTER_CALL",
-        hasError: !!accountTxError,
-        hasData: !!accountTxResult,
-        error: accountTxError ? {
-          message: accountTxError.message,
-          details: accountTxError.details,
-          hint: accountTxError.hint,
-          code: accountTxError.code,
-          fullError: accountTxError,
-        } : null,
-        result: accountTxResult,
+      // Generic RPC error handling
+      console.error("[RPC ERROR]", {
+        code: accountTxError.code,
+        message: accountTxError.message,
+        details: accountTxError.details,
+        hint: accountTxError.hint,
       });
-
-      if (accountTxError) {
-        // Check for duplicate email first
-        if (
-          accountTxError.message?.toLowerCase().includes("already") ||
-          accountTxError.message?.toLowerCase().includes("duplicate")
-        ) {
-          console.log("[create-trial] Email already registered", { email: data.email });
-          logWarn("Email already registered", {
-            ...baseLogOptions,
-            context: { email: data.email },
-          });
-          await cleanupStripeResources(stripe, customer.id, subscription.id, baseLogOptions);
-          return new Response(
-            JSON.stringify({
-              error: "This email is already registered. Please sign in instead.",
-            }),
-            {
-              status: 409,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        // Generic RPC error handling
-        console.error("[RPC ERROR]", {
-          code: accountTxError.code,
-          message: accountTxError.message,
-          details: accountTxError.details,
-          hint: accountTxError.hint,
-        });
-        const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
-        let err: Error;
-        try {
-          // @ts-ignore
-          err = new Error(safeMsg, { cause: accountTxError });
-        } catch {
-          err = new Error(safeMsg);
-          ; (err as any).cause = accountTxError;
-        }
-        ; (err as any).rpc = {
-          code: accountTxError.code,
-          details: accountTxError.details,
-          hint: accountTxError.hint,
-          original: accountTxError,
-        };
-        throw err;
+      const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
+      let err: Error;
+      try {
+        // @ts-ignore
+        err = new Error(safeMsg, { cause: accountTxError });
+      } catch {
+        err = new Error(safeMsg);
+        ; (err as any).cause = accountTxError;
       }
-
-      accountResult = accountTxResult;
-      currentAccountId = accountResult.account_id;
-      currentUserId = accountResult.user_id;
-
-      logInfo("Account created atomically", {
-        ...baseLogOptions,
-        accountId: currentAccountId,
-        context: { source: data.source },
-      });
-    } catch (accountError: any) {
-      console.error(JSON.stringify({ request_id, phase, message: accountError.message, stack: accountError.stack, raw: accountError }));
-
-      logError("Account creation failed - running compensation", {
-        ...baseLogOptions,
-        error: accountError,
-      });
-
-      // COMPENSATION: Cleanup Stripe resources
-      await cleanupStripeResources(stripe, customer.id, subscription.id, baseLogOptions);
-
-      return new Response(
-        JSON.stringify({ success: false, request_id, phase, message: accountError.message ?? "Unknown error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      ; (err as any).rpc = {
+        code: accountTxError.code,
+        details: accountTxError.details,
+        hint: accountTxError.hint,
+        original: accountTxError,
+      };
+      throw err;
     }
+
+    currentAccountId = accountTxResult.account_id;
+    currentUserId = accountTxResult.user_id;
+
+    logInfo("Account created atomically", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: { source: data.source },
+    });
 
     // ═══════════════════════════════════════════════════════════════
     // LINK LEAD (if provided)
