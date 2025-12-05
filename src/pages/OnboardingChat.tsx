@@ -243,7 +243,8 @@ function OnboardingChatInner() {
   // Payment state
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Account result state
@@ -749,11 +750,6 @@ function OnboardingChatInner() {
       return;
     }
 
-    if (!termsAccepted) {
-      toast.error("Please accept the Terms of Service");
-      return;
-    }
-
     setIsProcessing(true);
     addMessage("user", "Payment submitted");
 
@@ -836,6 +832,8 @@ function OnboardingChatInner() {
             source: "website",
             // Link to lead
             leadId: leadData.id,
+            // Test Mode Bypass Override
+            bypassStripe: isBypassMode,
           },
         }
       );
@@ -1165,14 +1163,9 @@ function OnboardingChatInner() {
                     />
                   </div>
 
-                  <div className="flex items-center space-x-2 py-4">
-                    <CheckCircle2 className={`h-5 w-5 ${termsAccepted ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
-                    <label
-                      htmlFor="terms"
-                      className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
-                      onClick={() => setTermsAccepted(!termsAccepted)}
-                    >
-                      I agree to the{" "}
+                  <div className="py-4 text-center">
+                    <p className="text-xs text-muted-foreground">
+                      By clicking "Start Your Free Trial Now", you agree to our{" "}
                       <a href="/terms" target="_blank" className="text-primary hover:underline">
                         Terms of Service
                       </a>{" "}
@@ -1180,7 +1173,7 @@ function OnboardingChatInner() {
                       <a href="/privacy" target="_blank" className="text-primary hover:underline">
                         Privacy Policy
                       </a>
-                    </label>
+                    </p>
                   </div>
 
                   <Button
