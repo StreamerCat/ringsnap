@@ -21,16 +21,18 @@ import { AssistantCard } from "@/components/AssistantCard";
 import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
 import { ReferralShareInterface } from "@/components/ReferralShareInterface";
 import { OperatorOverview } from "@/components/dashboard/OperatorOverview";
+import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
-  Clock, AlertCircle, CheckCircle, Loader2, Sparkles, Check, Calendar
+  Clock, AlertCircle, CheckCircle, Loader2, Sparkles, Check, Calendar,
+  Globe, XCircle
 } from "lucide-react";
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "today");
   const [account, setAccount] = useState<any>(null);
@@ -54,7 +56,11 @@ export default function CustomerDashboard() {
   // Business Details state
   const [serviceArea, setServiceArea] = useState("");
   const [emergencyPolicy, setEmergencyPolicy] = useState("");
+  const [website, setWebsite] = useState("");
+  const [businessHours, setBusinessHours] = useState<ServiceHoursData | null>(null);
+  const [showHoursEditor, setShowHoursEditor] = useState(false);
   const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
+  const [cancelingTrial, setCancelingTrial] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -166,6 +172,8 @@ export default function CustomerDashboard() {
       // Initialize business details
       setServiceArea(profileData.accounts.service_area || "");
       setEmergencyPolicy(profileData.accounts.emergency_policy || "");
+      setWebsite(profileData.accounts.website || "");
+      setBusinessHours((profileData.accounts.business_hours as unknown as ServiceHoursData) || null);
 
       // Load state recording laws if billing_state exists
       if (profileData.accounts.billing_state) {
@@ -258,7 +266,9 @@ export default function CustomerDashboard() {
         .from("accounts")
         .update({
           service_area: serviceArea,
-          emergency_policy: emergencyPolicy
+          emergency_policy: emergencyPolicy,
+          website: website,
+          business_hours: businessHours as any
         })
         .eq("id", account.id);
 
@@ -267,8 +277,11 @@ export default function CustomerDashboard() {
       setAccount({
         ...account,
         service_area: serviceArea,
-        emergency_policy: emergencyPolicy
+        emergency_policy: emergencyPolicy,
+        website: website,
+        business_hours: businessHours
       });
+      setShowHoursEditor(false);
       toast({
         title: "Success",
         description: "Business details updated successfully"
@@ -281,6 +294,40 @@ export default function CustomerDashboard() {
       });
     } finally {
       setSavingBusinessDetails(false);
+    }
+  };
+
+  const handleCancelTrial = async () => {
+    if (!window.confirm("Are you sure you want to cancel your trial? Your phone number will be released.")) {
+      return;
+    }
+
+    setCancelingTrial(true);
+    try {
+      const { error } = await supabase
+        .from("accounts")
+        .update({
+          subscription_status: 'cancelled',
+          // Optional: clear provisioning data if needed, but 'cancelled' status should suffice for logic
+        })
+        .eq("id", account.id);
+
+      if (error) throw error;
+
+      setAccount({ ...account, subscription_status: 'cancelled' });
+      toast({
+        title: "Trial Canceled",
+        description: "Your trial has been canceled."
+      });
+      // Optionally navigate away or refresh
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to cancel trial. Please contact support.",
+        variant: "destructive"
+      });
+    } finally {
+      setCancelingTrial(false);
     }
   };
 
@@ -573,8 +620,8 @@ export default function CustomerDashboard() {
                     status={phone.status}
                     isPrimary={phone.is_primary}
                     linkedAssistant={phone.purpose}
-                    onEdit={() => {}}
-                    onSetPrimary={() => {}}
+                    onEdit={() => { }}
+                    onSetPrimary={() => { }}
                   />
                 ))}
               </div>
@@ -605,7 +652,7 @@ export default function CustomerDashboard() {
                     gender={assistant.voice_gender || 'female'}
                     status={assistant.status}
                     customInstructions={assistant.custom_instructions}
-                    onEdit={() => {}}
+                    onEdit={() => { }}
                   />
                 ))}
               </div>
@@ -780,6 +827,46 @@ export default function CustomerDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
+                  <Label>Website</Label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      placeholder="www.yourcompany.com"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="block mb-2">Business Hours</Label>
+                  {showHoursEditor ? (
+                    <ServiceHoursEditor
+                      onSubmit={(data) => {
+                        setBusinessHours(data);
+                        setShowHoursEditor(false);
+                      }}
+                      onCancel={() => setShowHoursEditor(false)}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-between p-3 border rounded-md bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {businessHours
+                            ? "Custom hours configured"
+                            : "No hours configured (Available 24/7)"}
+                        </span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setShowHoursEditor(true)}>
+                        Edit Hours
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <Label>Service Area</Label>
                   <Input
                     value={serviceArea}
@@ -829,7 +916,9 @@ export default function CustomerDashboard() {
                         {account.monthly_minutes_limit} minutes/month
                       </p>
                     </div>
-                    <Badge>{account.subscription_status}</Badge>
+                    <Badge variant={account.subscription_status === 'active' ? 'default' : 'secondary'}>
+                      {account.subscription_status}
+                    </Badge>
                   </div>
                   <Separator />
                   <div className="space-y-2 text-sm">
@@ -842,8 +931,29 @@ export default function CustomerDashboard() {
                       <span>{account.overage_minutes_used}</span>
                     </div>
                   </div>
-                  <div className="pt-4">
-                    <Button>Upgrade Plan</Button>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <Button className="flex-1">Upgrade Plan</Button>
+                    {account.subscription_status === 'trial' && (
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={handleCancelTrial}
+                        disabled={cancelingTrial}
+                      >
+                        {cancelingTrial ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Canceling...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Cancel Trial
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
