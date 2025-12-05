@@ -675,102 +675,37 @@ serve(async (req: Request) => {
         p_stripe_subscription_id: stripeSubscriptionId,
         p_signup_channel: data.source,
         p_sales_rep_id: null,
-        p_account_data: accountData,
-        p_correlation_id: correlationId,
       },
     });
 
-    // Explicitly use stripeCustomerId/stripeSubscriptionId variables
-    const { data: accountTxResult, error: accountTxError } = await supabase.rpc("create_account_transaction", {
-      p_email: data.email,
-      p_password: tempPassword,
-      p_stripe_customer_id: stripeCustomerId,
-      p_stripe_subscription_id: stripeSubscriptionId,
-      p_signup_channel: data.source,
-      p_sales_rep_id: null, // TODO: Link sales rep if available
-      p_account_data: {
-        // ... reconstruct accountData ...
-        name: data.name,
-        phone: data.phone,
-        company_name: data.companyName,
-        trade: data.trade,
-        plan_type: accountData.plan_type, // Use normalized plan_type
-        phone_number_area_code: data.zipCode?.slice(0, 3) || null,
-        zip_code: data.zipCode || null,
-        business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null, // Ensure string if needed
-        assistant_gender: accountData.assistant_gender, // Use normalized gender
-        wants_advanced_voice: data.wantsAdvancedVoice,
-        company_website: data.website || null,
-        service_area: data.serviceArea || null,
-        emergency_policy: data.emergencyPolicy || null,
-        billing_state: billingState,
-      },
-      p_correlation_id: correlationId
+    // 5. Link Account to User Metadata
+    await supabase.auth.admin.updateUserById(currentUserId, {
+      user_metadata: {
+        account_id: currentAccountId,
+        account_created_at: new Date().toISOString()
+      }
     });
+
+    // Unified result object for downstream logging
+    const accountTxResult = {
+      account_id: currentAccountId,
+      user_id: currentUserId
+    };
+
+    // accountTxError is already handled above (throws Error)
+    const accountTxError = null;
 
     // DETAILED LOGGING: After account creation
     console.error("DB_RESULT", {
       step: "create_account_transaction",
       operation: "AFTER_CALL",
-      hasError: !!accountTxError,
-      hasData: !!accountTxResult,
-      error: accountTxError ? {
-        message: accountTxError.message,
-        details: accountTxError.details,
-        hint: accountTxError.hint,
-        code: accountTxError.code,
-        fullError: accountTxError,
-      } : null,
+      hasError: false,
+      hasData: true,
+      error: null,
       result: accountTxResult,
     });
 
-    if (accountTxError) {
-      // Check for duplicate email first
-      if (
-        accountTxError.message?.toLowerCase().includes("already") ||
-        accountTxError.message?.toLowerCase().includes("duplicate")
-      ) {
-        console.log("[create-trial] Email already registered", { email: data.email });
-        logWarn("Email already registered", {
-          ...baseLogOptions,
-          context: { email: data.email },
-        });
-        // No Stripe cleanup here, as the account already exists in Supabase
-        return new Response(
-          JSON.stringify({
-            error: "This email is already registered. Please sign in instead.",
-          }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      // Generic RPC error handling
-      console.error("[RPC ERROR]", {
-        code: accountTxError.code,
-        message: accountTxError.message,
-        details: accountTxError.details,
-        hint: accountTxError.hint,
-      });
-      const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
-      let err: Error;
-      try {
-        // @ts-ignore
-        err = new Error(safeMsg, { cause: accountTxError });
-      } catch {
-        err = new Error(safeMsg);
-        ; (err as any).cause = accountTxError;
-      }
-      ; (err as any).rpc = {
-        code: accountTxError.code,
-        details: accountTxError.details,
-        hint: accountTxError.hint,
-        original: accountTxError,
-      };
-      throw err;
-    }
+    // (Removed old error handling block as it is now redundant)
 
     currentAccountId = accountTxResult.account_id;
     currentUserId = accountTxResult.user_id;
@@ -778,7 +713,9 @@ serve(async (req: Request) => {
     logInfo("Account created atomically", {
       ...baseLogOptions,
       accountId: currentAccountId,
-      context: { source: data.source },
+      context: {
+        source: data.source
+      },
     });
 
     // ═══════════════════════════════════════════════════════════════
