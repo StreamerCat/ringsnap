@@ -518,7 +518,7 @@ serve(async (req: Request) => {
     // STRIPE LOGIC
     const pmId = data.paymentMethodId || "";
     // Robust Bypass: Check explicit flag OR magic string
-    const isBypassMode = data.bypassStripe === true || pmId.trim() === "pm_bypass_test";
+    const isBypassMode = data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
 
     console.log(`[${FUNCTION_NAME}] Payment Logic Check`, {
       receivedPmId: pmId,

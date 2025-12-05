@@ -23,7 +23,7 @@ JSON_DATA='{
   "trade": "Plumber",
   "planType": "starter",
   "source": "website",
-  "paymentMethodId": "pm_bypass_test",
+  "paymentMethodId": "pm_bypass_check_deploy",
   "bypassStripe": true,
   "zipCode": "99999"
 }'
