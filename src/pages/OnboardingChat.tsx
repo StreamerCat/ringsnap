@@ -82,21 +82,6 @@ if (!STRIPE_KEY) {
 }
 
 const stripePromise = loadStripe(STRIPE_KEY!);
-  | "welcome"
-  | "phone"
-  | "company"
-  | "trade"
-  | "website"
-  | "hours"
-  | "hours_custom"
-  | "voice"
-  | "goal"
-  | "plan"
-  | "payment"
-  | "processing"
-  | "provisioning"
-  | "complete"
-  | "error";
 
 // Message type
 interface Message {
