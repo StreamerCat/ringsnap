@@ -918,6 +918,17 @@ Deno.serve(async (req: Request) => {
             ...baseLogOptions,
             accountId: currentAccountId,
           });
+
+          // ═══════════════════════════════════════════════════════════════
+          // FIRE-AND-FORGET: Wake up the worker immediately
+          // ═══════════════════════════════════════════════════════════════
+          // We don't await this because we don't want to hold up the response
+          // and the worker is designed to poll the DB anyway.
+          supabase.functions.invoke("provision-vapi", {
+            body: { triggered_by: "create-trial" }
+          }).catch(err => {
+            console.error("Failed to trigger provision-vapi worker (background)", err);
+          });
         }
       } catch (err: any) {
         console.error(JSON.stringify({ request_id, phase: "vapi_provision_start", message: err.message, stack: err.stack, raw: err }));
