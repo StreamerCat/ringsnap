@@ -10,6 +10,8 @@ export interface ChatInputProps {
   type?: "text" | "email" | "tel" | "url";
   autoFocus?: boolean;
   allowEmpty?: boolean;
+  maxLength?: number;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
 }
 
 export function ChatInput({
@@ -18,7 +20,8 @@ export function ChatInput({
   disabled,
   type = "text",
   autoFocus = true,
-  allowEmpty = false
+  allowEmpty = false,
+  ...props
 }: ChatInputProps) {
   const [value, setValue] = useState("");
 
@@ -39,6 +42,8 @@ export function ChatInput({
         placeholder={placeholder}
         disabled={disabled}
         autoFocus={autoFocus}
+        maxLength={props.maxLength}
+        inputMode={props.inputMode}
         className="flex-1"
       />
       <Button
