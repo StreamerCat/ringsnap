@@ -73,19 +73,6 @@ type ChatStep =
   | "complete"
   | "error";
 
-interface OnboardingData {
-  phone: string;
-  companyName: string;
-  trade: string;
-  website: string;
-  businessHours: ServiceHoursData | null;
-  assistantGender: "male" | "female";
-  assistantTone: "professional" | "friendly" | "empathetic";
-  primaryGoal: string;
-  planType: "starter" | "professional" | "premium";
-  zipCode?: string;
-}
-
 // Check Stripe Key environment
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 if (!STRIPE_KEY) {
@@ -125,11 +112,12 @@ interface OnboardingData {
   companyName: string;
   trade: string;
   website: string;
-  businessHours: Record<string, string> | null;
+  businessHours: ServiceHoursData | null; // Changed to match component
   assistantGender: "male" | "female";
-  assistantTone: "formal" | "friendly" | "casual";
+  assistantTone: "professional" | "friendly" | "empathetic"; // Updated tones
   primaryGoal: string;
   planType: "starter" | "professional" | "premium";
+  zipCode?: string;
 }
 
 // Lead data from Step 1
