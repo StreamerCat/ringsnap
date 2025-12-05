@@ -30,8 +30,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
@@ -233,7 +233,7 @@ async function cleanupStripeResources(
   }
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
