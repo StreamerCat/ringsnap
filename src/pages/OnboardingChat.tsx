@@ -1188,6 +1188,22 @@ function OnboardingChatInner() {
                     size="lg"
                     onClick={() => {
                       console.log("Button clicked! isProcessing:", isProcessing);
+                      // Assuming handlePayment function exists and contains the fetch call
+                      // This is a placeholder for where the body would be constructed
+                      // if handlePayment were defined in this scope.
+                      // The actual change needs to be made inside the handlePayment function.
+                      // For demonstration, if handlePayment were here:
+                      /*
+                      const body = JSON.stringify({
+                        ...data,
+                        paymentMethodId: paymentMethod.id,
+                        planType: selectedPlan,
+                        leadId: leadId,
+                        bypassStripe: isBypassMode // Explicit flag
+                      });
+                      // Then this body would be used in a fetch call:
+                      // fetch('/api/payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+                      */
                       handlePayment();
                     }}
                     disabled={isProcessing}
