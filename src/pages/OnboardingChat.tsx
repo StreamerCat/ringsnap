@@ -1176,8 +1176,12 @@ function OnboardingChatInner() {
                   <Button
                     className="w-full"
                     size="lg"
-                    onClick={handlePayment}
+                    onClick={() => {
+                      console.log("Button clicked! isProcessing:", isProcessing);
+                      handlePayment();
+                    }}
                     disabled={isProcessing}
+                    data-debug-processing={isProcessing.toString()}
                   >
                     {isProcessing ? (
                       <>
@@ -1186,7 +1190,7 @@ function OnboardingChatInner() {
                       </>
                     ) : (
                       <>
-                        Start 3-Day Free Trial
+                        Start Your Free Trial Now
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
