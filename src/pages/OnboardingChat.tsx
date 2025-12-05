@@ -42,6 +42,7 @@ import {
   Copy,
   ExternalLink,
   ArrowRight,
+  Shield,
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -936,7 +937,7 @@ function OnboardingChatInner() {
                   <ChatButtons
                     options={[
                       { label: "Let's do it!", value: "start" },
-                      { label: "I have questions", value: messages.filter(m => m.role === 'user' && m.content === "I have questions").length > 0 ? "questions_2" : "questions" },
+                      { label: "I have questions", value: messages.filter(m => m.role === 'user' && m.content === "I have some questions first").length > 0 ? "questions_2" : "questions" },
                     ]}
                     onSelect={handleWelcome}
                   />
