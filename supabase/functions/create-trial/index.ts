@@ -90,6 +90,9 @@ const createTrialSchema = z.object({
   referralCode: z.string().length(8).optional().or(z.literal("")),
   deviceFingerprint: z.string().max(500).optional(),
   leadId: z.union([z.string().uuid(), z.null(), z.undefined()]).optional(),
+
+  // Test Mode Bypass Override
+  bypassStripe: z.boolean().optional(),
 });
 
 /**
