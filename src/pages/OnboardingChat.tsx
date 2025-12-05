@@ -598,6 +598,7 @@ function OnboardingChatInner() {
   };
 
   // Handle hours selection
+  // Handle hours selection
   const handleHoursChoice = async (value: string) => {
     if (value === "custom") {
       setStep("hours_custom");
@@ -607,38 +608,48 @@ function OnboardingChatInner() {
     }
 
     let hoursText: string;
-    let hoursData: Record<string, string>;
+    let hoursData: ServiceHoursData;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     if (value === "weekdays_9_5") {
       hoursText = "Weekdays 9am-5pm";
       hoursData = {
-        monday: "09:00-17:00",
-        tuesday: "09:00-17:00",
-        wednesday: "09:00-17:00",
-        thursday: "09:00-17:00",
-        friday: "09:00-17:00",
+        timezone,
+        blocks: [
+          { day: "monday", start: "09:00", end: "17:00" },
+          { day: "tuesday", start: "09:00", end: "17:00" },
+          { day: "wednesday", start: "09:00", end: "17:00" },
+          { day: "thursday", start: "09:00", end: "17:00" },
+          { day: "friday", start: "09:00", end: "17:00" },
+        ]
       };
     } else if (value === "everyday_8_6") {
       hoursText = "Every day 8am-6pm";
       hoursData = {
-        monday: "08:00-18:00",
-        tuesday: "08:00-18:00",
-        wednesday: "08:00-18:00",
-        thursday: "08:00-18:00",
-        friday: "08:00-18:00",
-        saturday: "08:00-18:00",
-        sunday: "08:00-18:00",
+        timezone,
+        blocks: [
+          { day: "monday", start: "08:00", end: "18:00" },
+          { day: "tuesday", start: "08:00", end: "18:00" },
+          { day: "wednesday", start: "08:00", end: "18:00" },
+          { day: "thursday", start: "08:00", end: "18:00" },
+          { day: "friday", start: "08:00", end: "18:00" },
+          { day: "saturday", start: "08:00", end: "18:00" },
+          { day: "sunday", start: "08:00", end: "18:00" },
+        ]
       };
     } else {
       hoursText = "24/7";
       hoursData = {
-        monday: "00:00-23:59",
-        tuesday: "00:00-23:59",
-        wednesday: "00:00-23:59",
-        thursday: "00:00-23:59",
-        friday: "00:00-23:59",
-        saturday: "00:00-23:59",
-        sunday: "00:00-23:59",
+        timezone,
+        blocks: [
+          { day: "monday", start: "00:00", end: "23:59" },
+          { day: "tuesday", start: "00:00", end: "23:59" },
+          { day: "wednesday", start: "00:00", end: "23:59" },
+          { day: "thursday", start: "00:00", end: "23:59" },
+          { day: "friday", start: "00:00", end: "23:59" },
+          { day: "saturday", start: "00:00", end: "23:59" },
+          { day: "sunday", start: "00:00", end: "23:59" },
+        ]
       };
     }
 
