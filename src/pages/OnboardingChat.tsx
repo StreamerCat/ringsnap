@@ -682,18 +682,14 @@ function OnboardingChatInner() {
 
   // Handle custom hours
   const handleCustomHours = async (hours: ServiceHoursData) => {
-    const hoursData: Record<string, string> = {};
-    hours.blocks.forEach((block) => {
-      hoursData[block.day] = `${block.start}-${block.end}`;
-    });
-
+    // hours is already ServiceHoursData, no need to convert
     const daysText =
       hours.blocks.length === 7
         ? "Every day"
         : hours.blocks.map((b) => b.day.charAt(0).toUpperCase() + b.day.slice(1, 3)).join(", ");
 
     addMessage("user", `Custom hours: ${daysText}`);
-    setData((prev) => ({ ...prev, businessHours: hoursData }));
+    setData((prev) => ({ ...prev, businessHours: hours }));
 
     setStep("voice");
     await showTypingDelay();
@@ -1199,8 +1195,12 @@ function OnboardingChatInner() {
                   <Button
                     className="w-full"
                     size="lg"
-                    onClick={handlePayment}
-                    disabled={!cardComplete || !termsAccepted || isProcessing}
+                    onClick={() => {
+                      console.log("Button clicked! isProcessing:", isProcessing);
+                      handlePayment();
+                    }}
+                    disabled={isProcessing}
+                    data-debug-processing={isProcessing.toString()}
                   >
                     {isProcessing ? (
                       <>
@@ -1209,7 +1209,7 @@ function OnboardingChatInner() {
                       </>
                     ) : (
                       <>
-                        Start 3-Day Free Trial
+                        Start Your Free Trial Now
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
