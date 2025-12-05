@@ -759,31 +759,44 @@ function OnboardingChatInner() {
 
     try {
       // Create payment method
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error("Card element not found");
-      }
+      let paymentMethod = { id: "pm_bypass_test" }; // Default for bypass
 
-      // Tokenize FIRST while CardElement is still mounted
-      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-        type: "card",
-        card: cardElement,
-        billing_details: {
-          name: leadData.full_name || undefined,
-          email: leadData.email,
-          phone: data.phone,
-          address: {
-            postal_code: data.zipCode,
-          }
-        },
-      });
+      const isBypassMode = data.zipCode === "99999";
 
-      if (pmError) {
-        throw new Error(pmError.message || "Failed to process payment method");
-      }
+      if (isBypassMode) {
+        console.log("Bypass mode activated: Skipping Stripe frontend calls");
+        addMessage("assistant", "Test Mode: Skipping payment verification...");
+        await showTypingDelay(500);
+      } else {
+        // Normal Flow
+        const cardElement = elements.getElement(CardElement);
+        if (!cardElement) {
+          throw new Error("Card element not found");
+        }
 
-      if (!paymentMethod) {
-        throw new Error("Payment method creation failed");
+        // Tokenize FIRST while CardElement is still mounted
+        const { error: pmError, paymentMethod: stripePaymentMethod } = await stripe.createPaymentMethod({
+          type: "card",
+          card: cardElement,
+          billing_details: {
+            name: leadData.full_name || undefined,
+            email: leadData.email,
+            phone: data.phone,
+            address: {
+              postal_code: data.zipCode,
+            }
+          },
+        });
+
+        if (pmError) {
+          throw new Error(pmError.message || "Failed to process payment method");
+        }
+
+        if (!stripePaymentMethod) {
+          throw new Error("Payment method creation failed");
+        }
+
+        paymentMethod = stripePaymentMethod;
       }
 
       // Now safe to change step (which unmounts CardElement)

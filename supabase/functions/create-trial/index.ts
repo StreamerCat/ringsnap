@@ -536,116 +536,131 @@ serve(async (req) => {
     phase = "stripe_customer";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
+    const isBypassMode = data.paymentMethodId === "pm_bypass_test";
     const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
     let customer: Stripe.Customer;
-    try {
-      customer = await stripe.customers.create({
-        email: data.email,
-        name: data.name,
-        phone: data.phone,
-        metadata: {
-          company_name: data.companyName,
-          trade: data.trade,
-          source: data.source,
-          sales_rep: data.salesRepName || "",
-        },
-      }, {
-        idempotencyKey: `${stripeIdempotencyPrefix}-customer`,
-      });
-
-      stripeCustomerId = customer.id;
-
-      logInfo("Stripe customer created", {
-        ...baseLogOptions,
-        context: {
-          customerId: customer.id,
-          source: data.source,
-          email: data.email,
-        },
-      });
-    } catch (err: any) {
-      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-      return new Response(
-        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // STRIPE: Attach Payment Method
-    // ═══════════════════════════════════════════════════════════════
-
-    phase = "stripe_payment_method";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
-    try {
-      await stripe.paymentMethods.attach(data.paymentMethodId, {
-        customer: customer.id,
-      });
-
-      await stripe.customers.update(customer.id, {
-        invoice_settings: {
-          default_payment_method: data.paymentMethodId,
-        },
-      });
-
-      logInfo("Payment method attached", {
-        ...baseLogOptions,
-        context: { customerId: customer.id },
-      });
-    } catch (err: any) {
-      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-      await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
-      return new Response(
-        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // STRIPE: Create Subscription (with idempotency)
-    // ═══════════════════════════════════════════════════════════════
-
-    phase = "stripe_subscription";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-
     let subscription: Stripe.Subscription;
-    try {
-      const priceId = getStripePriceId(data.planType);
-      subscription = await stripe.subscriptions.create({
-        customer: customer.id,
-        items: [{ price: priceId }],
-        trial_period_days: 3,
-        payment_behavior: "default_incomplete",
-        metadata: {
-          source: data.source,
-          sales_rep: data.salesRepName || "",
-          plan_type: data.planType,
-        },
-      }, {
-        idempotencyKey: `${stripeIdempotencyPrefix}-subscription`,
-      });
 
+    if (isBypassMode) {
+      logInfo("BYPASS MODE: Skipping Stripe API calls", baseLogOptions);
+      // Create Mock Objects
+      customer = { id: "cus_bypass_test_" + Date.now() } as any;
+      subscription = { id: "sub_bypass_test_" + Date.now(), status: "active" } as any;
+      stripeCustomerId = customer.id;
       stripeSubscriptionId = subscription.id;
 
-      logInfo("Stripe subscription created", {
-        ...baseLogOptions,
-        context: {
-          subscriptionId: subscription.id,
-          planType: data.planType,
-          source: data.source,
-          status: subscription.status,
-        },
-      });
-    } catch (err: any) {
-      console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
-      await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
-      return new Response(
-        JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    } else {
+      // -----------------------------------------------------------------
+      // REAL STRIPE FLOW
+      // -----------------------------------------------------------------
+      try {
+        customer = await stripe.customers.create({
+          email: data.email,
+          name: data.name,
+          phone: data.phone,
+          metadata: {
+            company_name: data.companyName,
+            trade: data.trade,
+            source: data.source,
+            sales_rep: data.salesRepName || "",
+          },
+        }, {
+          idempotencyKey: `${stripeIdempotencyPrefix}-customer`,
+        });
+
+        stripeCustomerId = customer.id;
+
+        logInfo("Stripe customer created", {
+          ...baseLogOptions,
+          context: {
+            customerId: customer.id,
+            source: data.source,
+            email: data.email,
+          },
+        });
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        return new Response(
+          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STRIPE: Attach Payment Method
+      // ═══════════════════════════════════════════════════════════════
+
+      phase = "stripe_payment_method";
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+      try {
+        await stripe.paymentMethods.attach(data.paymentMethodId, {
+          customer: customer.id,
+        });
+
+        await stripe.customers.update(customer.id, {
+          invoice_settings: {
+            default_payment_method: data.paymentMethodId,
+          },
+        });
+
+        logInfo("Payment method attached", {
+          ...baseLogOptions,
+          context: { customerId: customer.id },
+        });
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
+        return new Response(
+          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STRIPE: Create Subscription (with idempotency)
+      // ═══════════════════════════════════════════════════════════════
+
+      phase = "stripe_subscription";
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+      try {
+        const priceId = getStripePriceId(data.planType);
+        subscription = await stripe.subscriptions.create({
+          customer: customer.id,
+          items: [{ price: priceId }],
+          trial_period_days: 3,
+          payment_behavior: "default_incomplete",
+          metadata: {
+            source: data.source,
+            sales_rep: data.salesRepName || "",
+            plan_type: data.planType,
+          },
+        }, {
+          idempotencyKey: `${stripeIdempotencyPrefix}-subscription`,
+        });
+
+        stripeSubscriptionId = subscription.id;
+
+        logInfo("Stripe subscription created", {
+          ...baseLogOptions,
+          context: {
+            subscriptionId: subscription.id,
+            planType: data.planType,
+            source: data.source,
+            status: subscription.status,
+          },
+        });
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        await cleanupStripeResources(stripe, customer.id, null, baseLogOptions);
+        return new Response(
+          JSON.stringify({ success: false, request_id, phase, message: err.message ?? "Unknown error" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } // END ELSE (Real Stripe Flow)
 
     // ═══════════════════════════════════════════════════════════════
     // DATABASE: Atomic Account Creation
@@ -692,9 +707,9 @@ serve(async (req) => {
 
     accountData.plan_type =
       rawPlan === "pro" ? "professional" :
-      rawPlan === "professional" ? "professional" :
-      rawPlan === "premium" ? "premium" :
-      "starter";
+        rawPlan === "professional" ? "professional" :
+          rawPlan === "premium" ? "premium" :
+            "starter";
 
     // Normalize assistant_gender to match SQL constraint (male|female)
     const rawGender = (accountData.assistant_gender || "female")
@@ -759,10 +774,10 @@ serve(async (req) => {
           err = new Error(safeMsg, { cause: accountTxError });
         } catch {
           err = new Error(safeMsg);
-          ;(err as any).cause = accountTxError;
+          ; (err as any).cause = accountTxError;
         }
 
-        ;(err as any).rpc = {
+        ; (err as any).rpc = {
           code: accountTxError.code,
           details: accountTxError.details,
           hint: accountTxError.hint,
@@ -825,9 +840,9 @@ serve(async (req) => {
           err = new Error(safeMsg, { cause: accountTxError });
         } catch {
           err = new Error(safeMsg);
-          ;(err as any).cause = accountTxError;
+          ; (err as any).cause = accountTxError;
         }
-        ;(err as any).rpc = {
+        ; (err as any).rpc = {
           code: accountTxError.code,
           details: accountTxError.details,
           hint: accountTxError.hint,
