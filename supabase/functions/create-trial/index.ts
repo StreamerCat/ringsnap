@@ -675,85 +675,46 @@ serve(async (req: Request) => {
         p_stripe_subscription_id: stripeSubscriptionId,
         p_signup_channel: data.source,
         p_sales_rep_id: null,
-        const accountTxError = null; // Cleared
+      },
+    });
 
-        /*
-        // OLD RPC CALL (Removed due to race conditions)
-        const { data: accountTxResult, error: accountTxError } = await supabase.rpc("create_account_transaction", {
-          // ...
-        });
-        */
+    // 5. Link Account to User Metadata
+    await supabase.auth.admin.updateUserById(currentUserId, {
+      user_metadata: {
+        account_id: currentAccountId,
+        account_created_at: new Date().toISOString()
+      }
+    });
 
-        // DETAILED LOGGING: After account creation
-        console.error("DB_RESULT", {
-          step: "create_account_transaction",
-          hasError: !!accountTxError,
-          hasData: !!accountTxResult,
-          error: accountTxError ? {
-            message: accountTxError.message,
-            details: accountTxError.details,
-            hint: accountTxError.hint,
-            code: accountTxError.code,
-            fullError: accountTxError,
-          } : null,
-          result: accountTxResult,
-        });
+    // Unified result object for downstream logging
+    const accountTxResult = {
+      account_id: currentAccountId,
+      user_id: currentUserId
+    };
 
-        if(accountTxError) {
-          // Check for duplicate email first
-          if (
-            accountTxError.message?.toLowerCase().includes("already") ||
-            accountTxError.message?.toLowerCase().includes("duplicate")
-          ) {
-            console.log("[create-trial] Email already registered", { email: data.email });
-            logWarn("Email already registered", {
-              ...baseLogOptions,
-              context: { email: data.email },
-            });
-            // No Stripe cleanup here, as the account already exists in Supabase
-            return new Response(
-              JSON.stringify({
-                error: "This email is already registered. Please sign in instead.",
-              }),
-              {
-                status: 409,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
+    // accountTxError is already handled above (throws Error)
+    const accountTxError = null;
 
-          // Generic RPC error handling
-          console.error("[RPC ERROR]", {
-            code: accountTxError.code,
-            message: accountTxError.message,
-            details: accountTxError.details,
-            hint: accountTxError.hint,
-          });
-          const safeMsg = `RPC_FAILED: ${accountTxError.code} | ${accountTxError.message ?? "unknown error"}`;
-          let err: Error;
-          try {
-            // @ts-ignore
-            err = new Error(safeMsg, { cause: accountTxError });
-          } catch {
-            err = new Error(safeMsg);
-            ; (err as any).cause = accountTxError;
-          }
-          ; (err as any).rpc = {
-            code: accountTxError.code,
-            details: accountTxError.details,
-            hint: accountTxError.hint,
-            original: accountTxError,
-          };
-          throw err;
-        }
+    // DETAILED LOGGING: After account creation
+    console.error("DB_RESULT", {
+      step: "create_account_transaction",
+      operation: "AFTER_CALL",
+      hasError: false,
+      hasData: true,
+      error: null,
+      result: accountTxResult,
+    });
+
+    // (Removed old error handling block as it is now redundant)
 
     currentAccountId = accountTxResult.account_id;
-        currentUserId = accountTxResult.user_id;
+    currentUserId = accountTxResult.user_id;
 
-        logInfo("Account created atomically", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: { source: data.source
+    logInfo("Account created atomically", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        source: data.source
       },
     });
 
