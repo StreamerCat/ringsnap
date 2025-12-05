@@ -1,0 +1,44 @@
+name: Deploy Create Trial Function Only
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/create-trial/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy create-trial function
+        run: |
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+          # Set secrets for the function environment
+          supabase secrets set \
+            STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            STRIPE_PRICE_STARTER="${{ secrets.STRIPE_PRICE_STARTER }}" \
+            STRIPE_PRICE_PROFESSIONAL="${{ secrets.STRIPE_PRICE_PROFESSIONAL }}" \
+            STRIPE_PRICE_PREMIUM="${{ secrets.STRIPE_PRICE_PREMIUM }}" \
+            VAPI_API_KEY="${{ secrets.VAPI_API_KEY }}" \
+            VAPI_BASE_URL="${{ secrets.VAPI_BASE_URL }}" \
+            RESEND_PROD_KEY="${{ secrets.RESEND_PROD_KEY }}" \
+            APP_URL="${{ secrets.APP_URL }}" \
+            NOTIFY_EMAIL_FROM="${{ secrets.NOTIFY_EMAIL_FROM }}"
+
+          # Deploy ONLY create-trial
+          supabase functions deploy create-trial --force
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
