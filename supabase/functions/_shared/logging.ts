@@ -5,6 +5,7 @@ export interface LogOptions {
   correlationId: string;
   accountId?: string | null;
   context?: Record<string, unknown> | undefined;
+  error?: unknown;
 }
 
 const SENSITIVE_KEYWORDS = [

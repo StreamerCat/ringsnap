@@ -233,7 +233,7 @@ async function cleanupStripeResources(
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
