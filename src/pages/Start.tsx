@@ -29,9 +29,15 @@ import { useUser } from '@/lib/auth/useUser';
 // Store lead_id in localStorage for persistence
 const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
 
+const normalizeLeadId = (value?: string | null) => {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
+  return trimmed;
+};
+
 function getStoredLeadId(): string | null {
   try {
-    return localStorage.getItem(LEAD_ID_KEY);
+    return normalizeLeadId(localStorage.getItem(LEAD_ID_KEY));
   } catch {
     return null;
   }
@@ -58,7 +64,7 @@ export default function Start() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get existing lead_id from URL or localStorage
-  const existingLeadId = searchParams.get('lead_id') || getStoredLeadId();
+  const existingLeadId = normalizeLeadId(searchParams.get('lead_id')) || getStoredLeadId();
 
   // Check if already logged in or has existing lead
   useEffect(() => {
@@ -85,6 +91,7 @@ export default function Start() {
 
       // If we have an existing lead_id, offer to continue
       if (existingLeadId) {
+        console.log('[Start] Attempting resume lookup', { leadId: existingLeadId });
         // Check if lead exists and is not yet converted
         try {
           const { data: lead } = await supabase
@@ -98,9 +105,14 @@ export default function Start() {
             navigate(`/onboarding-chat?lead_id=${existingLeadId}&email=${encodeURIComponent(lead.email)}`, { replace: true });
             return;
           }
-        } catch {
+
+          console.log('[Start] Resume lookup failed - no matching lead', { leadId: existingLeadId });
+        } catch (error) {
+          console.log('[Start] Resume lookup skipped due to error', { leadId: existingLeadId, error });
           // Ignore - will create new lead if needed
         }
+      } else {
+        console.log('[Start] Resume lookup skipped - no stored lead id');
       }
     };
 

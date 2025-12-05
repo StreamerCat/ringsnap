@@ -43,13 +43,18 @@ export async function captureSignupLead(
         ...extraFields,
       },
     ])
-    .select("*")
+    .select("id, email, full_name, phone, source, signup_flow, metadata, completed_at")
     .single();
 
   if (error) {
     console.error("[signup_leads] insert error", error);
     throw new Error(`Failed to save your information: ${error.message}`);
   }
+
+  console.log("[signup_leads] lead captured", {
+    email: normalizedEmail,
+    leadId: data?.id,
+  });
 
   return data as SignupLeadRow;
 }

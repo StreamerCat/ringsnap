@@ -241,9 +241,15 @@ function OnboardingChatInner() {
 
   // Get lead_id from URL, fallback to localStorage
   const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
-  const urlLeadId = searchParams.get("lead_id");
+  const normalizeLeadId = (value?: string | null) => {
+    const trimmed = value?.trim();
+    if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
+    return trimmed;
+  };
+
+  const urlLeadId = normalizeLeadId(searchParams.get("lead_id"));
   const storedLeadId = (() => {
-    try { return localStorage.getItem(LEAD_ID_KEY); } catch { return null; }
+    try { return normalizeLeadId(localStorage.getItem(LEAD_ID_KEY)); } catch { return null; }
   })();
   const lead_id = urlLeadId || storedLeadId;
 
@@ -310,26 +316,37 @@ function OnboardingChatInner() {
       // Check for lead_id
       if (!lead_id) {
         // Check if user is already authenticated
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // Existing authenticated user - check their status
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("onboarding_status")
-            .eq("id", user.id)
-            .single();
+        try {
+          const { data, error } = await supabase.auth.getUser();
 
-          if (profile?.onboarding_status === "active") {
+          if (error && error.name !== "AuthSessionMissingError") {
+            console.log("[OnboardingChat] auth lookup error", error);
+          }
+
+          if (data?.user) {
+            const { user } = data;
+            // Existing authenticated user - check their status
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("onboarding_status")
+              .eq("id", user.id)
+              .single();
+
+            if (profile?.onboarding_status === "active") {
+              navigate("/dashboard", { replace: true });
+              return;
+            }
+            // For authenticated users in legacy flow, redirect to old flow behavior
+            // This would need the old OnboardingChat logic - for now redirect to dashboard
             navigate("/dashboard", { replace: true });
             return;
           }
-          // For authenticated users in legacy flow, redirect to old flow behavior
-          // This would need the old OnboardingChat logic - for now redirect to dashboard
-          navigate("/dashboard", { replace: true });
-          return;
+        } catch (error) {
+          console.log("[OnboardingChat] auth lookup skipped", error);
         }
 
         // No lead_id and not authenticated - go back to start
+        console.log("[OnboardingChat] Resume lookup skipped - no lead id");
         toast.error("Please start the signup process first");
         navigate("/start", { replace: true });
         return;
@@ -337,13 +354,15 @@ function OnboardingChatInner() {
 
       // Load lead data
       try {
+        console.log("[OnboardingChat] Attempting resume lookup", { leadId: lead_id });
         const { data: lead, error } = await supabase
           .from("signup_leads")
           .select("id, email, full_name, completed_at")
           .eq("id", lead_id)
-          .single();
+          .maybeSingle();
 
         if (error || !lead) {
+          console.log("[OnboardingChat] Resume lookup failed - not found", { leadId: lead_id, error });
           toast.error("Could not find your signup. Please start again.");
           navigate("/start", { replace: true });
           return;
