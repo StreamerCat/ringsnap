@@ -264,6 +264,7 @@ serve(async (req) => {
   }
 
   let currentAccountId: string | null = null;
+  let currentUserId: string | null = null; // Restore missing var
   // Initialize customer/subscription as basic objects to satisfy TS before assignment
   let customer: any = null;
   let subscription: any = null;
