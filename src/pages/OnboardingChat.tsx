@@ -54,11 +54,47 @@ import { ChatButtons, ChatButtonOption } from "@/components/onboarding-chat/Chat
 import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
-
 // Chat step types
 type ChatStep =
   | "loading"
+  | "welcome"
+  | "phone"
+  | "company"
+  | "trade"
+  | "website"
+  | "hours"
+  | "hours_custom"
+  | "voice"
+  | "goal"
+  | "plan"
+  | "payment"
+  | "processing"
+  | "provisioning"
+  | "complete"
+  | "error";
+
+interface OnboardingData {
+  phone: string;
+  companyName: string;
+  trade: string;
+  website: string;
+  businessHours: ServiceHoursData | null;
+  assistantGender: "male" | "female";
+  assistantTone: "professional" | "friendly" | "empathetic";
+  primaryGoal: string;
+  planType: "starter" | "professional" | "premium";
+  zipCode?: string;
+}
+
+// Check Stripe Key environment
+const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+if (!STRIPE_KEY) {
+  console.error("VITE_STRIPE_PUBLISHABLE_KEY is missing!");
+} else {
+  console.log("Stripe Key loaded (prefix):", STRIPE_KEY.substring(0, 8) + "...");
+}
+
+const stripePromise = loadStripe(STRIPE_KEY!);
   | "welcome"
   | "phone"
   | "company"
@@ -170,14 +206,21 @@ const GOAL_OPTIONS: ChatButtonOption[] = [
 
 // Stripe card element options
 const CARD_ELEMENT_OPTIONS = {
+  hidePostalCode: true,
   style: {
     base: {
+      color: "#32325d",
+      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+      fontSmoothing: "antialiased",
       fontSize: "16px",
-      color: "#424770",
-      "::placeholder": { color: "#aab7c4" },
-      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+      "::placeholder": {
+        color: "#aab7c4",
+      },
     },
-    invalid: { color: "#ef4444" },
+    invalid: {
+      color: "#fa755a",
+      iconColor: "#fa755a",
+    },
   },
 };
 
@@ -495,21 +538,18 @@ function OnboardingChatInner() {
 
   // Handle phone input
   const handlePhone = async (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
-    if (cleaned.length < 10) {
-      toast.error("Please enter a valid 10-digit phone number");
+    // Basic validation for 10 digits
+    const cleanPhone = value.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      toast.error("Please enter a valid 10-digit US phone number");
       return;
     }
 
-    const formatted = formatPhoneNumber(cleaned);
-    const normalized = normalizePhone(cleaned);
-
-    addMessage("user", formatted);
-    setData((prev) => ({ ...prev, phone: normalized }));
-
+    addMessage("user", value);
+    setData((prev) => ({ ...prev, phone: value }));
     setStep("company");
     await showTypingDelay();
-    addMessage("assistant", "Great! What's the name of your business?");
+    addMessage("assistant", "Got it. What's the name of your business?");
   };
 
   // Handle company name
@@ -724,6 +764,11 @@ function OnboardingChatInner() {
       return;
     }
 
+    if (!data.zipCode || data.zipCode.length !== 5) {
+      toast.error("Please enter a valid 5-digit billing zip code");
+      return;
+    }
+
     if (!termsAccepted) {
       toast.error("Please accept the Terms of Service");
       return;
@@ -750,6 +795,9 @@ function OnboardingChatInner() {
           name: leadData.full_name || undefined,
           email: leadData.email,
           phone: data.phone,
+          address: {
+            postal_code: data.zipCode,
+          }
         },
       });
 
@@ -783,10 +831,12 @@ function OnboardingChatInner() {
             businessHours: businessHoursStr,
             // AI configuration
             assistantGender: data.assistantGender,
+            assistantTone: data.assistantTone, // Ensure assistantTone is passed
             primaryGoal: data.primaryGoal || undefined,
             // Plan & payment
             planType: data.planType,
             paymentMethodId: paymentMethod.id,
+            zipCode: data.zipCode, // Pass zip code
             // Source tracking
             source: "website",
             // Link to lead
@@ -945,6 +995,8 @@ function OnboardingChatInner() {
                   onSubmit={handlePhone}
                   placeholder="(555) 123-4567"
                   type="tel"
+                  maxLength={14} // Allow for formatting chars
+                  inputMode="numeric"
                 />
               )}
 
@@ -1034,7 +1086,7 @@ function OnboardingChatInner() {
                       key={plan.value}
                       className={`border rounded-lg p-4 cursor-pointer transition-all hover:border-primary ${plan.popular ? "border-primary bg-primary/5" : ""
                         }`}
-                      onClick={() => handlePlan(plan.value)}
+                    // onClick={() => handlePlan(plan.value)} // This was commented out in the original, keeping it commented
                     >
                       <div className="flex items-start justify-between">
                         <div>
@@ -1103,16 +1155,34 @@ function OnboardingChatInner() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2">
+                  {/* Zip Code Input */}
+                  <div className="mt-4">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">
+                      Billing Zip Code
+                    </label>
                     <input
-                      type="checkbox"
-                      id="terms"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-1"
+                      type="text"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      maxLength={5}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="12345"
+                      value={data.zipCode || ""}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 5);
+                        setData(prev => ({ ...prev, zipCode: val }));
+                      }}
                     />
-                    <label htmlFor="terms" className="text-sm">
-                      I accept the{" "}
+                  </div>
+
+                  <div className="flex items-center space-x-2 py-4">
+                    <CheckCircle2 className={`h-5 w-5 ${termsAccepted ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
+                    <label
+                      htmlFor="terms"
+                      className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
+                      onClick={() => setTermsAccepted(!termsAccepted)}
+                    >
+                      I agree to the{" "}
                       <a href="/terms" target="_blank" className="text-primary hover:underline">
                         Terms of Service
                       </a>{" "}
@@ -1136,11 +1206,14 @@ function OnboardingChatInner() {
                       </>
                     ) : (
                       <>
-                        Start Free Trial
+                        Start 3-Day Free Trial
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
                   </Button>
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    We'll send a receipt to {leadData?.email}
+                  </p>
                 </div>
               )}
 
