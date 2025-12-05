@@ -663,18 +663,14 @@ function OnboardingChatInner() {
 
   // Handle custom hours
   const handleCustomHours = async (hours: ServiceHoursData) => {
-    const hoursData: Record<string, string> = {};
-    hours.blocks.forEach((block) => {
-      hoursData[block.day] = `${block.start}-${block.end}`;
-    });
-
+    // hours is already ServiceHoursData, no need to convert
     const daysText =
       hours.blocks.length === 7
         ? "Every day"
         : hours.blocks.map((b) => b.day.charAt(0).toUpperCase() + b.day.slice(1, 3)).join(", ");
 
     addMessage("user", `Custom hours: ${daysText}`);
-    setData((prev) => ({ ...prev, businessHours: hoursData }));
+    setData((prev) => ({ ...prev, businessHours: hours }));
 
     setStep("voice");
     await showTypingDelay();
