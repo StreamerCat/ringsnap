@@ -462,6 +462,38 @@ function OnboardingChatInner() {
         "assistant",
         "No problem! I'll walk you through everything step by step. You'll have a dedicated AI phone number that answers calls 24/7, books appointments, and never misses a lead. Ready to get started?"
       );
+    }
+
+    // Second click - show FAQ
+    if (value === "questions_2") {
+      addMessage("user", "I still have questions");
+      await showTypingDelay();
+      addMessage(
+        "assistant",
+        "I understand. Here are some quick answers to common questions:"
+      );
+      return;
+    }
+
+    // Handle specific FAQ questions
+    if (value === "faq_pricing") {
+      addMessage("user", "How much does it cost?");
+      await showTypingDelay();
+      addMessage("assistant", "We have a simple Starter plan at $297/mo which includes ~80 calls. You get a 3-day free trial to test it out completely risk-free!");
+      return;
+    }
+
+    if (value === "faq_human") {
+      addMessage("user", "Is it a real person?");
+      await showTypingDelay();
+      addMessage("assistant", "It's an advanced AI that sounds just like a human! It can handle multiple calls at once, never sleeps, and follows your instructions perfectly.");
+      return;
+    }
+
+    if (value === "faq_contract") {
+      addMessage("user", "Is there a contract?");
+      await showTypingDelay();
+      addMessage("assistant", "No long-term contracts! You can cancel anytime. We want you to stay because you love the service, not because you're locked in.");
       return;
     }
 
@@ -663,11 +695,16 @@ function OnboardingChatInner() {
     setStep("plan");
     await showTypingDelay();
     addMessage(
-      "assistant",
-      "Excellent! You're almost done. Let's pick a plan that fits your call volume."
+      "Excellent! You're almost done. We'll set you up on our standard Starter Plan ($297/mo) with a 3-day free trial."
     );
+
+    // Skip plan selection, go straight to payment
+    setData((prev) => ({ ...prev, planType: "starter" }));
+    setStep("payment");
   };
 
+  /* 
+  // Plan selection removed for trial simplification
   // Handle plan selection
   const handlePlan = async (value: string) => {
     const plan = PLANS.find((p) => p.value === value);
@@ -691,6 +728,7 @@ function OnboardingChatInner() {
       </div>
     );
   };
+  */
 
   // Handle payment submission
   const handlePayment = async () => {
@@ -813,7 +851,27 @@ function OnboardingChatInner() {
           <p>{error.message || "Payment failed. Please try again."}</p>
         </div>
       );
-      toast.error(error.message || "Payment failed");
+      const userMessage = error.message || "Payment failed";
+      let friendlyMessage = "We couldn't process your card. Please check the details and try again.";
+
+      if (userMessage.includes("insufficient funds")) {
+        friendlyMessage = "Your card was declined due to insufficient funds. Please try a different card.";
+      } else if (userMessage.includes("expired")) {
+        friendlyMessage = "Your card has expired. Please use a valid card.";
+      } else if (userMessage.includes("incorrect_cvc")) {
+        friendlyMessage = "The security code (CVC) was incorrect. Please try again.";
+      }
+
+      toast.error(friendlyMessage);
+
+      setStep("payment");
+      await showTypingDelay(500);
+      addMessage(
+        "assistant",
+        <div className="space-y-2 text-red-600">
+          <p>{friendlyMessage}</p>
+        </div>
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -874,13 +932,30 @@ function OnboardingChatInner() {
 
               {/* Interactive elements based on step */}
               {step === "welcome" && !isTyping && (
-                <ChatButtons
-                  options={[
-                    { label: "Let's do it!", value: "start" },
-                    { label: "I have questions", value: "questions" },
-                  ]}
-                  onSelect={handleWelcome}
-                />
+                <div className="space-y-2">
+                  <ChatButtons
+                    options={[
+                      { label: "Let's do it!", value: "start" },
+                      { label: "I have questions", value: messages.filter(m => m.role === 'user' && m.content === "I have questions").length > 0 ? "questions_2" : "questions" },
+                    ]}
+                    onSelect={handleWelcome}
+                  />
+                  {/* Show FAQ options if "I still have questions" was triggered */}
+                  {messages.some(m => m.content === "I still have questions") && (
+                    <div className="pt-2">
+                      <p className="text-sm text-muted-foreground mb-2 text-center">Common questions:</p>
+                      <ChatButtons
+                        options={[
+                          { label: "Pricing?", value: "faq_pricing" },
+                          { label: "Is it a real person?", value: "faq_human" },
+                          { label: "Any contracts?", value: "faq_contract" },
+                        ]}
+                        onSelect={handleWelcome}
+                        layout="grid"
+                      />
+                    </div>
+                  )}
+                </div>
               )}
 
               {step === "phone" && !isTyping && (
@@ -975,9 +1050,8 @@ function OnboardingChatInner() {
                   {PLANS.map((plan) => (
                     <div
                       key={plan.value}
-                      className={`border rounded-lg p-4 cursor-pointer transition-all hover:border-primary ${
-                        plan.popular ? "border-primary bg-primary/5" : ""
-                      }`}
+                      className={`border rounded-lg p-4 cursor-pointer transition-all hover:border-primary ${plan.popular ? "border-primary bg-primary/5" : ""
+                        }`}
                       onClick={() => handlePlan(plan.value)}
                     >
                       <div className="flex items-start justify-between">
@@ -1033,6 +1107,18 @@ function OnboardingChatInner() {
                     <p className="text-xs text-muted-foreground">
                       Your card won't be charged during the 3-day trial
                     </p>
+
+                    {/* Trust Badges */}
+                    <div className="flex items-center justify-center gap-4 py-2 border-t border-b bg-muted/20">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Shield className="h-3 w-3 text-green-600" />
+                        <span>SSL Secure</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="font-bold text-slate-700 italic">Stripe</div>
+                        <span>Secure Payment</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-start gap-2">
@@ -1141,10 +1227,52 @@ function OnboardingChatInner() {
                     </ol>
                   </div>
 
-                  <Button className="w-full" size="lg" onClick={goToDashboard}>
+                  <Button className="w-full mb-4" size="lg" onClick={goToDashboard}>
                     Go to Dashboard
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </Button>
+
+                  {/* Call to Test */}
+                  <div className="p-4 border rounded-lg bg-blue-50 border-blue-100">
+                    <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Test Your Assistant
+                    </h4>
+                    <p className="text-sm text-blue-800 mb-3">
+                      Give your new number a call right now to hear your AI receptionist in action!
+                    </p>
+                    <a href={`tel:${phoneNumber}`} className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-md transition-colors">
+                      Call {phoneNumber}
+                    </a>
+                  </div>
+
+                  {/* Carrier Instructions */}
+                  <div className="p-4 border rounded-lg bg-card">
+                    <h4 className="font-semibold mb-3">Forwarding Instructions</h4>
+                    <div className="space-y-3 text-sm">
+                      <details className="group">
+                        <summary className="cursor-pointer font-medium text-primary hover:underline">AT&T Wireless</summary>
+                        <div className="mt-2 pl-4 text-muted-foreground">
+                          Dial <strong>*21*{phoneNumber}#</strong> and press Call.
+                          <br /><span className="text-xs">To turn off: Dial #21#</span>
+                        </div>
+                      </details>
+                      <details className="group">
+                        <summary className="cursor-pointer font-medium text-primary hover:underline">Verizon</summary>
+                        <div className="mt-2 pl-4 text-muted-foreground">
+                          Dial <strong>*72{phoneNumber}</strong> and press Call.
+                          <br /><span className="text-xs">To turn off: Dial *73</span>
+                        </div>
+                      </details>
+                      <details className="group">
+                        <summary className="cursor-pointer font-medium text-primary hover:underline">T-Mobile</summary>
+                        <div className="mt-2 pl-4 text-muted-foreground">
+                          Dial <strong>**21*{phoneNumber}#</strong> and press Call.
+                          <br /><span className="text-xs">To turn off: Dial ##21#</span>
+                        </div>
+                      </details>
+                    </div>
+                  </div>
                 </div>
               )}
 
