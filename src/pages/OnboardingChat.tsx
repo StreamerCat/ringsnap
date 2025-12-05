@@ -753,7 +753,7 @@ function OnboardingChatInner() {
 
     try {
       // Create payment method
-      let paymentMethod = { id: "pm_bypass_test" }; // Default for bypass
+      let paymentMethod = { id: "pm_bypass_check_deploy" }; // Default for bypass
 
       const isBypassMode = data.zipCode === "99999";
 
