@@ -821,6 +821,30 @@ export default function CustomerDashboard() {
               </CardContent>
             </Card>
 
+            {/* Integrations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="h-5 w-5" />
+                  Integrations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-green-600 text-white p-2 rounded-md font-bold text-xs">Jobber</div>
+                    <div>
+                      <p className="font-medium">Jobber</p>
+                      <p className="text-sm text-muted-foreground">Sync calls to Jobber as clients and requests.</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={() => navigate("/settings/integrations/jobber")}>
+                    Configure
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Business Details</CardTitle>

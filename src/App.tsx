@@ -31,6 +31,7 @@ import SecuritySettings from "./pages/SecuritySettings";
 import AuthCallback from "./pages/AuthCallback";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import JobberIntegration from "./pages/settings/integrations/JobberIntegration";
 // Trade pages
 import Plumbers from "./pages/trades/Plumbers";
 import HVAC from "./pages/trades/HVAC";
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/auth/staff-invite" element={<StaffInvite />} />
           {/* Settings */}
           <Route path="/settings/security" element={<SecuritySettings />} />
+          <Route path="/settings/integrations/jobber" element={<JobberIntegration />} />
           {/* App routes */}
           <Route path="/sales" element={<Sales />} />
           <Route path="/form-preview" element={<FormPreview />} />
