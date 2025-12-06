@@ -708,7 +708,6 @@ Deno.serve(async (req: Request) => {
     currentAccountId = accountResult.id;
 
     // 3. Create/Link Profile
-    // Note: 'profiles' usually auto-created by trigger on auth.users, but we Upsert to be safe and link account
     const { error: profileError } = await supabase
       .from("profiles")
       .upsert({
@@ -717,13 +716,24 @@ Deno.serve(async (req: Request) => {
         email: data.email,
         name: data.name,
         phone: data.phone,
-        role: "owner",
         is_primary: true,
-        // notifications config...
       });
 
     if (profileError) {
       throw new Error(`Profile Upsert Failed: ${profileError.message}`);
+    }
+
+    // 4. Assign owner role in user_roles table
+    const { error: roleError } = await supabase
+      .from("user_roles")
+      .insert({
+        user_id: currentUserId,
+        role: "owner"
+      });
+
+    if (roleError) {
+      // Log but don't fail - role assignment is not critical for signup
+      console.warn("Failed to assign owner role (non-critical):", roleError);
     }
 
     // 5. Link Account to User Metadata (Updating existing block)
