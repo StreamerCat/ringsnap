@@ -29,8 +29,8 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+// import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 
@@ -508,7 +508,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
@@ -542,6 +542,23 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    // Check for direct invocation payload (e.g. from create-trial)
+    let payload: any = {};
+    try {
+      if (req.body && req.headers.get("content-type")?.includes("application/json")) {
+        payload = await req.json();
+      }
+    } catch (e) {
+      // Ignore JSON parse errors (e.g. empty body from Cron)
+    }
+
+    if (payload.triggered_by) {
+      logInfo("Worker triggered directly", {
+        ...baseLogOptions,
+        context: { source: payload.triggered_by }
+      });
+    }
 
     // Poll for jobs (queued or failed with retry_after passed)
     const { data: jobs, error: jobsError } = await supabase

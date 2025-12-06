@@ -89,3 +89,7 @@ verify_jwt = false
 
 [functions.create-trial]
 verify_jwt = false
+
+[functions.provision-vapi]
+verify_jwt = false
+
