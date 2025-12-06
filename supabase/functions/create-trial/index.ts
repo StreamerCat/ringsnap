@@ -628,8 +628,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const accountData = {
-      name: data.name,
-      phone: data.phone,
       company_name: data.companyName,
       trade: data.trade,
       plan_type: data.planType,
