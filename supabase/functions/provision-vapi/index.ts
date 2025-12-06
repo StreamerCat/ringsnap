@@ -465,7 +465,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       await supabase.from("provisioning_jobs").update({
         status: "failed",
         attempts: newAttempts,
-        retry_after: retryAfter,
         error: error.message?.substring(0, 500) || "Unknown error",
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
@@ -564,7 +563,7 @@ Deno.serve(async (req: Request) => {
     const { data: jobs, error: jobsError } = await supabase
       .from("provisioning_jobs")
       .select("*")
-      .or(`status.eq.queued,and(status.eq.failed,retry_after.lt.${new Date().toISOString()})`)
+      .or(`status.eq.queued,status.eq.failed`)
       .limit(JOBS_PER_BATCH)
       .order("created_at", { ascending: true });
 
