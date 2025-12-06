@@ -193,9 +193,45 @@ export default function Dashboard() {
     );
   }
 
+  // Fetch provisioning status for banner
+  const { data: accountStatus } = useQuery({
+    queryKey: ["account_provisioning_status", userId],
+    queryFn: async () => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("account_id")
+        .eq("id", userId)
+        .single();
+
+      if (!profile?.account_id) return null;
+
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("provisioning_status, vapi_phone_number")
+        .eq("id", profile.account_id)
+        .single();
+
+      return account;
+    },
+    enabled: !!userId,
+    refetchInterval: (data) => (data?.provisioning_status === "completed" ? false : 5000), // Poll if not complete
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-12">
-...
+      {/* Provisioning Status Banner */}
+      {accountStatus && accountStatus.provisioning_status !== "completed" && (
+        <div className={`w-full p-4 text-center text-sm font-medium ${accountStatus.provisioning_status?.startsWith("failed")
+            ? "bg-red-100 text-red-800 border-b border-red-200"
+            : "bg-blue-50 text-blue-800 border-b border-blue-200"
+          }`}>
+          {accountStatus.provisioning_status?.startsWith("failed")
+            ? "We hit a snag setting up your assistant. Please check your email for next steps."
+            : "Setting up your AI Assistant... (This may take a few minutes)"}
+        </div>
+      )}
+
+      ...
     </div>
   );
 }
