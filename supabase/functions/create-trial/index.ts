@@ -693,8 +693,7 @@ Deno.serve(async (req: Request) => {
     const { data: accountResult, error: accountError } = await supabase
       .from("accounts")
       .insert({
-        owner_id: currentUserId, // initially set owner
-        subscription_status: 'trial', // Default
+        subscription_status: 'trial',
         stripe_customer_id: stripeCustomerId,
         stripe_subscription_id: stripeSubscriptionId,
         ...accountData
