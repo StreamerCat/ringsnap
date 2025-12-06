@@ -467,7 +467,7 @@ Deno.serve(async (req: Request) => {
 
           return new Response(
             JSON.stringify({
-              error: "Trial limit reached for this location. Please contact support.",
+              error: `Trial limit reached. Debug: source=${data.source}, bypass=${isBypassMode}`,
             }),
             {
               status: 429,
