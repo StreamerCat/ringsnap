@@ -665,20 +665,66 @@ Deno.serve(async (req: Request) => {
     console.log(`[${FUNCTION_NAME}] normalized assistant_gender =`, accountData.assistant_gender);
     console.log(`[${FUNCTION_NAME}] final accountData keys =`, Object.keys(accountData));
 
-    // DETAILED LOGGING: Before account creation
-    console.error("DB_CALL", {
-      step: "create_account_transaction",
-      operation: "BEFORE_CALL",
-      payload: {
-        p_email: data.email,
-        p_stripe_customer_id: stripeCustomerId,
-        p_stripe_subscription_id: stripeSubscriptionId,
-        p_signup_channel: data.source,
-        p_sales_rep_id: null,
-      },
+    // ═══════════════════════════════════════════════════════════════
+    // MANUAL TRANSACTION: Create User -> Account -> Profile
+    // ═══════════════════════════════════════════════════════════════
+
+    // 1. Create Auth User
+    const { data: userData, error: userError } = await supabase.auth.admin.createUser({
+      email: data.email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: data.name,
+        company_name: data.companyName,
+      }
     });
 
-    // 5. Link Account to User Metadata
+    if (userError) {
+      // Handle "User already exists" gracefully if needed, or throw
+      throw new Error(`Auth User Creation Failed: ${userError.message}`);
+    }
+    currentUserId = userData.user.id;
+
+    // 2. Create Account
+    const { data: accountResult, error: accountError } = await supabase
+      .from("accounts")
+      .insert({
+        owner_id: currentUserId, // initially set owner
+        subscription_status: 'trial', // Default
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        ...accountData
+      })
+      .select("id")
+      .single();
+
+    if (accountError) {
+      // Rollback user if possible, or just throw (manual rollback complex here)
+      throw new Error(`Account Insertion Failed: ${accountError.message}`);
+    }
+    currentAccountId = accountResult.id;
+
+    // 3. Create/Link Profile
+    // Note: 'profiles' usually auto-created by trigger on auth.users, but we Upsert to be safe and link account
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert({
+        id: currentUserId,
+        account_id: currentAccountId,
+        email: data.email,
+        name: data.name,
+        phone: data.phone,
+        role: "owner",
+        is_primary: true,
+        // notifications config...
+      });
+
+    if (profileError) {
+      throw new Error(`Profile Upsert Failed: ${profileError.message}`);
+    }
+
+    // 5. Link Account to User Metadata (Updating existing block)
     await supabase.auth.admin.updateUserById(currentUserId, {
       user_metadata: {
         account_id: currentAccountId,
