@@ -833,11 +833,14 @@ function OnboardingChatInner() {
       setStep("payment"); // Ensure we stay/return to payment step
       setIsProcessing(false); // Re-enable button
 
-      // Show unified friendly error
+      // Show unified friendly error WITH DEBUG INFO
       addMessage(
         "assistant",
         <div className="space-y-2 text-red-600">
           <p>{friendlyMessage}</p>
+          <p className="text-xs text-red-500 font-mono mt-2 bg-red-50 p-2 rounded border border-red-100">
+            Debug: {userMessage}
+          </p>
         </div>
       );
     } finally {
