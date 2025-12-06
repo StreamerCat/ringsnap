@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - main
+      - 'feature/*'
     paths:
       - 'supabase/functions/create-trial/**'
+      - 'supabase/functions/provision-vapi/**'
   workflow_dispatch:
 
 jobs:
@@ -37,8 +39,8 @@ jobs:
             APP_URL="${{ secrets.APP_URL }}" \
             NOTIFY_EMAIL_FROM="${{ secrets.NOTIFY_EMAIL_FROM }}"
 
-          # Deploy ONLY create-trial
-          supabase functions deploy create-trial
+          # Deploy core signup flow functions
+          supabase functions deploy create-trial provision-vapi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
