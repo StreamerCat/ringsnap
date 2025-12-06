@@ -396,59 +396,9 @@ function OnboardingChatInner() {
     init();
   }, [lead_id, navigate, addMessage, showTypingDelay]);
 
-  // Poll provisioning status
-  useEffect(() => {
-    if (step !== "provisioning" || !accountId) return;
+  // Poll provisioning status - MOVED TO /setup/assistant page
+  // useEffect(() => { ... }) removed
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const { data: account } = await supabase
-          .from("accounts")
-          .select("provisioning_status, vapi_phone_number")
-          .eq("id", accountId)
-          .single();
-
-        if (account) {
-          setProvisioningStatus(account.provisioning_status);
-          if (account.vapi_phone_number) {
-            setPhoneNumber(account.vapi_phone_number);
-          }
-          if (account.provisioning_status === "completed" && account.vapi_phone_number) {
-            clearInterval(pollInterval);
-            setStep("complete");
-            await showTypingDelay(500);
-            addMessage(
-              "assistant",
-              <div className="space-y-3">
-                <p className="font-semibold text-green-600">Your AI receptionist is ready!</p>
-                <p>Your dedicated phone number is:</p>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
-                  <span className="text-xl font-bold text-green-700">{account.vapi_phone_number}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(account.vapi_phone_number);
-                      toast.success("Phone number copied!");
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Forward your business line to this number to start answering calls 24/7.
-                </p>
-              </div>
-            );
-          }
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-      }
-    }, 3000);
-
-    return () => clearInterval(pollInterval);
-  }, [step, accountId, addMessage, showTypingDelay]);
 
   // Handle welcome response
   const handleWelcome = async (value: string) => {
@@ -851,19 +801,16 @@ function OnboardingChatInner() {
 
         if (signInError) {
           console.warn("Auto sign-in failed (non-critical):", signInError);
+          // If sign-in fails but account created, send to login
+          navigate("/auth/login?email=" + encodeURIComponent(result.email));
+          return;
         }
       }
 
-      setAccountId(result.account_id);
-      setStep("provisioning");
-      await showTypingDelay(500);
-      addMessage(
-        "assistant",
-        <div className="space-y-3">
-          <p className="text-green-600 font-medium">Payment confirmed!</p>
-          <p>Setting up your AI phone number now. This usually takes under a minute...</p>
-        </div>
-      );
+      // Redirect immediately to the new Provisioning Status page
+      // This handles the "wait" time gracefully instead of hanging in the chat
+      navigate("/setup/assistant", { replace: true });
+
     } catch (error: any) {
       console.error("Payment error:", error);
 

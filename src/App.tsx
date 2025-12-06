@@ -12,7 +12,8 @@ import Start from "./pages/Start";
 import SignupRedirect from "./pages/SignupRedirect";
 import OnboardingRedirect from "./pages/OnboardingRedirect";
 import OnboardingChat from "./pages/OnboardingChat";
-import SetupStatus from "./pages/SetupStatus";
+import ProvisioningStatus from "./pages/ProvisioningStatus";
+import SetupStatus from "./pages/SetupStatus"; // Added this line
 import Sales from "./pages/Sales";
 import FormPreview from "./pages/FormPreview";
 import TrialFlowPreview from "./pages/TrialFlowPreview";
@@ -22,7 +23,6 @@ import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminUsers from "./pages/AdminUsers";
 import TeamManagement from "./pages/TeamManagement";
 import TrialConfirmation from "./pages/TrialConfirmation";
-// Auth pages
 import AuthLogin from "./pages/AuthLogin";
 import MagicCallback from "./pages/MagicCallback";
 import StaffInvite from "./pages/StaffInvite";
@@ -32,7 +32,6 @@ import AuthCallback from "./pages/AuthCallback";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import JobberIntegration from "./pages/settings/integrations/JobberIntegration";
-// Trade pages
 import Plumbers from "./pages/trades/Plumbers";
 import HVAC from "./pages/trades/HVAC";
 import Electricians from "./pages/trades/Electricians";
@@ -54,7 +53,9 @@ const App = () => (
           {/* Canonical signup/onboarding flow */}
           <Route path="/start" element={<Start />} />
           <Route path="/onboarding-chat" element={<OnboardingChat />} />
-          <Route path="/setup-status" element={<SetupStatus />} />
+          <Route path="/setup/assistant" element={<ProvisioningStatus />} />
+          {/* <Route path="/setup-status" element={<SetupStatus />} /> */}
+
           {/* Legacy signup routes - redirect to canonical paths */}
           <Route path="/signup" element={<SignupRedirect />} />
           <Route path="/signup/form" element={<SignupRedirect />} />
