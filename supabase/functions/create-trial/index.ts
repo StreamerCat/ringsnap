@@ -417,13 +417,22 @@ Deno.serve(async (req: Request) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // DETERMINE MODE
+    // ═══════════════════════════════════════════════════════════════
+    const pmId = data.paymentMethodId || "";
+    // Robust Bypass: Check explicit flag OR magic string
+    const isBypassMode = data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
+
+    // ═══════════════════════════════════════════════════════════════
     // ANTI-ABUSE: Rate limiting (website signups only)
     // ═══════════════════════════════════════════════════════════════
 
     phase = "anti_abuse";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    if (data.source === "website") {
+    // Skip rate limits if using Bypass Mode
+    if (data.source === "website" && !isBypassMode) {
       const clientIP =
         req.headers.get("x-forwarded-for")?.split(",")[0] ||
         req.headers.get("cf-connecting-ip") ||
@@ -516,10 +525,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // STRIPE LOGIC
-    const pmId = data.paymentMethodId || "";
-    // Robust Bypass: Check explicit flag OR magic string
-    const isBypassMode = data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
-
     console.log(`[${FUNCTION_NAME}] Payment Logic Check`, {
       receivedPmId: pmId,
       hasExplicitFlag: data.bypassStripe,
