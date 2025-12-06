@@ -944,10 +944,7 @@ Deno.serve(async (req: Request) => {
         const { error: jobError } = await supabase.from("provisioning_jobs").insert({
           account_id: currentAccountId,
           user_id: currentUserId,
-          job_type: "provision_phone",
           status: "queued",
-          metadata: jobMetadata,
-          correlation_id: correlationId,
         });
 
         // DETAILED LOGGING: After provisioning_jobs insert
