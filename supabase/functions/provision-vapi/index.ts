@@ -349,13 +349,46 @@ async function processJob(job: any, supabase: any): Promise<void> {
       p_status: "processing",
     });
 
+    // Fetch account data (since metadata column doesn't exist in provisioning_jobs)
+    const { data: accountData, error: accountError } = await supabase
+      .from("accounts")
+      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code")
+      .eq("id", job.account_id)
+      .single();
+
+    if (accountError || !accountData) {
+      throw new Error(`Failed to fetch account data: ${accountError?.message || "Account not found"}`);
+    }
+
+    // Fetch profile data for phone number
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("account_id", job.account_id)
+      .eq("is_primary", true)
+      .single();
+
+    // Build metadata object from account data
+    const metadata = {
+      company_name: accountData.company_name,
+      trade: accountData.trade,
+      service_area: accountData.service_area || "",
+      business_hours: accountData.business_hours || "Monday-Friday 8am-5pm",
+      emergency_policy: accountData.emergency_policy || "Available 24/7 for emergencies",
+      company_website: accountData.company_website || "",
+      assistant_gender: accountData.assistant_gender,
+      wants_advanced_voice: accountData.wants_advanced_voice,
+      area_code: accountData.zip_code?.slice(0, 3) || "415",
+      fallback_phone: profileData?.phone || "",
+    };
+
     // Check if assistant already exists (idempotency)
     let vapiAssistantId: string;
     let vapiAssistantDbId: string;
 
     const existingAssistant = await getExistingAssistant(supabase, job.account_id);
     if (existingAssistant) {
-      logInfo("Using existing Vapi assistant", {
+      logInfo("Assistant already exists, skipping creation", {
         ...baseLogOptions,
         context: { vapiAssistantId: existingAssistant.vapi_assistant_id },
       });
@@ -364,7 +397,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
     } else {
       const assistantResult = await createVapiAssistant(
         job.account_id,
-        job.metadata,
+        metadata,
         correlationId
       );
       vapiAssistantId = assistantResult.vapiAssistantId;
@@ -389,7 +422,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
       const phoneResult = await provisionVapiPhone(
         job.account_id,
         vapiAssistantId,
-        job.metadata,
+        metadata,
         correlationId
       );
       phoneE164 = phoneResult.phoneE164;
