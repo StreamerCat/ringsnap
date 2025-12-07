@@ -242,10 +242,21 @@ async function provisionVapiPhone(
     body: JSON.stringify(phonePayload),
   });
 
+  // Log response details for debugging
+  const responseBodyText = await phoneResponse.text();
+  logInfo("Vapi phone provisioning response", {
+    ...baseLogOptions,
+    context: {
+      endpoint: `${VAPI_BASE_URL}/phone-number`,
+      status: phoneResponse.status,
+      statusText: phoneResponse.statusText,
+      responseBody: responseBodyText,
+    },
+  });
+
   // Area code fallback
   if (!phoneResponse.ok && phoneResponse.status === 400) {
-    const errorText = await phoneResponse.text();
-    if (errorText.includes("area") || errorText.includes("unavailable")) {
+    if (responseBodyText.includes("area") || responseBodyText.includes("unavailable")) {
       logWarn("Requested area code unavailable, using fallback", {
         ...baseLogOptions,
         context: { requestedAreaCode },
@@ -262,17 +273,73 @@ async function provisionVapiPhone(
         },
         body: JSON.stringify(phonePayload),
       });
+
+      const retryResponseText = await phoneResponse.text();
+      logInfo("Vapi phone provisioning retry response", {
+        ...baseLogOptions,
+        context: {
+          endpoint: `${VAPI_BASE_URL}/phone-number`,
+          status: phoneResponse.status,
+          responseBody: retryResponseText,
+        },
+      });
+
+      if (!phoneResponse.ok) {
+        throw new Error(
+          `Vapi phone provisioning failed: ${phoneResponse.status} ${retryResponseText}`
+        );
+      }
+
+      const vapiPhone = JSON.parse(retryResponseText);
+      const phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
+      const vapiPhoneId = vapiPhone.id;
+
+      logInfo("Vapi phone number provisioned", {
+        ...baseLogOptions,
+        context: { phoneE164, vapiPhoneId },
+      });
+
+      // Insert into DB
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
+
+      const { data: phoneRow, error: phoneDbError } = await supabase
+        .from("phone_numbers")
+        .insert({
+          account_id: accountId,
+          phone_number: phoneE164,
+          area_code: requestedAreaCode,
+          vapi_phone_id: vapiPhoneId,
+          vapi_id: vapiPhoneId,
+          purpose: "primary",
+          status: "active",
+          is_primary: true,
+          activated_at: new Date().toISOString(),
+          raw: vapiPhone,
+        })
+        .select("id")
+        .single();
+
+      if (phoneDbError) {
+        throw new Error(`Failed to save phone to DB: ${phoneDbError.message}`);
+      }
+
+      return {
+        phoneE164,
+        vapiPhoneId,
+        phoneDbId: phoneRow.id,
+      };
     }
   }
 
   if (!phoneResponse.ok) {
-    const errorText = await phoneResponse.text();
     throw new Error(
-      `Vapi phone provisioning failed: ${phoneResponse.status} ${errorText}`
+      `Vapi phone provisioning failed: ${phoneResponse.status} ${responseBodyText}`
     );
   }
 
-  const vapiPhone = await phoneResponse.json();
+  const vapiPhone = JSON.parse(responseBodyText);
   const phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
   const vapiPhoneId = vapiPhone.id;
 
