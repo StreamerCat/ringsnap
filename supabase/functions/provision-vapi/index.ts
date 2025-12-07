@@ -246,7 +246,7 @@ async function provisionVapiPhone(
   const phonePayload: any = {
     provider: "vapi",
     name: metadata.company_name ? `${metadata.company_name} Line` : undefined,
-    areaCode: requestedAreaCode,
+    // areaCode: requestedAreaCode, // Removed: Vapi API rejects this field for POST /phone-number
     assistantId: vapiAssistantId, // Attach assistant during creation to avoid separate PATCH call if possible
   };
 
