@@ -63,23 +63,16 @@ export default function CustomerDashboard() {
   const [cancelingTrial, setCancelingTrial] = useState(false);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
+    // Auth is handled by withAuthGuard wrapper in App.tsx
+    // We just need to load data for the current user
+    const initData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth/login");
-        return;
+      if (user) {
+        loadDashboardData(user.id);
       }
-
-      await loadDashboardData(user.id);
-    } catch (error) {
-      console.error("Auth check failed:", error);
-      navigate("/auth/login");
-    }
-  };
+    };
+    initData();
+  }, []);
 
   const loadDashboardData = async (userId: string) => {
     try {
