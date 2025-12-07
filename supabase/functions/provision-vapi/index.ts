@@ -1,31 +1,31 @@
-/*
- * ═══════════════════════════════════════════════════════════════════════════
- * FUNCTION: provision-vapi (ASYNC WORKER)
- *
+/Fix Vapi phone provisioning
+  * ═══════════════════════════════════════════════════════════════════════════
+ * FUNCTION: provision - vapi(ASYNC WORKER)
+  *
  * PURPOSE: Process queued provisioning jobs asynchronously with retry logic
- *
+  *
  * FLOW:
- *   1. Poll for queued/failed jobs (with SKIP LOCKED for concurrency)
- *   2. Mark job as processing
- *   3. Create Vapi assistant idempotently
- *   4. Provision Vapi phone number with area code fallback
- *   5. Update account with provisioning results
- *   6. Mark job as completed or failed
- *   7. Implement exponential backoff for retries
- *
+ * 1. Poll for queued / failed jobs(with SKIP LOCKED for concurrency)
+ * 2. Mark job as processing
+  * 3. Create Vapi assistant idempotently
+    * 4. Provision Vapi phone number with area code fallback
+      * 5. Update account with provisioning results
+        * 6. Mark job as completed or failed
+          * 7. Implement exponential backoff for retries
+            *
  * RETRY LOGIC:
- *   - Max attempts: 5
- *   - Backoff: 2^attempt minutes
- *   - Permanent failure after max attempts
- *
+ * - Max attempts: 5
+  * - Backoff: 2 ^ attempt minutes
+    * - Permanent failure after max attempts
+      *
  * IDEMPOTENCY:
- *   - Check if assistant/phone already exists before creating
- *   - Safe to run multiple times on same account
- *
+ * - Check if assistant / phone already exists before creating
+  * - Safe to run multiple times on same account
+    *
  * CRON SCHEDULE:
- *   - Triggered every 30 seconds via Supabase cron
- *   - Processes up to 10 jobs per invocation
- *
+ * - Triggered every 30 seconds via Supabase cron
+  * - Processes up to 10 jobs per invocation
+    *
  * ═══════════════════════════════════════════════════════════════════════════
  */
 // import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
@@ -255,7 +255,7 @@ async function provisionVapiPhone(
         );
       }
       const vapiPhone = JSON.parse(retryResponseText);
-      const phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
+      const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
       const vapiPhoneId = vapiPhone.id;
       logInfo("Vapi phone number provisioned", {
         ...baseLogOptions,
@@ -297,7 +297,8 @@ async function provisionVapiPhone(
     );
   }
   const vapiPhone = JSON.parse(responseBodyText);
-  const phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
+  // Try multiple variations of the phone number field
+  const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
   const vapiPhoneId = vapiPhone.id;
   logInfo("Vapi phone number provisioned", {
     ...baseLogOptions,
