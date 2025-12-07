@@ -20,10 +20,9 @@ console.log("Vapi Phone Provisioning Test");
 console.log("=".repeat(60));
 console.log("");
 
-// Build payload according to Vapi API docs
+// Build payload according to Vapi API - FIXED: removed numberType
 const phonePayload = {
     provider: "vapi",
-    numberType: "local",
     areaCode: "415", // San Francisco area code
 };
 

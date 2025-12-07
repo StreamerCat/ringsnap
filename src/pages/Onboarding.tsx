@@ -442,7 +442,7 @@ export default function Onboarding() {
 
         {/* Carrier Forwarding Instructions - Hero when provisioned */}
         {phoneNumber && (
-          <CarrierForwardingInstructions 
+          <CarrierForwardingInstructions
             phoneNumber={phoneNumber}
             companyName={account?.company_name}
           />
@@ -500,7 +500,7 @@ export default function Onboarding() {
               <UsageWarningAlert
                 usagePercent={(usageStats.minutesUsed / usageStats.minutesLimit) * 100}
                 remainingMinutes={usageStats.minutesLimit - usageStats.minutesUsed}
-                onDismiss={() => {}}
+                onDismiss={() => { }}
               />
             )}
             <Button
@@ -569,7 +569,7 @@ export default function Onboarding() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                {phoneNumber 
+                {phoneNumber
                   ? "✓ Your RingSnap number is ready above!"
                   : "Your dedicated number will be sent to you within the next few minutes."
                 }
