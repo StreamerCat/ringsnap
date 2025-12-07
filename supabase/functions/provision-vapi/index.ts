@@ -1,31 +1,31 @@
-/*
- * ═══════════════════════════════════════════════════════════════════════════
- * FUNCTION: provision-vapi (ASYNC WORKER)
- *
+/Fix Vapi phone provisioning
+  * ═══════════════════════════════════════════════════════════════════════════
+ * FUNCTION: provision - vapi(ASYNC WORKER)
+  *
  * PURPOSE: Process queued provisioning jobs asynchronously with retry logic
- *
+  *
  * FLOW:
- *   1. Poll for queued/failed jobs (with SKIP LOCKED for concurrency)
- *   2. Mark job as processing
- *   3. Create Vapi assistant idempotently
- *   4. Provision Vapi phone number with area code fallback
- *   5. Update account with provisioning results
- *   6. Mark job as completed or failed
- *   7. Implement exponential backoff for retries
- *
+ * 1. Poll for queued / failed jobs(with SKIP LOCKED for concurrency)
+ * 2. Mark job as processing
+  * 3. Create Vapi assistant idempotently
+    * 4. Provision Vapi phone number with area code fallback
+      * 5. Update account with provisioning results
+        * 6. Mark job as completed or failed
+          * 7. Implement exponential backoff for retries
+            *
  * RETRY LOGIC:
- *   - Max attempts: 5
- *   - Backoff: 2^attempt minutes
- *   - Permanent failure after max attempts
- *
+ * - Max attempts: 5
+  * - Backoff: 2 ^ attempt minutes
+    * - Permanent failure after max attempts
+      *
  * IDEMPOTENCY:
- *   - Check if assistant/phone already exists before creating
- *   - Safe to run multiple times on same account
- *
+ * - Check if assistant / phone already exists before creating
+  * - Safe to run multiple times on same account
+    *
  * CRON SCHEDULE:
- *   - Triggered every 30 seconds via Supabase cron
- *   - Processes up to 10 jobs per invocation
- *
+ * - Triggered every 30 seconds via Supabase cron
+  * - Processes up to 10 jobs per invocation
+    *
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -290,8 +290,33 @@ async function provisionVapiPhone(
       }
 
       const vapiPhone = JSON.parse(retryResponseText);
-      const phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
+      const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
       const vapiPhoneId = vapiPhone.id;
+
+      if (!phoneE164) {
+        throw new Error(
+          `Vapi retry response missing phone number. Available keys: ${Object.keys(vapiPhone).join(", ")}`
+        );
+      }
+
+      // Link the phone number to the assistant (retry path)
+      const linkResponse = await fetch(`${VAPI_BASE_URL}/phone-number/${vapiPhoneId}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${VAPI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assistantId: vapiAssistantId,
+        }),
+      });
+
+      if (!linkResponse.ok) {
+        logWarn("Failed to link assistant to phone number (retry path)", {
+          ...baseLogOptions,
+          context: { error: await linkResponse.text() },
+        });
+      }
 
       logInfo("Vapi phone number provisioned", {
         ...baseLogOptions,
@@ -339,8 +364,46 @@ async function provisionVapiPhone(
   }
 
   const vapiPhone = JSON.parse(responseBodyText);
-  const phoneE164 = vapiPhone.number || vapiPhone.phone_e164;
+  // Try multiple variations of the phone number field
+  const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
   const vapiPhoneId = vapiPhone.id;
+
+  if (!phoneE164) {
+    throw new Error(
+      `Vapi response missing phone number. Available keys: ${Object.keys(vapiPhone).join(", ")}`
+    );
+  }
+
+  // Link the phone number to the assistant
+  logInfo("Linking phone number to assistant", {
+    ...baseLogOptions,
+    context: { vapiPhoneId, vapiAssistantId },
+  });
+
+  const linkResponse = await fetch(`${VAPI_BASE_URL}/phone-number/${vapiPhoneId}`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `Bearer ${VAPI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      assistantId: vapiAssistantId,
+    }),
+  });
+
+  if (!linkResponse.ok) {
+    const linkError = await linkResponse.text();
+    logWarn("Failed to link assistant to phone number", {
+      ...baseLogOptions,
+      context: { error: linkError },
+    });
+    // We continue anyway since we bought the number
+  } else {
+    logInfo("Assistant linked to phone number", {
+      ...baseLogOptions,
+      context: { vapiPhoneId, vapiAssistantId },
+    });
+  }
 
   logInfo("Vapi phone number provisioned", {
     ...baseLogOptions,
