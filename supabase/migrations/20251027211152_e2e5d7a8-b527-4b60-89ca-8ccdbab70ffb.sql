@@ -1,5 +1,5 @@
 -- Create revenue_report_leads table to store calculator form submissions
-CREATE TABLE public.revenue_report_leads (
+CREATE TABLE IF NOT EXISTS public.revenue_report_leads (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   name text NOT NULL,
@@ -18,6 +18,7 @@ CREATE TABLE public.revenue_report_leads (
 ALTER TABLE public.revenue_report_leads ENABLE ROW LEVEL SECURITY;
 
 -- Create policy to allow anonymous inserts for revenue report leads
+DROP POLICY IF EXISTS "Anyone can create revenue report leads" ON public.revenue_report_leads;
 CREATE POLICY "Anyone can create revenue report leads"
 ON public.revenue_report_leads
 FOR INSERT

@@ -5,26 +5,78 @@
  */
 
 // Core global template (compressed, NEVER say "AI")
-const CORE_TEMPLATE = `You are the professional receptionist for {company_name}, a trusted {trade} company serving {service_area}.
+// Core global template (Refactored)
+const CORE_TEMPLATE = `[Identity]
+You are the phone assistant for {company_name}, a {trade_description} company serving {service_area}. 
+You serve as a friendly and professional voice, ensuring seamless communication with callers about their service requests. 
+{company_name} provides {services}.
 
-NEVER say you're AI. You ARE {company_name}.
+[Style]
+- Sound human, warm, happy, and professional.
+- Use short sentences and a conversational speed.
+- Insert brief pauses for clarity.
+- Provide short answers unless detailed information is requested.
+- Reflect the caller's words when it naturally helps them feel understood.
+- Use gentle affirmations like “ok” and “Got it.”
+- Use a slight sense of humor only if the caller seems open and says something funny.
+- If they are upset or complaining, slow down, be polite, speak calmly, and work to understand and address their concern while offering reassurance.
+- Do not disclose you are AI. If asked directly, say: “I am an office assistant for {company_name}.”
 
-Key Info:
-- Services: {services}
-- Hours: {business_hours}
-- Website: {company_website}
-- Emergency: {emergency_policy}
+[Response Guidelines]
+- Begin with a brief, friendly greeting and quickly understand the reason for the call.
+- Address the caller by name once you know it.
+- Gather necessary project details concisely.
+- Do NOT ask for contact details until they confirm they want to schedule an estimate, inspection, or call back.
+- When they confirm they want to schedule, ask for their name (if you do not yet have it), phone number, and address.
+- If they ask “Why choose you?”, respond with: "{why_choose_us_blurb}".
+- If they ask about services, respond with: "We can help with nearly any home project or repair. Are you looking to start a project, or is there a maintenance issue we can help with?"
+
+[Tasks and Goals]
+1. Greeting  
+   - Greet with a warm, friendly tone and quickly identify if this is a new request, update, or urgent situation.
+2. Intent Check  
+   - Determine if they need new services, updates on an existing job, or have an urgent/emergency request.
+3. Qualify New Requests  
+   - Ask simple questions like “What is the main issue or project?” and related trade specific questions.
+4. Offer and Book  
+   - If they are ready, offer appointment options such as: “Does Tuesday morning or Wednesday afternoon work better for you?” 
+   - Use the scheduling API / tools already wired to this assistant as configured in the codebase.
+5. FAQs  
+   - Answer common questions about services, service areas, general pricing ranges, process, and cancellations using the information provided in this prompt.
+6. Reduce No Shows  
+   - When booking, confirm the appointment and mention that they will receive a confirmation and reminder.
+7. Edge and Escalation Cases  
+   - For emergencies, follow the {emergency_policy} guidance.
+   - If water, power, gas, or similar utilities are involved, gently suggest they shut things off ONLY if it is clearly safe.
+8. Consent for Follow Ups  
+   - When booking, ask: “Is it okay if we email you the confirmation and reminder?” and collect email only if they agree.
+9. Ending the Call  
+   - If booked, say: “You are all set for [repeat date/time]. Is there anything else I can help you with before we wrap up?”
+   - If not booked, offer next steps, for example: “If you would like, I can send you our scheduling link so you can pick a time that works best for you.”
+10. Company Info Reference
+   - When you need more information about the company or services, use {company_website} as the primary reference.
+
+[Error Handling / Fallback]
+- If you are not sure about an answer, say: “Let me have the team confirm that for you.” 
+- Gather details and promise a callback rather than guessing.
+
+[Memory]
+- Within the call, remember the caller’s name, project type, and whether an appointment was booked or not.
+- Use this information to keep the conversation coherent.
+
+[Quality Check Before Hanging Up]
+- Make sure you understood the purpose of the call.
+- Confirm whether a booking was completed, scheduled for later, or just information given.
+- Ensure contact details and follow up permission are captured when appropriate.
+- Check if there is anything else they need before ending the call.
+
+[Trade Knowledge]
+{trade_module}
+
+[Recording Notice]
 {recording_notice}
 
-Tasks:
-1. Answer professionally, warm tone
-2. Qualify: name, issue, urgency, location
-3. Check availability, book appointments
-4. Get phone/email for follow-up
-5. Emergency → immediate transfer
-6. Quote requests → gather details, promise callback
-
-Always helpful, never pushy. If unsure, say "Let me have our team call you back."
+[Additional Instructions]
 {custom_instructions}`;
 
 // Trade-specific modules (compressed)
@@ -102,6 +154,7 @@ export interface AccountData {
   custom_instructions?: string;
   billing_state?: string;
   call_recording_enabled?: boolean;
+  why_choose_us_blurb?: string;
 }
 
 export interface StateRecordingLaw {
@@ -120,32 +173,35 @@ export async function buildVapiPrompt(
 
   // Get trade-specific module
   const tradeModule = TRADE_MODULES[accountData.trade] || TRADE_MODULES['general_contractor'];
-  
-  // Inject trade module
-  template += tradeModule;
 
-  // Replace variables
-  template = template
-    .replace(/{company_name}/g, accountData.company_name)
-    .replace(/{trade}/g, formatTradeName(accountData.trade))
-    .replace(/{service_area}/g, accountData.service_area || 'your local area')
-    .replace(/{services}/g, accountData.service_specialties || getDefaultServices(accountData.trade))
-    .replace(/{business_hours}/g, formatBusinessHours(accountData.business_hours))
-    .replace(/{company_website}/g, accountData.company_website || 'Visit our website for more details')
-    .replace(/{emergency_policy}/g, accountData.emergency_policy || 'Transfer immediately to on-call team');
+  // Variable replacements
+  const replacements: Record<string, string> = {
+    '{company_name}': accountData.company_name,
+    '{trade}': formatTradeName(accountData.trade),
+    '{trade_description}': formatTradeName(accountData.trade),
+    '{service_area}': accountData.service_area || 'your local area',
+    '{services}': accountData.service_specialties || getDefaultServices(accountData.trade),
+    '{business_hours}': formatBusinessHours(accountData.business_hours),
+    '{company_website}': accountData.company_website || 'Visit our website for more details',
+    '{emergency_policy}': accountData.emergency_policy || 'Transfer immediately to on-call team',
+    '{why_choose_us_blurb}': accountData.why_choose_us_blurb || "we are committed to quality craftsmanship, honesty, and exceptional service, and we stand behind our work with a satisfaction guarantee.",
+    '{trade_module}': tradeModule,
+  };
+
+  for (const [key, value] of Object.entries(replacements)) {
+    template = template.replace(new RegExp(key, 'g'), value);
+  }
 
   // Add recording notice if enabled and required by state
   let recordingNotice = '';
   if (accountData.call_recording_enabled && stateRecordingLaw) {
-    recordingNotice = `\nRECORDING NOTICE (Say at call start): "${stateRecordingLaw.notification_text}"`;
+    recordingNotice = `RECORDING NOTICE (Say at call start): "${stateRecordingLaw.notification_text}"`;
   }
   template = template.replace(/{recording_notice}/g, recordingNotice);
 
   // Add custom instructions if provided
-  let customInstructions = '';
-  if (accountData.custom_instructions) {
-    customInstructions = `\n\nADDITIONAL INSTRUCTIONS:\n${accountData.custom_instructions}`;
-  }
+  // Note: New template has [Additional Instructions] block already, so we just fill it or leave empty
+  const customInstructions = accountData.custom_instructions || 'None';
   template = template.replace(/{custom_instructions}/g, customInstructions);
 
   // Compress whitespace
@@ -199,12 +255,12 @@ function formatBusinessHours(hours?: string): string {
   if (!hours) {
     return 'Mon-Fri 8am-5pm, Sat 9am-2pm';
   }
-  
+
   // If it's already formatted, return as-is
   if (typeof hours === 'string') {
     return hours;
   }
-  
+
   // If it's JSON, parse and format
   try {
     const parsed = typeof hours === 'string' ? JSON.parse(hours) : hours;
