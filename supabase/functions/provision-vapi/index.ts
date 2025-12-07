@@ -28,23 +28,19 @@
     *
  * ═══════════════════════════════════════════════════════════════════════════
  */
-
 // import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
-
 const FUNCTION_NAME = "provision-vapi";
 const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
 const VAPI_BASE_URL = "https://api.vapi.ai";
 const MAX_RETRY_ATTEMPTS = 5;
 const JOBS_PER_BATCH = 10;
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
 /**
  * Calculate exponential backoff delay
  */
@@ -53,7 +49,6 @@ function calculateRetryDelay(attempts: number): string {
   const delayDate = new Date(Date.now() + minutes * 60 * 1000);
   return delayDate.toISOString();
 }
-
 /**
  * Check if Vapi assistant already exists for account
  */
@@ -66,7 +61,6 @@ async function getExistingAssistant(
     .select("id, vapi_assistant_id")
     .eq("account_id", accountId)
     .maybeSingle();
-
   if (error) {
     logWarn("Failed to check existing assistant", {
       functionName: FUNCTION_NAME,
@@ -74,10 +68,8 @@ async function getExistingAssistant(
     });
     return null;
   }
-
   return data;
 }
-
 /**
  * Check if phone number already exists for account
  */
@@ -91,7 +83,6 @@ async function getExistingPhone(
     .eq("account_id", accountId)
     .eq("is_primary", true)
     .maybeSingle();
-
   if (error) {
     logWarn("Failed to check existing phone", {
       functionName: FUNCTION_NAME,
@@ -99,10 +90,8 @@ async function getExistingPhone(
     });
     return null;
   }
-
   return data;
 }
-
 /**
  * Create Vapi assistant
  */
@@ -116,7 +105,6 @@ async function createVapiAssistant(
     correlationId,
     accountId,
   };
-
   // Build prompt
   const prompt = await buildVapiPrompt({
     company_name: metadata.company_name,
@@ -127,9 +115,7 @@ async function createVapiAssistant(
     company_website: metadata.company_website || "",
     custom_instructions: "",
   });
-
   const voiceId = metadata.assistant_gender === "male" ? "michael" : "sarah";
-
   const assistantPayload = {
     name: `${metadata.company_name} Assistant`,
     model: {
@@ -148,12 +134,10 @@ async function createVapiAssistant(
     },
     firstMessage: `Thank you for calling ${metadata.company_name}! How can I help you today?`,
   };
-
   logInfo("Creating Vapi assistant", {
     ...baseLogOptions,
     context: { companyName: metadata.company_name, voice: voiceId },
   });
-
   const vapiResponse = await fetch(`${VAPI_BASE_URL}/assistant`, {
     method: "POST",
     headers: {
@@ -162,27 +146,22 @@ async function createVapiAssistant(
     },
     body: JSON.stringify(assistantPayload),
   });
-
   if (!vapiResponse.ok) {
     const errorText = await vapiResponse.text();
     throw new Error(
       `Vapi assistant creation failed: ${vapiResponse.status} ${errorText}`
     );
   }
-
   const vapiAssistant = await vapiResponse.json();
   const vapiAssistantId = vapiAssistant.id;
-
   logInfo("Vapi assistant created", {
     ...baseLogOptions,
     context: { vapiAssistantId },
   });
-
   // Insert into DB
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
-
   const { data: assistantRow, error: assistantDbError } = await supabase
     .from("vapi_assistants")
     .insert({
@@ -192,17 +171,14 @@ async function createVapiAssistant(
     })
     .select("id")
     .single();
-
   if (assistantDbError) {
     throw new Error(`Failed to save assistant to DB: ${assistantDbError.message}`);
   }
-
   return {
     vapiAssistantId,
     vapiAssistantDbId: assistantRow.id,
   };
 }
-
 /**
  * Provision Vapi phone number with area code fallback
  */
@@ -217,21 +193,17 @@ async function provisionVapiPhone(
     correlationId,
     accountId,
   };
-
   const requestedAreaCode = metadata.area_code || "415";
   const fallbackPhone = metadata.fallback_phone;
-
   // Vapi API requires provider field
   const phonePayload = {
     provider: "vapi",
     areaCode: requestedAreaCode,
   };
-
   logInfo("Provisioning Vapi phone number", {
     ...baseLogOptions,
     context: { areaCode: requestedAreaCode },
   });
-
   let phoneResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
     method: "POST",
     headers: {
@@ -240,7 +212,6 @@ async function provisionVapiPhone(
     },
     body: JSON.stringify(phonePayload),
   });
-
   // Log response details for debugging
   const responseBodyText = await phoneResponse.text();
   logInfo("Vapi phone provisioning response", {
@@ -252,7 +223,6 @@ async function provisionVapiPhone(
       responseBody: responseBodyText,
     },
   });
-
   // Area code fallback
   if (!phoneResponse.ok && phoneResponse.status === 400) {
     if (responseBodyText.includes("area") || responseBodyText.includes("unavailable")) {
@@ -260,10 +230,8 @@ async function provisionVapiPhone(
         ...baseLogOptions,
         context: { requestedAreaCode },
       });
-
       // Retry without area code restriction
       delete phonePayload.areaCode;
-
       phoneResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
         method: "POST",
         headers: {
@@ -272,7 +240,6 @@ async function provisionVapiPhone(
         },
         body: JSON.stringify(phonePayload),
       });
-
       const retryResponseText = await phoneResponse.text();
       logInfo("Vapi phone provisioning retry response", {
         ...baseLogOptions,
@@ -282,52 +249,22 @@ async function provisionVapiPhone(
           responseBody: retryResponseText,
         },
       });
-
       if (!phoneResponse.ok) {
         throw new Error(
           `Vapi phone provisioning failed: ${phoneResponse.status} ${retryResponseText}`
         );
       }
-
       const vapiPhone = JSON.parse(retryResponseText);
       const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
       const vapiPhoneId = vapiPhone.id;
-
-      if (!phoneE164) {
-        throw new Error(
-          `Vapi retry response missing phone number. Available keys: ${Object.keys(vapiPhone).join(", ")}`
-        );
-      }
-
-      // Link the phone number to the assistant (retry path)
-      const linkResponse = await fetch(`${VAPI_BASE_URL}/phone-number/${vapiPhoneId}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${VAPI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          assistantId: vapiAssistantId,
-        }),
-      });
-
-      if (!linkResponse.ok) {
-        logWarn("Failed to link assistant to phone number (retry path)", {
-          ...baseLogOptions,
-          context: { error: await linkResponse.text() },
-        });
-      }
-
       logInfo("Vapi phone number provisioned", {
         ...baseLogOptions,
         context: { phoneE164, vapiPhoneId },
       });
-
       // Insert into DB
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
       const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
-
       const { data: phoneRow, error: phoneDbError } = await supabase
         .from("phone_numbers")
         .insert({
@@ -344,11 +281,9 @@ async function provisionVapiPhone(
         })
         .select("id")
         .single();
-
       if (phoneDbError) {
         throw new Error(`Failed to save phone to DB: ${phoneDbError.message}`);
       }
-
       return {
         phoneE164,
         vapiPhoneId,
@@ -356,65 +291,23 @@ async function provisionVapiPhone(
       };
     }
   }
-
   if (!phoneResponse.ok) {
     throw new Error(
       `Vapi phone provisioning failed: ${phoneResponse.status} ${responseBodyText}`
     );
   }
-
   const vapiPhone = JSON.parse(responseBodyText);
   // Try multiple variations of the phone number field
   const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
   const vapiPhoneId = vapiPhone.id;
-
-  if (!phoneE164) {
-    throw new Error(
-      `Vapi response missing phone number. Available keys: ${Object.keys(vapiPhone).join(", ")}`
-    );
-  }
-
-  // Link the phone number to the assistant
-  logInfo("Linking phone number to assistant", {
-    ...baseLogOptions,
-    context: { vapiPhoneId, vapiAssistantId },
-  });
-
-  const linkResponse = await fetch(`${VAPI_BASE_URL}/phone-number/${vapiPhoneId}`, {
-    method: "PATCH",
-    headers: {
-      "Authorization": `Bearer ${VAPI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      assistantId: vapiAssistantId,
-    }),
-  });
-
-  if (!linkResponse.ok) {
-    const linkError = await linkResponse.text();
-    logWarn("Failed to link assistant to phone number", {
-      ...baseLogOptions,
-      context: { error: linkError },
-    });
-    // We continue anyway since we bought the number
-  } else {
-    logInfo("Assistant linked to phone number", {
-      ...baseLogOptions,
-      context: { vapiPhoneId, vapiAssistantId },
-    });
-  }
-
   logInfo("Vapi phone number provisioned", {
     ...baseLogOptions,
     context: { phoneE164, vapiPhoneId },
   });
-
   // Insert into DB
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
-
   const { data: phoneRow, error: phoneDbError } = await supabase
     .from("phone_numbers")
     .insert({
@@ -431,18 +324,15 @@ async function provisionVapiPhone(
     })
     .select("id")
     .single();
-
   if (phoneDbError) {
     throw new Error(`Failed to save phone to DB: ${phoneDbError.message}`);
   }
-
   return {
     phoneE164,
     vapiPhoneId,
     phoneDbId: phoneRow.id,
   };
 }
-
 /**
  * Process a single provisioning job
  */
@@ -453,7 +343,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
     correlationId,
     accountId: job.account_id,
   };
-
   logInfo("Processing provisioning job", {
     ...baseLogOptions,
     context: {
@@ -462,31 +351,26 @@ async function processJob(job: any, supabase: any): Promise<void> {
       attempts: job.attempts,
     },
   });
-
   try {
     // Mark job as processing
     await supabase.from("provisioning_jobs").update({
       status: "processing",
       updated_at: new Date().toISOString(),
     }).eq("id", job.id);
-
     // Update account provisioning status
     await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
       p_status: "processing",
     });
-
     // Fetch account data (since metadata column doesn't exist in provisioning_jobs)
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
       .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code")
       .eq("id", job.account_id)
       .single();
-
     if (accountError || !accountData) {
       throw new Error(`Failed to fetch account data: ${accountError?.message || "Account not found"}`);
     }
-
     // Fetch profile data for phone number
     const { data: profileData } = await supabase
       .from("profiles")
@@ -494,7 +378,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       .eq("account_id", job.account_id)
       .eq("is_primary", true)
       .single();
-
     // Build metadata object from account data
     const metadata = {
       company_name: accountData.company_name,
@@ -508,11 +391,9 @@ async function processJob(job: any, supabase: any): Promise<void> {
       area_code: accountData.zip_code?.slice(0, 3) || "415",
       fallback_phone: profileData?.phone || "",
     };
-
     // Check if assistant already exists (idempotency)
     let vapiAssistantId: string;
     let vapiAssistantDbId: string;
-
     const existingAssistant = await getExistingAssistant(supabase, job.account_id);
     if (existingAssistant) {
       logInfo("Assistant already exists, skipping creation", {
@@ -530,12 +411,10 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiAssistantId = assistantResult.vapiAssistantId;
       vapiAssistantDbId = assistantResult.vapiAssistantDbId;
     }
-
     // Check if phone already exists (idempotency)
     let phoneE164: string;
     let vapiPhoneId: string;
     let phoneDbId: string;
-
     const existingPhone = await getExistingPhone(supabase, job.account_id);
     if (existingPhone) {
       logInfo("Using existing phone number", {
@@ -556,7 +435,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiPhoneId = phoneResult.vapiPhoneId;
       phoneDbId = phoneResult.phoneDbId;
     }
-
     // Update account with provisioning results
     await supabase.from("accounts").update({
       vapi_assistant_id: vapiAssistantId,
@@ -566,25 +444,21 @@ async function processJob(job: any, supabase: any): Promise<void> {
       phone_number_status: "active",
       phone_provisioned_at: new Date().toISOString(),
     }).eq("id", job.account_id);
-
     // Update provisioning lifecycle to completed
     await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
       p_status: "completed",
     });
-
     // Update user's onboarding status to active (hybrid onboarding flow)
     if (job.user_id) {
       await supabase.from("profiles").update({
         onboarding_status: "active",
       }).eq("id", job.user_id);
-
       logInfo("Updated onboarding status to active", {
         ...baseLogOptions,
         context: { userId: job.user_id },
       });
     }
-
     // Mark job as completed
     await supabase.from("provisioning_jobs").update({
       status: "completed",
@@ -594,7 +468,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       updated_at: new Date().toISOString(),
       error: null,
     }).eq("id", job.id);
-
     logInfo("Provisioning job completed successfully", {
       ...baseLogOptions,
       context: {
@@ -607,7 +480,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
     // Job failed - determine if we should retry
     const newAttempts = (job.attempts || 0) + 1;
     const shouldRetry = newAttempts < MAX_RETRY_ATTEMPTS;
-
     logError("Provisioning job failed", {
       ...baseLogOptions,
       error,
@@ -617,18 +489,15 @@ async function processJob(job: any, supabase: any): Promise<void> {
         willRetry: shouldRetry,
       },
     });
-
     if (shouldRetry) {
       // Calculate retry delay with exponential backoff
       const retryAfter = calculateRetryDelay(newAttempts);
-
       await supabase.from("provisioning_jobs").update({
         status: "failed",
         attempts: newAttempts,
         error: error.message?.substring(0, 500) || "Unknown error",
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
-
       // Update account status
       await supabase.rpc("update_provisioning_lifecycle", {
         p_account_id: job.account_id,
@@ -643,21 +512,18 @@ async function processJob(job: any, supabase: any): Promise<void> {
         error: error.message?.substring(0, 500) || "Unknown error",
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
-
       // Update account status
       await supabase.rpc("update_provisioning_lifecycle", {
         p_account_id: job.account_id,
         p_status: "failed",
         p_error: `Provisioning failed permanently after ${MAX_RETRY_ATTEMPTS} attempts: ${error.message}`,
       });
-
       // Update user's onboarding status to provision_failed (hybrid onboarding flow)
       if (job.user_id) {
         await supabase.from("profiles").update({
           onboarding_status: "provision_failed",
         }).eq("id", job.user_id);
       }
-
       logError("Provisioning job failed permanently", {
         ...baseLogOptions,
         error,
@@ -666,22 +532,18 @@ async function processJob(job: any, supabase: any): Promise<void> {
     }
   }
 }
-
 Deno.serve(async (req: Request) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
   };
-
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
   try {
     console.log("[provision-vapi] Start", { correlationId });
-
     if (!VAPI_API_KEY) {
       logWarn("VAPI_API_KEY not configured", baseLogOptions);
       return new Response(
@@ -692,16 +554,12 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
     if (!supabaseUrl || !supabaseServiceRoleKey) {
       throw new Error("Missing Supabase environment variables");
     }
-
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
     // Check for direct invocation payload (e.g. from create-trial)
     let payload: any = {};
     try {
@@ -711,14 +569,12 @@ Deno.serve(async (req: Request) => {
     } catch (e) {
       // Ignore JSON parse errors (e.g. empty body from Cron)
     }
-
     if (payload.triggered_by) {
       logInfo("Worker triggered directly", {
         ...baseLogOptions,
         context: { source: payload.triggered_by }
       });
     }
-
     // Poll for jobs (queued or failed with retry_after passed)
     const { data: jobs, error: jobsError } = await supabase
       .from("provisioning_jobs")
@@ -726,11 +582,9 @@ Deno.serve(async (req: Request) => {
       .or(`status.eq.queued,status.eq.failed`)
       .limit(JOBS_PER_BATCH)
       .order("created_at", { ascending: true });
-
     if (jobsError) {
       throw new Error(`Failed to fetch jobs: ${jobsError.message}`);
     }
-
     if (!jobs || jobs.length === 0) {
       logInfo("No jobs to process", baseLogOptions);
       return new Response(
@@ -741,16 +595,13 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
     logInfo("Processing jobs batch", {
       ...baseLogOptions,
       context: { jobCount: jobs.length },
     });
-
     // Process jobs sequentially (could be parallelized with Promise.all)
     let successCount = 0;
     let failureCount = 0;
-
     for (const job of jobs) {
       try {
         await processJob(job, supabase);
@@ -764,12 +615,10 @@ Deno.serve(async (req: Request) => {
         });
       }
     }
-
     logInfo("Batch processing completed", {
       ...baseLogOptions,
       context: { total: jobs.length, success: successCount, failed: failureCount },
     });
-
     return new Response(
       JSON.stringify({
         message: "Batch processing completed",
@@ -787,12 +636,10 @@ Deno.serve(async (req: Request) => {
       message: error?.message,
       stack: error?.stack,
     });
-
     logError("Worker execution failed", {
       ...baseLogOptions,
       error,
     });
-
     return new Response(
       JSON.stringify({
         error: "Worker execution failed",
