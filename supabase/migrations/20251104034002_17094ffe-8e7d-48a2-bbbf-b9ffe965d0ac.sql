@@ -1,9 +1,18 @@
 -- Create enum types for roles and subscription status
-CREATE TYPE public.app_role AS ENUM ('owner', 'admin', 'user');
-CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'cancelled', 'expired');
+DO $$ BEGIN
+  CREATE TYPE public.app_role AS ENUM ('owner', 'admin', 'user');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.subscription_status AS ENUM ('trial', 'active', 'cancelled', 'expired');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- Create accounts table (company/organization level)
-CREATE TABLE public.accounts (
+CREATE TABLE IF NOT EXISTS public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_name TEXT NOT NULL,
   company_domain TEXT UNIQUE,
@@ -17,7 +26,7 @@ CREATE TABLE public.accounts (
 );
 
 -- Create profiles table (user level - linked to auth.users)
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   account_id UUID NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -29,7 +38,7 @@ CREATE TABLE public.profiles (
 );
 
 -- Create user_roles table (separate for security - prevents privilege escalation)
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role public.app_role NOT NULL DEFAULT 'user',
@@ -169,17 +178,20 @@ END;
 $$;
 
 -- Create trigger on auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user_signup();
 
 -- RLS Policies for accounts table
+DROP POLICY IF EXISTS "Users can view their own account" ON public.accounts;
 CREATE POLICY "Users can view their own account"
   ON public.accounts FOR SELECT
   TO authenticated
   USING (id = public.get_user_account_id(auth.uid()));
 
+DROP POLICY IF EXISTS "Account owners can update their account" ON public.accounts;
 CREATE POLICY "Account owners can update their account"
   ON public.accounts FOR UPDATE
   TO authenticated
@@ -189,16 +201,19 @@ CREATE POLICY "Account owners can update their account"
   );
 
 -- RLS Policies for profiles table
+DROP POLICY IF EXISTS "Users can view profiles in their account" ON public.profiles;
 CREATE POLICY "Users can view profiles in their account"
   ON public.profiles FOR SELECT
   TO authenticated
   USING (account_id = public.get_user_account_id(auth.uid()));
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
   ON public.profiles FOR UPDATE
   TO authenticated
   USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Owners and admins can update team profiles" ON public.profiles;
 CREATE POLICY "Owners and admins can update team profiles"
   ON public.profiles FOR UPDATE
   TO authenticated
@@ -208,11 +223,13 @@ CREATE POLICY "Owners and admins can update team profiles"
   );
 
 -- RLS Policies for user_roles table
+DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
 CREATE POLICY "Users can view their own roles"
   ON public.user_roles FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Owners can view all roles in their account" ON public.user_roles;
 CREATE POLICY "Owners can view all roles in their account"
   ON public.user_roles FOR SELECT
   TO authenticated
@@ -233,11 +250,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add updated_at triggers
+DROP TRIGGER IF EXISTS update_accounts_updated_at ON public.accounts;
 CREATE TRIGGER update_accounts_updated_at
   BEFORE UPDATE ON public.accounts
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW

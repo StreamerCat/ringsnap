@@ -33,6 +33,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
+import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
 import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 
 const FUNCTION_NAME = "provision-vapi";
@@ -110,6 +111,7 @@ async function getExistingPhone(
  * Create Vapi assistant
  */
 async function createVapiAssistant(
+  supabase: any,
   accountId: string,
   metadata: any,
   correlationId: string
@@ -120,16 +122,33 @@ async function createVapiAssistant(
     accountId,
   };
 
-  // Build prompt
-  const prompt = await buildVapiPrompt({
-    company_name: metadata.company_name,
-    trade: metadata.trade,
-    service_area: metadata.service_area || "",
-    business_hours: metadata.business_hours || "Monday-Friday 8am-5pm",
-    emergency_policy: metadata.emergency_policy || "Available 24/7 for emergencies",
-    company_website: metadata.company_website || "",
-    custom_instructions: "",
-  });
+  // 1. Try to load existing template
+  let prompt = await getAccountTemplate(supabase, accountId, metadata.trade);
+
+  // 2. If no template exists, build default and store it
+  if (!prompt) {
+    logInfo("No existing template found, building default", baseLogOptions);
+    prompt = await buildVapiPrompt({
+      company_name: metadata.company_name,
+      trade: metadata.trade,
+      service_area: metadata.service_area || "",
+      business_hours: metadata.business_hours || "Monday-Friday 8am-5pm",
+      emergency_policy: metadata.emergency_policy || "Available 24/7 for emergencies",
+      company_website: metadata.company_website || "",
+      custom_instructions: "",
+      why_choose_us_blurb: metadata.why_choose_us_blurb, // Pass if available in metadata
+    });
+
+    // Save generated template
+    try {
+      await upsertAccountTemplate(supabase, accountId, metadata.trade, prompt, 'system_generated', true);
+      logInfo("Stored default template", baseLogOptions);
+    } catch (err) {
+      logWarn("Failed to store default template (continuing)", { ...baseLogOptions, error: err });
+    }
+  } else {
+    logInfo("Using existing account template", baseLogOptions);
+  }
 
   const voiceId = metadata.assistant_gender === "male" ? "michael" : "sarah";
 
@@ -182,10 +201,6 @@ async function createVapiAssistant(
   });
 
   // Insert into DB
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
-
   const { data: assistantRow, error: assistantDbError } = await supabase
     .from("vapi_assistants")
     .insert({
@@ -423,6 +438,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiAssistantDbId = existingAssistant.id;
     } else {
       const assistantResult = await createVapiAssistant(
+        supabase, // Pass supabase client
         job.account_id,
         metadata,
         correlationId
