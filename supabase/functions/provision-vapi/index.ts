@@ -221,12 +221,10 @@ async function provisionVapiPhone(
   const requestedAreaCode = metadata.area_code || "415";
   const fallbackPhone = metadata.fallback_phone;
 
+  // Vapi API requires provider field and doesn't accept assistantId/fallbackDestination in phone creation
   const phonePayload = {
-    assistantId: vapiAssistantId,
-    fallbackDestination: {
-      type: "number",
-      number: fallbackPhone,
-    },
+    provider: "vapi",
+    numberType: "local",
     areaCode: requestedAreaCode,
   };
 
