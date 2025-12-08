@@ -264,11 +264,22 @@ async function provisionVapiPhone(
   // --------------------------------------------------------
   if (TELEPHONY_PROVIDER === "twilio") {
     // Validate Creds
-    const twilioApiKey = Deno.env.get("TWILIO_API_KEY");
-    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
+    const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID")?.trim();
+    // Use TWILIO_API_KEY / TWILIO_API_SECRET preferentially for Twilio Auth
+    const twilioApiKey = Deno.env.get("TWILIO_API_KEY")?.trim();
+    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET")?.trim();
 
     if (!TWILIO_ACCOUNT_SID || !twilioApiKey || !twilioApiSecret) {
-      throw new Error("Missing Twilio credentials in environment (TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET)");
+      const missing = [];
+      if (!TWILIO_ACCOUNT_SID) missing.push("TWILIO_ACCOUNT_SID");
+      if (!twilioApiKey) missing.push("TWILIO_API_KEY");
+      if (!twilioApiSecret) missing.push("TWILIO_API_SECRET");
+
+      logError("Missing Twilio credentials", {
+        ...baseLogOptions,
+        context: { missing }
+      });
+      throw new Error(`Missing Twilio credentials in environment: ${missing.join(", ")}`);
     }
 
     // We use API Key/Secret for Twilio Auth (matches Vapi inline requirement)
