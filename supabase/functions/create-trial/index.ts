@@ -717,7 +717,8 @@ Deno.serve(async (req: Request) => {
         name: data.name,
         phone: data.phone,
         is_primary: true,
-        onboarding_status: 'active',
+        role: 'customer',
+        // onboarding_status removed to fix schema mismatch (column missing in prod)
       });
 
     if (profileError) {

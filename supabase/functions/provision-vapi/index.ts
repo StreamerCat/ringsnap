@@ -497,9 +497,8 @@ async function processJob(job: any, supabase: any): Promise<void> {
     const { data: profileData } = await supabase
       .from("profiles")
       .select("phone")
-      .eq("account_id", job.account_id)
-      .eq("is_primary", true)
-      .single();
+      .eq("id", job.user_id)
+      .maybeSingle();
 
     // Build metadata object from account data
     const metadata = {
