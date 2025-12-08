@@ -207,8 +207,8 @@ async function provisionTwilioNumber(
     if (!buyRes.ok) {
         const errText = await buyRes.text();
 
-        // CHECK FOR TRIAL LIMIT (Error 21404)
-        if (buyRes.status === 400 && errText.includes("21404")) {
+        // CHECK FOR TRIAL LIMIT (Error 21404 OR generic 400 with "Trial" message)
+        if (buyRes.status === 400 && (errText.includes("21404") || errText.includes("Trial"))) {
             logInfo("Twilio Limit Reached (Trial Account). Attempting to reuse existing number...", { ...baseLog });
 
             // Fetch existing numbers
@@ -217,10 +217,14 @@ async function provisionTwilioNumber(
 
             if (listRes.ok) {
                 const listData = await listRes.json();
+
+                // Debug log full response
+                logInfo("IncomingPhoneNumbers Response Dump", { ...baseLog, context: { listData } });
+
                 if (listData.incoming_phone_numbers && listData.incoming_phone_numbers.length > 0) {
                     const existing = listData.incoming_phone_numbers[0];
                     logInfo("Reusing existing Twilio number", { ...baseLog, context: { sid: existing.sid, number: existing.phone_number } });
-
+                    // ... return ...
                     return {
                         phoneNumber: existing.phone_number,
                         providerId: existing.sid,
@@ -231,7 +235,12 @@ async function provisionTwilioNumber(
                             reused: true
                         }
                     };
+                } else {
+                    throw new Error(`Twilio Trial Limit Reached, but no existing numbers found to reuse. IncomingPhoneNumbers list is empty.`);
                 }
+            } else {
+                const listErr = await listRes.text();
+                throw new Error(`Twilio Trial Limit Reached, but failed to list existing numbers. Status: ${listRes.status} ${listErr}`);
             }
         }
 
