@@ -723,17 +723,23 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Profile Upsert Failed: ${profileError.message}`);
     }
 
-    // 4. Assign owner role in user_roles table
-    const { error: roleError } = await supabase
-      .from("user_roles")
+    // 4. Assign owner role in account_members table (Corrected from user_roles)
+    const { error: memberError } = await supabase
+      .from("account_members")
       .insert({
         user_id: currentUserId,
+        account_id: currentAccountId,
         role: "owner"
       });
 
-    if (roleError) {
-      // Log but don't fail - role assignment is not critical for signup
-      console.warn("Failed to assign owner role (non-critical):", roleError);
+    if (memberError) {
+      // Log but don't fail - link is critical but we have profile backup
+      console.warn("Failed to create account_member link:", memberError);
+      logWarn("Failed to create account_member link", {
+        ...baseLogOptions,
+        error: memberError,
+        accountId: currentAccountId
+      });
     }
 
     // 5. Link Account to User Metadata (Updating existing block)

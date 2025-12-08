@@ -204,7 +204,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      
+
       logError("Auth error during free trial signup", {
         ...baseLogOptions,
         error: authError,
@@ -305,9 +305,10 @@ serve(async (req) => {
     });
 
     const { error: roleInsertError } = await supabase
-      .from("user_roles")
+      .from("account_members")
       .insert({
         user_id: authData.user.id,
+        account_id: accountId,
         role: "owner",
       });
 

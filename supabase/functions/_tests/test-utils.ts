@@ -130,7 +130,7 @@ export async function cleanupTestAccount(
 
       // Delete in order to respect foreign keys
       await supabase.from("provisioning_state_transitions").delete().eq("account_id", accountId);
-      await supabase.from("user_roles").delete().eq("user_id", userId);
+      await supabase.from("account_members").delete().eq("user_id", userId);
       await supabase.from("profiles").delete().eq("id", userId);
       await supabase.from("accounts").delete().eq("id", accountId);
 

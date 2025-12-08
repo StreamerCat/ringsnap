@@ -73,6 +73,7 @@ ACCESS_TOKEN=$(echo "$AUTH_RESPONSE" | jq -r '.access_token // empty')
 
 if [ -z "$ACCESS_TOKEN" ]; then
   echo "⚠️  Could not authenticate to check provisioning status"
+  echo "DEBUG: Auth Response: $AUTH_RESPONSE"
   echo "   (This is expected - need service role key for full verification)"
 else
   # Check account status

@@ -321,18 +321,29 @@ async function provisionVapiPhone(
   // 2. Import/Create Number in Vapi
   // --------------------------------------------------------
 
+  // Check Mode
+  const mode = Deno.env.get("TWILIO_PROVISION_MODE") || "live";
+  const isTestMode = mode === "test";
+
   // Construct Vapi Payload based on Provider
   let vapiPayload: any;
+  let twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  let twilioApiKey = Deno.env.get("TWILIO_API_KEY");
+  let twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
+
+  if (isTestMode) {
+    logInfo("Running in TEST mode: Using Test Credentials for Vapi Payload", baseLogOptions);
+    twilioAccountSid = Deno.env.get("TWILIO_TEST_ACCOUNT_SID");
+    twilioApiKey = ""; // Test creds use SID/Token usually
+    twilioApiSecret = Deno.env.get("TWILIO_TEST_AUTH_TOKEN"); // Token acts as secret
+  }
 
   if (TELEPHONY_PROVIDER === "twilio") {
-    const twilioApiKey = Deno.env.get("TWILIO_API_KEY");
-    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
-
     vapiPayload = {
       provider: "twilio",
       number: phoneE164, // The number we just bought
-      twilioAccountSid: TWILIO_ACCOUNT_SID,
-      twilioApiKey: twilioApiKey,
+      twilioAccountSid: twilioAccountSid,
+      twilioApiKey: twilioApiKey || undefined, // Send undefined if empty (test mode)
       twilioApiSecret: twilioApiSecret,
       name: metadata.company_name ? `${metadata.company_name} Line` : undefined,
       assistantId: vapiAssistantId, // Bind immediately
@@ -347,33 +358,49 @@ async function provisionVapiPhone(
     ...baseLogOptions,
     context: {
       phoneE164,
-      payload: { ...vapiPayload, twilioApiSecret: "***" } // Redact secret
+      payload: { ...vapiPayload, twilioApiSecret: "***" }, // Redact secret
+      isTestMode
     },
   });
 
-  const vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${VAPI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(vapiPayload),
-  });
+  let vapiPhone: any;
 
-  if (!vapiResponse.ok) {
-    const errorText = await vapiResponse.text();
-    throw new Error(
-      `Vapi phone import failed: ${vapiResponse.status} ${errorText}`
-    );
+  if (isTestMode) {
+    // MOCK Vapi Response for Test Mode
+    logInfo("Test Mode: Mocking Vapi Import (Skipping actual API call)", baseLogOptions);
+    vapiPhone = {
+      id: `test-vapi-phone-${Date.now()}`,
+      number: phoneE164,
+      phoneNumber: phoneE164,
+      createdAt: new Date().toISOString(),
+      provider: "twilio"
+    };
+  } else {
+    // REAL Vapi Call
+    const vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${VAPI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(vapiPayload),
+    });
+
+    if (!vapiResponse.ok) {
+      const errorText = await vapiResponse.text();
+      throw new Error(
+        `Vapi phone import failed: ${vapiResponse.status} ${errorText}`
+      );
+    }
+    vapiPhone = await vapiResponse.json();
   }
 
-  const vapiPhone = await vapiResponse.json();
   const vapiPhoneId = vapiPhone.id;
   const finalNumber = vapiPhone.number || vapiPhone.phoneNumber || phoneE164; // Fallback to what we tried to import
 
   logInfo("Vapi phone number provisioned/imported", {
     ...baseLogOptions,
-    context: { phoneE164: finalNumber, vapiPhoneId },
+    context: { phoneE164: finalNumber, vapiPhoneId, isMock: isTestMode },
   });
 
   // Calculate Trial Dates
@@ -405,6 +432,8 @@ async function provisionVapiPhone(
       },
       trial_expires_at: trialExpiresAt.toISOString(),
       phone_retention_expires_at: retentionExpiresAt.toISOString(),
+      provider: TELEPHONY_PROVIDER,
+      provider_id: providerProviderId,
     })
     .select("id")
     .single();
