@@ -903,6 +903,7 @@ Deno.serve(async (req: Request) => {
 
     // Check for VAPI kill switch
     const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+    let jobError: any = null;
 
     if (disableVapiProvisioning) {
       console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
@@ -911,6 +912,7 @@ Deno.serve(async (req: Request) => {
         accountId: currentAccountId,
       });
     } else {
+      // ... metadata build ...
       const jobMetadata = {
         company_name: data.companyName,
         trade: data.trade,
@@ -941,11 +943,13 @@ Deno.serve(async (req: Request) => {
       });
 
       try {
-        const { error: jobError } = await supabase.from("provisioning_jobs").insert({
+        // Assign to outer var - Do not redeclare const
+        const { error } = await supabase.from("provisioning_jobs").insert({
           account_id: currentAccountId,
           user_id: currentUserId,
           status: "queued",
         });
+        jobError = error;
 
         // DETAILED LOGGING: After provisioning_jobs insert
         console.error("DB_RESULT", {
@@ -974,11 +978,7 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
           });
 
-          // ═══════════════════════════════════════════════════════════════
-          // FIRE-AND-FORGET: Wake up the worker immediately
-          // ═══════════════════════════════════════════════════════════════
-          // We don't await this because we don't want to hold up the response
-          // and the worker is designed to poll the DB anyway.
+          // FIRE-AND-FORGET
           supabase.functions.invoke("provision-vapi", {
             body: { triggered_by: "create-trial" }
           }).catch(err => {
