@@ -264,8 +264,10 @@ async function provisionVapiPhone(
   // --------------------------------------------------------
   if (TELEPHONY_PROVIDER === "twilio") {
     // Validate Creds
-    const twilioApiKey = Deno.env.get("TWILIO_API_KEY");
-    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
+    const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID")?.trim();
+    // Use TWILIO_API_KEY / TWILIO_API_SECRET preferentially for Twilio Auth
+    const twilioApiKey = Deno.env.get("TWILIO_API_KEY")?.trim();
+    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET")?.trim();
 
     if (!TWILIO_ACCOUNT_SID || !twilioApiKey || !twilioApiSecret) {
       const missing = [];
