@@ -87,12 +87,12 @@ export async function redirectToRoleDashboard(userId: string): Promise<string> {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('onboarding_completed')
+        .select('onboarding_status')
         .eq('id', userId)
         .single();
 
       // If onboarding not completed, redirect to onboarding
-      if (!profile?.onboarding_completed) {
+      if (profile?.onboarding_status !== 'active') {
         return '/onboarding';
       }
     } catch (error) {

@@ -717,6 +717,7 @@ Deno.serve(async (req: Request) => {
         name: data.name,
         phone: data.phone,
         is_primary: true,
+        onboarding_status: 'active',
       });
 
     if (profileError) {
