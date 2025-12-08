@@ -29,12 +29,16 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-// import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
+// Imports
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
 import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
+import { formatPhoneE164 } from "../_shared/validators.ts";
+
+import { provisionPhoneNumber, ProviderConfig } from "../_shared/telephony.ts";
 
 const FUNCTION_NAME = "provision-vapi";
 const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
@@ -43,6 +47,12 @@ const MAX_RETRY_ATTEMPTS = 5;
 const JOBS_PER_BATCH = 10;
 const TRIAL_DAYS = parseInt(Deno.env.get("TRIAL_DAYS") || "3", 10);
 const TRIAL_PHONE_RETENTION_DAYS = parseInt(Deno.env.get("TRIAL_PHONE_RETENTION_DAYS") || "10", 10);
+
+// Telephony Config
+const TELEPHONY_PROVIDER = (Deno.env.get("VAPI_DEFAULT_PROVIDER") || "twilio") as "twilio" | "vapi";
+const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
+const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
+const VAPI_TWILIO_CREDENTIAL_ID = Deno.env.get("VAPI_TWILIO_CREDENTIAL_ID");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -150,7 +160,12 @@ async function createVapiAssistant(
     logInfo("Using existing account template", baseLogOptions);
   }
 
-  const voiceId = metadata.assistant_gender === "male" ? "michael" : "sarah";
+  // Use valid ElevenLabs voice IDs
+  // Rachel (Female): 21m00Tcm4TlvDq8ikWAM
+  // Brian (Male): nPczCjzI2devNBz1zQrb
+  const voiceId = metadata.assistant_gender === "male"
+    ? "nPczCjzI2devNBz1zQrb"  // Brian
+    : "21m00Tcm4TlvDq8ikWAM"; // Rachel
 
   const assistantPayload = {
     name: `${metadata.company_name} Assistant`,
@@ -240,82 +255,114 @@ async function provisionVapiPhone(
   const areaCodePref = getPreferredAreaCode(metadata.fallback_phone, metadata.zip_code);
   const requestedAreaCode = areaCodePref.areaCode;
 
-  // Vapi Managed Number Payload
-  // CRITICAL: provider must be 'vapi' for managed numbers. 
-  // We pass areaCode to request a specific one.
-  const phonePayload: any = {
-    provider: "vapi",
-    name: metadata.company_name ? `${metadata.company_name} Line` : undefined,
-    // areaCode: requestedAreaCode, // Removed: Vapi API rejects this field for POST /phone-number
-    assistantId: vapiAssistantId, // Attach assistant during creation to avoid separate PATCH call if possible
-  };
+  let phoneE164: string;
+  let providerProviderId: string | undefined; // e.g. Twilio SID
+  let providerMetadata: any = {};
 
-  logInfo("Provisioning Vapi phone number", {
+  // --------------------------------------------------------
+  // 1. Provision (Buy) Number from Telephony Provider
+  // --------------------------------------------------------
+  if (TELEPHONY_PROVIDER === "twilio") {
+    // Validate Creds
+    const twilioApiKey = Deno.env.get("TWILIO_API_KEY");
+    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
+
+    if (!TWILIO_ACCOUNT_SID || !twilioApiKey || !twilioApiSecret) {
+      throw new Error("Missing Twilio credentials in environment (TWILIO_ACCOUNT_SID, TWILIO_API_KEY, TWILIO_API_SECRET)");
+    }
+
+    // We use API Key/Secret for Twilio Auth (matches Vapi inline requirement)
+    // Twilio API supports Basic Auth with API Key SID (username) and Secret (password)
+    const providerConfig: ProviderConfig = {
+      type: "twilio",
+      accountSid: TWILIO_ACCOUNT_SID,
+      apiKey: twilioApiKey,
+      apiSecret: twilioApiSecret,
+    };
+
+    logInfo("Provisioning number via Twilio", {
+      ...baseLogOptions,
+      context: { requestedAreaCode, provider: "twilio" },
+    });
+
+    try {
+      const result = await provisionPhoneNumber(
+        providerConfig,
+        { countryCode: "US", areaCode: requestedAreaCode },
+        { correlationId }
+      );
+
+      phoneE164 = result.phoneNumber;
+      providerProviderId = result.providerId;
+      providerMetadata = result.metadata;
+
+    } catch (e: any) {
+      throw new Error(`Telephony Provisioning Failed: ${e.message}`);
+    }
+
+  } else {
+    // Legacy Vapi "Free" Number (Known to be flaky/exhausted)
+    throw new Error("Legacy Vapi provisioning is deprecated. Configure Twilio credentials.");
+  }
+
+
+  // --------------------------------------------------------
+  // 2. Import/Create Number in Vapi
+  // --------------------------------------------------------
+
+  // Construct Vapi Payload based on Provider
+  let vapiPayload: any;
+
+  if (TELEPHONY_PROVIDER === "twilio") {
+    const twilioApiKey = Deno.env.get("TWILIO_API_KEY");
+    const twilioApiSecret = Deno.env.get("TWILIO_API_SECRET");
+
+    vapiPayload = {
+      provider: "twilio",
+      number: phoneE164, // The number we just bought
+      twilioAccountSid: TWILIO_ACCOUNT_SID,
+      twilioApiKey: twilioApiKey,
+      twilioApiSecret: twilioApiSecret,
+      name: metadata.company_name ? `${metadata.company_name} Line` : undefined,
+      assistantId: vapiAssistantId, // Bind immediately
+      fallbackDestination: {
+        type: "number",
+        number: formatPhoneE164(metadata.fallback_phone || "4155551234"),
+      }
+    };
+  }
+
+  logInfo("Importing number to Vapi", {
     ...baseLogOptions,
-    context: { areaCode: requestedAreaCode, source: areaCodePref.source },
+    context: {
+      phoneE164,
+      payload: { ...vapiPayload, twilioApiSecret: "***" } // Redact secret
+    },
   });
 
-  let phoneResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
+  const vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${VAPI_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(phonePayload),
+    body: JSON.stringify(vapiPayload),
   });
 
-  // Log response details for debugging
-  let responseBodyText = await phoneResponse.text();
-
-  // Handling specific "Area code unavailable" or similar 400 errors
-  if (!phoneResponse.ok && (phoneResponse.status === 400 || phoneResponse.status === 422)) {
-    const isAreaCodeError = responseBodyText.toLowerCase().includes("unavailable") ||
-      responseBodyText.includes("area code") ||
-      responseBodyText.includes("no phone numbers");
-
-    if (isAreaCodeError) {
-      logWarn("Requested area code unavailable, using fallback (random)", {
-        ...baseLogOptions,
-        context: { requestedAreaCode, error: responseBodyText },
-      });
-
-      // Retry without area code restriction (random US number)
-      delete phonePayload.areaCode;
-
-      phoneResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${VAPI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(phonePayload),
-      });
-
-      responseBodyText = await phoneResponse.text();
-    }
-  }
-
-  if (!phoneResponse.ok) {
+  if (!vapiResponse.ok) {
+    const errorText = await vapiResponse.text();
     throw new Error(
-      `Vapi phone provisioning failed: ${phoneResponse.status} ${responseBodyText}`
+      `Vapi phone import failed: ${vapiResponse.status} ${errorText}`
     );
   }
 
-  const vapiPhone = JSON.parse(responseBodyText);
-
-  // Try multiple variations of the phone number field
-  const phoneE164 = vapiPhone.number || vapiPhone.phoneNumber || vapiPhone.phone_e164 || vapiPhone.phone;
+  const vapiPhone = await vapiResponse.json();
   const vapiPhoneId = vapiPhone.id;
+  const finalNumber = vapiPhone.number || vapiPhone.phoneNumber || phoneE164; // Fallback to what we tried to import
 
-  if (!phoneE164 || !vapiPhoneId) {
-    throw new Error(
-      `Vapi response missing phone number or ID. Response: ${responseBodyText}`
-    );
-  }
-
-  logInfo("Vapi phone number provisioned", {
+  logInfo("Vapi phone number provisioned/imported", {
     ...baseLogOptions,
-    context: { phoneE164, vapiPhoneId },
+    context: { phoneE164: finalNumber, vapiPhoneId },
   });
 
   // Calculate Trial Dates
@@ -332,15 +379,19 @@ async function provisionVapiPhone(
     .from("phone_numbers")
     .insert({
       account_id: accountId,
-      phone_number: phoneE164,
+      phone_number: finalNumber,
       area_code: requestedAreaCode,
-      vapi_phone_id: vapiPhoneId,
       vapi_id: vapiPhoneId,
       purpose: "primary",
       status: "active",
       is_primary: true,
       activated_at: now.toISOString(),
-      raw: vapiPhone,
+      raw: {
+        ...vapiPhone,
+        telephony_provider: TELEPHONY_PROVIDER,
+        provider_id: providerProviderId,
+        provider_metadata: providerMetadata
+      },
       trial_expires_at: trialExpiresAt.toISOString(),
       phone_retention_expires_at: retentionExpiresAt.toISOString(),
     })
@@ -352,7 +403,7 @@ async function provisionVapiPhone(
   }
 
   return {
-    phoneE164,
+    phoneE164: finalNumber,
     vapiPhoneId,
     phoneDbId: phoneRow.id,
   };
