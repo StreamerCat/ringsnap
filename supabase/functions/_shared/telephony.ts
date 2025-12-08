@@ -206,6 +206,35 @@ async function provisionTwilioNumber(
 
     if (!buyRes.ok) {
         const errText = await buyRes.text();
+
+        // CHECK FOR TRIAL LIMIT (Error 21404)
+        if (buyRes.status === 400 && errText.includes("21404")) {
+            logInfo("Twilio Limit Reached (Trial Account). Attempting to reuse existing number...", { ...baseLog });
+
+            // Fetch existing numbers
+            const listUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json?PageSize=1`;
+            const listRes = await fetch(listUrl, { method: "GET", headers });
+
+            if (listRes.ok) {
+                const listData = await listRes.json();
+                if (listData.incoming_phone_numbers && listData.incoming_phone_numbers.length > 0) {
+                    const existing = listData.incoming_phone_numbers[0];
+                    logInfo("Reusing existing Twilio number", { ...baseLog, context: { sid: existing.sid, number: existing.phone_number } });
+
+                    return {
+                        phoneNumber: existing.phone_number,
+                        providerId: existing.sid,
+                        provider: "twilio",
+                        metadata: {
+                            friendlyName: existing.friendly_name,
+                            capabilities: existing.capabilities,
+                            reused: true
+                        }
+                    };
+                }
+            }
+        }
+
         throw new Error(`Twilio Purchase Failed: ${buyRes.status} ${errText}`);
     }
 
