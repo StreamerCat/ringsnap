@@ -48,7 +48,29 @@ async function provisionTwilioNumber(
     filters: { countryCode: string; areaCode?: string },
     ctx: { correlationId?: string } = {}
 ): Promise<ProvisionResult> {
-    const { accountSid, authToken, apiKey, apiSecret } = config;
+
+    // START: Configurable Provisioning Mode Logic
+    const mode = Deno.env.get("TWILIO_PROVISION_MODE") || "live";
+    let { accountSid, authToken, apiKey, apiSecret } = config;
+
+    if (mode === "test") {
+        accountSid = Deno.env.get("TWILIO_TEST_ACCOUNT_SID");
+        authToken = Deno.env.get("TWILIO_TEST_AUTH_TOKEN");
+        apiKey = undefined;   // Test credentials usually use SID + AuthToken
+        apiSecret = undefined;
+
+        if (!accountSid || !authToken) {
+            throw new Error("Missing Twilio TEST credentials (TWILIO_TEST_ACCOUNT_SID / TWILIO_TEST_AUTH_TOKEN)");
+        }
+
+        // Log that we are in test mode
+        logInfo("Using Twilio TEST credentials", {
+            functionName: "provisionTwilioNumber",
+            correlationId: ctx.correlationId,
+            provider: "twilio",
+            context: { mode: "test" }
+        });
+    }
 
     // Validate Creds: Need Account SID AND (AuthToken OR (ApiKey+ApiSecret))
     if (!accountSid) {
@@ -60,6 +82,7 @@ async function provisionTwilioNumber(
     if (!hasToken && !hasApiKeys) {
         throw new Error("Missing Twilio credentials (need AuthToken or ApiKey/ApiSecret)");
     }
+    // END: Configurable Provisioning Mode Logic
 
     const correlationId = ctx.correlationId || `twilio-${Date.now()}`;
 
@@ -83,37 +106,28 @@ async function provisionTwilioNumber(
         "Content-Type": "application/x-www-form-urlencoded",
     };
 
-    // 1. Search for a number
-    let searchParams = new URLSearchParams();
-    if (filters.areaCode) searchParams.append("AreaCode", filters.areaCode);
-    searchParams.append("VoiceEnabled", "true");
-    searchParams.append("SmsEnabled", "true");
-    searchParams.append("PageSize", "1");
+    // 1. Search for a number (SKIP if Test Mode)
+    let chosenNumber: string;
 
-    const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${searchParams.toString()}`;
+    if (mode === "test") {
+        logInfo("Test Mode: Skipping Twilio Search, using Magic Number", { ...baseLog });
+        chosenNumber = "+15005550006"; // Twilio Magic Number that passes validation
+    } else {
+        let searchParams = new URLSearchParams();
+        if (filters.areaCode) searchParams.append("AreaCode", filters.areaCode);
+        searchParams.append("VoiceEnabled", "true");
+        searchParams.append("SmsEnabled", "true");
+        searchParams.append("PageSize", "1");
 
-    logInfo("Searching for Twilio number", { ...baseLog, context: { filters } });
+        const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${searchParams.toString()}`;
 
-    let searchRes = await fetch(searchUrl, { method: "GET", headers });
+        logInfo("Searching for Twilio number", { ...baseLog, context: { filters } });
 
-    // Backup: If search fails with specific area code, retry without it or with a fallback
-    if (!searchRes.ok && filters.areaCode) {
-        logInfo("Twilio search failed with AreaCode, retrying without", { ...baseLog });
-        const cleanParams = new URLSearchParams();
-        cleanParams.append("VoiceEnabled", "true");
-        cleanParams.append("SmsEnabled", "true");
-        cleanParams.append("PageSize", "1");
-        searchRes = await fetch(
-            `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${cleanParams.toString()}`,
-            { method: "GET", headers }
-        );
-    }
+        let searchRes = await fetch(searchUrl, { method: "GET", headers });
 
-    if (!searchRes.ok) {
-        const errText = await searchRes.text();
-        // Special handling: If 404 or bad request due to area code
-        if (filters.areaCode) {
-            logInfo("Twilio search failed (HTTP error), retrying without AreaCode", { ...baseLog });
+        // Backup: If search fails with specific area code, retry without it or with a fallback
+        if (!searchRes.ok && filters.areaCode) {
+            logInfo("Twilio search failed with AreaCode, retrying without", { ...baseLog });
             const cleanParams = new URLSearchParams();
             cleanParams.append("VoiceEnabled", "true");
             cleanParams.append("SmsEnabled", "true");
@@ -122,41 +136,58 @@ async function provisionTwilioNumber(
                 `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${cleanParams.toString()}`,
                 { method: "GET", headers }
             );
-            if (!searchRes.ok) {
-                const retryErrText = await searchRes.text();
-                throw new Error(`Twilio Search Failed (Retry): ${searchRes.status} ${retryErrText}`);
+        }
+
+        if (!searchRes.ok) {
+            const errText = await searchRes.text();
+            // Special handling: If 404 or bad request due to area code
+            if (filters.areaCode) {
+                logInfo("Twilio search failed (HTTP error), retrying without AreaCode", { ...baseLog });
+                const cleanParams = new URLSearchParams();
+                cleanParams.append("VoiceEnabled", "true");
+                cleanParams.append("SmsEnabled", "true");
+                cleanParams.append("PageSize", "1");
+                searchRes = await fetch(
+                    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${cleanParams.toString()}`,
+                    { method: "GET", headers }
+                );
+                if (!searchRes.ok) {
+                    const retryErrText = await searchRes.text();
+                    throw new Error(`Twilio Search Failed (Retry): ${searchRes.status} ${retryErrText}`);
+                }
+            } else {
+                throw new Error(`Twilio Search Failed: ${searchRes.status} ${errText}`);
             }
-        } else {
-            throw new Error(`Twilio Search Failed: ${searchRes.status} ${errText}`);
         }
-    }
 
-    let searchData = await searchRes.json();
-    let available = searchData.available_phone_numbers;
+        let searchData = await searchRes.json();
+        let available = searchData.available_phone_numbers;
 
-    // Retry if empty list and we used an area code
-    if ((!available || available.length === 0) && filters.areaCode) {
-        logInfo("No numbers found in area code, retrying with raw country search", { ...baseLog });
-        const cleanParams = new URLSearchParams();
-        cleanParams.append("VoiceEnabled", "true");
-        cleanParams.append("SmsEnabled", "true");
-        cleanParams.append("PageSize", "1");
-        searchRes = await fetch(
-            `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${cleanParams.toString()}`,
-            { method: "GET", headers }
-        );
+        // Retry if empty list and we used an area code
+        if ((!available || available.length === 0) && filters.areaCode) {
+            logInfo("No numbers found in area code, retrying with raw country search", { ...baseLog });
+            const cleanParams = new URLSearchParams();
+            cleanParams.append("VoiceEnabled", "true");
+            cleanParams.append("SmsEnabled", "true");
+            cleanParams.append("PageSize", "1");
+            searchRes = await fetch(
+                `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${filters.countryCode}/Local.json?${cleanParams.toString()}`,
+                { method: "GET", headers }
+            );
 
-        if (searchRes.ok) {
-            searchData = await searchRes.json();
-            available = searchData.available_phone_numbers;
+            if (searchRes.ok) {
+                searchData = await searchRes.json();
+                available = searchData.available_phone_numbers;
+            }
         }
+
+        if (!available || available.length === 0) {
+            throw new Error("No available Twilio numbers found.");
+        }
+
+        chosenNumber = available[0].phone_number; // E.164 already
     }
 
-    if (!available || available.length === 0) {
-        throw new Error("No available Twilio numbers found.");
-    }
-
-    const chosenNumber = available[0].phone_number; // E.164 already
     logInfo("Found Twilio number, purchasing...", { ...baseLog, context: { chosenNumber } });
 
     // 2. Buy the number

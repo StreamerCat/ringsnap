@@ -86,7 +86,7 @@ Deno.test("create-trial-v2: happy path self-service signup", async () => {
 
     // Verify role assigned
     const { data: role } = await supabase
-      .from("user_roles")
+      .from("account_members")
       .select("*")
       .eq("user_id", data.user_id)
       .single();
