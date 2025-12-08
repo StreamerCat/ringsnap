@@ -12,7 +12,12 @@ export interface ProviderConfig {
     vapiCredentialId?: string; // ID of the credential in Vapi (for import)
 }
 
-// ... (ProvisionResult interface remains same) ...
+export interface ProvisionResult {
+    phoneNumber: string;
+    provider: TelephonyProviderType;
+    providerId: string;
+    metadata?: Record<string, any>;
+}
 
 export async function provisionPhoneNumber(
     config: ProviderConfig,
