@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
 import type { LogOptions } from '../_shared/logging.ts';
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
 const FUNCTION_NAME = 'sync-usage';
 
@@ -23,6 +24,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+    const stripe = stripeKey ? new Stripe(stripeKey, {
+      apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(),
+    }) : null;
 
     // Parse VAPI post-call webhook
     const payload = await req.json();
@@ -73,6 +80,15 @@ serve(async (req) => {
     const currentMonthlyUsed = account.monthly_minutes_used || 0;
     const monthlyLimit = account.monthly_minutes_limit || 150;
     const isOverage = currentMonthlyUsed >= monthlyLimit;
+
+    // Check for Trial Upgrade (Limit Reached)
+    if (isOverage && account.subscription_status === 'trial' && stripe && account.stripe_subscription_id) {
+      const ended = await endTrialNow(stripe, account.stripe_subscription_id, accountId, baseLogOptions);
+      if (ended) {
+        await supabase.from('accounts').update({ subscription_status: 'active' }).eq('id', accountId);
+        logInfo('Account upgraded from trial to active due to usage limit', { ...baseLogOptions, accountId });
+      }
+    }
 
     // Update appropriate counter
     if (isOverage) {
@@ -190,7 +206,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         minutes_used: durationMinutes,
         is_overage: isOverage
@@ -209,6 +225,36 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper to end trial
+async function endTrialNow(
+  stripe: Stripe,
+  subscriptionId: string,
+  accountId: string,
+  logOptions: any
+) {
+  try {
+    logInfo('Ending trial due to usage limit reached', {
+      ...logOptions,
+      accountId,
+      context: { subscriptionId }
+    });
+
+    await stripe.subscriptions.update(subscriptionId, {
+      trial_end: 'now',
+    });
+
+    return true;
+  } catch (err: any) {
+    logError('Failed to end trial in Stripe', {
+      ...logOptions,
+      accountId,
+      error: err,
+      context: { subscriptionId }
+    });
+    return false;
+  }
+}
 
 async function sendUsageWarning(
   account: Record<string, unknown>,
