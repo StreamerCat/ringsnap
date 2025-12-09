@@ -14,7 +14,10 @@
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
     "test:voice-demo": "bash scripts/test-voice-demo.sh",
-    "test:vapi-demo": "bash scripts/test-voice-demo.sh"
+    "test:vapi-demo": "bash scripts/test-voice-demo.sh",
+    "audit:perf": "echo 'Run: npx lighthouse <url> --output json --output-path ./audit-report.json' # Placeholder for agent",
+    "audit:seo": "echo 'Run: npx lighthouse <url> --only-categories=seo'",
+    "audit:a11y": "echo 'Run: npx axe <url>'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
