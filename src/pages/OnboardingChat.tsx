@@ -805,9 +805,24 @@ function OnboardingChatInner() {
         }
       );
 
+      // Check for ACCOUNT_EXISTS error code
+      if (result?.code === "ACCOUNT_EXISTS") {
+        addMessage(
+          "assistant",
+          <div className="space-y-2">
+            <p>It looks like you already have an account with this email.</p>
+            <p>Please log in to access your dashboard.</p>
+          </div>
+        );
+        setTimeout(() => {
+          navigate("/auth/login?email=" + encodeURIComponent(leadData.email));
+        }, 2000);
+        return;
+      }
+
       if (createTrialError || !result?.success) {
         throw new Error(
-          result?.message || createTrialError?.message || "Failed to create account"
+          result?.error || result?.message || createTrialError?.message || "Failed to create account"
         );
       }
 
