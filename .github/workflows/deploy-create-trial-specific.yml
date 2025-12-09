@@ -27,19 +27,8 @@ jobs:
         run: |
           supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
-          # Set secrets for the function environment
-          supabase secrets set \
-            STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
-            STRIPE_PRICE_STARTER="${{ secrets.STRIPE_PRICE_STARTER }}" \
-            STRIPE_PRICE_PROFESSIONAL="${{ secrets.STRIPE_PRICE_PROFESSIONAL }}" \
-            STRIPE_PRICE_PREMIUM="${{ secrets.STRIPE_PRICE_PREMIUM }}" \
-            VAPI_API_KEY="${{ secrets.VAPI_API_KEY }}" \
-            VAPI_BASE_URL="${{ secrets.VAPI_BASE_URL }}" \
-            RESEND_PROD_KEY="${{ secrets.RESEND_PROD_KEY }}" \
-            APP_URL="${{ secrets.APP_URL }}" \
-            NOTIFY_EMAIL_FROM="${{ secrets.NOTIFY_EMAIL_FROM }}"
-
           # Deploy core signup flow functions
+          # Note: Secrets are managed manually via Supabase CLI to prevent accidental overwrites
           supabase functions deploy create-trial provision-vapi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
