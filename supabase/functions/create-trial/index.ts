@@ -125,6 +125,70 @@ function generateSecurePassword(): string {
 }
 
 /**
+ * Create an admin alert for critical failures that need manual intervention
+ */
+async function createAdminAlert(
+  supabase: any,
+  alertType: string,
+  details: Record<string, any>,
+  accountId?: string | null
+): Promise<void> {
+  try {
+    await supabase.from("call_pattern_alerts").insert({
+      account_id: accountId || null,
+      alert_type: `edge_function_${alertType}`,
+      alert_details: {
+        function_name: FUNCTION_NAME,
+        timestamp: new Date().toISOString(),
+        ...details,
+      },
+      resolved: false,
+    });
+    console.log(`[${FUNCTION_NAME}] Admin alert created: ${alertType}`);
+  } catch (err: any) {
+    // Don't fail the main flow if alert creation fails
+    console.error(`[${FUNCTION_NAME}] Failed to create admin alert:`, err?.message);
+  }
+}
+
+/**
+ * Check if a user already exists by email and return their info
+ */
+async function getExistingUserByEmail(
+  supabase: any,
+  email: string
+): Promise<{ id: string; hasAccount: boolean; accountId?: string } | null> {
+  try {
+    // First, try to find the user in auth.users via admin API
+    const { data: users, error } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+    });
+
+    // Since listUsers doesn't filter by email, we need a different approach
+    // Check profiles table which has email
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, account_id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      return null;
+    }
+
+    return {
+      id: profile.id,
+      hasAccount: !!profile.account_id,
+      accountId: profile.account_id,
+    };
+  } catch (err) {
+    console.error(`[${FUNCTION_NAME}] Error checking existing user:`, err);
+    return null;
+  }
+}
+
+/**
  * Get Stripe price ID for plan type
  */
 function getStripePriceId(planType: string): string {
@@ -672,22 +736,99 @@ Deno.serve(async (req: Request) => {
     // MANUAL TRANSACTION: Create User -> Account -> Profile
     // ═══════════════════════════════════════════════════════════════
 
-    // 1. Create Auth User
-    const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-      email: data.email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: data.name,
-        company_name: data.companyName,
-      }
-    });
+    // 1. Check if user already exists
+    const existingUser = await getExistingUserByEmail(supabase, data.email);
 
-    if (userError) {
-      // Handle "User already exists" gracefully if needed, or throw
-      throw new Error(`Auth User Creation Failed: ${userError.message}`);
+    if (existingUser) {
+      if (existingUser.hasAccount) {
+        // User already has an account - they should log in instead
+        logWarn("User already has an account", {
+          ...baseLogOptions,
+          context: { email: data.email, existingAccountId: existingUser.accountId },
+        });
+
+        return new Response(
+          JSON.stringify({
+            error: "An account with this email already exists. Please log in instead.",
+            code: "ACCOUNT_EXISTS",
+            redirect: "/login",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // User exists but has no account - we'll create an account for them
+      logInfo("Existing user found without account, creating account", {
+        ...baseLogOptions,
+        context: { email: data.email, userId: existingUser.id },
+      });
+      currentUserId = existingUser.id;
+    } else {
+      // 1b. Create new Auth User
+      const { data: userData, error: userError } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: data.name,
+          company_name: data.companyName,
+        }
+      });
+
+      if (userError) {
+        // Check if this is specifically "user already exists" error
+        if (userError.message?.includes("already been registered") ||
+          userError.message?.includes("already exists")) {
+          // Try to look them up in profiles as a fallback
+          const { data: fallbackProfile } = await supabase
+            .from("profiles")
+            .select("id, account_id")
+            .eq("email", data.email)
+            .maybeSingle();
+
+          if (fallbackProfile?.account_id) {
+            // They have an account - redirect to login
+            return new Response(
+              JSON.stringify({
+                error: "An account with this email already exists. Please log in instead.",
+                code: "ACCOUNT_EXISTS",
+                redirect: "/login",
+              }),
+              { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          if (fallbackProfile?.id) {
+            // They exist but no account - use their ID
+            currentUserId = fallbackProfile.id;
+            logInfo("Recovered existing user ID from profile", {
+              ...baseLogOptions,
+              context: { email: data.email, userId: currentUserId },
+            });
+          } else {
+            // Can't recover - create admin alert and return error
+            await createAdminAlert(supabase, "user_creation_failed", {
+              email: data.email,
+              error: userError.message,
+              phase: "user_creation",
+              request_id,
+            });
+            throw new Error(`Auth User Creation Failed: ${userError.message}`);
+          }
+        } else {
+          // Different error - throw it
+          await createAdminAlert(supabase, "user_creation_failed", {
+            email: data.email,
+            error: userError.message,
+            phase: "user_creation",
+            request_id,
+          });
+          throw new Error(`Auth User Creation Failed: ${userError.message}`);
+        }
+      } else {
+        currentUserId = userData.user.id;
+      }
     }
-    currentUserId = userData.user.id;
 
     // 2. Create Account
     const { data: accountResult, error: accountError } = await supabase
@@ -980,6 +1121,14 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
             error: jobError,
           });
+
+          // Create admin alert for failed job enqueue
+          await createAdminAlert(supabase, "provisioning_job_enqueue_failed", {
+            email: data.email,
+            error: jobError.message || "Unknown error",
+            phase: "job_enqueue",
+            request_id,
+          }, currentAccountId);
         } else {
           logInfo("Provisioning job enqueued", {
             ...baseLogOptions,
@@ -996,6 +1145,14 @@ Deno.serve(async (req: Request) => {
       } catch (err: any) {
         console.error(JSON.stringify({ request_id, phase: "vapi_provision_start", message: err.message, stack: err.stack, raw: err }));
         logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
+
+        // Create admin alert for exception during job enqueue
+        await createAdminAlert(supabase, "provisioning_job_exception", {
+          email: data.email,
+          error: err?.message || "Unknown error",
+          phase: "job_enqueue",
+          request_id,
+        }, currentAccountId);
       }
     }
 
