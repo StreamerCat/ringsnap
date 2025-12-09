@@ -398,12 +398,25 @@ function OnboardingChatInner() {
         });
 
         // Start the chat
-        setStep("welcome");
+        // Start the chat
+        setStep("phone");
+
         await showTypingDelay(800);
         const userName = lead.full_name?.split(" ")[0] || "there";
         addMessage(
           "assistant",
           `Hi ${userName}! I'm here to get your AI receptionist set up in just a few minutes. Ready to never miss another call?`
+        );
+
+        await showTypingDelay(1000);
+        addMessage(
+          "assistant",
+          <div className="space-y-2">
+            <p>Perfect! First, what's the best phone number to reach you?</p>
+            <p className="text-sm text-muted-foreground">
+              We'll give you a dedicated RingSnap number, and you'll forward your business line to it. When needed, calls can be forwarded back to this number.
+            </p>
+          </div>
         );
       } catch (error) {
         console.error("Init error:", error);
@@ -907,7 +920,7 @@ function OnboardingChatInner() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
       {/* Header */}
-      <header className="p-4 border-b bg-background/80 backdrop-blur sticky top-0 z-10">
+      <header className="p-3 border-b bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Phone className="h-5 w-5 text-primary" />
@@ -925,10 +938,10 @@ function OnboardingChatInner() {
       </header>
 
       {/* Chat Container */}
-      <main className="max-w-2xl mx-auto p-4">
+      <main className="max-w-2xl mx-auto p-2 sm:p-4">
         <Card className="min-h-[60vh] flex flex-col">
           <CardContent className="flex-1 overflow-y-auto p-4 sm:p-6">
-            <div className="space-y-4">
+            <div className="space-y-3">
               {messages.map((msg) => (
                 <ChatMessage key={msg.id} {...msg} />
               ))}
@@ -1190,7 +1203,7 @@ function OnboardingChatInner() {
                     {isProcessing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
+                        Setting up...
                       </>
                     ) : (
                       <>
@@ -1199,16 +1212,14 @@ function OnboardingChatInner() {
                       </>
                     )}
                   </Button>
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    We'll send a receipt to {leadData?.email}
-                  </p>
+
                 </div>
               )}
 
               {step === "processing" && (
                 <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  <span>Processing your payment...</span>
+                  <span>Setting up your account...</span>
                 </div>
               )}
 
@@ -1225,7 +1236,7 @@ function OnboardingChatInner() {
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      <span>Payment confirmed</span>
+                      <span>Card verified</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       {provisioningStatus === "pending" ? (
