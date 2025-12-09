@@ -56,7 +56,7 @@ const Index = () => {
       "bestRating": "5",
       "worstRating": "1"
     },
-    
+
     "image": "https://www.getringsnap.com/assets/social/ringsnap-og.jpg",
     "featureList": [
       "Answers in under 1 second",
@@ -142,29 +142,29 @@ const Index = () => {
     <>
       <Helmet>
         <title>RingSnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
-        <meta 
-          name="description" 
-          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. RingSnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 3 days." 
+        <meta
+          name="description"
+          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. RingSnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 3 days."
         />
-        <meta 
-          name="keywords" 
-          content="AI answering service, contractor receptionist, human-sounding AI, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, AI voice agent, warm AI assistant" 
+        <meta
+          name="keywords"
+          content="AI answering service, contractor receptionist, human-sounding AI, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, AI voice agent, warm AI assistant"
         />
         <link rel="canonical" href="https://www.getringsnap.com/" />
-        
+
         {/* Open Graph */}
         <meta property="og:title" content="RingSnap: AI that Answers Like a Human" />
         <meta property="og:description" content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.getringsnap.com/" />
         <meta property="og:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
-        
+
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="RingSnap: AI that Answers Like a Human" />
         <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. AI that sounds warm and human." />
         <meta name="twitter:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
-        
+
         {/* Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify(organizationSchema)}
@@ -182,10 +182,10 @@ const Index = () => {
 
       <SiteHeader />
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0 pt-14">
-        <h1 className="sr-only">RingSnap: AI Answering Service That Sounds Human - For Plumbers, HVAC, Electrical & Roofing Contractors</h1>
 
-        <a 
-          href="#main-content" 
+
+        <a
+          href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:shadow-lg"
         >
           Skip to main content

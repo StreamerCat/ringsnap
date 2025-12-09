@@ -56,7 +56,9 @@ Every non-trivial change follows this flow:
 | **[@test-agent](.github/agents/test-agent.md)** | Test coverage for critical flows | Writing tests (does NOT edit business logic) |
 | **[@edge-function-debug-agent](.github/agents/edge-function-debug-agent.md)** | Debugging edge function failures | 500 errors, timeouts, Deno issues |
 | **[@flow-observability-agent](.github/agents/flow-observability-agent.md)** | Logging, tracing, monitoring | Adding correlation IDs, status fields, logs |
+| **[@flow-observability-agent](.github/agents/flow-observability-agent.md)** | Logging, tracing, monitoring | Adding correlation IDs, status fields, logs |
 | **[@data-contract-agent](.github/agents/data-contract-agent.md)** | Cross-system payload contracts | Payload mismatches, type consistency |
+| **[@performance-guardian-agent](.github/agents/performance-guardian-agent.md)** | Performance, SEO, A11y | Audits, optimizations, asset shrinking |
 
 ### 🛠️ Development
 
