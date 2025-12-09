@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 
 type BaseLogContext = {
@@ -135,8 +135,8 @@ async function sendInvoiceEmail({
 
   const lineItemsHtml = lineItems.length
     ? `<ul style="margin: 0 0 16px 16px; padding: 0;">${lineItems
-        .map((item) => `<li style="margin-bottom: 8px;">${item.description}${item.quantity ? ` (x${item.quantity})` : ''} - ${item.amount}</li>`)
-        .join('')}</ul>`
+      .map((item) => `<li style="margin-bottom: 8px;">${item.description}${item.quantity ? ` (x${item.quantity})` : ''} - ${item.amount}</li>`)
+      .join('')}</ul>`
     : '';
 
   const lineItemsTextLines = lineItems.map((item) => `• ${item.description}${item.quantity ? ` (x${item.quantity})` : ''} - ${item.amount}`);
@@ -498,12 +498,12 @@ serve(async (req) => {
           .order('expires_at', { ascending: true });
 
         let remainingAmount: number = invoiceAmountCents;
-        
+
         for (const credit of credits || []) {
           if (remainingAmount <= 0) break;
-          
+
           const appliedAmount = Math.min(credit.amount_cents, remainingAmount);
-          
+
           await supabase
             .from('account_credits')
             .update({
@@ -511,7 +511,7 @@ serve(async (req) => {
               applied_to_invoice_id: invoice.id,
             })
             .eq('id', credit.id);
-          
+
           remainingAmount -= appliedAmount;
         }
 
@@ -634,6 +634,15 @@ serve(async (req) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         const customerId = subscription.customer;
+
+        // Sync subscription status
+        await supabase
+          .from('accounts')
+          .update({
+            subscription_status: subscription.status,
+            stripe_subscription_id: subscription.id
+          })
+          .eq('stripe_customer_id', customerId);
 
         // Check if reactivating within hold period
         const { data: account } = await supabase
