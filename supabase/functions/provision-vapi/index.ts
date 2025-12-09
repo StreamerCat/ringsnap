@@ -413,34 +413,49 @@ async function provisionVapiPhone(
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
 
+  logInfo("Inserting phone number into database", {
+    ...baseLogOptions,
+    context: {
+      phoneNumber: finalNumber,
+      areaCode: requestedAreaCode,
+      vapiPhoneId,
+    },
+  });
+
   const { data: phoneRow, error: phoneDbError } = await supabase
     .from("phone_numbers")
     .insert({
       account_id: accountId,
       phone_number: finalNumber,
       area_code: requestedAreaCode,
-      vapi_id: vapiPhoneId,
+      vapi_phone_id: vapiPhoneId,  // Fixed: was vapi_id
       purpose: "primary",
       status: "active",
       is_primary: true,
-      activated_at: now.toISOString(),
-      raw: {
-        ...vapiPhone,
-        telephony_provider: TELEPHONY_PROVIDER,
-        provider_id: providerProviderId,
-        provider_metadata: providerMetadata
-      },
-      trial_expires_at: trialExpiresAt.toISOString(),
-      phone_retention_expires_at: retentionExpiresAt.toISOString(),
-      provider: TELEPHONY_PROVIDER,
-      provider_id: providerProviderId,
     })
     .select("id")
     .single();
 
   if (phoneDbError) {
+    logError("Failed to save phone to DB", {
+      ...baseLogOptions,
+      error: phoneDbError,
+      context: {
+        phoneNumber: finalNumber,
+        errorDetails: phoneDbError.details,
+        errorHint: phoneDbError.hint,
+      },
+    });
     throw new Error(`Failed to save phone to DB: ${phoneDbError.message}`);
   }
+
+  logInfo("Phone number saved to database successfully", {
+    ...baseLogOptions,
+    context: {
+      phoneDbId: phoneRow.id,
+      phoneNumber: finalNumber,
+    },
+  });
 
   return {
     phoneE164: finalNumber,
