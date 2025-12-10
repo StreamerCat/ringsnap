@@ -1,14 +1,16 @@
 -- Migration: Add cron job for provision-vapi worker
--- Purpose: Automatically process queued provisioning jobs every 30 seconds
+-- Purpose: Automatically process queued provisioning jobs every 5 seconds
 -- Date: 2025-12-10
+-- Note: Matches frontend polling interval for faster retry attempts
 
 -- Enable pg_cron extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
--- Schedule provision-vapi worker to run every 30 seconds
+-- Schedule provision-vapi worker to run every 5 seconds
+-- This ensures stuck jobs are retried quickly and aligns with frontend polling
 SELECT cron.schedule(
   'process-provisioning-jobs',  -- job name
-  '*/30 * * * * *',              -- every 30 seconds (cron format with seconds)
+  '*/5 * * * * *',               -- every 5 seconds (cron format with seconds)
   $$
     SELECT
       net.http_post(

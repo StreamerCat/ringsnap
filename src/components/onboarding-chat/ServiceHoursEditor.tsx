@@ -14,6 +14,7 @@ export interface ServiceHoursData {
 }
 
 export interface ServiceHoursEditorProps {
+  initialData?: ServiceHoursData;
   onSubmit: (hours: ServiceHoursData) => void;
   onCancel?: () => void;
 }
@@ -35,12 +36,27 @@ const TIME_OPTIONS = [
   "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
 ];
 
-export function ServiceHoursEditor({ onSubmit, onCancel }: ServiceHoursEditorProps) {
-  const [selectedDays, setSelectedDays] = useState<Set<string>>(
-    new Set(["monday", "tuesday", "wednesday", "thursday", "friday"])
-  );
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("17:00");
+export function ServiceHoursEditor({ initialData, onSubmit, onCancel }: ServiceHoursEditorProps) {
+  // Parse initial data if present
+  const initialDays = new Set<string>();
+  let initialStart = "09:00";
+  let initialEnd = "17:00";
+
+  if (initialData?.blocks && initialData.blocks.length > 0) {
+    initialData.blocks.forEach(block => {
+      initialDays.add(block.day);
+      // Assuming uniform hours for now as per UI limitation
+      initialStart = block.start;
+      initialEnd = block.end;
+    });
+  } else {
+    // Default
+    ["monday", "tuesday", "wednesday", "thursday", "friday"].forEach(d => initialDays.add(d));
+  }
+
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(initialDays);
+  const [startTime, setStartTime] = useState(initialStart);
+  const [endTime, setEndTime] = useState(initialEnd);
 
   const handleDayToggle = (day: string) => {
     const newDays = new Set(selectedDays);
