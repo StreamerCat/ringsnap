@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
+import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 export default function PasswordReset() {
   const navigate = useNavigate();
@@ -54,19 +55,31 @@ export default function PasswordReset() {
 
     setIsLoading(true);
 
+
+
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { data, error } = await supabase.auth.updateUser({
         password
       });
 
       if (error) throw error;
 
-      toast.success("Password reset successfully! Please log in with your new password.");
-      navigate("/login");
+      if (data.user) {
+        toast.success("Password updated successfully!");
+        // Redirect to the appropriate dashboard
+        const finalRedirect = await redirectToRoleDashboard(data.user.id);
+        navigate(finalRedirect);
+      } else {
+        // Fallback if user object is missing for some reason
+        toast.success("Password updated. Please log in.");
+        navigate("/login");
+      }
 
     } catch (error: any) {
       console.error("Password update error:", error);
-      const message = error?.message || "Failed to update password. Please try again.";
+      let message = error?.message || "Failed to update password. Please try again.";
+      // Mask raw JSON errors if any occur (unlikely here but safe practice)
+      if (message.includes("JSON")) message = "An unexpected error occurred. Please try again.";
       toast.error(message);
     } finally {
       setIsLoading(false);

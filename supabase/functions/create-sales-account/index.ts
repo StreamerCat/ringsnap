@@ -627,7 +627,7 @@ serve(async (req) => {
     // Check for VAPI kill switch
     const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
 
-    let provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
+    const provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
 
     if (disableVapiProvisioning) {
       console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);

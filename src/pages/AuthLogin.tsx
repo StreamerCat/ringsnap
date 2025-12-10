@@ -112,8 +112,19 @@ export default function AuthLogin() {
       toast.success("Password reset link sent! Check your email.");
     } catch (error: any) {
       console.error("Reset password error:", error);
-      const message = error?.message || "Failed to send reset link";
-      toast.error(message);
+
+      // Security: Do not reveal if the user exists or not
+      // Only show actual errors for network issues or rate limits
+      const isRateLimit = error?.status === 429 || error?.message?.includes("rate limit");
+      const isNetwork = error?.message?.includes("network") || error?.message?.includes("fetch");
+
+      if (isRateLimit || isNetwork) {
+        toast.error(error?.message || "Function temporarily unavailable. Please try again later.");
+      } else {
+        // For "User not found" or other auth errors, treat as success to avoid enumeration
+        setResetEmailSent(true);
+        toast.success("If an account exists, a reset link has been sent.");
+      }
     } finally {
       setIsLoading(false);
     }

@@ -13,9 +13,12 @@ export default function ProvisioningStatus() {
 
     // Poll for status
     useEffect(() => {
-        let intervalId: NodeJS.Timeout;
+        let active = true;
+        const timerRef = { current: null as NodeJS.Timeout | null };
 
         const checkStatus = async () => {
+            if (!active) return;
+
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
@@ -23,46 +26,35 @@ export default function ProvisioningStatus() {
                     return;
                 }
 
-                // Fetch account status
-                // We assume 1:1 user-to-account mapping for now, or fetch by user_id
-                // Ideally, we fetch the account associated with this user
-                // But for now let's query accounts where owner_id = user.id (or via profiles check)
-
-                // Better: Join profiles -> accounts
-                // But let's try direct query if RLS allows reading own account
                 const { data: profile } = await supabase
                     .from("profiles")
                     .select("account_id")
                     .eq("id", user.id)
                     .single();
 
-                if (profile?.account_id) {
+                if (profile?.account_id && active) {
                     const { data: account } = await supabase
                         .from("accounts")
                         .select("provisioning_status, vapi_phone_number")
                         .eq("id", profile.account_id)
                         .single();
 
-                    if (account) {
-                        // Map DB status to UI state
-                        // DB statuses: pending, processing, completed, failed
+                    if (account && active) {
                         if (account.provisioning_status === "completed") {
                             setStatus("ready");
                             setPhoneNumber(account.vapi_phone_number);
-                            // Stop polling if ready
-                            clearInterval(intervalId);
+                            if (timerRef.current) clearInterval(timerRef.current);
                         } else if (account.provisioning_status?.startsWith("failed")) {
                             setStatus("failed");
-                            clearInterval(intervalId);
+                            if (timerRef.current) clearInterval(timerRef.current);
                         } else {
                             setStatus("pending");
                         }
                     }
                 }
-                setLoading(false);
+                if (active) setLoading(false);
             } catch (error) {
                 console.error("Error checking provisioning status:", error);
-                // Don't set failed immediately on network error, just retry
             }
         };
 
@@ -70,9 +62,12 @@ export default function ProvisioningStatus() {
         checkStatus();
 
         // Poll every 5s
-        intervalId = setInterval(checkStatus, 5000);
+        timerRef.current = setInterval(checkStatus, 5000);
 
-        return () => clearInterval(intervalId);
+        return () => {
+            active = false;
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
     }, [navigate]);
 
     return (
