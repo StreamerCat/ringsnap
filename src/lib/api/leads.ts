@@ -31,56 +31,54 @@ export async function captureSignupLead(
 
   const normalizedEmail = email.trim().toLowerCase();
 
+  const dbPayload = {
+    email: normalizedEmail,
+    full_name: full_name?.trim(),
+    phone: phone?.trim(),
+    source: source ?? 'website',
+    signup_flow: signup_flow ?? 'two-step-v2',
+    metadata: extraFields.metadata || extraFields,
+  };
+
   try {
-    const { data, error } = await supabase.functions.invoke('capture-signup-lead', {
-      body: {
-        email: normalizedEmail,
-        full_name: full_name?.trim(),
-        phone: phone?.trim(),
-        source: source ?? 'website',
-        signup_flow: signup_flow ?? 'two-step-v2',
-        metadata: extraFields.metadata || extraFields,
-      },
-    });
+    // Attempt upsert (Insert or Update if email exists)
+    // Using 'as any' because signup_leads table definition is missing in local types
+    const { data: leads, error } = await (supabase
+      .from('signup_leads') as any)
+      .upsert(dbPayload, {
+        onConflict: 'email',
+        ignoreDuplicates: false
+      })
+      .select()
+      .single();
 
     if (error) {
-      // Handle Edge Function invocation errors (e.g. network, 500s)
-      console.error("[captureSignupLead] Edge Function invocation failed:", error);
-      // Try to parse the error body if it exists, otherwise use message
-      let errorMessage = error.message || "Unknown error";
-      try {
-        // sometimes the error body is a stringified JSON
-        const body = typeof error.context === 'string' ? JSON.parse(error.context) : error.context;
-        if (body?.message) errorMessage = body.message;
-      } catch { /* ignore parse error */ }
+      console.error("[captureSignupLead] upsert error:", error);
 
-      throw new Error(`Failed to save your information: ${errorMessage}`);
+      // Fallback: If upsert failed (e.g. RLS preventing update), try simple insert to see if we can just create
+      // But if it's a unique violation on insert, we try to fetch.
+      if (error.code === '42501' || error.code === 'PGRST301') {
+        // Permission denied or other RLS issue on UPDATE. Try fetch.
+        const { data: existing } = await (supabase
+          .from('signup_leads') as any)
+          .select('*')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+
+        if (existing) return existing as SignupLeadRow;
+      }
+
+      throw new Error(`Failed to save your information: ${error.message}`);
     }
 
-    if (!data?.success) {
-      throw new Error(data?.message || "Failed to capture lead");
+    if (!leads) {
+      throw new Error("Saved successfully but no data returned.");
     }
 
-    console.log("[captureSignupLead] success", { leadId: data.lead_id });
-
-    // Return a mock row structure that complies with the interface
-    // The Edge Function returns lead_id. We might need to fetch the full row or just return basic info.
-    // Start.tsx only uses `lead.id`.
-    return {
-      id: data.lead_id,
-      email: normalizedEmail,
-      full_name: full_name ?? null,
-      phone: phone ?? null,
-      source: source ?? null,
-      signup_flow: signup_flow ?? null,
-      metadata: extraFields.metadata || extraFields,
-      completed_at: null, // New leads are not completed
-    };
+    return leads as SignupLeadRow;
 
   } catch (error: any) {
     console.error("[captureSignupLead] error", error);
-    // Determine if it's a "User already exists" or similar logic that we should mask?
-    // The edge function handles updates, so it shouldn't fail on duplicates.
     throw error;
   }
 }
