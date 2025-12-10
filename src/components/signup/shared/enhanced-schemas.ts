@@ -16,7 +16,7 @@ export const nameSchema = z.string()
   .min(2, "Please enter your full name (at least 2 characters)")
   .max(100, "Name is too long (maximum 100 characters)")
   .regex(
-    /^[a-zA-Z\s'\-\u00C0-\u024F]+$/,
+    /^[a-zA-Z\s'-\u00C0-\u024F]+$/,
     "Name can only contain letters, spaces, hyphens, and apostrophes"
   );
 
@@ -33,7 +33,7 @@ export const phoneSchema = z.string()
   .trim()
   .min(1, "Phone number is required")
   .regex(
-    /^(\+1[\s\-]?)?(\(?\d{3}\)?[\s\-]?)\d{3}[\s\-]?\d{4}$/,
+    /^(\+1[\s-]?)?(\(?\d{3}\)?[\s-]?)\d{3}[\s-]?\d{4}$/,
     "Please enter a valid phone number (e.g., (555) 123-4567)"
   );
 

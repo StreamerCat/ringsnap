@@ -35,7 +35,7 @@ const businessHoursSchema = z.object({
 const salesFormSchema = z.object({
   name: z.string().trim().min(1, "Name required").max(100),
   email: z.string().trim().email("Invalid email").max(255),
-  phone: z.string().trim().regex(/^(\+1[\s\-]?)?(\(?\d{3}\)?[\s\-]?)\d{3}[\s\-]?\d{4}$/, "Enter a valid US phone number"),
+  phone: z.string().trim().regex(/^(\+1[\s-]?)?(\(?\d{3}\)?[\s-]?)\d{3}[\s-]?\d{4}$/, "Enter a valid US phone number"),
   companyName: z.string().trim().min(1, "Company name required").max(200),
   website: z
     .string()
@@ -303,52 +303,52 @@ function SalesSignupFormInner() {
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {/* Customer Info Section */}
-        <CustomerInfoSection form={form} isSubmitting={isSubmitting} />
+          {/* Customer Info Section */}
+          <CustomerInfoSection form={form} isSubmitting={isSubmitting} />
 
-        {/* Business Details Section */}
-        <BusinessDetailsSection form={form} isSubmitting={isSubmitting} />
+          {/* Business Details Section */}
+          <BusinessDetailsSection form={form} isSubmitting={isSubmitting} />
 
-        {/* Plan Selection Section (includes Order Summary) */}
-        <PlanSelectionSection form={form} isSubmitting={isSubmitting} />
+          {/* Plan Selection Section (includes Order Summary) */}
+          <PlanSelectionSection form={form} isSubmitting={isSubmitting} />
 
-        {/* Sales Rep Section */}
-        <SalesRepSection form={form} isSubmitting={isSubmitting} />
+          {/* Sales Rep Section */}
+          <SalesRepSection form={form} isSubmitting={isSubmitting} />
 
-        {/* Payment Section */}
-        <PaymentSection
-          form={form}
-          isSubmitting={isSubmitting}
-          onCardChange={(complete, error) => {
-            setCardComplete(complete);
-            setCardError(error);
-          }}
-        />
+          {/* Payment Section */}
+          <PaymentSection
+            form={form}
+            isSubmitting={isSubmitting}
+            onCardChange={(complete, error) => {
+              setCardComplete(complete);
+              setCardError(error);
+            }}
+          />
 
-        {/* Error Display */}
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-600">
-            {error}
+          {/* Error Display */}
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-600">
+              {error}
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <div className="space-y-2">
+            <p className="text-xs text-center text-muted-foreground">All required fields are marked with *</p>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full min-h-[44px]"
+              disabled={isSubmitting || !selectedPlan || !isStripeReady}
+            >
+              {isSubmitting
+                ? "Processing secure payment..."
+                : selectedPlanDetails
+                  ? `Pay $${selectedPlanDetails.price} & Create Account`
+                  : "Create Account & Start"
+              }
+            </Button>
           </div>
-        )}
-
-        {/* Submit Button */}
-        <div className="space-y-2">
-          <p className="text-xs text-center text-muted-foreground">All required fields are marked with *</p>
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full min-h-[44px]"
-            disabled={isSubmitting || !selectedPlan || !isStripeReady}
-          >
-            {isSubmitting
-              ? "Processing secure payment..."
-              : selectedPlanDetails
-                ? `Pay $${selectedPlanDetails.price} & Create Account`
-                : "Create Account & Start"
-            }
-          </Button>
-        </div>
         </form>
       </Form>
       <SalesSuccessModal

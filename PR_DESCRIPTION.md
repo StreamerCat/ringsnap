@@ -1,10 +1,14 @@
-# Async provisioning + idempotent create-trial + webhook hardening
+# Async provisioning + Idempotent create-trial + Auth Hardening
 
 ## Summary
 
-This PR implements async provisioning with comprehensive idempotency, compensation logic, and webhook hardening to eliminate duplicate accounts, orphaned Stripe customers, and stalled provisioning.
+This PR implements async provisioning with comprehensive idempotency, compensation logic, and webhook hardening. Additionally, it **hardens the authentication and onboarding flows** to resolve critical issues for returning users, recurring lead capture errors, and password reset failures.
 
 ### Problem Solved
+- ✅ **Auth & Signup:** Fixed JSON errors for returning users on `/start` by adding robust session validation and auto-signout for invalid states.
+- ✅ **Idempotency:** Resolved "duplicate key" errors in lead capture by implementing upsert logic for existing emails.
+- ✅ **Password Reset:** Fixed "no valid recovery session" error by ensuring session checks complete before user interaction and handling URL error parameters.
+- ✅ **Linting:** Resolved all blocking lint errors and warnings across the codebase.
 - ✅ Duplicate account creation from repeated API calls
 - ✅ Orphaned Stripe customers when DB creation fails
 - ✅ Stalled provisioning from inline Vapi failures blocking signup
@@ -13,6 +17,14 @@ This PR implements async provisioning with comprehensive idempotency, compensati
 - ✅ Duplicate webhook event processing
 
 ## Files Changed
+
+**Authentication & Onboarding (New):**
+- `src/pages/Start.tsx`: Hardened session checks and error handling.
+- `src/pages/PasswordReset.tsx`: Fixed session race conditions and added loading states.
+- `src/pages/OnboardingChat.tsx`: Improved duplicate error handling.
+- `src/components/SalesSignupForm.tsx`: Fixed regex patterns.
+- `src/components/signup/shared/enhanced-schemas.ts`: Fixed regex patterns.
+- `eslint.config.js`: Updated to ignore Deno functions (fix false positives).
 
 **Database Migrations (4):**
 - `supabase/migrations/20251123000001_idempotency_results.sql`
@@ -28,11 +40,13 @@ This PR implements async provisioning with comprehensive idempotency, compensati
 **Frontend Components (1):**
 - `src/components/onboarding/shared/ProvisioningStatus.tsx` (+151 -43 lines)
 
-**Total:** 8 files changed, ~1,500 lines added/modified
+**Total:** ~15 files changed
 
 ## How to Test
 
-See full testing instructions in the complete PR description (too large for initial PR body).
+1.  **Returning Users:** Visit `/start` as a logged-in user. You should be redirected correctly instead of seeing a JSON error.
+2.  **Password Reset:** Request a password reset link, click it, and verify the page loads in a "Verifying link..." state before allowing input. Ensure password reset succeeds and redirects to dashboard.
+3.  **Signup:** Attempt to sign up with an existing email on the lead form. The flow should proceed gracefully without crashing.
 
 ## Rollback Plan
 
