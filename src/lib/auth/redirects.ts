@@ -89,10 +89,10 @@ export async function redirectToRoleDashboard(userId: string): Promise<string> {
         .from('profiles')
         .select('onboarding_status')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      // If onboarding not completed, redirect to onboarding
-      if (profile?.onboarding_status !== 'active') {
+      // If no profile found or onboarding not active, redirect to onboarding
+      if (!profile || profile.onboarding_status !== 'active') {
         return '/onboarding';
       }
     } catch (error) {
