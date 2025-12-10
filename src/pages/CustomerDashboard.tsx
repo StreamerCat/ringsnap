@@ -1,32 +1,26 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { signOutUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
-import { PhoneNumberCard } from "@/components/PhoneNumberCard";
-import { AssistantCard } from "@/components/AssistantCard";
-import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
-import { ReferralShareInterface } from "@/components/ReferralShareInterface";
-import { OperatorOverview } from "@/components/dashboard/OperatorOverview";
-import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
-  Clock, AlertCircle, CheckCircle, Loader2, Sparkles, Check, Calendar,
-  Globe, XCircle
+  Calendar, Loader2
 } from "lucide-react";
+
+// Tab Components
+import { TodayTab } from "@/components/dashboard/TodayTab";
+import { OverviewTab } from "@/components/dashboard/OverviewTab";
+import { PhoneNumbersTab } from "@/components/dashboard/PhoneNumbersTab";
+import { AssistantsTab } from "@/components/dashboard/AssistantsTab";
+import { TeamTab } from "@/components/dashboard/TeamTab";
+import { SettingsTab } from "@/components/dashboard/SettingsTab";
+import { BillingTab } from "@/components/dashboard/BillingTab";
+import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
@@ -44,27 +38,9 @@ export default function CustomerDashboard() {
   const [referrals, setReferrals] = useState<any[]>([]);
   const [referralCode, setReferralCode] = useState("");
   const [recordingState, setRecordingState] = useState<any>(null);
-  const [showRecordingConsent, setShowRecordingConsent] = useState(false);
-  const [customInstructions, setCustomInstructions] = useState("");
-  const [savingInstructions, setSavingInstructions] = useState(false);
-
-  // SMS Settings state
-  const [smsAppointmentConfirmations, setSmsAppointmentConfirmations] = useState(false);
-  const [smsReminders, setSmsReminders] = useState(false);
-  const [savingSmsSettings, setSavingSmsSettings] = useState(false);
-
-  // Business Details state
-  const [serviceArea, setServiceArea] = useState("");
-  const [emergencyPolicy, setEmergencyPolicy] = useState("");
-  const [website, setWebsite] = useState("");
-  const [businessHours, setBusinessHours] = useState<ServiceHoursData | null>(null);
-  const [showHoursEditor, setShowHoursEditor] = useState(false);
-  const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
-  const [cancelingTrial, setCancelingTrial] = useState(false);
 
   useEffect(() => {
     // Auth is handled by withAuthGuard wrapper in App.tsx
-    // We just need to load data for the current user
     const initData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -83,92 +59,32 @@ export default function CustomerDashboard() {
         .eq("id", userId)
         .single();
 
-      if (profileError) {
-        console.error("Profile query error:", profileError);
-        throw new Error(`Failed to load profile: ${profileError.message}`);
-      }
-
-      if (!profileData) {
-        console.error("Profile not found for user:", userId);
-        throw new Error("Profile not found. Your account may still be setting up. Please wait a moment and refresh the page.");
-      }
-
-      if (!profileData.accounts) {
-        console.error("Account not found for profile:", profileData);
-        throw new Error("Account not found. Your account may still be setting up. Please wait a moment and refresh the page.");
-      }
+      if (profileError) throw new Error(`Failed to load profile: ${profileError.message}`);
+      if (!profileData || !profileData.accounts) throw new Error("Account not found. Your account may still be setting up.");
 
       setProfile(profileData);
       setAccount(profileData.accounts);
 
       const accountId = profileData.account_id;
 
-      // Load phone numbers
-      const { data: phonesData } = await supabase
-        .from("phone_numbers")
-        .select("*")
-        .eq("account_id", accountId);
-      setPhoneNumbers(phonesData || []);
+      // Load parallel data
+      const [phonesRes, assistantsRes, logsRes, creditsRes, referralsRes, codeRes] = await Promise.all([
+        supabase.from("phone_numbers").select("*").eq("account_id", accountId),
+        supabase.from("assistants").select("*").eq("account_id", accountId),
+        supabase.from("usage_logs").select("*").eq("account_id", accountId).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }).limit(50),
+        supabase.from("account_credits").select("*").eq("account_id", accountId).order("created_at", { ascending: false }),
+        supabase.from("referrals").select("*").eq("referrer_account_id", accountId).order("created_at", { ascending: false }),
+        supabase.from("referral_codes").select("code").eq("account_id", accountId).single()
+      ]);
 
-      // Load assistants
-      const { data: assistantsData } = await supabase
-        .from("assistants")
-        .select("*")
-        .eq("account_id", accountId);
-      setAssistants(assistantsData || []);
+      setPhoneNumbers(phonesRes.data || []);
+      setAssistants(assistantsRes.data || []);
+      setUsageLogs(logsRes.data || []);
+      setAccountCredits(creditsRes.data || []);
+      setReferrals(referralsRes.data || []);
+      if (codeRes.data) setReferralCode(codeRes.data.code);
 
-      // Load usage logs (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data: logsData } = await supabase
-        .from("usage_logs")
-        .select("*")
-        .eq("account_id", accountId)
-        .gte("created_at", thirtyDaysAgo.toISOString())
-        .order("created_at", { ascending: false })
-        .limit(50);
-      setUsageLogs(logsData || []);
-
-      // Load account credits
-      const { data: creditsData } = await supabase
-        .from("account_credits")
-        .select("*")
-        .eq("account_id", accountId)
-        .order("created_at", { ascending: false });
-      setAccountCredits(creditsData || []);
-
-      // Load referrals
-      const { data: referralsData } = await supabase
-        .from("referrals")
-        .select("*")
-        .eq("referrer_account_id", accountId)
-        .order("created_at", { ascending: false });
-      setReferrals(referralsData || []);
-
-      // Load referral code
-      const { data: codeData } = await supabase
-        .from("referral_codes")
-        .select("code")
-        .eq("account_id", accountId)
-        .single();
-      if (codeData) setReferralCode(codeData.code);
-
-      // Load custom instructions
-      if (profileData.accounts.custom_instructions) {
-        setCustomInstructions(profileData.accounts.custom_instructions);
-      }
-
-      // Initialize SMS settings
-      setSmsAppointmentConfirmations(profileData.accounts.sms_appointment_confirmations || false);
-      setSmsReminders(profileData.accounts.sms_reminders || false);
-
-      // Initialize business details
-      setServiceArea(profileData.accounts.service_area || "");
-      setEmergencyPolicy(profileData.accounts.emergency_policy || "");
-      setWebsite(profileData.accounts.website || "");
-      setBusinessHours((profileData.accounts.business_hours as unknown as ServiceHoursData) || null);
-
-      // Load state recording laws if billing_state exists
+      // Load recording laws if state is present
       if (profileData.accounts.billing_state) {
         const { data: stateData } = await supabase
           .from("state_recording_laws")
@@ -189,138 +105,6 @@ export default function CustomerDashboard() {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleEnableRecording = async () => {
-    try {
-      const { error } = await supabase
-        .from("accounts")
-        .update({
-          call_recording_enabled: true,
-          call_recording_consent_accepted: true,
-          call_recording_consent_date: new Date().toISOString()
-        })
-        .eq("id", account.id);
-
-      if (error) throw error;
-
-      setAccount({ ...account, call_recording_enabled: true });
-      toast({
-        title: "Recording Enabled",
-        description: "Call recording has been enabled for your account"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSaveSmsSettings = async () => {
-    setSavingSmsSettings(true);
-    try {
-      const { error } = await supabase
-        .from("accounts")
-        .update({
-          sms_appointment_confirmations: smsAppointmentConfirmations,
-          sms_reminders: smsReminders
-        })
-        .eq("id", account.id);
-
-      if (error) throw error;
-
-      setAccount({
-        ...account,
-        sms_appointment_confirmations: smsAppointmentConfirmations,
-        sms_reminders: smsReminders
-      });
-      toast({
-        title: "Success",
-        description: "SMS settings updated successfully"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setSavingSmsSettings(false);
-    }
-  };
-
-  const handleSaveBusinessDetails = async () => {
-    setSavingBusinessDetails(true);
-    try {
-      const { error } = await supabase
-        .from("accounts")
-        .update({
-          service_area: serviceArea,
-          emergency_policy: emergencyPolicy,
-          website: website,
-          business_hours: businessHours as any
-        })
-        .eq("id", account.id);
-
-      if (error) throw error;
-
-      setAccount({
-        ...account,
-        service_area: serviceArea,
-        emergency_policy: emergencyPolicy,
-        website: website,
-        business_hours: businessHours
-      });
-      setShowHoursEditor(false);
-      toast({
-        title: "Success",
-        description: "Business details updated successfully"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setSavingBusinessDetails(false);
-    }
-  };
-
-  const handleCancelTrial = async () => {
-    if (!window.confirm("Are you sure you want to cancel your trial? Your phone number will be released.")) {
-      return;
-    }
-
-    setCancelingTrial(true);
-    try {
-      const { error } = await supabase
-        .from("accounts")
-        .update({
-          subscription_status: 'cancelled',
-          // Optional: clear provisioning data if needed, but 'cancelled' status should suffice for logic
-        })
-        .eq("id", account.id);
-
-      if (error) throw error;
-
-      setAccount({ ...account, subscription_status: 'cancelled' });
-      toast({
-        title: "Trial Canceled",
-        description: "Your trial has been canceled."
-      });
-      // Optionally navigate away or refresh
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to cancel trial. Please contact support.",
-        variant: "destructive"
-      });
-    } finally {
-      setCancelingTrial(false);
     }
   };
 
@@ -399,8 +183,6 @@ export default function CustomerDashboard() {
             <Button variant="outline" onClick={async () => {
               try {
                 await signOutUser();
-              } catch (error) {
-                console.error("Failed to sign out:", error);
               } finally {
                 navigate("/signin");
               }
@@ -425,690 +207,89 @@ export default function CustomerDashboard() {
           <TabsList className="grid grid-cols-4 lg:grid-cols-8 mb-8">
             <TabsTrigger value="today">
               <Calendar className="h-4 w-4 mr-2" />
-              Today
+              <span className="hidden sm:inline">Today</span>
             </TabsTrigger>
             <TabsTrigger value="overview">
               <TrendingUp className="h-4 w-4 mr-2" />
-              Overview
+              <span className="hidden sm:inline">Overview</span>
             </TabsTrigger>
             <TabsTrigger value="phone-numbers">
               <Phone className="h-4 w-4 mr-2" />
-              Phone Numbers
+              <span className="hidden sm:inline">Phones</span>
             </TabsTrigger>
             <TabsTrigger value="assistants">
               <Users className="h-4 w-4 mr-2" />
-              Assistants
+              <span className="hidden sm:inline">Assistant</span>
             </TabsTrigger>
             <TabsTrigger value="team">
               <Users className="h-4 w-4 mr-2" />
-              Team
+              <span className="hidden sm:inline">Team</span>
             </TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="h-4 w-4 mr-2" />
-              Settings
+              <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
             <TabsTrigger value="billing">
               <CreditCard className="h-4 w-4 mr-2" />
-              Billing
+              <span className="hidden sm:inline">Billing</span>
             </TabsTrigger>
             <TabsTrigger value="referrals">
               <Gift className="h-4 w-4 mr-2" />
-              Referrals
+              <span className="hidden sm:inline">Earn</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Today Tab - Operator Dashboard */}
-          <TabsContent value="today" className="space-y-6">
-            <OperatorOverview accountId={account.id} />
+          <TabsContent value="today">
+            <TodayTab accountId={account.id} />
           </TabsContent>
 
-          {/* Team Tab */}
-          <TabsContent value="team" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Manage your team members and their access levels.
-                </p>
-                <Button onClick={() => navigate("/dashboard/team")}>
-                  Go to Team Management
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Monthly Usage</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {account.monthly_minutes_used} / {account.monthly_minutes_limit}
-                  </div>
-                  <Progress value={usagePercent} className="mt-2" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {usagePercent}% used this cycle
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Calls This Month</CardTitle>
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{usageLogs.length}</div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {usageLogs.filter(l => l.appointment_booked).length} appointments booked
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Account Status</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <Badge variant={account.subscription_status === 'active' ? 'default' : 'secondary'}>
-                    {account.subscription_status}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {account.plan_type} plan
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {account.subscription_status === 'trial' ? 'Trial Days Left' : 'Credits Balance'}
-                  </CardTitle>
-                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {account.subscription_status === 'trial' ? trialDaysRemaining : `$${creditsBalance.toFixed(2)}`}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {account.subscription_status === 'trial' ? 'Upgrade to continue' : 'Available credits'}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Calls Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Calls</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {usageLogs.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No calls yet</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Customer Phone</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Outcome</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {usageLogs.slice(0, 10).map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell>
-                            {new Date(log.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>{log.customer_phone || 'Unknown'}</TableCell>
-                          <TableCell>{Math.ceil(log.call_duration_seconds / 60)} min</TableCell>
-                          <TableCell>
-                            {log.appointment_booked && (
-                              <Badge variant="default">Appointment</Badge>
-                            )}
-                            {log.was_emergency && (
-                              <Badge variant="destructive">Emergency</Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Phone Numbers Tab */}
-          <TabsContent value="phone-numbers" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Your Phone Numbers</h2>
-              <Button disabled={account.plan_type === 'starter'}>
-                {account.plan_type === 'starter' ? 'Upgrade to Add Numbers' : 'Add Phone Number'}
-              </Button>
-            </div>
-
-            {phoneNumbers.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No phone numbers yet. Your number will appear here after provisioning.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {phoneNumbers.map((phone) => (
-                  <PhoneNumberCard
-                    key={phone.id}
-                    number={phone.phone_number}
-                    label={phone.label}
-                    status={phone.status}
-                    isPrimary={phone.is_primary}
-                    linkedAssistant={phone.purpose}
-                    onEdit={() => { }}
-                    onSetPrimary={() => { }}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Assistants Tab */}
-          <TabsContent value="assistants" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Your AI Assistants</h2>
-              <Button disabled={account.plan_type !== 'premium'}>
-                {account.plan_type === 'premium' ? 'Add Assistant' : 'Premium Feature'}
-              </Button>
-            </div>
-
-            {assistants.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No assistants yet. Your assistant will appear here after setup.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {assistants.map((assistant) => (
-                  <AssistantCard
-                    key={assistant.id}
-                    name={assistant.name}
-                    gender={assistant.voice_gender || 'female'}
-                    status={assistant.status}
-                    customInstructions={assistant.custom_instructions}
-                    onEdit={() => { }}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  AI Assistant Customization
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customInstructions">Custom Instructions</Label>
-                  <Textarea
-                    id="customInstructions"
-                    placeholder="e.g., Always mention our 24/7 emergency service and family-owned status. Offer 10% discount for first-time customers."
-                    value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
-                    rows={6}
-                    maxLength={500}
-                    className="resize-none"
-                  />
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={customInstructions.length > 450 ? 'text-red-500 font-semibold' : 'text-muted-foreground'}>
-                      {customInstructions.length}/500 characters
-                    </span>
-                    <span className="text-muted-foreground text-xs">Updates take effect on next call</span>
-                  </div>
-                </div>
-                <Button
-                  onClick={async () => {
-                    setSavingInstructions(true);
-                    try {
-                      const { error } = await supabase
-                        .from('accounts')
-                        .update({ custom_instructions: customInstructions })
-                        .eq('id', account.id);
-                      if (error) throw error;
-                      setAccount({ ...account, custom_instructions: customInstructions });
-                      toast({ title: "Success", description: "Custom instructions updated" });
-                    } catch (error: any) {
-                      toast({ title: "Error", description: error.message, variant: "destructive" });
-                    } finally {
-                      setSavingInstructions(false);
-                    }
-                  }}
-                  disabled={savingInstructions}
-                  size="lg"
-                  className="w-full sm:w-auto"
-                >
-                  {savingInstructions ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Save Instructions
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Call Recording</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {account.plan_type === 'starter' ? (
-                  <div className="bg-muted p-4 rounded-lg">
-                    <p className="font-semibold mb-2">Upgrade to Pro or Premium</p>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Call recording is available on Professional and Premium plans
-                    </p>
-                    <Button size="sm">Upgrade Now</Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label>Enable Call Recording</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Record all calls for quality and training
-                        </p>
-                      </div>
-                      <Switch
-                        checked={account.call_recording_enabled}
-                        onCheckedChange={(checked) => {
-                          if (checked && !account.call_recording_consent_accepted) {
-                            setShowRecordingConsent(true);
-                          }
-                        }}
-                      />
-                    </div>
-                    {recordingState && (
-                      <div className="bg-muted/50 p-3 rounded text-sm">
-                        <p><strong>State:</strong> {recordingState.state_name}</p>
-                        <p><strong>Consent Type:</strong> {recordingState.consent_type}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>SMS Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!account.sms_enabled ? (
-                  <div className="bg-muted p-4 rounded-lg">
-                    <p className="font-semibold mb-2">SMS Not Enabled</p>
-                    <p className="text-sm text-muted-foreground">
-                      Contact support to enable SMS features
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <Label>Appointment Confirmations</Label>
-                      <Switch
-                        checked={smsAppointmentConfirmations}
-                        onCheckedChange={setSmsAppointmentConfirmations}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label>Reminder Messages</Label>
-                      <Switch
-                        checked={smsReminders}
-                        onCheckedChange={setSmsReminders}
-                      />
-                    </div>
-                    <div className="bg-muted/50 p-3 rounded">
-                      <p className="text-sm">
-                        Daily Quota: {account.daily_sms_sent} / {account.daily_sms_quota}
-                      </p>
-                      <Progress
-                        value={(account.daily_sms_sent / account.daily_sms_quota) * 100}
-                        className="mt-2"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleSaveSmsSettings}
-                      disabled={savingSmsSettings}
-                      className="w-full"
-                    >
-                      {savingSmsSettings ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save SMS Settings"
-                      )}
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Integrations */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Integrations
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-green-600 text-white p-2 rounded-md font-bold text-xs">Jobber</div>
-                    <div>
-                      <p className="font-medium">Jobber</p>
-                      <p className="text-sm text-muted-foreground">Sync calls to Jobber as clients and requests.</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" onClick={() => navigate("/settings/integrations/jobber")}>
-                    Configure
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Website</Label>
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      className="pl-9"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                      placeholder="www.yourcompany.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="block mb-2">Business Hours</Label>
-                  {showHoursEditor ? (
-                    <ServiceHoursEditor
-                      onSubmit={(data) => {
-                        setBusinessHours(data);
-                        setShowHoursEditor(false);
-                      }}
-                      onCancel={() => setShowHoursEditor(false)}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-between p-3 border rounded-md bg-muted/20">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {businessHours
-                            ? "Custom hours configured"
-                            : "No hours configured (Available 24/7)"}
-                        </span>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setShowHoursEditor(true)}>
-                        Edit Hours
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Service Area</Label>
-                  <Input
-                    value={serviceArea}
-                    onChange={(e) => setServiceArea(e.target.value)}
-                    placeholder="e.g., Greater Boston Area"
-                  />
-                </div>
-                <div>
-                  <Label>Emergency Policy</Label>
-                  <Textarea
-                    value={emergencyPolicy}
-                    onChange={(e) => setEmergencyPolicy(e.target.value)}
-                    rows={4}
-                    placeholder="Describe your emergency call handling policy..."
-                  />
-                </div>
-                <Button
-                  onClick={handleSaveBusinessDetails}
-                  disabled={savingBusinessDetails}
-                  className="w-full"
-                >
-                  {savingBusinessDetails ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Changes"
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Billing Tab */}
-          <TabsContent value="billing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Plan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold text-lg capitalize">{account.plan_type} Plan</p>
-                      <p className="text-sm text-muted-foreground">
-                        {account.monthly_minutes_limit} minutes/month
-                      </p>
-                    </div>
-                    <Badge variant={account.subscription_status === 'active' ? 'default' : 'secondary'}>
-                      {account.subscription_status}
-                    </Badge>
-                  </div>
-                  <Separator />
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Included Minutes:</span>
-                      <span>{account.monthly_minutes_used} / {account.monthly_minutes_limit}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Overage Minutes:</span>
-                      <span>{account.overage_minutes_used}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                    <Button className="flex-1">Upgrade Plan</Button>
-                    {account.subscription_status === 'trial' && (
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                        onClick={handleCancelTrial}
-                        disabled={cancelingTrial}
-                      >
-                        {cancelingTrial ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Canceling...
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Cancel Trial
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Credits</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-4">${creditsBalance.toFixed(2)}</div>
-                {accountCredits.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No credits yet</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {accountCredits.slice(0, 10).map((credit) => (
-                        <TableRow key={credit.id}>
-                          <TableCell>
-                            {new Date(credit.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell className="capitalize">{credit.source}</TableCell>
-                          <TableCell>${(credit.amount_cents / 100).toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge variant={credit.status === 'available' ? 'default' : 'secondary'}>
-                              {credit.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Referrals Tab */}
-          <TabsContent value="referrals" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Total Referred</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{referralStats.total}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Converted</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{referralStats.converted}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Credits Earned</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">${referralStats.creditsEarned.toFixed(2)}</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Share Interface */}
-            <ReferralShareInterface
-              referralCode={referralCode}
-              accountId={account.id}
+          <TabsContent value="overview">
+            <OverviewTab
+              account={account}
+              usageLogs={usageLogs}
+              usagePercent={usagePercent}
+              remainingMinutes={remainingMinutes}
+              trialDaysRemaining={trialDaysRemaining}
+              creditsBalance={creditsBalance}
             />
+          </TabsContent>
 
-            {/* Referral History */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Referral History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {referrals.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No referrals yet. Start sharing your link!
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Signup Date</TableHead>
-                        <TableHead>Credit Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {referrals.map((referral) => (
-                        <TableRow key={referral.id}>
-                          <TableCell>{referral.referee_email || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Badge variant={referral.status === 'converted' ? 'default' : 'secondary'}>
-                              {referral.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(referral.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            ${(referral.referrer_credit_cents / 100).toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
+          <TabsContent value="phone-numbers">
+            <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
+          </TabsContent>
+
+          <TabsContent value="assistants">
+            <AssistantsTab account={account} assistants={assistants} />
+          </TabsContent>
+
+          <TabsContent value="team">
+            <TeamTab />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <SettingsTab
+              account={account}
+              onUpdateAccount={setAccount}
+              recordingState={recordingState}
+            />
+          </TabsContent>
+
+          <TabsContent value="billing">
+            <BillingTab
+              account={account}
+              trialDaysRemaining={trialDaysRemaining}
+              creditsBalance={creditsBalance}
+            />
+          </TabsContent>
+
+          <TabsContent value="referrals">
+            <ReferralsTab
+              referralCode={referralCode}
+              referralStats={referralStats}
+            />
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Recording Consent Dialog */}
-      {recordingState && (
-        <CallRecordingConsentDialog
-          open={showRecordingConsent}
-          onOpenChange={setShowRecordingConsent}
-          stateName={recordingState.state_name}
-          consentType={recordingState.consent_type}
-          notificationText={recordingState.notification_text}
-          onAccept={handleEnableRecording}
-        />
-      )}
     </div>
   );
 }
