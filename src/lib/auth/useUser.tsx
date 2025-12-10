@@ -35,7 +35,10 @@ export function useUser(): UseUserResult {
         clearTimeout(timeoutId);
 
         if (error) {
-          console.error("Failed to fetch Supabase user:", error);
+          // Suppress expected "session missing" error, log others
+          if (error.name !== "AuthSessionMissingError" && !error.message?.includes("Auth session missing")) {
+            console.error("Failed to fetch Supabase user:", error);
+          }
         }
         if (isMounted) {
           setUser(data?.user ?? null);

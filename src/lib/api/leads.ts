@@ -31,54 +31,62 @@ export async function captureSignupLead(
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  const dbPayload = {
-    email: normalizedEmail,
-    full_name: full_name?.trim(),
-    phone: phone?.trim(),
-    source: source ?? 'website',
-    signup_flow: signup_flow ?? 'two-step-v2',
-    metadata: extraFields.metadata || extraFields,
-  };
-
   try {
-    // Attempt upsert (Insert or Update if email exists)
-    // Using 'as any' because signup_leads table definition is missing in local types
-    const { data: leads, error } = await (supabase
-      .from('signup_leads') as any)
-      .upsert(dbPayload, {
-        onConflict: 'email',
-        ignoreDuplicates: false
-      })
-      .select()
-      .single();
+    // 1. Check for existing lead manually (since unique constraint might be missing)
+    // Using 'as any' to bypass missing type definitions
+    const { data: existingLeads } = await (supabase as any)
+      .from('signup_leads')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (error) {
-      console.error("[captureSignupLead] upsert error:", error);
+    const existingLead = existingLeads?.[0];
 
-      // Fallback: If upsert failed (e.g. RLS preventing update), try simple insert to see if we can just create
-      // But if it's a unique violation on insert, we try to fetch.
-      if (error.code === '42501' || error.code === 'PGRST301') {
-        // Permission denied or other RLS issue on UPDATE. Try fetch.
-        const { data: existing } = await (supabase
-          .from('signup_leads') as any)
-          .select('*')
-          .eq('email', normalizedEmail)
-          .maybeSingle();
+    const dbPayload = {
+      email: normalizedEmail,
+      full_name: full_name?.trim(),
+      phone: phone?.trim(),
+      source: source ?? 'website',
+      signup_flow: signup_flow ?? 'two-step-v2',
+      metadata: extraFields.metadata || extraFields,
+    };
 
-        if (existing) return existing as SignupLeadRow;
-      }
+    let resultData;
 
-      throw new Error(`Failed to save your information: ${error.message}`);
+    if (existingLead) {
+      // 2a. Update existing lead
+      console.log("[captureSignupLead] Updating existing lead:", existingLead.id);
+      const { data: updated, error: updateError } = await (supabase as any)
+        .from('signup_leads')
+        .update(dbPayload)
+        .eq('id', existingLead.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      resultData = updated;
+    } else {
+      // 2b. Insert new lead
+      console.log("[captureSignupLead] Creating new lead");
+      const { data: inserted, error: insertError } = await (supabase as any)
+        .from('signup_leads')
+        .insert(dbPayload)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      resultData = inserted;
     }
 
-    if (!leads) {
-      throw new Error("Saved successfully but no data returned.");
+    if (!resultData) {
+      throw new Error("Operation completed but no data returned.");
     }
 
-    return leads as SignupLeadRow;
+    return resultData as SignupLeadRow;
 
   } catch (error: any) {
     console.error("[captureSignupLead] error", error);
-    throw error;
+    throw new Error(`Failed to save your information: ${error.message}`);
   }
 }
