@@ -57,10 +57,17 @@ export default function CustomerDashboard() {
         .from("profiles")
         .select("*, accounts(*)")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw new Error(`Failed to load profile: ${profileError.message}`);
-      if (!profileData || !profileData.accounts) throw new Error("Account not found. Your account may still be setting up.");
+
+      // If profile doesn't exist, they need to finish onboarding
+      if (!profileData) {
+        navigate("/onboarding");
+        return;
+      }
+
+      if (!profileData.accounts) throw new Error("Account not found. Your account may still be setting up.");
 
       setProfile(profileData);
       setAccount(profileData.accounts);

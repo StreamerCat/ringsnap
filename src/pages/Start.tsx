@@ -80,7 +80,7 @@ export default function Start() {
             .from('profiles')
             .select('onboarding_status')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           if (error) throw error;
 
@@ -88,9 +88,11 @@ export default function Start() {
             if (profile?.onboarding_status === 'active') {
               navigate('/dashboard', { replace: true });
             } else {
+              // No profile or not active -> go to onboarding chat
               navigate('/onboarding-chat', { replace: true });
             }
           }
+          return;
           return;
         } catch (error) {
           console.error('[Start] Session check failed, clearing invalid session:', error);

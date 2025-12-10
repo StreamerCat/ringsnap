@@ -6,6 +6,7 @@ This PR implements async provisioning with comprehensive idempotency, compensati
 
 ### Problem Solved
 - ✅ **Auth & Signup:** Fixed JSON errors for returning users on `/start` by adding robust session validation and auto-signout for invalid states.
+- ✅ **Existing Users:** Resolved 406 errors for users with missing profiles by using `maybeSingle()` and redirecting to onboarding instead of crashing.
 - ✅ **Signup Leads:** Fixed "Failed to fetch" errors and "duplicate key" constraints by implementing robust client-side upsert logic for lead capture.
 - ✅ **Idempotency:** Resolved "duplicate key" errors in lead capture by implementing upsert logic for existing emails.
 - ✅ **Password Reset:** Fixed "no valid recovery session" error by ensuring session checks complete before user interaction and handling URL error parameters.
