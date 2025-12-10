@@ -125,9 +125,9 @@ serve(async (req) => {
 
     customerInfo.planType =
       rawPlan === "pro" ? "professional" :
-      rawPlan === "professional" ? "professional" :
-      rawPlan === "premium" ? "premium" :
-      "starter";
+        rawPlan === "professional" ? "professional" :
+          rawPlan === "premium" ? "premium" :
+            "starter";
 
     // Normalize assistant_gender to match SQL constraint (male|female)
     const rawGender = (customerInfo.assistantGender || "female")
@@ -733,6 +733,20 @@ serve(async (req) => {
 
 // Helper: Map plan type to Stripe price ID
 function getPriceIdForPlan(planType: string): string {
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_");
+
+  if (isLive) {
+    const livePriceMap: Record<string, string> = {
+      'starter': "price_1SMav5IdevV48BnpEEIRKvk5",
+      'professional': "price_1SMaw9IdevV48BnpJkUs1UY0",
+      'premium': "price_1SMawyIdevV48BnpM9r2mk2g",
+    };
+    if (livePriceMap[planType]) {
+      return livePriceMap[planType];
+    }
+  }
+
   const priceMap: Record<string, string> = {
     'starter': Deno.env.get('STRIPE_PRICE_STARTER') || 'price_starter_placeholder',
     'professional': Deno.env.get('STRIPE_PRICE_PROFESSIONAL') || 'price_professional_placeholder',
