@@ -19,13 +19,39 @@ export default function PasswordReset() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for errors in URL (e.g. expired link)
+    const hash = window.location.hash;
+    if (hash && hash.includes("error_description")) {
+      const params = new URLSearchParams(hash.substring(1));
+      const errorDescription = params.get("error_description");
+      if (errorDescription) {
+        setError(decodeURIComponent(errorDescription));
+        return;
+      }
+    }
+
+    // Check for existing session immediately
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setRecoverySession(session);
+      }
+    };
+    checkSession();
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[PasswordReset] Auth event:", event);
+      if (session) {
+        setRecoverySession(session);
+      } else if (event === "SIGNED_OUT") {
+        setRecoverySession(null);
+      }
+
+      // If we get an explicit recovery event, we can be sure
       if (event === "PASSWORD_RECOVERY") {
-        if (session) {
-          setRecoverySession(session);
-        } else {
+        if (!session) {
           setError("Invalid or expired password reset link. Please try again.");
-          setTimeout(() => navigate("/login"), 3000);
         }
       }
     });
