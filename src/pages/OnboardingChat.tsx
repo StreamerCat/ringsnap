@@ -871,7 +871,6 @@ function OnboardingChatInner() {
       } else if (userMessage.includes("incorrect_cvc")) {
         friendlyMessage = "The security code (CVC) was incorrect. Please try again.";
       } else if (userMessage.includes("card_declined")) {
-      } else if (userMessage.includes("card_declined")) {
         friendlyMessage = "Your card was declined. Please try a different card.";
       } else if (userMessage.toLowerCase().includes("already registered") || userMessage.toLowerCase().includes("duplicate")) {
         friendlyMessage = "This email is already registered. Please sign in or use a different email.";

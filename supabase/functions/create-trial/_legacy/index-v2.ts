@@ -710,14 +710,14 @@ serve(async (req) => {
 
         let err: Error;
         try {
-          // @ts-ignore
+          // @ts-expect-error -- Supabase error types are complex to match exactly
           err = new Error(safeMsg, { cause: txError });
         } catch {
           err = new Error(safeMsg);
-          ;(err as any).cause = txError;
+          ; (err as any).cause = txError;
         }
 
-        ;(err as any).rpc = {
+        ; (err as any).rpc = {
           code: txError.code,
           details: txError.details,
           hint: txError.hint,

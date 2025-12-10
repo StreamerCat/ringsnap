@@ -129,6 +129,10 @@ export default function Start() {
     if (!isAuthLoading) {
       checkStatus();
     }
+
+    return () => {
+      mounted = false;
+    };
   }, [user, isAuthLoading, navigate, existingLeadId]);
 
   const validateEmail = (email: string): boolean => {

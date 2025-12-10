@@ -113,7 +113,7 @@ async function provisionTwilioNumber(
         logInfo("Test Mode: Skipping Twilio Search, using Magic Number", { ...baseLog });
         chosenNumber = "+15005550006"; // Twilio Magic Number that passes validation
     } else {
-        let searchParams = new URLSearchParams();
+        const searchParams = new URLSearchParams();
         if (filters.areaCode) searchParams.append("AreaCode", filters.areaCode);
         searchParams.append("VoiceEnabled", "true");
         searchParams.append("SmsEnabled", "true");
