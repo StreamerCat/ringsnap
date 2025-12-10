@@ -192,8 +192,11 @@ async function getExistingUserByEmail(
  * Get Stripe price ID for plan type
  */
 function getStripePriceId(planType: string): string {
-  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
-  const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_");
+  const stripeKey = (Deno.env.get("STRIPE_SECRET_KEY") || "").trim();
+  // Check for live key or if the key contains "_live_" (to be extra safe)
+  const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_") || stripeKey.includes("_live_");
+
+  console.log(`[getStripePriceId] Key prefix: ${stripeKey.substring(0, 8)}... isLive=${isLive} plan=${planType}`);
 
   // Use hardcoded production IDs if we are in live mode
   // This resolves an issue where environment variables were pointing to test IDs
@@ -205,8 +208,14 @@ function getStripePriceId(planType: string): string {
     };
 
     const liveId = livePriceIds[planType as keyof typeof livePriceIds];
-    if (liveId) return liveId;
+    if (liveId) {
+      console.log(`[getStripePriceId] Using HARDCODED LIVE price ID: ${liveId}`);
+      return liveId;
+    }
   }
+
+  // Fallback to environment variables (Test Mode or missing config)
+  console.log("[getStripePriceId] Falling back to ENV VAR price IDs (Test Mode)");
 
   // Fallback to environment variables (Test Mode)
   const priceIds = {
@@ -315,6 +324,7 @@ async function cleanupStripeResources(
 }
 
 Deno.serve(async (req: Request) => {
+  console.log("FUNCTION VERSION: 2025-12-10-LOGGING-FIX-V3");
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
