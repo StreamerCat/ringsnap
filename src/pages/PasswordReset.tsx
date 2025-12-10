@@ -15,6 +15,7 @@ export default function PasswordReset() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [recoverySession, setRecoverySession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,9 +33,13 @@ export default function PasswordReset() {
 
     // Check for existing session immediately
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setRecoverySession(session);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setRecoverySession(session);
+        }
+      } finally {
+        setIsCheckingSession(false);
       }
     };
     checkSession();
@@ -155,7 +160,7 @@ export default function PasswordReset() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || isCheckingSession}
                 minLength={8}
                 autoFocus
               />
@@ -173,16 +178,21 @@ export default function PasswordReset() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading || isCheckingSession}
                 minLength={8}
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || isCheckingSession}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Resetting password...
+                </>
+              ) : isCheckingSession ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying link...
                 </>
               ) : (
                 "Reset Password"
