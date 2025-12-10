@@ -55,8 +55,8 @@ echo "   User ID: $USER_ID"
 echo ""
 
 # Step 2: Wait for provisioning to start
-echo "⏳ Step 2: Waiting for provisioning to start (10 seconds)..."
-sleep 10
+echo "⏳ Step 2: Waiting for provisioning to start (2 seconds)..."
+sleep 2
 
 # Step 3: Check provisioning job status
 echo "📋 Step 3: Checking provisioning job..."

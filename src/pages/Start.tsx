@@ -54,7 +54,8 @@ function storeLeadId(leadId: string): void {
 export default function Start() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isLoading: isCheckingAuth } = useUser();
+  const { user, isLoading: isAuthLoading } = useUser();
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
@@ -68,58 +69,67 @@ export default function Start() {
 
   // Check if already logged in or has existing lead
   useEffect(() => {
+    let mounted = true;
+
     const checkStatus = async () => {
-      // If user is already logged in, redirect appropriately
+      // 1. Authenticated User Check
       if (user) {
+        if (mounted) setIsCheckingStatus(true);
         try {
-          const { data: profile } = await supabase
+          const { data: profile, error } = await supabase
             .from('profiles')
             .select('onboarding_status')
             .eq('id', user.id)
             .single();
 
-          if (profile?.onboarding_status === 'active') {
-            navigate('/dashboard', { replace: true });
-          } else {
-            navigate('/onboarding-chat', { replace: true });
+          if (error) throw error;
+
+          if (mounted) {
+            if (profile?.onboarding_status === 'active') {
+              navigate('/dashboard', { replace: true });
+            } else {
+              navigate('/onboarding-chat', { replace: true });
+            }
           }
           return;
         } catch (error) {
-          console.error('Status check error:', error);
+          console.error('[Start] Session check failed, clearing invalid session:', error);
+          // If profile check fails (e.g. invalid token, network), sign out so they can use the form
+          await supabase.auth.signOut();
+          if (mounted) setIsCheckingStatus(false);
+          // Don't return, allow lead check to proceed
         }
       }
 
-      // If we have an existing lead_id, offer to continue
+      // 2. Existing Lead Resume Check
       if (existingLeadId) {
-        console.log('[Start] Attempting resume lookup', { leadId: existingLeadId });
-        // Check if lead exists and is not yet converted
+        // ... (existing lead logic)
         try {
+          // Small optimization: don't block render for this if we want to show form fast?
+          // actually we want to redirect fast if lead exists.
+          console.log('[Start] Attempting resume lookup', { leadId: existingLeadId });
           const { data: lead } = await supabase
-            .from('signup_leads')
+            .from('signup_leads' as any)
             .select('id, email, full_name, completed_at')
             .eq('id', existingLeadId)
             .maybeSingle();
 
-          if (lead && !lead.completed_at) {
-            // Lead exists and not yet completed - redirect to Step 2
-            navigate(`/onboarding-chat?lead_id=${existingLeadId}&email=${encodeURIComponent(lead.email)}`, { replace: true });
+          if (lead && !(lead as any).completed_at && mounted) {
+            navigate(`/onboarding-chat?lead_id=${existingLeadId}&email=${encodeURIComponent((lead as any).email)}`, { replace: true });
             return;
           }
-
-          console.log('[Start] Resume lookup failed - no matching lead', { leadId: existingLeadId });
-        } catch (error) {
-          console.log('[Start] Resume lookup skipped due to error', { leadId: existingLeadId, error });
-          // Ignore - will create new lead if needed
+        } catch (err) {
+          console.log('[Start] Resume lookup skipped', err);
         }
-      } else {
-        console.log('[Start] Resume lookup skipped - no stored lead id');
       }
+
+      if (mounted) setIsCheckingStatus(false);
     };
 
-    if (!isCheckingAuth) {
+    if (!isAuthLoading) {
       checkStatus();
     }
-  }, [user, isCheckingAuth, navigate, existingLeadId]);
+  }, [user, isAuthLoading, navigate, existingLeadId]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -231,7 +241,7 @@ export default function Start() {
     }
   };
 
-  if (isCheckingAuth) {
+  if (isAuthLoading || isCheckingStatus) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
