@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'feature/*'
+      - 'fix/*'
     paths:
       - 'supabase/functions/create-trial/**'
       - 'supabase/functions/provision-vapi/**'
