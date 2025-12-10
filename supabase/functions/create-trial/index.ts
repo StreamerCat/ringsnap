@@ -192,6 +192,23 @@ async function getExistingUserByEmail(
  * Get Stripe price ID for plan type
  */
 function getStripePriceId(planType: string): string {
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_");
+
+  // Use hardcoded production IDs if we are in live mode
+  // This resolves an issue where environment variables were pointing to test IDs
+  if (isLive) {
+    const livePriceIds = {
+      starter: "price_1SMav5IdevV48BnpEEIRKvk5",
+      professional: "price_1SMaw9IdevV48BnpJkUs1UY0",
+      premium: "price_1SMawyIdevV48BnpM9r2mk2g",
+    };
+
+    const liveId = livePriceIds[planType as keyof typeof livePriceIds];
+    if (liveId) return liveId;
+  }
+
+  // Fallback to environment variables (Test Mode)
   const priceIds = {
     starter: Deno.env.get("STRIPE_PRICE_STARTER"),
     professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
