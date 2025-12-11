@@ -8,6 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { hasRoleAccess } from "@/lib/auth/roles";
+import { SalesTab } from "@/components/dashboard/SalesTab";
+import { SignupsTab } from "@/components/dashboard/SignupsTab";
+import { UsageTab } from "@/components/dashboard/UsageTab";
+import { SystemHealthTab } from "@/components/dashboard/SystemHealthTab";
 
 const PLAN_PRICING: Record<string, number> = {
   starter: 297,
@@ -219,8 +223,6 @@ export default function Dashboard() {
     );
   }
 
-
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-12">
       {/* Provisioning Status Banner */}
@@ -235,7 +237,48 @@ export default function Dashboard() {
         </div>
       )}
 
-      ...
+      <div className="container mx-auto p-6 space-y-8">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 3 months</SelectItem>
+              <SelectItem value="all">All time</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Tabs defaultValue="sales" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="sales">Sales</TabsTrigger>
+            <TabsTrigger value="signups">Signups & Funnel</TabsTrigger>
+            <TabsTrigger value="usage">Usage & Calls</TabsTrigger>
+            <TabsTrigger value="health">System Health</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sales" className="space-y-6">
+            <SalesTab dateFilter={dateFilter} />
+          </TabsContent>
+
+          <TabsContent value="signups" className="space-y-6">
+            <SignupsTab dateFilter={dateFilter} />
+          </TabsContent>
+
+          <TabsContent value="usage" className="space-y-6">
+            <UsageTab dateFilter={dateFilter} />
+          </TabsContent>
+
+          <TabsContent value="health" className="space-y-6">
+            <SystemHealthTab dateFilter={dateFilter} />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

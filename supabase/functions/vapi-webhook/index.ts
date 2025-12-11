@@ -1,6 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { CallOutcome } from "../_shared/integration-types.ts";
+import { trackEvent } from "../_shared/analytics.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -26,6 +26,9 @@ serve(async (req) => {
         }
 
         const { call, transcript, recordingUrl, summary, analysis } = payload.message;
+
+        // Calculate duration
+        const durationSeconds = call.durationSeconds || (call.endedAt && call.startedAt ? Math.round((new Date(call.endedAt).getTime() - new Date(call.startedAt).getTime()) / 1000) : 0);
 
         // We need account_id. 
         // Vapi allows passing custom data in the assistant config or call setup. 
@@ -73,7 +76,8 @@ serve(async (req) => {
             summary: summary || analysis?.summary || "No summary available",
             transcript_url: transcript || null,
             recording_url: recordingUrl || null,
-            tags: [], // Could be populated from analysis.structuredData
+            tags: [],
+            duration_seconds: durationSeconds
         };
 
         // Insert into Supabase
@@ -89,6 +93,23 @@ serve(async (req) => {
             console.error("Error inserting call outcome:", error);
             throw error;
         }
+
+        // Track Lead Created in Analytics
+        if (outcome === 'new_lead' || outcome === 'quote_requested' || outcome === 'booking_created') {
+            await trackEvent(supabase, accountId, null, 'lead_created', {
+                call_id: call.id,
+                outcome: outcome,
+                summary_snippet: summary?.substring(0, 100)
+            });
+        }
+
+        // Always track call completed
+        await trackEvent(supabase, accountId, null, 'call_completed', {
+            call_id: call.id,
+            duration: durationSeconds,
+            outcome: outcome,
+            direction: call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound'
+        });
 
         return new Response(JSON.stringify({ message: "Success", event }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
