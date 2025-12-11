@@ -64,6 +64,7 @@ const App = () => (
             <Route path="/start" element={<Start />} />
             <Route path="/onboarding-chat" element={<OnboardingChat />} />
             <Route path="/setup/assistant" element={<ProvisioningStatus />} />
+            <Route path="/onboarding-status" element={<ProvisioningStatus />} />
             {/* <Route path="/setup-status" element={<SetupStatus />} /> */}
 
             {/* Legacy signup routes - redirect to canonical paths */}

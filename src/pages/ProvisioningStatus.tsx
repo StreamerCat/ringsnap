@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, CheckCircle2, AlertCircle, ArrowRight, Phone, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
-const TIMEOUT_MS = 20000; // 20 seconds
+const TIMEOUT_MS = 60000; // 60 seconds - allows time for Twilio provisioning
 
 export default function ProvisioningStatus() {
     const navigate = useNavigate();
