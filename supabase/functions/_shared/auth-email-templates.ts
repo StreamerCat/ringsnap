@@ -363,3 +363,51 @@ Need help? Contact ${SUPPORT_EMAIL}
     text: buildEmailText(text)
   };
 }
+
+/**
+ * Welcome Email
+ */
+export function buildWelcomeEmail(
+  recipientName: string,
+  dashboardLink: string
+): EmailTemplate {
+  const content = `
+    <p>Hi ${recipientName},</p>
+    <p>Welcome to RingSnap! 🎉 We're thrilled to have you on board.</p>
+    <p>Your AI receptionist is being set up and will be ready to take calls shortly.</p>
+    <p>You can manage your account, view call logs, and customize your assistant from your dashboard:</p>
+    <p style="text-align: center;">
+      <a href="${dashboardLink}" class="button">Go to Dashboard</a>
+    </p>
+    <div class="help">
+      <strong>Next Steps:</strong><br>
+      1. Wait for your number to be provisioned (usually takes less than a minute)<br>
+      2. Call your new RingSnap number to test your assistant<br>
+      3. Forward your business calls to RingSnap
+    </div>
+  `;
+
+  const text = `Hi ${recipientName},
+
+Welcome to RingSnap! 🎉 We're thrilled to have you on board.
+
+Your AI receptionist is being set up and will be ready to take calls shortly.
+
+Access your dashboard here:
+${dashboardLink}
+
+Next Steps:
+1. Wait for your number to be provisioned
+2. Call your new RingSnap number to test your assistant
+3. Forward your business calls to RingSnap
+
+Need help? Contact ${SUPPORT_EMAIL}
+
+— The RingSnap Team`;
+
+  return {
+    subject: 'Welcome to RingSnap!',
+    html: buildEmailHtml('Welcome to RingSnap', content),
+    text: buildEmailText(text)
+  };
+}

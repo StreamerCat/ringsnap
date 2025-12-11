@@ -1566,11 +1566,22 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
           });
 
-          // FIRE-AND-FORGET
+          // FIRE-AND-FORGET: Provision Vapi
           supabase.functions.invoke("provision-vapi", {
             body: { triggered_by: "create-trial" }
           }).catch(err => {
             console.error("Failed to trigger provision-vapi worker (background)", err);
+          });
+
+          // FIRE-AND-FORGET: Send Welcome Email
+          supabase.functions.invoke("send-welcome-email", {
+            body: {
+              email: data.email,
+              name: data.name,
+              userId: currentUserId
+            }
+          }).catch(err => {
+            console.error("Failed to trigger send-welcome-email (background)", err);
           });
         }
       } catch (err: any) {
