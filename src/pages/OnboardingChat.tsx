@@ -727,24 +727,27 @@ function OnboardingChatInner() {
       return;
     }
 
-    // Check bypass mode EARLY - before card validation
+    // Bypass mode: zip 99999 - for safe testing without real payment
     const isBypassMode = data.zipCode === "99999";
 
-    // Only require card completion in non-bypass mode
-    if (!isBypassMode && !cardComplete) {
-      toast.error("Please complete your card information");
-      return;
+    // For bypass mode, skip card validation entirely
+    // For normal mode, require card to be complete
+    if (!isBypassMode) {
+      if (!cardComplete) {
+        toast.error("Please complete your card information");
+        return;
+      }
     }
 
     setIsProcessing(true);
     addMessage("user", "Payment submitted");
 
     try {
-      // Create payment method
-      let paymentMethod = { id: "pm_bypass_check_deploy" }; // Default for bypass
+      // Create payment method - default for bypass mode
+      let paymentMethod = { id: "pm_bypass_check_deploy" };
 
       if (isBypassMode) {
-        console.log("Bypass mode activated: Skipping Stripe frontend calls");
+        console.log("[BYPASS MODE] Skipping Stripe frontend - using mock payment method");
         addMessage("assistant", "Test Mode: Skipping payment verification...");
         await showTypingDelay(500);
       } else {

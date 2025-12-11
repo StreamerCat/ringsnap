@@ -1086,13 +1086,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2. Create Account
+    // NOTE: is_test_account field removed from initial insert to prevent errors if column doesn't exist
+    // Will be updated after insert if test mode is active
     const { data: accountResult, error: accountError } = await supabase
       .from("accounts")
       .insert({
         subscription_status: 'trial',
         stripe_customer_id: stripeCustomerId,
         stripe_subscription_id: stripeSubscriptionId,
-        is_test_account: isTestMode, // Flag test accounts for UI display
         ...accountData
       })
       .select("id")
@@ -1349,11 +1350,11 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Assign to outer var - Do not redeclare const
+        // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
         const { error } = await supabase.from("provisioning_jobs").insert({
           account_id: currentAccountId,
           user_id: currentUserId,
           status: "queued",
-          test_mode: isTestMode, // Pass test mode to provisioning worker
         });
         jobError = error;
 
