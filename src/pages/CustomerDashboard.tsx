@@ -44,11 +44,50 @@ export default function CustomerDashboard() {
     const initData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        loadDashboardData(user.id);
+        await loadDashboardData(user.id);
       }
     };
     initData();
-  }, []);
+
+    // Set up Realtime subscription for usage_logs
+    let subscription: any = null;
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && account?.id) {
+        subscription = supabase
+          .channel('usage_logs_changes')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'usage_logs',
+              filter: `account_id=eq.${account.id}`
+            },
+            (payload) => {
+              console.log('New usage log received:', payload);
+              // Add new log to state
+              setUsageLogs(prev => [payload.new as any, ...prev]);
+              // Optionally reload full dashboard data for updated stats
+              if (user) {
+                loadDashboardData(user.id);
+              }
+            }
+          )
+          .subscribe();
+      }
+    };
+
+    if (account?.id) {
+      setupRealtimeSubscription();
+    }
+
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
+  }, [account?.id]);
 
   const loadDashboardData = async (userId: string) => {
     try {
@@ -270,7 +309,7 @@ export default function CustomerDashboard() {
           </TabsContent>
 
           <TabsContent value="team">
-            <TeamTab />
+            <TeamTab accountId={account.id} />
           </TabsContent>
 
           <TabsContent value="settings">

@@ -1,8 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, AlertCircle } from "lucide-react";
+import { CreditCard, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -16,6 +15,7 @@ interface BillingTabProps {
 export function BillingTab({ account, trialDaysRemaining, creditsBalance }: BillingTabProps) {
     const { toast } = useToast();
     const [cancelingTrial, setCancelingTrial] = useState(false);
+    const [creatingPortalSession, setCreatingPortalSession] = useState(false);
 
     const handleCancelTrial = async () => {
         if (!window.confirm("Are you sure you want to cancel your trial? Your phone number will be released.")) {
@@ -33,7 +33,6 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
 
             if (error) throw error;
 
-            // Ideally we would trigger a refresh of the account data here via a callback
             toast({
                 title: "Trial Canceled",
                 description: "Your trial has been canceled. Please refresh the page.",
@@ -47,6 +46,38 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
         } finally {
             setCancelingTrial(false);
         }
+    };
+
+    const handleOpenBillingPortal = async () => {
+        setCreatingPortalSession(true);
+        try {
+            // Call Stripe to create a billing portal session
+            const { data, error } = await supabase.functions.invoke('create-billing-portal-session', {
+                body: { account_id: account.id }
+            });
+
+            if (error) throw error;
+
+            if (data?.url) {
+                // Redirect to Stripe billing portal
+                window.location.href = data.url;
+            } else {
+                throw new Error("No portal URL returned");
+            }
+        } catch (error: any) {
+            console.error("Failed to create billing portal session:", error);
+            toast({
+                title: "Error",
+                description: "Failed to open billing portal. Please contact support.",
+                variant: "destructive"
+            });
+            setCreatingPortalSession(false);
+        }
+    };
+
+    const handleUpgradePlan = async () => {
+        // For now, redirect to billing portal where they can manage subscription
+        await handleOpenBillingPortal();
     };
 
     return (
@@ -75,7 +106,23 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                                 </div>
                             )}
                             <div className="pt-4">
-                                <Button className="w-full">Upgrade Plan</Button>
+                                <Button
+                                    className="w-full"
+                                    onClick={handleUpgradePlan}
+                                    disabled={creatingPortalSession}
+                                >
+                                    {creatingPortalSession ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ExternalLink className="mr-2 h-4 w-4" />
+                                            Manage Subscription
+                                        </>
+                                    )}
+                                </Button>
                             </div>
                         </div>
                     </CardContent>
@@ -95,7 +142,21 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                                 <span className="text-muted-foreground">Minutes Used</span>
                                 <span>{account.monthly_minutes_used} / {account.monthly_minutes_limit}</span>
                             </div>
-                            <Button variant="outline" className="w-full">Add Credits</Button>
+                            <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={handleOpenBillingPortal}
+                                disabled={creatingPortalSession}
+                            >
+                                {creatingPortalSession ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Loading...
+                                    </>
+                                ) : (
+                                    "Add Credits"
+                                )}
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -111,10 +172,23 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                             <CreditCard className="h-6 w-6 text-slate-400" />
                         </div>
                         <div>
-                            <p className="font-medium">•••• •••• •••• {account.last_4 || "1234"}</p>
-                            <p className="text-xs text-muted-foreground">Expires {account.exp_month || "12"}/{account.exp_year || "25"}</p>
+                            <p className="font-medium">•••• •••• •••• {account.last_4 || "****"}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {account.last_4 ? `Expires ${account.exp_month || "**"}/${account.exp_year || "**"}` : "No payment method on file"}
+                            </p>
                         </div>
-                        <Button variant="ghost" className="ml-auto">Update</Button>
+                        <Button
+                            variant="ghost"
+                            className="ml-auto"
+                            onClick={handleOpenBillingPortal}
+                            disabled={creatingPortalSession}
+                        >
+                            {creatingPortalSession ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                "Update"
+                            )}
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -132,7 +206,14 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                             Canceling your trial will immediately release your phone number and stop your assistant.
                         </p>
                         <Button variant="destructive" onClick={handleCancelTrial} disabled={cancelingTrial}>
-                            {cancelingTrial ? "Canceling..." : "Cancel Trial"}
+                            {cancelingTrial ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Canceling...
+                                </>
+                            ) : (
+                                "Cancel Trial"
+                            )}
                         </Button>
                     </CardContent>
                 </Card>

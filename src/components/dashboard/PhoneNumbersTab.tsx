@@ -3,9 +3,13 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { PhoneNumberCard } from "@/components/PhoneNumberCard";
-import { HelpCircle, Phone, ArrowRight, ShieldCheck } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { HelpCircle, Phone, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface PhoneNumbersTabProps {
     account: any;
@@ -15,6 +19,10 @@ interface PhoneNumbersTabProps {
 export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps) {
     const [showForwardingInfo, setShowForwardingInfo] = useState(false);
     const [showTestInfo, setShowTestInfo] = useState(false);
+    const [editingNumber, setEditingNumber] = useState<any>(null);
+    const [editLabel, setEditLabel] = useState("");
+    const [saving, setSaving] = useState(false);
+    const { toast } = useToast();
 
     // Choose a primary RingSnap number to display.
     const primaryNumber = useMemo(() => {
@@ -24,6 +32,74 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
 
     const hasNumbers = phoneNumbers && phoneNumbers.length > 0;
     const formattedPrimaryNumber = primaryNumber?.phone_number;
+
+    const handleEditNumber = (phone: any) => {
+        setEditingNumber(phone);
+        setEditLabel(phone.label || "");
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingNumber) return;
+
+        setSaving(true);
+        try {
+            const { error } = await supabase
+                .from("phone_numbers")
+                .update({ label: editLabel })
+                .eq("id", editingNumber.id);
+
+            if (error) throw error;
+
+            toast({
+                title: "Success",
+                description: "Phone number updated"
+            });
+
+            setEditingNumber(null);
+            // Trigger parent refresh
+            window.location.reload();
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to update phone number",
+                variant: "destructive"
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSetPrimary = async (phoneId: string) => {
+        try {
+            // First, unset all primary flags for this account
+            await supabase
+                .from("phone_numbers")
+                .update({ is_primary: false })
+                .eq("account_id", account.id);
+
+            // Then set the selected number as primary
+            const { error } = await supabase
+                .from("phone_numbers")
+                .update({ is_primary: true })
+                .eq("id", phoneId);
+
+            if (error) throw error;
+
+            toast({
+                title: "Success",
+                description: "Primary number updated"
+            });
+
+            // Trigger parent refresh
+            window.location.reload();
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to set primary number",
+                variant: "destructive"
+            });
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -97,8 +173,8 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                             status={phone.status}
                             isPrimary={phone.is_primary}
                             linkedAssistant={phone.purpose}
-                            onEdit={() => { }}
-                            onSetPrimary={() => { }}
+                            onEdit={() => handleEditNumber(phone)}
+                            onSetPrimary={() => handleSetPrimary(phone.id)}
                         />
                     ))}
                 </div>
@@ -212,6 +288,46 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                             Use a different phone (like your personal cell) to call this number so you can experience it as a customer would.
                         </p>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Number Dialog */}
+            <Dialog open={!!editingNumber} onOpenChange={(open) => !open && setEditingNumber(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Phone Number</DialogTitle>
+                        <DialogDescription>
+                            Update the label for {editingNumber?.phone_number}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-label">Label</Label>
+                            <Input
+                                id="edit-label"
+                                placeholder="e.g., Main Line, Support"
+                                value={editLabel}
+                                onChange={(e) => setEditLabel(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingNumber(null)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveEdit} disabled={saving}>
+                            {saving ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                "Save"
+                            )}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
