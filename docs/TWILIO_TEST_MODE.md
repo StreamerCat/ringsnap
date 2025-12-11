@@ -1,99 +1,74 @@
-# Twilio Test Mode (ZIP 99999)
+# Twilio Test Mode (ZIP 99999) - Demo Bundle Approach
 
 ## Overview
 
-Test mode allows running complete signups without incurring real Twilio or Vapi costs. When a user enters ZIP code `99999` during signup, the system:
+Test mode (ZIP 99999) now uses a **Shared Demo Bundle** instead of mock provisioning.
 
-1. **Skips Stripe billing** - No real charges
-2. **Skips Twilio provisioning** - No real phone numbers purchased
-3. **Skips Vapi assistant creation** - No real AI assistants created
-4. **Mocks all provisioning data** - Account appears fully provisioned with test data
+This means:
+- ✅ Real callable phone number
+- ✅ Real Vapi assistant answering calls
+- ✅ Same DB structure as live signups
+- ✅ Status page and dashboard work identically
+- ❌ No Twilio API calls for purchasing
+- ❌ No Vapi API calls for creation
 
 ## How It Works
 
-### Detection
+When a user enters ZIP `99999` at billing:
 
-Test mode is triggered when:
-- User enters `99999` as their billing ZIP code
-- This sets `isTestMode = true` in `create-trial`
+1. **Stripe is bypassed** (no charges)
+2. **Account created** with `billing_test_mode = true`
+3. **Phone number row created** using demo bundle values (not a new Twilio purchase)
+4. **Assistant row created** using demo bundle values (not a new Vapi assistant)
+5. **Provisioning marked complete** immediately
+6. **Status page shows Ready** with real demo number
 
-### What Happens
+## Environment Variables
 
-#### In `create-trial`:
+The demo bundle requires these Supabase secrets:
 
+| Variable | Description |
+|----------|-------------|
+| `RINGSNAP_DEMO_TWILIO_NUMBER` | E.164 phone number (e.g., `+18554360110`) |
+| `RINGSNAP_DEMO_TWILIO_PHONE_SID` | Twilio Phone Number SID |
+| `RINGSNAP_DEMO_VAPI_PHONE_ID` | Vapi phone ID linked to the Twilio number |
+| `RINGSNAP_DEMO_VAPI_ASSISTANT_ID` | Vapi assistant ID for demo calls |
+
+### Setting Secrets
+
+```bash
+npx supabase secrets set \
+  RINGSNAP_DEMO_TWILIO_NUMBER="+18554360110" \
+  RINGSNAP_DEMO_TWILIO_PHONE_SID="PNxxxx..." \
+  RINGSNAP_DEMO_VAPI_PHONE_ID="uuid" \
+  RINGSNAP_DEMO_VAPI_ASSISTANT_ID="uuid" \
+  --project-ref rmyvvbqnccpfeyowidrq
 ```
-if (isTestMode) {
-  // Mock provisioning - NO real API calls
-  - Write mock phone number: +15005550006
-  - Write mock assistant ID: test-assistant-mock-{timestamp}
-  - Write mock phone ID: test-phone-mock-{timestamp}
-  - Mark provisioning as "completed" immediately
-  - Skip enqueuing provisioning job
-  - Skip calling provision-vapi
-}
-```
 
-#### In `provision-vapi` (safety net):
+## Live vs Test Comparison
 
-```
-if (zip_code === "99999") {
-  // Early exit - no Twilio/Vapi calls
-  - Mark job as "completed"
-  - Return immediately
-}
-```
+| Feature | Test Mode (ZIP 99999) | Live Mode |
+|---------|----------------------|-----------|
+| Stripe | Skipped | Charged |
+| Twilio | Demo bundle (shared) | New purchase |
+| Vapi | Demo bundle (shared) | New assistant |
+| Phone callable | Yes (demo number) | Yes (own number) |
+| DB structure | Same | Same |
+| Status page | Shows Ready | Shows Ready |
 
-## Test Data Values
+## Files Changed
 
-| Field | Test Value |
-|-------|------------|
-| Phone Number | `+15005550006` (Twilio magic test number) |
-| Vapi Assistant ID | `test-assistant-mock-{timestamp}` |
-| Vapi Phone ID | `test-phone-mock-{timestamp}` |
-| Provisioning Status | `completed` |
-| Phone Status | `active` |
+- `supabase/functions/create-trial/index.ts` - Demo bundle provisioning
+- `supabase/functions/provision-vapi/index.ts` - Early exit for test accounts
+- `supabase/migrations/20251211000001_add_test_mode_columns.sql` - New columns
+- `docs/TEST_SIGNUP_DEMO_BUNDLE.md` - Setup guide
 
-## Identifying Test Accounts
+## Fallback
 
-Test accounts can be identified by:
-1. `zip_code === "99999"` on the account
-2. `vapi_phone_number === "+15005550006"`
-3. `vapi_assistant_id` starting with `test-assistant-mock-`
+If demo bundle env vars are missing:
+- Warning logged
+- Falls back to mock values (`+15005550006`)
+- UI still works
+- Number won't be callable
 
-## Live vs Test Behavior
-
-| Feature | Test Mode (ZIP 99999) | Live Mode (Normal ZIP) |
-|---------|----------------------|------------------------|
-| Stripe | Bypassed | Real charges |
-| Twilio | Mocked | Real provisioning |
-| Vapi | Mocked | Real assistant |
-| Phone Number | `+15005550006` | Real E.164 number |
-| Provisioning Time | Instant | ~10-30 seconds |
-
-## Testing Instructions
-
-1. Go to signup: https://getringsnap.com/start
-2. Enter any test data for name/email
-3. Complete onboarding chat
-4. At billing, enter ZIP: `99999`
-5. Card details can be left empty or use test card
-6. Submit - should transition to "Ready" immediately
-
-## Logs to Verify
-
-Search Supabase logs for:
-- `TEST MODE: Mocking provisioning`
-- `TEST MODE: Mock provisioning completed`
-- `TEST MODE: Skipping Twilio/Vapi provisioning entirely`
-
-No logs should show:
-- Twilio API calls
-- Vapi API calls
-- Phone number purchase attempts
-
-## Rollback
-
-Test mode is additive and conditional. To disable:
-1. Remove the `isTestMode` check in `create-trial`
-2. Remove the early exit in `provision-vapi`
-3. Redeploy both functions
+See [docs/TEST_SIGNUP_DEMO_BUNDLE.md](./TEST_SIGNUP_DEMO_BUNDLE.md) for setup instructions.

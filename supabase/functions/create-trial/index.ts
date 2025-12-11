@@ -1319,61 +1319,137 @@ Deno.serve(async (req: Request) => {
       });
     } else if (isTestMode) {
       // ═══════════════════════════════════════════════════════════════
-      // TEST MODE: Mock provisioning - NO Twilio/Vapi calls
-      // Writes mock data directly to DB and marks provisioning as completed
+      // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
+      // Uses pre-provisioned real resources and mirrors LIVE DB structure
       // ═══════════════════════════════════════════════════════════════
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=test_mode_mock_provisioning`);
-      logInfo("TEST MODE: Mocking provisioning (no Twilio/Vapi calls)", {
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=test_mode_demo_bundle`);
+
+      // Load demo bundle environment variables
+      const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
+      const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
+      const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
+      const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+
+      // Validate all demo bundle env vars are present
+      if (!demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId) {
+        const missing = [];
+        if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
+        if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
+        if (!demoVapiPhoneId) missing.push("RINGSNAP_DEMO_VAPI_PHONE_ID");
+        if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+
+        const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
+        console.error(`[${FUNCTION_NAME}] ${errorMsg}`);
+        logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
+
+        // Fallback to mock values if env vars not configured (backwards compatible)
+        // This allows test mode to work even if demo bundle isn't set up yet
+        console.log(`[${FUNCTION_NAME}] Falling back to mock provisioning values`);
+      }
+
+      // Use demo bundle values or fallback to mock values
+      const phoneNumber = demoTwilioNumber || "+15005550006";
+      const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
+      const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
+      const vapiAssistantId = demoVapiAssistantId || `vapi_assistant_test_${Date.now()}`;
+      const areaCode = phoneNumber.slice(2, 5); // Extract area code from E.164
+
+      logInfo("TEST MODE: Using shared demo bundle", {
         ...baseLogOptions,
         accountId: currentAccountId,
-        context: { zipCode: data.zipCode, isTestMode: true },
+        context: {
+          zipCode: data.zipCode,
+          demoPhoneNumber: phoneNumber,
+          hasDemoBundle: !!(demoTwilioNumber && demoVapiPhoneId && demoVapiAssistantId),
+        },
       });
 
-      const testPhoneNumber = "+15005550006"; // Twilio magic test number
-      const testVapiAssistantId = "test-assistant-mock-" + Date.now();
-      const testVapiPhoneId = "test-phone-mock-" + Date.now();
-
       try {
-        // Update account with mock provisioning data
+        // ══════════════════════════════════════════════════════════════
+        // Mirror LIVE success path: Create all required DB records
+        // ══════════════════════════════════════════════════════════════
+
+        // 1. Insert phone_numbers row (mirrors LIVE: provision-vapi line 426-437)
+        const { error: phoneError } = await supabase.from("phone_numbers").insert({
+          account_id: currentAccountId,
+          phone_number: phoneNumber,
+          area_code: areaCode,
+          vapi_phone_id: vapiPhoneId,
+          purpose: "primary",
+          status: "active",
+          is_primary: true,
+          // is_test_number: true, // Add once migration is applied
+        });
+
+        if (phoneError) {
+          logWarn("TEST MODE: Phone number insert error (may already exist)", {
+            ...baseLogOptions,
+            error: phoneError,
+          });
+        }
+
+        // 2. Insert vapi_assistants row (mirrors LIVE: provision-vapi line 220-227)
+        const { error: assistantError } = await supabase.from("vapi_assistants").insert({
+          account_id: currentAccountId,
+          vapi_assistant_id: vapiAssistantId,
+          config: {
+            id: vapiAssistantId,
+            name: "Demo Assistant",
+            description: "Shared demo assistant for test accounts",
+            isTestAssistant: true,
+          },
+          // is_test_assistant: true, // Add once migration is applied
+        });
+
+        if (assistantError) {
+          logWarn("TEST MODE: Assistant insert error (may already exist)", {
+            ...baseLogOptions,
+            error: assistantError,
+          });
+        }
+
+        // 3. Update accounts row (mirrors LIVE: provision-vapi line 622-629)
         await supabase.from("accounts").update({
-          vapi_assistant_id: testVapiAssistantId,
-          vapi_phone_number: testPhoneNumber,
-          phone_number_e164: testPhoneNumber,
-          vapi_phone_number_id: testVapiPhoneId,
+          vapi_assistant_id: vapiAssistantId,
+          vapi_phone_number: phoneNumber,
+          phone_number_e164: phoneNumber,
+          vapi_phone_number_id: vapiPhoneId,
           phone_number_status: "active",
           phone_provisioned_at: new Date().toISOString(),
+          // billing_test_mode: true, // Add once migration is applied
         }).eq("id", currentAccountId);
 
-        // Mark provisioning as completed via RPC
+        // 4. Mark provisioning as completed via RPC (mirrors LIVE: provision-vapi line 632-635)
         await supabase.rpc("update_provisioning_lifecycle", {
           p_account_id: currentAccountId,
           p_status: "completed",
         });
 
-        // Update profile to active
+        // 5. Update profile to active (mirrors LIVE: provision-vapi line 639-641)
         if (currentUserId) {
           await supabase.from("profiles").update({
             onboarding_status: "active",
           }).eq("id", currentUserId);
         }
 
-        logInfo("TEST MODE: Mock provisioning completed successfully", {
+        logInfo("TEST MODE: Demo bundle provisioning completed successfully", {
           ...baseLogOptions,
           accountId: currentAccountId,
           context: {
-            testPhoneNumber,
-            testVapiAssistantId,
-            testVapiPhoneId,
+            phoneNumber,
+            vapiAssistantId,
+            vapiPhoneId,
           },
         });
-        console.log(`[${FUNCTION_NAME}] TEST MODE: Mock provisioning done for account ${currentAccountId}`);
-      } catch (mockErr: any) {
-        logError("TEST MODE: Mock provisioning failed", {
+        console.log(`[${FUNCTION_NAME}] TEST MODE: Demo bundle complete for account ${currentAccountId}`);
+
+      } catch (testErr: any) {
+        logError("TEST MODE: Demo bundle provisioning failed", {
           ...baseLogOptions,
           accountId: currentAccountId,
-          error: mockErr,
+          error: testErr,
         });
-        // Non-critical - signup still succeeded
+        // Non-critical - signup still succeeded, user can retry
       }
     } else {
       // ═══════════════════════════════════════════════════════════════
