@@ -1118,6 +1118,14 @@ function OnboardingChatInner() {
 
               {step === "payment" && !isTyping && (
                 <div className="space-y-4 p-4 border rounded-lg bg-card">
+                  {/* Trial Messaging - Prominent */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+                    <p className="text-sm font-semibold text-blue-900">Start your 3-day free trial</p>
+                    <p className="text-xs text-blue-700">
+                      You will not be charged today. Your card will only be charged after your 3-day trial ends if you do not cancel.
+                    </p>
+                  </div>
+
                   <div className="space-y-3">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <CreditCard className="h-4 w-4" />
@@ -1135,9 +1143,6 @@ function OnboardingChatInner() {
                     {cardError && (
                       <p className="text-sm text-red-600">{cardError}</p>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                      Your card won't be charged during the 3-day trial
-                    </p>
 
                     {/* Trust Badges */}
                     <div className="flex items-center justify-center gap-4 py-2 border-t border-b bg-muted/20">
@@ -1214,11 +1219,11 @@ function OnboardingChatInner() {
                     {isProcessing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Setting up...
+                        Validating your card to start your free trial...
                       </>
                     ) : (
                       <>
-                        Start Your Free Trial Now
+                        Start 3-Day Free Trial
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
