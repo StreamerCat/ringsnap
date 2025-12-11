@@ -1329,9 +1329,12 @@ Deno.serve(async (req: Request) => {
       const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
       const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
       const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+      const allowFallback = Deno.env.get("RINGSNAP_ALLOW_DEMO_FALLBACK") === "true";
 
       // Validate all demo bundle env vars are present
-      if (!demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId) {
+      const hasMissingVars = !demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId;
+
+      if (hasMissingVars) {
         const missing = [];
         if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
         if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
@@ -1342,12 +1345,18 @@ Deno.serve(async (req: Request) => {
         console.error(`[${FUNCTION_NAME}] ${errorMsg}`);
         logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
 
-        // Fallback to mock values if env vars not configured (backwards compatible)
-        // This allows test mode to work even if demo bundle isn't set up yet
-        console.log(`[${FUNCTION_NAME}] Falling back to mock provisioning values`);
+        // Only allow fallback if explicitly enabled via env var (for local dev only)
+        if (!allowFallback) {
+          throw new Error(
+            `Demo bundle not configured. Set the following Supabase secrets: ${missing.join(", ")}. ` +
+            `Or set RINGSNAP_ALLOW_DEMO_FALLBACK=true to use mock values (not recommended for production).`
+          );
+        }
+
+        console.log(`[${FUNCTION_NAME}] RINGSNAP_ALLOW_DEMO_FALLBACK=true - using mock values (LOCAL DEV ONLY)`);
       }
 
-      // Use demo bundle values or fallback to mock values
+      // Use demo bundle values (or fallback if explicitly allowed)
       const phoneNumber = demoTwilioNumber || "+15005550006";
       const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
       const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
@@ -1360,7 +1369,8 @@ Deno.serve(async (req: Request) => {
         context: {
           zipCode: data.zipCode,
           demoPhoneNumber: phoneNumber,
-          hasDemoBundle: !!(demoTwilioNumber && demoVapiPhoneId && demoVapiAssistantId),
+          hasDemoBundle: !hasMissingVars,
+          usingFallback: hasMissingVars && allowFallback,
         },
       });
 
