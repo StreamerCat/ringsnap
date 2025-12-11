@@ -511,13 +511,42 @@ async function processJob(job: any, supabase: any): Promise<void> {
 
     // Check for test mode - use zip_code as fallback since is_test_account column may not exist
     const isJobTestMode = job.test_mode || accountData.zip_code === "99999";
+
     if (isJobTestMode) {
-      logInfo("Using TEST MODE for provisioning", { ...baseLogOptions, context: { jobTestMode: job.test_mode, zipCode: accountData.zip_code } });
-      // Set env override for telephony layer
-      Deno.env.set("TWILIO_PROVISION_MODE", "test");
-    } else {
-      logInfo("Using LIVE MODE for provisioning", baseLogOptions);
+      // ═══════════════════════════════════════════════════════════════
+      // TEST MODE: Skip all Twilio/Vapi calls - use mock data
+      // The create-trial function should have already written mock data
+      // This is a safety net in case provision-vapi is called anyway
+      // ═══════════════════════════════════════════════════════════════
+      logInfo("TEST MODE: Skipping Twilio/Vapi provisioning entirely", {
+        ...baseLogOptions,
+        context: {
+          jobTestMode: job.test_mode,
+          zipCode: accountData.zip_code,
+          reason: "Test account detected - no real provisioning needed"
+        }
+      });
+      console.log(`[provision-vapi] TEST MODE: Skipping job ${job.id} for test account`);
+
+      // Mark job as completed immediately (no Twilio/Vapi work)
+      await supabase.from("provisioning_jobs").update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        error: null,
+      }).eq("id", job.id);
+
+      logInfo("TEST MODE: Job marked as completed (no-op)", {
+        ...baseLogOptions,
+        context: { jobId: job.id },
+      });
+
+      // Exit this job processing - do NOT continue with Twilio/Vapi calls
+      return;
     }
+
+    // LIVE MODE: Proceed with real Twilio/Vapi provisioning
+    logInfo("LIVE MODE: Processing real provisioning", baseLogOptions);
 
     // Fetch profile data for phone number
     const { data: profileData } = await supabase
