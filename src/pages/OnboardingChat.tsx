@@ -53,6 +53,8 @@ import { ChatMessage, TypingIndicator, MessageRole } from "@/components/onboardi
 import { ChatButtons, ChatButtonOption } from "@/components/onboarding-chat/ChatButtons";
 import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
+import { extractUserError, logClientError } from "@/lib/errors";
+
 
 // Chat step types
 type ChatStep =
@@ -861,32 +863,42 @@ function OnboardingChatInner() {
     } catch (error: any) {
       console.error("Payment error:", error);
 
-      const userMessage = error.message || "Payment failed";
-      let friendlyMessage = "We couldn't process your card. Please check the details and try again.";
+      // Use shared error utility (handles both old and new formats)
+      // Try result first (from edge function), then createTrialError, then the caught error
+      const errorPayload = error;
+      const appError = extractUserError(errorPayload);
 
-      if (userMessage.includes("insufficient funds")) {
-        friendlyMessage = "Your card was declined due to insufficient funds. Please try a different card.";
-      } else if (userMessage.includes("expired")) {
-        friendlyMessage = "Your card has expired. Please use a valid card.";
-      } else if (userMessage.includes("incorrect_cvc")) {
-        friendlyMessage = "The security code (CVC) was incorrect. Please try again.";
-      } else if (userMessage.includes("card_declined")) {
-        friendlyMessage = "Your card was declined. Please try a different card.";
-      } else if (userMessage.toLowerCase().includes("already registered") || userMessage.toLowerCase().includes("duplicate")) {
-        friendlyMessage = "This email is already registered. Please sign in or use a different email.";
+      // Log technical details for debugging
+      logClientError('Trial Creation', appError, {
+        email: leadData.email,
+        correlationId: errorPayload?.correlationId,
+        phase: errorPayload?.phase
+      });
+
+      // Show user-friendly message
+      if (appError.retryable) {
+        setStep("payment");
+        setIsProcessing(false);
+
+        addMessage(
+          "assistant",
+          <div className="space-y-2 text-red-600">
+            <p>{appError.userMessage}</p>
+            {appError.suggestedAction && (
+              <p className="text-sm text-muted-foreground">{appError.suggestedAction}</p>
+            )}
+          </div>
+        );
+        return;
       }
 
-      setStep("payment"); // Ensure we stay/return to payment step
-      setIsProcessing(false); // Re-enable button
-
-      // Show unified friendly error WITH DEBUG INFO
+      // Non-retryable error - show message and stay on payment
+      setStep("payment");
+      setIsProcessing(false);
       addMessage(
         "assistant",
         <div className="space-y-2 text-red-600">
-          <p>{friendlyMessage}</p>
-          <p className="text-xs text-red-500 font-mono mt-2 bg-red-50 p-2 rounded border border-red-100">
-            Debug: {userMessage}
-          </p>
+          <p>{appError.userMessage}</p>
         </div>
       );
     } finally {
