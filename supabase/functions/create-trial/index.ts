@@ -41,6 +41,49 @@ import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 
 const FUNCTION_NAME = "create-trial";
 
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE FLAG: Structured Error Responses
+// Set to "true" to enable user-friendly error messages
+// Set to "false" or omit to preserve legacy behavior (for easy rollback)
+// ═══════════════════════════════════════════════════════════════════════════
+const ENABLE_STRUCTURED_TRIAL_ERRORS =
+  Deno.env.get("ENABLE_STRUCTURED_TRIAL_ERRORS") === "true";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STRUCTURED ERROR TYPES (Additive - does not replace existing types)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Structured error response for trial creation
+ * Includes both new fields (errorCode, userMessage) and legacy fields (error, message)
+ * for backward compatibility
+ */
+interface TrialCreationErrorResponse {
+  success: false;
+  errorCode: string;
+  userMessage: string;
+  debugMessage?: string;
+  correlationId: string;
+  phase?: string;
+  retryable: boolean;
+  suggestedAction?: string;
+  // Legacy fields preserved for backward compatibility
+  error?: string;
+  message?: string;
+  request_id?: string;
+}
+
+type ErrorCode =
+  | 'CARD_DECLINED'
+  | 'CARD_NOT_SUPPORTED'
+  | 'CARD_EXPIRED'
+  | 'INSUFFICIENT_FUNDS'
+  | 'INCORRECT_CVC'
+  | 'PAYMENT_AUTH_REQUIRED'
+  | 'PAYMENT_PROCESSOR_ERROR'
+  | 'INTERNAL_ERROR';
+
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
@@ -321,6 +364,138 @@ async function cleanupStripeResources(
       context: { customerId, subscriptionId },
     });
   }
+}
+
+/**
+ * Map Stripe error to user-friendly error response
+ * ONLY used when ENABLE_STRUCTURED_TRIAL_ERRORS is true
+ * Preserves legacy fields for backward compatibility
+ */
+function mapStripeErrorToUserError(
+  stripeError: any,
+  phase: string,
+  correlationId: string,
+  requestId?: string
+): TrialCreationErrorResponse {
+  const message = stripeError.message?.toLowerCase() || '';
+
+  // Card not supported
+  if (message.includes('does not support this type of purchase')) {
+    return {
+      success: false,
+      errorCode: 'CARD_NOT_SUPPORTED',
+      userMessage: 'This card was declined by your bank. Please try a different card or contact your bank.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      // Legacy fields
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Generic card declined
+  if (message.includes('card_declined') || message.includes('card was declined') || message.includes('declined')) {
+    return {
+      success: false,
+      errorCode: 'CARD_DECLINED',
+      userMessage: 'Your card was declined. Please try a different card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Insufficient funds
+  if (message.includes('insufficient') || message.includes('funds')) {
+    return {
+      success: false,
+      errorCode: 'INSUFFICIENT_FUNDS',
+      userMessage: 'Your card was declined due to insufficient funds. Please try a different card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Expired card
+  if (message.includes('expired')) {
+    return {
+      success: false,
+      errorCode: 'CARD_EXPIRED',
+      userMessage: 'Your card has expired. Please use a valid card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Update your payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Incorrect CVC
+  if (message.includes('cvc') || message.includes('security code') || message.includes('incorrect_cvc')) {
+    return {
+      success: false,
+      errorCode: 'INCORRECT_CVC',
+      userMessage: 'The security code (CVC) was incorrect. Please check and try again.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Verify your card security code',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Authentication required
+  if (message.includes('authentication') || message.includes('3d secure')) {
+    return {
+      success: false,
+      errorCode: 'PAYMENT_AUTH_REQUIRED',
+      userMessage: 'Your card requires additional verification. Please try a different card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Fallback for payment errors
+  return {
+    success: false,
+    errorCode: 'PAYMENT_PROCESSOR_ERROR',
+    userMessage: 'We could not process your payment. Please try again or use a different card.',
+    debugMessage: stripeError.message,
+    correlationId,
+    phase,
+    retryable: true,
+    suggestedAction: 'Try again or contact support',
+    error: stripeError.message,
+    message: stripeError.message,
+    request_id: requestId
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -672,7 +847,29 @@ Deno.serve(async (req: Request) => {
           context: { customerId: customer.id },
         });
       } catch (e: any) {
-        throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
+        // ALWAYS log full technical details (unchanged)
+        logError("Stripe payment method attach failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: e,
+          context: {
+            phase,
+            customerId: customer.id,
+            paymentMethodId: data.paymentMethodId
+          }
+        });
+
+        // Return structured error if flag enabled, otherwise preserve legacy behavior
+        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          return new Response(JSON.stringify(errorResponse), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } else {
+          // Legacy behavior - throw error as before
+          throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
+        }
       }
 
       // Subscription
@@ -697,7 +894,25 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
-        throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
+        // ALWAYS log full technical details (unchanged)
+        logError("Stripe subscription creation failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: e,
+          context: { phase, customerId: customer.id }
+        });
+
+        // Return structured error if flag enabled, otherwise preserve legacy behavior
+        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          return new Response(JSON.stringify(errorResponse), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } else {
+          // Legacy behavior - throw error as before
+          throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
+        }
       }
     }
 
@@ -930,7 +1145,7 @@ Deno.serve(async (req: Request) => {
     const accountTxError = null;
 
     // DETAILED LOGGING: After account creation
-    console.error("DB_RESULT", {
+    console.log("DB_RESULT", {
       step: "create_account_transaction",
       operation: "AFTER_CALL",
       hasError: false,
@@ -962,7 +1177,7 @@ Deno.serve(async (req: Request) => {
     if (data.leadId) {
 
       // DETAILED LOGGING: Before lead update
-      console.error("DB_CALL", {
+      console.log("DB_CALL", {
         step: "link_lead",
         operation: "BEFORE_UPDATE",
         table: "signup_leads",
@@ -987,7 +1202,7 @@ Deno.serve(async (req: Request) => {
           .eq("id", data.leadId);
 
         // DETAILED LOGGING: After lead update
-        console.error("DB_RESULT", {
+        console.log("DB_RESULT", {
           step: "link_lead",
           operation: "AFTER_UPDATE",
           table: "signup_leads",
@@ -1028,7 +1243,7 @@ Deno.serve(async (req: Request) => {
         "unknown";
 
       // DETAILED LOGGING: Before signup_attempts insert
-      console.error("DB_CALL", {
+      console.log("DB_CALL", {
         step: "log_signup_success",
         operation: "BEFORE_INSERT",
         table: "signup_attempts",
@@ -1051,7 +1266,7 @@ Deno.serve(async (req: Request) => {
         });
 
         // DETAILED LOGGING: After signup_attempts insert
-        console.error("DB_RESULT", {
+        console.log("DB_RESULT", {
           step: "log_signup_success",
           operation: "AFTER_INSERT",
           table: "signup_attempts",
@@ -1104,7 +1319,7 @@ Deno.serve(async (req: Request) => {
       };
 
       // DETAILED LOGGING: Before provisioning_jobs insert
-      console.error("DB_CALL", {
+      console.log("DB_CALL", {
         step: "enqueue_provisioning",
         operation: "BEFORE_INSERT",
         table: "provisioning_jobs",
@@ -1128,7 +1343,7 @@ Deno.serve(async (req: Request) => {
         jobError = error;
 
         // DETAILED LOGGING: After provisioning_jobs insert
-        console.error("DB_RESULT", {
+        console.log("DB_RESULT", {
           step: "enqueue_provisioning",
           operation: "AFTER_INSERT",
           table: "provisioning_jobs",
@@ -1288,17 +1503,41 @@ Deno.serve(async (req: Request) => {
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
-    return new Response(
-      JSON.stringify({
+    // Return structured error if flag enabled
+    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+      const errorResponse: TrialCreationErrorResponse = {
         success: false,
-        request_id,
+        errorCode: 'INTERNAL_ERROR',
+        userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
+        debugMessage: error?.message ?? errorMessage,
+        correlationId,
         phase,
+        retryable: true,
+        suggestedAction: 'Try again or contact support if the issue persists',
+        // Legacy fields
+        error: error?.message ?? errorMessage,
         message: String(error?.message ?? errorMessage),
-      }),
-      {
+        request_id
+      };
+
+      return new Response(JSON.stringify(errorResponse), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } else {
+      // Legacy behavior - return existing error format
+      return new Response(
+        JSON.stringify({
+          success: false,
+          request_id,
+          phase,
+          message: String(error?.message ?? errorMessage),
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
   }
 });
