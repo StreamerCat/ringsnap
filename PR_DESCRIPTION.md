@@ -1,57 +1,36 @@
-# Async provisioning + Idempotent create-trial + Auth Hardening
+# Feature: Shared Demo Bundle for Test Signups (ZIP 99999)
 
 ## Summary
+Implements a robust "Test Mode" for signups using a **Shared Demo Bundle** approach. When a user signs up with ZIP `99999`, the system bypasses real Twilio/Vapi provisioning and instead assigns a set of pre-provisioned, real resources (Demo Twilio Number + Demo Vapi Assistant).
 
-This PR implements async provisioning with comprehensive idempotency, compensation logic, and webhook hardening. Additionally, it **hardens the authentication and onboarding flows** to resolve critical issues for returning users, recurring lead capture errors, and password reset failures.
+This ensures test signups are fast, free (no Stripe/Twilio charges), and result in a fully functional dashboard/phone state without polluting the production environment with mock data that causes runtime errors.
 
-### Problem Solved
-- ✅ **Auth & Signup:** Fixed JSON errors for returning users on `/start` by adding robust session validation and auto-signout for invalid states.
-- ✅ **Existing Users:** Resolved 406 errors for users with missing profiles by using `maybeSingle()` and redirecting to onboarding instead of crashing.
-- ✅ **Signup Leads:** Fixed "Failed to fetch" errors and "duplicate key" constraints by implementing robust client-side upsert logic for lead capture.
-- ✅ **Idempotency:** Resolved "duplicate key" errors in lead capture by implementing upsert logic for existing emails.
-- ✅ **Password Reset:** Fixed "no valid recovery session" error by ensuring session checks complete before user interaction and handling URL error parameters.
-- ✅ **Linting:** Resolved all blocking lint errors and warnings across the codebase.
-- ✅ Duplicate account creation from repeated API calls
-- ✅ Orphaned Stripe customers when DB creation fails
-- ✅ Stalled provisioning from inline Vapi failures blocking signup
-- ✅ No retry mechanism for provisioning failures
-- ✅ Missing webhook signature validation (security risk)
-- ✅ Duplicate webhook event processing
+## Key Changes
 
-## Files Changed
+### 1. `create-trial` Edge Function
+- **Test Mode Logic**: Detects ZIP `99999` (or `billing_test_mode=true`).
+- **Demo Bundle Integration**: reads `RINGSNAP_DEMO_*` env vars to get real resource IDs.
+- **DB Mirroring**: Inserts all required database rows (`phone_numbers`, `vapi_assistants`) and updates `accounts` to exactly match the shape of a successful LIVE provisioning.
+- **Safety**: Throws a hard error if demo bundle env vars are missing (prevents "fake success" states).
 
-**Authentication & Onboarding (New):**
-- `src/pages/Start.tsx`: Hardened session checks and error handling.
-- `src/pages/PasswordReset.tsx`: Fixed session race conditions and added loading states.
-- `src/pages/OnboardingChat.tsx`: Improved duplicate error handling.
-- `src/components/SalesSignupForm.tsx`: Fixed regex patterns.
-- `src/components/signup/shared/enhanced-schemas.ts`: Fixed regex patterns.
-- `eslint.config.js`: Updated to ignore Deno functions (fix false positives).
+### 2. Database Schema
+- Added `accounts.billing_test_mode` (DEFAULT FALSE)
+- Added `phone_numbers.is_test_number` (DEFAULT FALSE)
+- Added `vapi_assistants.is_test_assistant` (DEFAULT FALSE)
+- *Migration included: `supabase/migrations/20251211000001_add_test_mode_columns.sql`*
 
-**Database Migrations (4):**
-- `supabase/migrations/20251123000001_idempotency_results.sql`
-- `supabase/migrations/20251123000002_provisioning_timestamps.sql`
-- `supabase/migrations/20251123000003_stripe_events.sql`
-- `supabase/migrations/20251123999999_rollback_async_provisioning.sql`
-
-**Edge Functions (3):**
-- `supabase/functions/create-trial/index.ts` (refactored, -571 +302 lines)
-- `supabase/functions/provision-vapi/index.ts` (new, 612 lines)
-- `supabase/functions/stripe-webhook/index.ts` (+116 -3 lines)
-
-**Frontend Components (1):**
-- `src/components/onboarding/shared/ProvisioningStatus.tsx` (+151 -43 lines)
-
-**Total:** ~15 files changed
+### 3. Provisioning Logic
+- `provision-vapi` now includes a safety check to EARLY EXIT if it encounters a test account, preventing accidental API calls to Twilio/Vapi.
 
 ## How to Test
 
-1.  **Returning Users:** Visit `/start` as a logged-in user. You should be redirected correctly instead of seeing a JSON error.
-2.  **Password Reset:** Request a password reset link, click it, and verify the page loads in a "Verifying link..." state before allowing input. Ensure password reset succeeds and redirects to dashboard.
-3.  **Signup:** Attempt to sign up with an existing email on the lead form. The flow should proceed gracefully without crashing.
+1. **Apply Migration**: Run the SQL in `supabase/migrations/20251211000001_add_test_mode_columns.sql`.
+2. **Set Secrets**: Ensure `RINGSNAP_DEMO_TWILIO_NUMBER`, `RINGSNAP_DEMO_TWILIO_PHONE_SID`, `RINGSNAP_DEMO_VAPI_PHONE_ID`, and `RINGSNAP_DEMO_VAPI_ASSISTANT_ID` are set.
+3. **Run Signup**:
+   - Go to Signup page.
+   - Enter `99999` as ZIP Code.
+   - Complete signup.
+   - **Expect**: Immediate success, "Ready" status page, and the dashboard showing the Demo Twilio Number.
 
-## Rollback Plan
-
-Emergency rollback available via `20251123999999_rollback_async_provisioning.sql` migration.
-
-**Ready for staging deployment and smoke testing.**
+## Live Safety
+- Live signups (non-99999 ZIP) continue to use the existing `create-trial` logic, enforcing `billing_test_mode=false` and executing real Twilio/Vapi provisioning paths.
