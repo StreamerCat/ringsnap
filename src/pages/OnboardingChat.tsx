@@ -722,13 +722,17 @@ function OnboardingChatInner() {
       return;
     }
 
-    if (!cardComplete) {
-      toast.error("Please complete your card information");
+    if (!data.zipCode || data.zipCode.length !== 5) {
+      toast.error("Please enter a valid 5-digit billing zip code");
       return;
     }
 
-    if (!data.zipCode || data.zipCode.length !== 5) {
-      toast.error("Please enter a valid 5-digit billing zip code");
+    // Check bypass mode EARLY - before card validation
+    const isBypassMode = data.zipCode === "99999";
+
+    // Only require card completion in non-bypass mode
+    if (!isBypassMode && !cardComplete) {
+      toast.error("Please complete your card information");
       return;
     }
 
@@ -738,8 +742,6 @@ function OnboardingChatInner() {
     try {
       // Create payment method
       let paymentMethod = { id: "pm_bypass_check_deploy" }; // Default for bypass
-
-      const isBypassMode = data.zipCode === "99999";
 
       if (isBypassMode) {
         console.log("Bypass mode activated: Skipping Stripe frontend calls");
