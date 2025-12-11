@@ -1145,7 +1145,7 @@ Deno.serve(async (req: Request) => {
     const accountTxError = null;
 
     // DETAILED LOGGING: After account creation
-    console.error("DB_RESULT", {
+    console.log("DB_RESULT", {
       step: "create_account_transaction",
       operation: "AFTER_CALL",
       hasError: false,
@@ -1177,7 +1177,7 @@ Deno.serve(async (req: Request) => {
     if (data.leadId) {
 
       // DETAILED LOGGING: Before lead update
-      console.error("DB_CALL", {
+      console.log("DB_CALL", {
         step: "link_lead",
         operation: "BEFORE_UPDATE",
         table: "signup_leads",
@@ -1202,7 +1202,7 @@ Deno.serve(async (req: Request) => {
           .eq("id", data.leadId);
 
         // DETAILED LOGGING: After lead update
-        console.error("DB_RESULT", {
+        console.log("DB_RESULT", {
           step: "link_lead",
           operation: "AFTER_UPDATE",
           table: "signup_leads",
@@ -1243,7 +1243,7 @@ Deno.serve(async (req: Request) => {
         "unknown";
 
       // DETAILED LOGGING: Before signup_attempts insert
-      console.error("DB_CALL", {
+      console.log("DB_CALL", {
         step: "log_signup_success",
         operation: "BEFORE_INSERT",
         table: "signup_attempts",
@@ -1266,7 +1266,7 @@ Deno.serve(async (req: Request) => {
         });
 
         // DETAILED LOGGING: After signup_attempts insert
-        console.error("DB_RESULT", {
+        console.log("DB_RESULT", {
           step: "log_signup_success",
           operation: "AFTER_INSERT",
           table: "signup_attempts",
@@ -1319,7 +1319,7 @@ Deno.serve(async (req: Request) => {
       };
 
       // DETAILED LOGGING: Before provisioning_jobs insert
-      console.error("DB_CALL", {
+      console.log("DB_CALL", {
         step: "enqueue_provisioning",
         operation: "BEFORE_INSERT",
         table: "provisioning_jobs",
@@ -1343,7 +1343,7 @@ Deno.serve(async (req: Request) => {
         jobError = error;
 
         // DETAILED LOGGING: After provisioning_jobs insert
-        console.error("DB_RESULT", {
+        console.log("DB_RESULT", {
           step: "enqueue_provisioning",
           operation: "AFTER_INSERT",
           table: "provisioning_jobs",
