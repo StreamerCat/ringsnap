@@ -1317,7 +1317,68 @@ Deno.serve(async (req: Request) => {
         ...baseLogOptions,
         accountId: currentAccountId,
       });
+    } else if (isTestMode) {
+      // ═══════════════════════════════════════════════════════════════
+      // TEST MODE: Mock provisioning - NO Twilio/Vapi calls
+      // Writes mock data directly to DB and marks provisioning as completed
+      // ═══════════════════════════════════════════════════════════════
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=test_mode_mock_provisioning`);
+      logInfo("TEST MODE: Mocking provisioning (no Twilio/Vapi calls)", {
+        ...baseLogOptions,
+        accountId: currentAccountId,
+        context: { zipCode: data.zipCode, isTestMode: true },
+      });
+
+      const testPhoneNumber = "+15005550006"; // Twilio magic test number
+      const testVapiAssistantId = "test-assistant-mock-" + Date.now();
+      const testVapiPhoneId = "test-phone-mock-" + Date.now();
+
+      try {
+        // Update account with mock provisioning data
+        await supabase.from("accounts").update({
+          vapi_assistant_id: testVapiAssistantId,
+          vapi_phone_number: testPhoneNumber,
+          phone_number_e164: testPhoneNumber,
+          vapi_phone_number_id: testVapiPhoneId,
+          phone_number_status: "active",
+          phone_provisioned_at: new Date().toISOString(),
+        }).eq("id", currentAccountId);
+
+        // Mark provisioning as completed via RPC
+        await supabase.rpc("update_provisioning_lifecycle", {
+          p_account_id: currentAccountId,
+          p_status: "completed",
+        });
+
+        // Update profile to active
+        if (currentUserId) {
+          await supabase.from("profiles").update({
+            onboarding_status: "active",
+          }).eq("id", currentUserId);
+        }
+
+        logInfo("TEST MODE: Mock provisioning completed successfully", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          context: {
+            testPhoneNumber,
+            testVapiAssistantId,
+            testVapiPhoneId,
+          },
+        });
+        console.log(`[${FUNCTION_NAME}] TEST MODE: Mock provisioning done for account ${currentAccountId}`);
+      } catch (mockErr: any) {
+        logError("TEST MODE: Mock provisioning failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: mockErr,
+        });
+        // Non-critical - signup still succeeded
+      }
     } else {
+      // ═══════════════════════════════════════════════════════════════
+      // LIVE MODE: Real provisioning via job queue
+      // ═══════════════════════════════════════════════════════════════
       // ... metadata build ...
       const jobMetadata = {
         company_name: data.companyName,
