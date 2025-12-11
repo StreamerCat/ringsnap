@@ -204,10 +204,10 @@ async function trackEvent(
   eventType: string,
   metadata: any = {}
 ): Promise<void> {
-  if (!accountId) return;
+  // Allow tracking events without account_id (e.g. signup_started)
   try {
     await supabase.from("analytics_events").insert({
-      account_id: accountId,
+      account_id: accountId, // Can be null now
       user_id: userId,
       event_type: eventType,
       metadata: metadata,
