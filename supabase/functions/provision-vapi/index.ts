@@ -35,8 +35,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
-import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { formatPhoneE164 } from "../_shared/validators.ts";
+import { trackEvent } from "../_shared/analytics.ts";
 
 import { provisionPhoneNumber, ProviderConfig } from "../_shared/telephony.ts";
 
@@ -491,6 +491,12 @@ async function processJob(job: any, supabase: any): Promise<void> {
       updated_at: new Date().toISOString(),
     }).eq("id", job.id);
 
+    // Track Start
+    trackEvent(supabase, job.account_id, job.user_id, "provisioning_started", {
+      job_id: job.id,
+      attempts: job.attempts
+    });
+
     // Update account provisioning status
     await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
@@ -664,6 +670,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         vapiAssistantId,
       },
     });
+
+    // Track Success
+    trackEvent(supabase, job.account_id, job.user_id, "provisioning_completed", {
+      job_id: job.id,
+      phone_number: phoneE164,
+      vapi_phone_id: vapiPhoneId
+    });
   } catch (error: any) {
     // Job failed - determine if we should retry
     const newAttempts = (job.attempts || 0) + 1;
@@ -696,6 +709,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         p_status: "failed",
         p_error: `Provisioning failed (attempt ${newAttempts}/${MAX_RETRY_ATTEMPTS}): ${error.message}`,
       });
+
+      trackEvent(supabase, job.account_id, job.user_id, "provisioning_failed", {
+        job_id: job.id,
+        error: error.message,
+        attempt: newAttempts,
+        is_permanent: false
+      });
     } else {
       // Permanent failure
       await supabase.from("provisioning_jobs").update({
@@ -710,6 +730,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         p_account_id: job.account_id,
         p_status: "failed",
         p_error: `Provisioning failed permanently after ${MAX_RETRY_ATTEMPTS} attempts: ${error.message}`,
+      });
+
+      trackEvent(supabase, job.account_id, job.user_id, "provisioning_failed", {
+        job_id: job.id,
+        error: error.message,
+        attempt: newAttempts,
+        is_permanent: true
       });
 
       // Update user's onboarding status to provision_failed (hybrid onboarding flow)

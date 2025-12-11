@@ -195,6 +195,29 @@ async function createAdminAlert(
 }
 
 /**
+ * Track analytics event (Best Effort)
+ */
+async function trackEvent(
+  supabase: any,
+  accountId: string | null,
+  userId: string | null,
+  eventType: string,
+  metadata: any = {}
+): Promise<void> {
+  if (!accountId) return;
+  try {
+    await supabase.from("analytics_events").insert({
+      account_id: accountId,
+      user_id: userId,
+      event_type: eventType,
+      metadata: metadata,
+    });
+  } catch (err) {
+    console.error(`[${FUNCTION_NAME}] Failed to track event ${eventType}:`, err);
+  }
+}
+
+/**
  * Check if a user already exists by email and return their info
  */
 async function getExistingUserByEmail(
@@ -648,6 +671,9 @@ Deno.serve(async (req: Request) => {
         planType: data.planType,
       },
     });
+
+    // We can't track 'signup_started' in DB yet because we don't have an account_id.
+    // We will track it once the account is created.
 
     // ═══════════════════════════════════════════════════════════════
     // VALIDATION: Phone and email checks
