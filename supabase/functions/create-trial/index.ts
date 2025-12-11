@@ -684,11 +684,24 @@ Deno.serve(async (req: Request) => {
 
     // ═══════════════════════════════════════════════════════════════
     // ═══════════════════════════════════════════════════════════════
-    // DETERMINE MODE
+    // DETERMINE MODE (Live vs Test)
+    // Test mode triggers: zip code 99999, explicit bypassStripe flag, or magic payment method
     // ═══════════════════════════════════════════════════════════════
     const pmId = data.paymentMethodId || "";
-    // Robust Bypass: Check explicit flag OR magic string
-    const isBypassMode = data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
+
+    // Test mode: Zip 99999 triggers full test flow (no real Stripe, Twilio test creds)
+    const isTestMode = data.zipCode === "99999";
+
+    // Bypass mode: Skip Stripe (used by test mode or explicit bypass)
+    const isBypassMode = isTestMode || data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
+
+    // Log mode clearly for debugging
+    logInfo(`Trial creation mode: ${isTestMode ? "TEST" : "LIVE"}`, {
+      ...baseLogOptions,
+      context: { zipCode: data.zipCode, isTestMode, isBypassMode },
+    });
+    console.log(`[${FUNCTION_NAME}] MODE=${isTestMode ? "TEST" : "LIVE"} zipCode=${data.zipCode} isBypassMode=${isBypassMode}`);
+
 
     // ═══════════════════════════════════════════════════════════════
     // ANTI-ABUSE: Rate limiting (website signups only)
@@ -1079,6 +1092,7 @@ Deno.serve(async (req: Request) => {
         subscription_status: 'trial',
         stripe_customer_id: stripeCustomerId,
         stripe_subscription_id: stripeSubscriptionId,
+        is_test_account: isTestMode, // Flag test accounts for UI display
         ...accountData
       })
       .select("id")
@@ -1339,6 +1353,7 @@ Deno.serve(async (req: Request) => {
           account_id: currentAccountId,
           user_id: currentUserId,
           status: "queued",
+          test_mode: isTestMode, // Pass test mode to provisioning worker
         });
         jobError = error;
 

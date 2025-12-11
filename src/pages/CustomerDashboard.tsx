@@ -219,7 +219,14 @@ export default function CustomerDashboard() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold">{account.company_name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{account.company_name}</h1>
+              {account.is_test_account && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                  TEST ACCOUNT
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground">{profile.name} • {profile.phone}</p>
           </div>
           <div className="flex gap-2">

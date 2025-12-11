@@ -500,12 +500,22 @@ async function processJob(job: any, supabase: any): Promise<void> {
     // Fetch account data (since metadata column doesn't exist in provisioning_jobs)
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
-      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code")
+      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code, is_test_account")
       .eq("id", job.account_id)
       .single();
 
     if (accountError || !accountData) {
       throw new Error(`Failed to fetch account data: ${accountError?.message || "Account not found"}`);
+    }
+
+    // Check for test mode from job or account
+    const isJobTestMode = job.test_mode || accountData.is_test_account;
+    if (isJobTestMode) {
+      logInfo("Using TEST MODE for provisioning", { ...baseLogOptions, context: { jobTestMode: job.test_mode, accountTestMode: accountData.is_test_account } });
+      // Set env override for telephony layer
+      Deno.env.set("TWILIO_PROVISION_MODE", "test");
+    } else {
+      logInfo("Using LIVE MODE for provisioning", baseLogOptions);
     }
 
     // Fetch profile data for phone number
