@@ -33,7 +33,9 @@ export function OverviewTab({
     const handleManageBilling = async () => {
         setBillingLoading(true);
         try {
-            const { data, error } = await supabase.functions.invoke('create-portal-session');
+            const { data, error } = await supabase.functions.invoke('create-billing-portal-session', {
+                body: { account_id: account?.id }
+            });
             if (error) throw error;
             if (data?.url) {
                 window.location.href = data.url;
