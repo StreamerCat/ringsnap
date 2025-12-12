@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -35,12 +35,19 @@ serve(async (req) => {
 
         // 2. Auth Check
         logContext.phase = 'auth';
+        const authHeader = req.headers.get('Authorization');
+
+        if (!authHeader) {
+            log('Missing Authorization header');
+            return errorResponse(401, 'Missing Authorization header', 'AUTH_HEADER_MISSING');
+        }
+
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? '',
             {
                 global: {
-                    headers: { Authorization: req.headers.get('Authorization')! },
+                    headers: { Authorization: authHeader },
                 },
             }
         );
@@ -51,7 +58,8 @@ serve(async (req) => {
         } = await supabaseClient.auth.getUser();
 
         if (authError || !user) {
-            return errorResponse(401, 'Unauthorized: Invalid or missing token', 'AUTH_FAILED');
+            log('Auth failed', { error: authError, hasUser: !!user });
+            return errorResponse(401, 'Unauthorized: Invalid or missing token', 'AUTH_FAILED', { error: authError });
         }
 
         log('User authenticated', { userId: user.id });
