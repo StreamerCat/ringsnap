@@ -32,7 +32,7 @@
 
 // import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
@@ -1689,71 +1689,70 @@ Deno.serve(async (req: Request) => {
       stack: error?.stack ?? "",
       raw: error,
       account_id: currentAccountId,
-```
-    user_id: currentUserId,
-    stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: stripeSubscriptionId,
-  }));
+      user_id: currentUserId,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+    }));
 
-  logError("Trial creation failed", {
-    ...baseLogOptions,
-    accountId: currentAccountId,
-    error,
-    context: { phase },
-  });
+    logError("Trial creation failed", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error,
+      context: { phase },
+    });
 
-  // Track failure in Analytics (Critical for Dashboard visibility)
-  // We try to access 'data' if it was parsed, otherwise we lose the email.
-  // Since 'data' is scoped to the try block, we can't access it here directly if not lifted.
-  // However, most failures happen after parsing. 
-  // TODO: Ideally we retrieve email from a wider scope variable. 
-  // For now, we will track what we have.
-  await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
+    // Track failure in Analytics (Critical for Dashboard visibility)
+    // We try to access 'data' if it was parsed, otherwise we lose the email.
+    // Since 'data' is scoped to the try block, we can't access it here directly if not lifted.
+    // However, most failures happen after parsing. 
+    // TODO: Ideally we retrieve email from a wider scope variable. 
+    // For now, we will track what we have.
+    await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
       error: error instanceof Error ? error.message : "Unknown error",
       phase: phase,
       stripeErrorType: (error as any)?.type || 'unknown',
       // In a real refactor we would lift 'email' to outer scope. 
       // For this specific 'catch', we might be limited.
       // But wait, we can log the event without email if needed.
-  });
-
-  const errorMessage = error instanceof Error ? error.message : "Internal server error";
-
-  // Return structured error if flag enabled
-  if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-    const errorResponse: TrialCreationErrorResponse = {
-      success: false,
-      errorCode: 'INTERNAL_ERROR',
-      userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
-      debugMessage: error?.message ?? errorMessage,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Try again or contact support if the issue persists',
-      // Legacy fields
-      error: error?.message ?? errorMessage,
-      message: String(error?.message ?? errorMessage),
-      request_id
-    };
-
-    return new Response(JSON.stringify(errorResponse), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
-  } else {
-    // Legacy behavior - return existing error format
-    return new Response(
-      JSON.stringify({
+
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+
+    // Return structured error if flag enabled
+    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+      const errorResponse: TrialCreationErrorResponse = {
         success: false,
-        request_id,
+        errorCode: 'INTERNAL_ERROR',
+        userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
+        debugMessage: error?.message ?? errorMessage,
+        correlationId,
         phase,
+        retryable: true,
+        suggestedAction: 'Try again or contact support if the issue persists',
+        // Legacy fields
+        error: error?.message ?? errorMessage,
         message: String(error?.message ?? errorMessage),
-      }),
-      {
+        request_id
+      };
+
+      return new Response(JSON.stringify(errorResponse), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } else {
+      // Legacy behavior - return existing error format
+      return new Response(
+        JSON.stringify({
+          success: false,
+          request_id,
+          phase,
+          message: String(error?.message ?? errorMessage),
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
   }
-}
 });
