@@ -152,8 +152,23 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                 </Button>
             </div>
 
-            {/* Numbers list / empty state */}
-            {!hasNumbers ? (
+            {/* Numbers list / empty state / provisioning state */}
+            {(!hasNumbers && (account.provisioning_status === 'pending' || account.provisioning_status === 'in_progress' || account.provisioning_status === 'provisioning')) ? (
+                <Card className="border-amber-200 bg-amber-50">
+                    <CardContent className="py-12 text-center space-y-4">
+                        <div className="flex justify-center">
+                            <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="font-semibold text-amber-900">Provisioning your RingSnap number...</h3>
+                            <p className="text-sm text-amber-700 max-w-sm mx-auto">
+                                We are currently securing your phone number and setting up your AI assistant.
+                                This usually takes less than a minute.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            ) : !hasNumbers ? (
                 <Card>
                     <CardContent className="py-12 text-center text-muted-foreground space-y-2">
                         <p>No phone numbers yet.</p>

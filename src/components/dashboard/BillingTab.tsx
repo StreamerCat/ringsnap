@@ -24,23 +24,24 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
 
         setCancelingTrial(true);
         try {
-            const { error } = await supabase
-                .from("accounts")
-                .update({
-                    subscription_status: 'cancelled',
-                })
-                .eq("id", account.id);
+            const { error } = await supabase.functions.invoke('cancel-subscription', {
+                body: { account_id: account.id }
+            });
 
             if (error) throw error;
 
             toast({
-                title: "Trial Canceled",
-                description: "Your trial has been canceled. Please refresh the page.",
+                title: "Subscription Canceled",
+                description: "Your subscription has been canceled. The page will reload.",
             });
+
+            // Reload to reflect new status
+            setTimeout(() => window.location.reload(), 1500);
         } catch (error: any) {
+            console.error("Cancellation error:", error);
             toast({
                 title: "Error",
-                description: "Failed to cancel trial. Please contact support.",
+                description: "Failed to cancel subscription. Please contact support.",
                 variant: "destructive"
             });
         } finally {
