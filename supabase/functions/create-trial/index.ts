@@ -38,6 +38,7 @@ import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/log
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
+import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 
 const FUNCTION_NAME = "create-trial";
 
@@ -561,6 +562,9 @@ Deno.serve(async (req: Request) => {
     correlationId,
     request_id,
   };
+
+  // Initialize Sentry for error tracking
+  initSentry(FUNCTION_NAME, { correlationId });
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -1731,6 +1735,15 @@ Deno.serve(async (req: Request) => {
       error,
       context: { phase },
     });
+
+    // Send error to Sentry
+    if (currentAccountId) {
+      setContext('accountId', currentAccountId);
+    }
+    if (currentUserId) {
+      setContext('userId', currentUserId);
+    }
+    await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
 
     // Track failure in Analytics (Critical for Dashboard visibility)
     // We try to access 'data' if it was parsed, otherwise we lose the email.

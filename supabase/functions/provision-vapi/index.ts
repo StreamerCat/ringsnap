@@ -38,6 +38,7 @@ import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-s
 import { formatPhoneE164 } from "../_shared/validators.ts";
 import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { trackEvent } from "../_shared/analytics.ts";
+import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 
 import { provisionPhoneNumber, ProviderConfig } from "../_shared/telephony.ts";
 
@@ -763,6 +764,9 @@ Deno.serve(async (req: Request) => {
     correlationId,
   };
 
+  // Initialize Sentry for error tracking
+  initSentry(FUNCTION_NAME, { correlationId });
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -992,6 +996,9 @@ Deno.serve(async (req: Request) => {
       ...baseLogOptions,
       error,
     });
+
+    // Capture error to Sentry
+    await captureError(error, { phase: 'worker_execution' });
 
     return new Response(
       JSON.stringify({
