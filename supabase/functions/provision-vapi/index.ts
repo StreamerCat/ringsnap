@@ -36,6 +36,7 @@ import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/log
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
 import { formatPhoneE164 } from "../_shared/validators.ts";
+import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { trackEvent } from "../_shared/analytics.ts";
 
 import { provisionPhoneNumber, ProviderConfig } from "../_shared/telephony.ts";
