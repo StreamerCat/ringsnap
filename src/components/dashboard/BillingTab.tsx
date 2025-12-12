@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, AlertCircle, Loader2, ExternalLink } from "lucide-react";
+import { CreditCard, AlertCircle, Loader2, ExternalLink, FileText } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -24,23 +24,24 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
 
         setCancelingTrial(true);
         try {
-            const { error } = await supabase
-                .from("accounts")
-                .update({
-                    subscription_status: 'cancelled',
-                })
-                .eq("id", account.id);
+            const { error } = await supabase.functions.invoke('cancel-subscription', {
+                body: { account_id: account.id }
+            });
 
             if (error) throw error;
 
             toast({
-                title: "Trial Canceled",
-                description: "Your trial has been canceled. Please refresh the page.",
+                title: "Subscription Canceled",
+                description: "Your subscription has been canceled. The page will reload.",
             });
+
+            // Reload to reflect new status
+            setTimeout(() => window.location.reload(), 1500);
         } catch (error: any) {
+            console.error("Cancellation error:", error);
             toast({
                 title: "Error",
-                description: "Failed to cancel trial. Please contact support.",
+                description: "Failed to cancel subscription. Please contact support.",
                 variant: "destructive"
             });
         } finally {
@@ -56,19 +57,41 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                 body: { account_id: account.id }
             });
 
-            if (error) throw error;
+            if (error) {
+                // Try to parse the error message from the response if it's structured
+                let errorMessage = "Failed to open billing portal. Please contact support.";
+                try {
+                    // If error matches our backend structure
+                    if (error.context && typeof error.context.json === 'function') {
+                        const body = await error.context.json();
+                        if (body.error) errorMessage = body.error;
+                    } else if (error.message) {
+                        try {
+                            const parsed = JSON.parse(error.message);
+                            if (parsed.error) errorMessage = parsed.error;
+                            else errorMessage = error.message;
+                        } catch {
+                            errorMessage = error.message;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Could not parse error details", e);
+                }
+
+                throw new Error(errorMessage);
+            }
 
             if (data?.url) {
                 // Redirect to Stripe billing portal
                 window.location.href = data.url;
             } else {
-                throw new Error("No portal URL returned");
+                throw new Error("No portal URL returned from server");
             }
         } catch (error: any) {
             console.error("Failed to create billing portal session:", error);
             toast({
-                title: "Error",
-                description: "Failed to open billing portal. Please contact support.",
+                title: "Unable to Load Billing Portal",
+                description: error.message || "An unknown error occurred.",
                 variant: "destructive"
             });
             setCreatingPortalSession(false);
@@ -140,7 +163,7 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-muted-foreground">Minutes Used</span>
-                                <span>{account.monthly_minutes_used} / {account.monthly_minutes_limit}</span>
+                                <span className="flex items-center gap-1">{account.monthly_minutes_used} <span className="text-muted-foreground">/ {account.monthly_minutes_limit === -1 ? 'Unlimited' : account.monthly_minutes_limit}</span></span>
                             </div>
                             <Button
                                 variant="outline"
@@ -162,36 +185,70 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Payment Method</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center gap-4">
-                        <div className="h-10 w-16 bg-slate-100 rounded flex items-center justify-center">
-                            <CreditCard className="h-6 w-6 text-slate-400" />
+            <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Payment Method</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-4">
+                            <div className="h-10 w-16 bg-slate-100 rounded flex items-center justify-center">
+                                <CreditCard className="h-6 w-6 text-slate-400" />
+                            </div>
+                            <div>
+                                <p className="font-medium">•••• •••• •••• {account.last_4 || "****"}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {account.last_4 ? `Expires ${account.exp_month || "**"}/${account.exp_year || "**"}` : "No payment method on file"}
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                className="ml-auto"
+                                onClick={handleOpenBillingPortal}
+                                disabled={creatingPortalSession}
+                            >
+                                {creatingPortalSession ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    "Update"
+                                )}
+                            </Button>
                         </div>
-                        <div>
-                            <p className="font-medium">•••• •••• •••• {account.last_4 || "****"}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {account.last_4 ? `Expires ${account.exp_month || "**"}/${account.exp_year || "**"}` : "No payment method on file"}
-                            </p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Billing History</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center">
+                                <FileText className="h-5 w-5 text-slate-500" />
+                            </div>
+                            <div>
+                                <p className="font-medium">Invoices & Receipts</p>
+                                <p className="text-xs text-muted-foreground">
+                                    View your complete billing history on Stripe.
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="ml-auto"
+                                onClick={handleOpenBillingPortal}
+                                disabled={creatingPortalSession}
+                            >
+                                {creatingPortalSession ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    "View Invoices"
+                                )}
+                            </Button>
                         </div>
-                        <Button
-                            variant="ghost"
-                            className="ml-auto"
-                            onClick={handleOpenBillingPortal}
-                            disabled={creatingPortalSession}
-                        >
-                            {creatingPortalSession ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                "Update"
-                            )}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </div>
 
             {account.subscription_status === 'trial' && (
                 <Card className="border-destructive/20 bg-destructive/5">

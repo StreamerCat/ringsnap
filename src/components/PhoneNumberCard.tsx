@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Edit2, Star } from "lucide-react";
+import { Phone, Edit2, Star, Loader2 } from "lucide-react";
 
 interface PhoneNumberCardProps {
   number: string;
@@ -51,9 +51,18 @@ export function PhoneNumberCard({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Status</span>
-            <Badge variant={status === 'active' ? 'default' : 'secondary'}>
-              {status}
-            </Badge>
+            {status === 'provisioning' || status === 'pending' ? (
+              <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Provisioning
+              </Badge>
+            ) : status === 'error' || status === 'failed' ? (
+              <Badge variant="destructive">Error</Badge>
+            ) : (
+              <Badge variant={status === 'active' ? 'default' : 'secondary'}>
+                {status}
+              </Badge>
+            )}
           </div>
 
           {linkedAssistant && (
