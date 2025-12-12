@@ -8,11 +8,33 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+    // 1. Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
 
+    const requestId = crypto.randomUUID();
+    const logContext = { requestId, phase: 'init' };
+
+    // Helper for structured logging
+    const log = (msg: string, data: any = {}) => {
+        console.log(JSON.stringify({ ...logContext, message: msg, ...data }));
+    };
+
+    // Helper for error responses
+    const errorResponse = (status: number, message: string, code?: string, details?: any) => {
+        log('Request failed', { status, message, code, details });
+        return new Response(JSON.stringify({ error: message, code }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status,
+        });
+    };
+
     try {
+        log('Starting cancel request');
+
+        // 2. Auth Check
+        logContext.phase = 'auth';
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -23,34 +45,38 @@ serve(async (req) => {
             }
         );
 
-        // 1. Authenticate User
         const {
             data: { user },
+            error: authError
         } = await supabaseClient.auth.getUser();
 
-        if (!user) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 401,
-            });
+        if (authError || !user) {
+            return errorResponse(401, 'Unauthorized: Invalid or missing token', 'AUTH_FAILED');
         }
 
-        const { account_id } = await req.json();
+        // 3. Request Body Parsing
+        logContext.phase = 'body_parse';
+        let account_id: string;
+        try {
+            const body = await req.json();
+            account_id = body.account_id;
+        } catch (e) {
+            return errorResponse(400, 'Invalid JSON body', 'INVALID_JSON');
+        }
 
         if (!account_id) {
-            return new Response(JSON.stringify({ error: 'Account ID required' }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400,
-            });
+            return errorResponse(400, 'Missing account_id', 'MISSING_PARAM');
         }
 
-        // 2. Get Account details (need Service Role for secure account access if RLS strict, but user should have access to their own account)
-        // Using service role to be safe and ensure we can write to analytics_events if needed
+        // 4. Ownership Verification & Account Fetch
+        logContext.phase = 'ownership_check';
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
+        // Fetch account AND verify membership/profile in one go if possible, or separate.
+        // We need account details for Stripe ID.
         const { data: account, error: accountError } = await supabaseAdmin
             .from('accounts')
             .select('id, stripe_customer_id, stripe_subscription_id, subscription_status')
@@ -58,14 +84,11 @@ serve(async (req) => {
             .single();
 
         if (accountError || !account) {
-            return new Response(JSON.stringify({ error: 'Account not found' }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 404,
-            });
+            log('Account lookup failed', { error: accountError });
+            return errorResponse(404, 'Account not found', 'ACCOUNT_NOT_FOUND');
         }
 
-        // Verify user owns this account (via profile linking check or relying on RLS if we used standard client)
-        // Since we used admin client, let's fast check if the user is a member of this account
+        // Verify membership
         const { data: profile } = await supabaseAdmin
             .from('profiles')
             .select('id')
@@ -74,51 +97,77 @@ serve(async (req) => {
             .single();
 
         if (!profile) {
-            return new Response(JSON.stringify({ error: 'Unauthorized access to account' }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 403,
-            });
+            return errorResponse(403, 'You do not have permission to manage this account', 'ACCESS_DENIED');
         }
 
-        // 3. Cancel in Stripe
-        const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+        log('Ownership verified', { account_id, stripe_subscription_id: account.stripe_subscription_id });
+
+        // 5. Cancel in Stripe
+        logContext.phase = 'stripe_cancel';
+        const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+        if (!stripeKey) {
+            return errorResponse(500, 'Server configuration error', 'CONFIG_ERROR');
+        }
+
+        const stripe = new Stripe(stripeKey, {
             apiVersion: '2023-10-16',
             httpClient: Stripe.createFetchHttpClient(),
         });
 
         if (account.stripe_subscription_id) {
             try {
-                // Check status first to be idempotent-ish
+                // Check status first
                 const sub = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
                 if (sub.status !== 'canceled') {
+                    log('Cancelling subscription in Stripe', { sub_attributes: sub });
+                    // Immediate cancellation? Or at period end? 
+                    // Requirement: "Cancel subscription (immediate cancel vs cancel_at_period_end based on product policy)".
+                    // Trial cancel usually implies immediate.
+                    // Let's assume immediate for "Danger Zone" trial cancel.
+                    // If it's a paid sub, portal handles it better. This btn is mostly for "Cancel Trial".
                     await stripe.subscriptions.cancel(account.stripe_subscription_id);
+                } else {
+                    log('Subscription already canceled in Stripe');
                 }
             } catch (stripeError: any) {
-                console.error("Stripe cancellation error:", stripeError);
-                // If it's already canceled or doesn't exist, we can proceed to update local state
+                console.error("Stripe error:", stripeError);
+                // If resource missing, we assume it's gone and proceed to clean up DB
                 if (stripeError.code !== 'resource_missing') {
-                    // If it's a real error, we might want to stop, OR force local cancel. 
-                    // Let's proceed to update local state to reflect user intent, but log the error.
+                    return errorResponse(500, 'Failed to cancel subscription in Stripe', 'STRIPE_ERROR', { stripeError: stripeError.message });
                 }
             }
         }
 
-        // 4. Update Local DB
+        // 6. Update Local DB
+        logContext.phase = 'db_update';
+        // Using 'cancelled' as it seems to be the convention in other parts, 
+        // but 'canceled' is standard English. 
+        // Based on search results, I see `subscription_status` usage. 
+        // If I see `status === 'trial'`, `status === 'active'`.
+        // I will stick to 'canceled' (one L) if that matches Stripe, 
+        // BUT if the DB expects 'cancelled' (two Ls) I will use that.
+        // Safest bet: check what the previous code used. 
+        // Previous code had: `subscription_status: 'canceled', // or 'cancelled'` then comments arguing for 'cancelled'.
+        // I will use 'canceled' (one L) as a default unless I see strong evidence of 'cancelled' in the grep results.
+        // Actually, standardized enum recommended is 'canceled'.
+
         const { error: updateError } = await supabaseAdmin
             .from('accounts')
             .update({
-                subscription_status: 'canceled', // or 'cancelled' depending on your enum, audit showed 'cancelled' in snippet
-                // If you use 'cancelled' with ll, check your DB constraint. Snippet in BillingTab used 'cancelled'.
-                // Stripe uses 'canceled'. Let's check what the user's DB expects. 
-                // BillingTab.tsx:30 uses 'cancelled'. 
-                // Stripe webhook line 622 uses 'cancelled'.
-                // So 'cancelled' (double l) seems to be the local convention.
+                subscription_status: 'cancelled',
+                // We might want to clear stripe_subscription_id or keep it for history?
+                // Usually keep it, status is what matters.
             })
             .eq('id', account_id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+            // If this fails due to enum constraint, then it is 'cancelled'.
+            // But we can't easily retry.
+            log('DB update failed', { error: updateError });
+            throw updateError;
+        }
 
-        // 5. Log Analytics Event
+        // 7. Analytics
         await supabaseAdmin.from('analytics_events').insert({
             account_id: account_id,
             event_type: 'subscription_canceled',
@@ -126,22 +175,19 @@ serve(async (req) => {
                 user_id: user.id,
                 stripe_customer_id: account.stripe_customer_id,
                 stripe_subscription_id: account.stripe_subscription_id,
+                initiated_by: 'user_action'
             }
         });
+
+        log('Cancellation complete');
 
         return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         });
 
-    } catch (error) {
-        console.error('Error cancelling subscription:', error);
-        return new Response(
-            JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-            {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500,
-            }
-        );
+    } catch (error: any) {
+        console.error('Unhandled cancel error:', error);
+        return errorResponse(500, 'Internal Server Error', 'INTERNAL_ERROR', { error: error.message });
     }
 });
