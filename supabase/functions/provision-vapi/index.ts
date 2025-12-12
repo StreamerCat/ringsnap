@@ -801,26 +801,105 @@ Deno.serve(async (req: Request) => {
       // Ignore JSON parse errors (e.g. empty body from Cron)
     }
 
-    if (payload.triggered_by) {
-      logInfo("Worker triggered directly", {
+    // --------------------------------------------------------------------------
+    // 1. MANUAL TRIGGER MODE
+    // --------------------------------------------------------------------------
+    if (payload.jobId) {
+      logInfo("Manual trigger received for specific job", {
         ...baseLogOptions,
-        context: { source: payload.triggered_by }
+        context: { jobId: payload.jobId }
       });
+
+      const { data: job, error: jobError } = await supabase
+        .from("provisioning_jobs")
+        .select("*")
+        .eq("id", payload.jobId)
+        .single();
+
+      if (jobError || !job) {
+        return new Response(
+          JSON.stringify({ error: "Job not found", jobId: payload.jobId }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if job is already completed to avoid double-processing
+      if (job.status === 'completed') {
+        return new Response(
+          JSON.stringify({ message: "Job already completed", job }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Process immediately
+      try {
+        await processJob(job, supabase);
+        return new Response(
+          JSON.stringify({ success: true, message: "Job processed successfully", jobId: job.id }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (err: any) {
+        return new Response(
+          JSON.stringify({ success: false, error: err.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    // Poll for jobs (queued or failed with retry_after passed)
-    const { data: jobs, error: jobsError } = await supabase
+    // --------------------------------------------------------------------------
+    // 2. CRON POLL MODE (Prioritized)
+    // --------------------------------------------------------------------------
+
+    // Step 2a: Fetch QUEUED jobs first (High Priority - New Signups)
+    // We want to process these immediately so users don't wait
+    const { data: queuedJobs, error: queuedError } = await supabase
       .from("provisioning_jobs")
       .select("*")
-      .or(`status.eq.queued,status.eq.failed`)
-      .limit(JOBS_PER_BATCH)
-      .order("created_at", { ascending: true });
+      .eq("status", "queued")
+      .order("created_at", { ascending: true }) // FIFO
+      .limit(JOBS_PER_BATCH);
 
-    if (jobsError) {
-      throw new Error(`Failed to fetch jobs: ${jobsError.message}`);
+    if (queuedError) {
+      throw new Error(`Failed to fetch queued jobs: ${queuedError.message}`);
     }
 
-    if (!jobs || jobs.length === 0) {
+    let jobsToProcess = queuedJobs || [];
+
+    // Step 2b: If we have capacity, fetch FAILED jobs (Retry Queue)
+    // We strictly check the backoff time to ensure we don't retry too fast
+    if (jobsToProcess.length < JOBS_PER_BATCH) {
+      const remainingSlots = JOBS_PER_BATCH - jobsToProcess.length;
+
+      const { data: failedJobs, error: failedError } = await supabase
+        .from("provisioning_jobs")
+        .select("*")
+        .eq("status", "failed")
+        .order("updated_at", { ascending: true }) // Oldest failures first
+        .limit(remainingSlots * 2); // Fetch extra to filter in memory
+
+      if (!failedError && failedJobs) {
+        const now = Date.now();
+
+        // Filter for jobs that have passed their backoff period
+        const readyRetries = failedJobs.filter((job: any) => {
+          // If no updated_at, assume ready
+          if (!job.updated_at) return true;
+
+          const lastUpdate = new Date(job.updated_at).getTime();
+          const attempts = job.attempts || 0;
+          // Calculate backoff: 2^attempts minutes
+          // We add a small buffer (e.g. 5 seconds) to be safe
+          const requiredDelayMs = Math.pow(2, attempts) * 60 * 1000;
+
+          return (now - lastUpdate) > requiredDelayMs;
+        });
+
+        // Add ready retries to batch until full
+        jobsToProcess = [...jobsToProcess, ...readyRetries.slice(0, remainingSlots)];
+      }
+    }
+
+    if (jobsToProcess.length === 0) {
       logInfo("No jobs to process", baseLogOptions);
       return new Response(
         JSON.stringify({ message: "No jobs to process", processed: 0 }),
@@ -833,14 +912,18 @@ Deno.serve(async (req: Request) => {
 
     logInfo("Processing jobs batch", {
       ...baseLogOptions,
-      context: { jobCount: jobs.length },
+      context: {
+        total: jobsToProcess.length,
+        queued: queuedJobs?.length || 0,
+        retries: jobsToProcess.length - (queuedJobs?.length || 0)
+      },
     });
 
-    // Process jobs sequentially (could be parallelized with Promise.all)
+    // Process jobs sequentially
     let successCount = 0;
     let failureCount = 0;
 
-    for (const job of jobs) {
+    for (const job of jobsToProcess) {
       try {
         await processJob(job, supabase);
         successCount++;
@@ -856,13 +939,13 @@ Deno.serve(async (req: Request) => {
 
     logInfo("Batch processing completed", {
       ...baseLogOptions,
-      context: { total: jobs.length, success: successCount, failed: failureCount },
+      context: { total: jobsToProcess.length, success: successCount, failed: failureCount },
     });
 
     return new Response(
       JSON.stringify({
         message: "Batch processing completed",
-        total: jobs.length,
+        total: jobsToProcess.length,
         success: successCount,
         failed: failureCount,
       }),

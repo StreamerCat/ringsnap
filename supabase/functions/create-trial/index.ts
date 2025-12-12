@@ -519,6 +519,37 @@ function mapStripeErrorToUserError(
     message: stripeError.message,
     request_id: requestId
   };
+};
+
+
+/**
+ * Retry helper for transient failures
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { retries: number; delay: number; operationName: string }
+): Promise<T> {
+  let lastError: any;
+
+  for (let i = 0; i < options.retries; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[${options.operationName}] Attempt ${i + 1} failed: ${err.message}`);
+
+      // Don't retry if it looks like a permanent validation error (e.g. 400s)
+      if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+        throw err;
+      }
+
+      if (i < options.retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, options.delay * Math.pow(2, i)));
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 Deno.serve(async (req: Request) => {
