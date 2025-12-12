@@ -2,9 +2,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, AlertCircle, Loader2, ExternalLink, FileText } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+
+interface PaymentMethodInfo {
+    brand: string | null;
+    last4: string | null;
+    exp_month: number | null;
+    exp_year: number | null;
+}
 
 interface BillingTabProps {
     account: any;
@@ -16,6 +23,34 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
     const { toast } = useToast();
     const [cancelingTrial, setCancelingTrial] = useState(false);
     const [creatingPortalSession, setCreatingPortalSession] = useState(false);
+
+    // Payment method state - fetched from Stripe
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodInfo | null>(null);
+    const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(true);
+
+    // Fetch payment method from Stripe (fail soft)
+    useEffect(() => {
+        const fetchBillingSummary = async () => {
+            try {
+                const { data, error } = await supabase.functions.invoke('get-billing-summary', {
+                    body: { account_id: account.id }
+                });
+
+                if (!error && data?.payment_method) {
+                    setPaymentMethod(data.payment_method);
+                }
+                // Fail soft - don't show errors, just use fallback display
+            } catch (e) {
+                console.log('Failed to fetch billing summary (soft fail):', e);
+            } finally {
+                setLoadingPaymentMethod(false);
+            }
+        };
+
+        if (account?.id) {
+            fetchBillingSummary();
+        }
+    }, [account?.id]);
 
     const handleCancelTrial = async () => {
         if (!window.confirm("Are you sure you want to cancel your trial? Your phone number will be released.")) {
@@ -171,21 +206,7 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                                 <span className="text-muted-foreground">Minutes Used</span>
                                 <span className="flex items-center gap-1">{account.monthly_minutes_used} <span className="text-muted-foreground">/ {account.monthly_minutes_limit === -1 ? 'Unlimited' : account.monthly_minutes_limit}</span></span>
                             </div>
-                            <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={handleOpenBillingPortal}
-                                disabled={creatingPortalSession}
-                            >
-                                {creatingPortalSession ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Loading...
-                                    </>
-                                ) : (
-                                    "Add Credits"
-                                )}
-                            </Button>
+                            {/* Add Credits removed for MVP */}
                         </div>
                     </CardContent>
                 </Card>
@@ -202,10 +223,30 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
                                 <CreditCard className="h-6 w-6 text-slate-400" />
                             </div>
                             <div>
-                                <p className="font-medium">•••• •••• •••• {account.last_4 || "****"}</p>
-                                <p className="text-xs text-muted-foreground">
-                                    {account.last_4 ? `Expires ${account.exp_month || "**"}/${account.exp_year || "**"}` : "No payment method on file"}
-                                </p>
+                                {loadingPaymentMethod ? (
+                                    <div className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span className="text-sm text-muted-foreground">Loading...</span>
+                                    </div>
+                                ) : paymentMethod?.last4 ? (
+                                    <>
+                                        <p className="font-medium capitalize">
+                                            {paymentMethod.brand || 'Card'} •••• {paymentMethod.last4}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Expires {paymentMethod.exp_month}/{paymentMethod.exp_year}
+                                        </p>
+                                    </>
+                                ) : account.last_4 ? (
+                                    <>
+                                        <p className="font-medium">•••• •••• •••• {account.last_4}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Expires {account.exp_month || '**'}/{account.exp_year || '**'}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">No payment method on file</p>
+                                )}
                             </div>
                             <Button
                                 variant="ghost"

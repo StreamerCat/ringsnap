@@ -26,6 +26,17 @@ export interface FeatureFlags {
    * Set via: VITE_DEBUG_SIGNUP=true
    */
   debugSignup: boolean;
+
+  /**
+   * Enable the Upgrade modal for plan upgrades in the dashboard.
+   * When disabled, upgrade buttons redirect to Stripe billing portal instead.
+   * 
+   * This is a "kill switch" - deploy UI fixes with flag off, then enable
+   * upgrades when ready.
+   *
+   * Set via: VITE_FEATURE_UPGRADE_MODAL=true
+   */
+  upgradeModalEnabled: boolean;
 }
 
 /**
@@ -54,6 +65,9 @@ export const featureFlags: FeatureFlags = {
 
   // Debug logging disabled by default
   debugSignup: parseBoolEnv(import.meta.env.VITE_DEBUG_SIGNUP, false),
+
+  // Upgrade modal DISABLED by default (kill switch - enable when ready)
+  upgradeModalEnabled: parseBoolEnv(import.meta.env.VITE_FEATURE_UPGRADE_MODAL, false),
 };
 
 /**
@@ -68,4 +82,6 @@ export function logFeatureFlags(): void {
 // Log on module load in development
 if (import.meta.env.DEV) {
   console.log('[FeatureFlags] Two-step signup:', featureFlags.twoStepSignup ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Upgrade modal:', featureFlags.upgradeModalEnabled ? 'ENABLED' : 'DISABLED');
 }
+
