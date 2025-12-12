@@ -804,23 +804,51 @@ Deno.serve(async (req: Request) => {
     // --------------------------------------------------------------------------
     // 1. MANUAL TRIGGER MODE
     // --------------------------------------------------------------------------
-    if (payload.jobId) {
-      logInfo("Manual trigger received for specific job", {
-        ...baseLogOptions,
-        context: { jobId: payload.jobId }
-      });
+    if (payload.jobId || payload.accountId) {
+      let job;
 
-      const { data: job, error: jobError } = await supabase
-        .from("provisioning_jobs")
-        .select("*")
-        .eq("id", payload.jobId)
-        .single();
+      if (payload.jobId) {
+        logInfo("Manual trigger received for specific job", {
+          ...baseLogOptions,
+          context: { jobId: payload.jobId }
+        });
 
-      if (jobError || !job) {
-        return new Response(
-          JSON.stringify({ error: "Job not found", jobId: payload.jobId }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const { data, error } = await supabase
+          .from("provisioning_jobs")
+          .select("*")
+          .eq("id", payload.jobId)
+          .single();
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Job not found", details: error.message }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        job = data;
+
+      } else if (payload.accountId) {
+        logInfo("Manual trigger received for account", {
+          ...baseLogOptions,
+          context: { accountId: payload.accountId }
+        });
+
+        // Find the most recent job for this account
+        const { data, error } = await supabase
+          .from("provisioning_jobs")
+          .select("*")
+          .eq("account_id", payload.accountId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error || !data) {
+          return new Response(
+            JSON.stringify({ error: "No provisioning job found for this account" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        job = data;
       }
 
       // Check if job is already completed to avoid double-processing
