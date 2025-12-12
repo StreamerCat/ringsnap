@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -16,6 +17,9 @@ serve(async (req) => {
 
     const requestId = crypto.randomUUID();
     const logContext = { requestId, phase: 'init' };
+
+    // Initialize Sentry for error tracking
+    initSentry('create-billing-portal-session', { correlationId: requestId });
 
     // Helper for structured logging
     const log = (msg: string, data: any = {}) => {
@@ -157,6 +161,7 @@ serve(async (req) => {
     } catch (error: any) {
         // Catch-all for unexpected runtime errors
         console.error('Unhandled billing portal error:', error);
+        await captureError(error, { phase: logContext.phase });
 
         const isStripeError = error?.type?.startsWith('Stripe');
         const statusCode = isStripeError ? 400 : 500;

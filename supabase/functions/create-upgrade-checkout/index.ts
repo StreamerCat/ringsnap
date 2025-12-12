@@ -13,6 +13,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { initSentry, captureError } from "../_shared/sentry.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -42,6 +43,9 @@ serve(async (req) => {
     const log = (msg: string, data: any = {}) => {
         console.log(JSON.stringify({ requestId, message: msg, ...data }));
     };
+
+    // Initialize Sentry for error tracking
+    initSentry('create-upgrade-checkout', { correlationId: requestId });
 
     // Helper for error responses
     const errorResponse = (status: number, message: string, code?: string) => {
@@ -257,6 +261,7 @@ serve(async (req) => {
 
     } catch (error: any) {
         console.error("Unhandled upgrade error:", error);
+        await captureError(error, { phase: 'upgrade_checkout' });
 
         const isStripeError = error?.type?.startsWith("Stripe");
         const statusCode = isStripeError ? 400 : 500;

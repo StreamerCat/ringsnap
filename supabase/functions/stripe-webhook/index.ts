@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 
 type BaseLogContext = {
   functionName: string;
@@ -286,6 +287,9 @@ serve(async (req) => {
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   let currentAccountId: string | null = null;
+
+  // Initialize Sentry with correlation ID for error tracking
+  initSentry(FUNCTION_NAME, { correlationId });
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -700,6 +704,13 @@ serve(async (req) => {
       accountId: currentAccountId,
       error
     });
+
+    // Capture error to Sentry
+    if (currentAccountId) {
+      setContext('accountId', currentAccountId);
+    }
+    await captureError(error, { phase: 'webhook_handler' });
+
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Webhook error' }),
       { status: 400, headers: { 'Content-Type': 'application/json' } }
