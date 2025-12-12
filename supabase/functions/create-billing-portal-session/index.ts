@@ -5,6 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
@@ -35,11 +36,20 @@ serve(async (req) => {
 
         // 2. Auth Check
         logContext.phase = 'auth';
-        const authHeader = req.headers.get('Authorization');
+
+        // Debug: Log all header keys
+        const headerKeys: string[] = [];
+        req.headers.forEach((_: string, key: string) => headerKeys.push(key));
+        log('Received headers', { keys: headerKeys });
+
+        // Try case-insensitive retrieval
+        const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
 
         if (!authHeader) {
-            log('Missing Authorization header');
-            return errorResponse(401, 'Missing Authorization header', 'AUTH_HEADER_MISSING');
+            log('Missing Authorization header', { availableHeaders: headerKeys });
+            // Don't return immediately, let createClient fail if it must, or maybe it works if header is somehow injected
+            // But usually we need to pass it. Return specific error metadata.
+            return errorResponse(401, 'Missing Authorization header', 'AUTH_HEADER_MISSING', { keys: headerKeys });
         }
 
         const supabaseClient = createClient(

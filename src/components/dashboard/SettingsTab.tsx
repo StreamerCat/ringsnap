@@ -16,9 +16,10 @@ interface SettingsTabProps {
     account: any;
     onUpdateAccount: (newAccount: any) => void;
     recordingState: any;
+    onOpenUpgradeModal?: () => void;
 }
 
-export function SettingsTab({ account, onUpdateAccount, recordingState }: SettingsTabProps) {
+export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUpgradeModal }: SettingsTabProps) {
     const { toast } = useToast();
 
     // Custom Instructions State
@@ -159,11 +160,11 @@ export function SettingsTab({ account, onUpdateAccount, recordingState }: Settin
                 <CardContent className="space-y-4">
                     {account.plan_type === 'starter' ? (
                         <div className="bg-muted p-4 rounded-lg">
-                            <p className="font-semibold mb-2">Upgrade to Pro or Premium</p>
+                            <p className="font-semibold mb-2">Upgrade to Professional or Premium</p>
                             <p className="text-sm text-muted-foreground mb-3">
                                 Call recording is available on Professional and Premium plans
                             </p>
-                            <Button size="sm">Upgrade Now</Button>
+                            <Button size="sm" onClick={onOpenUpgradeModal}>Upgrade Now</Button>
                         </div>
                     ) : (
                         <>

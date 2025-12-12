@@ -6,8 +6,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, Phone, TrendingUp, CheckCircle, AlertCircle, CreditCard, Loader2, Copy } from "lucide-react";
+import { Clock, Phone, TrendingUp, CheckCircle, AlertCircle, CreditCard, Loader2, Copy, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
+import { featureFlags } from "@/lib/featureFlags";
 
 interface OverviewTabProps {
     account: any;
@@ -16,6 +17,7 @@ interface OverviewTabProps {
     remainingMinutes: number;
     trialDaysRemaining: number;
     creditsBalance: number;
+    onOpenUpgradeModal?: () => void;
 }
 
 export function OverviewTab({
@@ -23,7 +25,8 @@ export function OverviewTab({
     usageLogs,
     usagePercent,
     trialDaysRemaining,
-    creditsBalance
+    creditsBalance,
+    onOpenUpgradeModal
 }: OverviewTabProps) {
     const [billingLoading, setBillingLoading] = useState(false);
 
@@ -97,10 +100,23 @@ export function OverviewTab({
                             variant="outline"
                             size="sm"
                             className="w-full mt-3 h-8"
-                            onClick={handleManageBilling}
+                            onClick={() => {
+                                if (featureFlags.upgradeModalEnabled && onOpenUpgradeModal) {
+                                    onOpenUpgradeModal();
+                                } else {
+                                    handleManageBilling();
+                                }
+                            }}
                             disabled={billingLoading}
                         >
-                            {billingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Manage Billing"}
+                            {billingLoading ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                                <>
+                                    <ArrowUpRight className="h-3 w-3 mr-1" />
+                                    Upgrade
+                                </>
+                            )}
                         </Button>
                     </CardContent>
                 </Card>

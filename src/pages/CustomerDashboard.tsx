@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { signOutUser } from "@/lib/auth/session";
@@ -11,6 +11,9 @@ import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
   Calendar, Loader2
 } from "lucide-react";
+import { featureFlags } from "@/lib/featureFlags";
+import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
+import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 
 // Tab Components
 import { TodayTab } from "@/components/dashboard/TodayTab";
@@ -36,8 +39,13 @@ export default function CustomerDashboard() {
   const [usageLogs, setUsageLogs] = useState<any[]>([]);
   const [accountCredits, setAccountCredits] = useState<any[]>([]);
   const [referrals, setReferrals] = useState<any[]>([]);
-  const [referralCode, setReferralCode] = useState("");
   const [recordingState, setRecordingState] = useState<any>(null);
+
+  // Upgrade modal state
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  // Provisioning polling ref
+  const [isPollingProvisioning, setIsPollingProvisioning] = useState(false);
 
   useEffect(() => {
     // Auth is handled by withAuthGuard wrapper in App.tsx
@@ -113,14 +121,13 @@ export default function CustomerDashboard() {
 
       const accountId = profileData.account_id;
 
-      // Load parallel data
-      const [phonesRes, assistantsRes, logsRes, creditsRes, referralsRes, codeRes] = await Promise.all([
+      // Load parallel data (removed referral_codes fetch to avoid errors)
+      const [phonesRes, assistantsRes, logsRes, creditsRes, referralsRes] = await Promise.all([
         supabase.from("phone_numbers").select("*").eq("account_id", accountId),
         supabase.from("assistants").select("*").eq("account_id", accountId),
         supabase.from("usage_logs").select("*").eq("account_id", accountId).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }).limit(50),
         supabase.from("account_credits").select("*").eq("account_id", accountId).order("created_at", { ascending: false }),
         supabase.from("referrals").select("*").eq("referrer_account_id", accountId).order("created_at", { ascending: false }),
-        supabase.from("referral_codes").select("code").eq("account_id", accountId).single()
       ]);
 
       setPhoneNumbers(phonesRes.data || []);
@@ -128,7 +135,6 @@ export default function CustomerDashboard() {
       setUsageLogs(logsRes.data || []);
       setAccountCredits(creditsRes.data || []);
       setReferrals(referralsRes.data || []);
-      if (codeRes.data) setReferralCode(codeRes.data.code);
 
       // Load recording laws if state is present
       if (profileData.accounts.billing_state) {
@@ -216,7 +222,7 @@ export default function CustomerDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4 max-w-7xl">
-        {/* Header */}
+        {/* Header - shows company name, first name, and Vapi number */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <div className="flex items-center gap-3">
@@ -227,7 +233,14 @@ export default function CustomerDashboard() {
                 </span>
               )}
             </div>
-            <p className="text-muted-foreground">{profile.name} • {profile.phone}</p>
+            <p className="text-muted-foreground">
+              {profile.name?.split(' ')[0] || profile.name}
+            </p>
+            {account.vapi_phone_number && (
+              <p className="text-sm text-primary font-medium">
+                {account.vapi_phone_number}
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate("/")}>
@@ -304,6 +317,7 @@ export default function CustomerDashboard() {
               remainingMinutes={remainingMinutes}
               trialDaysRemaining={trialDaysRemaining}
               creditsBalance={creditsBalance}
+              onOpenUpgradeModal={() => setUpgradeModalOpen(true)}
             />
           </TabsContent>
 
@@ -324,6 +338,7 @@ export default function CustomerDashboard() {
               account={account}
               onUpdateAccount={setAccount}
               recordingState={recordingState}
+              onOpenUpgradeModal={() => setUpgradeModalOpen(true)}
             />
           </TabsContent>
 
@@ -337,11 +352,20 @@ export default function CustomerDashboard() {
 
           <TabsContent value="referrals">
             <ReferralsTab
-              referralCode={referralCode}
               referralStats={referralStats}
             />
           </TabsContent>
         </Tabs>
+
+        {/* Upgrade Modal - controlled by feature flag */}
+        {featureFlags.upgradeModalEnabled && (
+          <UpgradeModal
+            open={upgradeModalOpen}
+            onOpenChange={setUpgradeModalOpen}
+            currentPlanKey={account.plan_type}
+            accountId={account.id}
+          />
+        )}
       </div>
     </div>
   );
