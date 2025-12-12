@@ -52,18 +52,24 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance }: Bill
     const handleOpenBillingPortal = async () => {
         setCreatingPortalSession(true);
         try {
+            // Debug: Log auth state before call
+            const { data: sessionData } = await supabase.auth.getSession();
+            console.log("Current session token:", sessionData.session?.access_token ? "Last 4 chars: " + sessionData.session.access_token.slice(-4) : "No token found");
+
             // Call Stripe to create a billing portal session
             const { data, error } = await supabase.functions.invoke('create-billing-portal-session', {
                 body: { account_id: account.id }
             });
 
             if (error) {
+                console.error("Full invoke error object:", error); // Log full object for debugging
                 // Try to parse the error message from the response if it's structured
                 let errorMessage = "Failed to open billing portal. Please contact support.";
                 try {
-                    // If error matches our backend structure
+                    // Check if context has response body
                     if (error.context && typeof error.context.json === 'function') {
                         const body = await error.context.json();
+                        console.log("Error response body:", body);
                         if (body.error) errorMessage = body.error;
                     } else if (error.message) {
                         try {
