@@ -1,36 +1,62 @@
-# Feature: Shared Demo Bundle for Test Signups (ZIP 99999)
+## Customer Dashboard Fixes + Billing Upgrade Flow
 
-## Summary
-Implements a robust "Test Mode" for signups using a **Shared Demo Bundle** approach. When a user signs up with ZIP `99999`, the system bypasses real Twilio/Vapi provisioning and instead assigns a set of pre-provisioned, real resources (Demo Twilio Number + Demo Vapi Assistant).
+### Summary
+Stabilizes and cleans up the Customer Dashboard for MVP launch. Implements a feature-flagged plan upgrade flow, fixes broken UI elements, and improves billing UX.
 
-This ensures test signups are fast, free (no Stripe/Twilio charges), and result in a fully functional dashboard/phone state without polluting the production environment with mock data that causes runtime errors.
+### Changes
 
-## Key Changes
+#### 🆕 New Features
+- **Upgrade Modal** (`UpgradeModal.tsx`) - Shared component for plan upgrades with all 3 plans displayed
+- **Kill Switch Feature Flag** - `VITE_FEATURE_UPGRADE_MODAL` defaults to `false`, allowing UI fixes to ship before enabling upgrades
+- **Safe Upgrade Logic** - Edge function updates existing subscriptions instead of creating duplicates
+- **Payment Method Display** - Fetches card details from Stripe with soft fail fallback
 
-### 1. `create-trial` Edge Function
-- **Test Mode Logic**: Detects ZIP `99999` (or `billing_test_mode=true`).
-- **Demo Bundle Integration**: reads `RINGSNAP_DEMO_*` env vars to get real resource IDs.
-- **DB Mirroring**: Inserts all required database rows (`phone_numbers`, `vapi_assistants`) and updates `accounts` to exactly match the shape of a successful LIVE provisioning.
-- **Safety**: Throws a hard error if demo bundle env vars are missing (prevents "fake success" states).
+#### 🐛 Bug Fixes
+- **Team Tab** - Fixed critical `useState → useEffect` bug causing "Failed to load team members"
+- **Header Display** - Now shows company name, first name, and Vapi phone number
 
-### 2. Database Schema
-- Added `accounts.billing_test_mode` (DEFAULT FALSE)
-- Added `phone_numbers.is_test_number` (DEFAULT FALSE)
-- Added `vapi_assistants.is_test_assistant` (DEFAULT FALSE)
-- *Migration included: `supabase/migrations/20251211000001_add_test_mode_columns.sql`*
+#### 🔧 Improvements
+- **Overview Tab** - Changed "Manage Billing" to "Upgrade" button
+- **Settings Tab** - Wired "Upgrade Now" button in Call Recording section
+- **Billing Tab** - Removed "Add Credits" button, shows actual card last4 from Stripe
+- **Referrals Tab** - Temporarily disabled with "coming soon" placeholder
 
-### 3. Provisioning Logic
-- `provision-vapi` now includes a safety check to EARLY EXIT if it encounters a test account, preventing accidental API calls to Twilio/Vapi.
+### New Edge Functions
+| Function | Purpose |
+|----------|---------|
+| `create-upgrade-checkout` | Handles plan upgrades safely (updates existing subscription OR creates Stripe Checkout) |
+| `get-billing-summary` | Fetches payment method details from Stripe (fails soft) |
 
-## How to Test
+### Plan Keys (Corrected)
+- `starter` | `professional` | `premium`
 
-1. **Apply Migration**: Run the SQL in `supabase/migrations/20251211000001_add_test_mode_columns.sql`.
-2. **Set Secrets**: Ensure `RINGSNAP_DEMO_TWILIO_NUMBER`, `RINGSNAP_DEMO_TWILIO_PHONE_SID`, `RINGSNAP_DEMO_VAPI_PHONE_ID`, and `RINGSNAP_DEMO_VAPI_ASSISTANT_ID` are set.
-3. **Run Signup**:
-   - Go to Signup page.
-   - Enter `99999` as ZIP Code.
-   - Complete signup.
-   - **Expect**: Immediate success, "Ready" status page, and the dashboard showing the Demo Twilio Number.
+### Deployment Requirements
 
-## Live Safety
-- Live signups (non-99999 ZIP) continue to use the existing `create-trial` logic, enforcing `billing_test_mode=false` and executing real Twilio/Vapi provisioning paths.
+1. **Deploy edge functions:**
+   ```bash
+   supabase functions deploy create-upgrade-checkout
+   supabase functions deploy get-billing-summary
+   ```
+
+2. **Set Stripe secrets (if not already set):**
+   ```bash
+   supabase secrets set STRIPE_PRICE_STARTER=price_xxx
+   supabase secrets set STRIPE_PRICE_PROFESSIONAL=price_xxx
+   supabase secrets set STRIPE_PRICE_PREMIUM=price_xxx
+   ```
+
+3. **Enable upgrades when ready:**
+   ```
+   VITE_FEATURE_UPGRADE_MODAL=true
+   ```
+
+### Testing Checklist
+- [ ] Header displays company name, first name, Vapi number
+- [ ] Upgrade button opens modal (with flag enabled) or billing portal (flag disabled)
+- [ ] Team tab loads members successfully
+- [ ] Billing tab shows card last4 (or graceful fallback)
+- [ ] Referrals tab shows "coming soon" without errors
+- [ ] Existing flows (signup, provisioning, billing portal) still work
+
+### Breaking Changes
+None - all changes are additive and feature-flagged.
