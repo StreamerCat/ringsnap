@@ -239,7 +239,7 @@ COMMENT ON FUNCTION public.is_within_service_hours IS 'Check if a given time fal
 -- ==============================================================================
 
 GRANT SELECT, INSERT, UPDATE ON public.appointments TO service_role;
-GRANT USAGE ON SEQUENCE public.appointments_id_seq TO service_role;
+-- GRANT USAGE ON SEQUENCE public.appointments_id_seq TO service_role; -- Removed: ID is UUID, no sequence exists
 
 GRANT SELECT ON public.account_service_hours TO authenticated;
 
