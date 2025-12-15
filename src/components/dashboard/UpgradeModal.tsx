@@ -23,15 +23,14 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
     // Normalize current plan key for comparison
     const normalizedCurrentPlan = (currentPlanKey?.toLowerCase() || "starter") as PlanKey;
 
-    // Get plans available for upgrade (higher than current)
-    const currentPlanIndex = DASHBOARD_PLANS.findIndex(p => p.key === normalizedCurrentPlan);
-    const availablePlans = DASHBOARD_PLANS.filter((_, index) => index > currentPlanIndex);
+    // Get all plans (allow downgrades/cross-grades)
+    const availablePlans = DASHBOARD_PLANS.filter(p => p.key !== normalizedCurrentPlan);
 
     const handleUpgrade = async () => {
         if (!selectedPlan) {
             toast({
                 title: "Select a Plan",
-                description: "Please select a plan to upgrade to.",
+                description: "Please select a plan to upgrade or change to.",
                 variant: "destructive",
             });
             return;
@@ -48,7 +47,7 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
 
             if (error) {
                 // Try to extract meaningful error message
-                let errorMessage = "Failed to start upgrade process.";
+                let errorMessage = "Failed to start plan change process.";
                 try {
                     if (error.message) {
                         const parsed = JSON.parse(error.message);
@@ -67,7 +66,7 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                 // Subscription was updated in-place (no checkout redirect needed)
                 toast({
                     title: "Plan Updated!",
-                    description: `Your plan has been upgraded to ${selectedPlan}. Changes take effect immediately.`,
+                    description: `Your plan has been changed to ${selectedPlan}. Changes take effect immediately.`,
                 });
                 onOpenChange(false);
                 // Refresh page to show updated plan
@@ -78,8 +77,8 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
         } catch (error: any) {
             console.error("Upgrade error:", error);
             toast({
-                title: "Upgrade Failed",
-                description: error.message || "Could not process upgrade. Please try again.",
+                title: "Change Plan Failed",
+                description: error.message || "Could not process plan change. Please try again.",
                 variant: "destructive",
             });
         } finally {
@@ -87,34 +86,9 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
         }
     };
 
-    // If already on the highest plan
-    if (availablePlans.length === 0) {
-        return (
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Sparkles className="h-5 w-5 text-primary" />
-                            You're on Our Best Plan!
-                        </DialogTitle>
-                        <DialogDescription>
-                            You're already on the Premium plan with all features included.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 text-center">
-                        <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 text-lg">
-                            Premium
-                        </Badge>
-                        <p className="mt-4 text-muted-foreground">
-                            Enjoy unlimited access to all RingSnap features!
-                        </p>
-                    </div>
-                    <Button onClick={() => onOpenChange(false)} className="w-full">
-                        Close
-                    </Button>
-                </DialogContent>
-            </Dialog>
-        );
+    // If no available plans (unlikely unless plans list is empty)
+    if (availablePlans.length === 0 && DASHBOARD_PLANS.length === 0) {
+        return null;
     }
 
     return (
@@ -123,29 +97,29 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-2xl">
                         <Sparkles className="h-6 w-6 text-primary" />
-                        Upgrade Your Plan
+                        Change Your Plan
                     </DialogTitle>
                     <DialogDescription>
-                        Get more minutes, AI receptionists, and advanced features.
+                        Upgrade or downgrade your plan to fit your needs.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4 md:grid-cols-2 lg:grid-cols-3">
                     {DASHBOARD_PLANS.map((plan) => {
                         const isCurrentPlan = plan.key === normalizedCurrentPlan;
-                        const isPlanSelectable = DASHBOARD_PLANS.indexOf(plan) > currentPlanIndex;
+                        const isPlanSelectable = !isCurrentPlan;
                         const isSelected = selectedPlan === plan.key;
 
                         return (
                             <Card
                                 key={plan.key}
                                 className={`relative cursor-pointer transition-all ${isCurrentPlan
-                                        ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
-                                        : isPlanSelectable
-                                            ? isSelected
-                                                ? "border-primary ring-2 ring-primary shadow-lg"
-                                                : "hover:border-primary/50 hover:shadow-md"
-                                            : "opacity-50 cursor-not-allowed"
+                                    ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
+                                    : isPlanSelectable
+                                        ? isSelected
+                                            ? "border-primary ring-2 ring-primary shadow-lg"
+                                            : "hover:border-primary/50 hover:shadow-md"
+                                        : "opacity-50 cursor-not-allowed"
                                     }`}
                                 onClick={() => {
                                     if (isPlanSelectable) {
