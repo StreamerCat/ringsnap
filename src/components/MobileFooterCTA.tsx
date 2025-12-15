@@ -1,11 +1,19 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, Calculator } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export const MobileFooterCTA = () => {
   const [showCTA, setShowCTA] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const handleSignup = () => {
+    navigate({
+      pathname: '/start',
+      search: searchParams.toString()
+    });
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,7 +30,7 @@ export const MobileFooterCTA = () => {
   if (!showCTA) return null;
 
   return (
-    <div 
+    <div
       className="fixed bottom-0 left-0 right-0 z-50 md:hidden backdrop-blur-xl border-t animate-in slide-in-from-bottom"
       style={{
         background: 'linear-gradient(to top, white 0%, hsl(var(--cream) / 0.3) 100%)',
@@ -35,14 +43,14 @@ export const MobileFooterCTA = () => {
         <Button
           className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md text-sm font-semibold"
           aria-label="Start your free 3-day trial with RingSnap AI receptionist"
-          onClick={() => navigate('/start')}
+          onClick={handleSignup}
         >
           <PhoneCall className="w-4 h-4" />
           <span className="ml-1.5">Start Trial</span>
         </Button>
         <Button
           className="flex-1 h-12 rounded-full bg-white border-2 active:scale-95 transition-transform shadow-sm text-sm font-semibold"
-          style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+          style={{ borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))' }}
           aria-label="Calculate potential revenue from missed calls with RingSnap"
           onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })}
         >

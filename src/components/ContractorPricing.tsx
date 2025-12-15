@@ -2,10 +2,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Check, Zap, Phone, Crown, Calculator, CheckCircle, Clock, Lock, Star, PhoneCall } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export const ContractorPricing = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const handleSignup = () => {
+    navigate({
+      pathname: '/start',
+      search: searchParams.toString()
+    });
+  };
+
   const comparisonData = [
     { option: "Full-time Receptionist", cost: "$3,000-4,000/month", issues: "Benefits, sick days, 9-5 only" },
     { option: "Answering Service", cost: "$500-1,200/month", issues: "Robotic, can't book appointments" },
@@ -79,8 +88,8 @@ export const ContractorPricing = () => {
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style={{color: 'hsl(var(--charcoal))'}}>
-            Pricing as simple as <span style={{color: 'hsl(var(--primary))'}}>a handshake</span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style={{ color: 'hsl(var(--charcoal))' }}>
+            Pricing as simple as <span style={{ color: 'hsl(var(--primary))' }}>a handshake</span>
           </h2>
           <p className="text-fluid-body text-muted-foreground leading-relaxed">
             Transparent pricing. No setup fees. Cancel anytime.
@@ -107,11 +116,10 @@ export const ContractorPricing = () => {
               <h3 className="font-bold text-lg mb-4 text-center">Compare Your Options</h3>
               <div className="space-y-3">
                 {comparisonData.map((item, index) => (
-                  <div 
-                    key={index} 
-                    className={`flex items-center justify-between p-4 rounded-lg border ${
-                      index === 2 ? 'border-primary bg-primary/5' : 'bg-muted/30'
-                    }`}
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between p-4 rounded-lg border ${index === 2 ? 'border-primary bg-primary/5' : 'bg-muted/30'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       {index === 2 ? (
@@ -137,33 +145,31 @@ export const ContractorPricing = () => {
         {/* Pricing Tiers */}
         <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto items-stretch">
           {pricingTiers.map((tier, index) => (
-            <Card 
-              key={index} 
-              className={`relative flex flex-col h-full ${
-                tier.badge 
-                  ? 'card-pricing-popular' 
-                  : 'card-tier-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-300'
-              }`}
+            <Card
+              key={index}
+              className={`relative flex flex-col h-full ${tier.badge
+                ? 'card-pricing-popular'
+                : 'card-tier-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-300'
+                }`}
             >
-                {tier.badge && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                    <Badge className="px-4 py-1.5 text-xs font-bold rounded-full bg-primary text-white animate-pulse-subtle">
-                      {tier.badge}
-                    </Badge>
-                  </div>
-                )}
-                
-                <CardHeader className="text-center pb-4">
-                  <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                    tier.badge ? 'bg-primary' : 'bg-cream'
+              {tier.badge && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+                  <Badge className="px-4 py-1.5 text-xs font-bold rounded-full bg-primary text-white animate-pulse-subtle">
+                    {tier.badge}
+                  </Badge>
+                </div>
+              )}
+
+              <CardHeader className="text-center pb-4">
+                <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${tier.badge ? 'bg-primary' : 'bg-cream'
                   }`}>
-                    <tier.icon className="w-8 h-8" style={{color: tier.badge ? 'white' : 'hsl(var(--primary))'}} />
-                  </div>
+                  <tier.icon className="w-8 h-8" style={{ color: tier.badge ? 'white' : 'hsl(var(--primary))' }} />
+                </div>
                 <CardTitle className="text-xl sm:text-2xl">{tier.name}</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">{tier.description}</CardDescription>
                 <div className="pt-3 sm:pt-4">
-                  <div className="text-4xl sm:text-5xl font-bold" style={{color: 'hsl(var(--charcoal))'}}>{tier.price}</div>
-                  <div className="text-sm" style={{color: 'hsl(var(--charcoal) / 0.6)'}}>per month</div>
+                  <div className="text-4xl sm:text-5xl font-bold" style={{ color: 'hsl(var(--charcoal))' }}>{tier.price}</div>
+                  <div className="text-sm" style={{ color: 'hsl(var(--charcoal) / 0.6)' }}>per month</div>
                 </div>
               </CardHeader>
 
@@ -178,10 +184,9 @@ export const ContractorPricing = () => {
                 <ul className="space-y-3">
                   {tier.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2">
-                      <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color: 'hsl(var(--primary))'}} />
-                      <span className={`text-sm ${
-                        feature.includes('PLUS') ? 'font-semibold text-primary' : ''
-                      }`}>
+                      <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'hsl(var(--primary))' }} />
+                      <span className={`text-sm ${feature.includes('PLUS') ? 'font-semibold text-primary' : ''
+                        }`}>
                         {feature}
                       </span>
                     </li>
@@ -190,14 +195,13 @@ export const ContractorPricing = () => {
 
                 {/* CTA */}
                 <Button
-                  className={`w-full h-12 text-lg rounded-full transition-all ${
-                    tier.badge
-                      ? 'bg-primary text-white hover:opacity-90 shadow-md'
-                      : 'bg-white border-2 hover:shadow-md'
-                  }`}
-                  style={tier.badge ? {} : {borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+                  className={`w-full h-12 text-lg rounded-full transition-all ${tier.badge
+                    ? 'bg-primary text-white hover:opacity-90 shadow-md'
+                    : 'bg-white border-2 hover:shadow-md'
+                    }`}
+                  style={tier.badge ? {} : { borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))' }}
                   size="lg"
-                  onClick={() => navigate('/start')}
+                  onClick={handleSignup}
                 >
                   {tier.cta}
                 </Button>
@@ -250,10 +254,10 @@ export const ContractorPricing = () => {
 
         {/* Usage Guide Section */}
         <div className="max-w-4xl mx-auto mt-12 p-8 rounded-xl border-2 bg-background" style={{ borderColor: 'rgba(44, 54, 57, 0.2)' }}>
-          <h3 className="text-2xl font-bold text-center mb-8" style={{color: 'hsl(var(--charcoal))'}}>
+          <h3 className="text-2xl font-bold text-center mb-8" style={{ color: 'hsl(var(--charcoal))' }}>
             How Many Minutes Do I Need?
           </h3>
-          
+
           <div className="text-center mb-8 text-muted-foreground">
             <p className="text-lg">Average call length: <span className="font-semibold text-charcoal">3-4 minutes</span></p>
           </div>
@@ -328,10 +332,10 @@ export const ContractorPricing = () => {
         {/* Final Strong CTA - Condensed */}
         <div className="max-w-4xl mx-auto mt-12 text-center space-y-6 p-6 rounded-2xl bg-gradient-to-br from-cream/30 to-white border-2 border-primary/20">
           <div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3" style={{color: 'hsl(var(--charcoal))'}}>
-              Your Next Customer Is Calling. <span style={{color: 'hsl(var(--primary))'}}>Will You Answer?</span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
+              Your Next Customer Is Calling. <span style={{ color: 'hsl(var(--primary))' }}>Will You Answer?</span>
             </h2>
-            <p className="text-base leading-relaxed" style={{color: 'hsl(var(--charcoal) / 0.7)'}}>
+            <p className="text-base leading-relaxed" style={{ color: 'hsl(var(--charcoal) / 0.7)' }}>
               Join 1,200+ contractors who never miss a call with RingSnap
             </p>
           </div>
@@ -340,15 +344,15 @@ export const ContractorPricing = () => {
             <Button
               size="lg"
               className="text-base h-12 px-6 font-semibold rounded-full bg-primary text-white hover:opacity-90 shadow-lg"
-              onClick={() => navigate('/start')}
+              onClick={handleSignup}
             >
               <PhoneCall className="mr-2 w-4 h-4" />
               Start Free Trial
             </Button>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="text-base h-12 px-6 font-semibold rounded-full bg-white border-2 hover:shadow-md"
-              style={{borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))'}}
+              style={{ borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))' }}
               onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })}
             >
               <Calculator className="mr-2 w-4 h-4" />
