@@ -16,12 +16,16 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    // Enable source maps for production to allow Sentry to show readable stack traces
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-toast', '@radix-ui/react-tabs'],
         },
+        // Include source maps in separate files (not inline) for Sentry upload
+        sourcemapExcludeSources: false,
       },
     },
   },

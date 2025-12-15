@@ -4,24 +4,146 @@ import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
 import "./index.css";
 
+// Get environment and release info
+const environment = import.meta.env.MODE || "production";
+const release = import.meta.env.VITE_SENTRY_RELEASE || "unknown";
+
 // Initialize Sentry for error tracking
 Sentry.init({
-  dsn: "https://1f6b5bec7383a2bdc6f65ec86bf977f0@o4510524163096576.ingest.us.sentry.io/4510524183609344",
+  // Use environment variable for DSN if available, otherwise fallback to hardcoded
+  dsn: import.meta.env.VITE_SENTRY_DSN || "https://1f6b5bec7383a2bdc6f65ec86bf977f0@o4510524163096576.ingest.us.sentry.io/4510524183609344",
+  environment,
+  release,
+
   integrations: [
     Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration(),
+    Sentry.replayIntegration({
+      // Mask all text and input content by default for privacy
+      maskAllText: true,
+      maskAllInputs: true,
+      // Block all media (images, videos, etc) for privacy
+      blockAllMedia: true,
+    }),
     // Capture console errors automatically
-    Sentry.consoleLoggingIntegration({ levels: ["error", "warn"] }),
+    Sentry.consoleLoggingIntegration({ levels: ["error"] }), // Only errors, not warns
   ],
+
   // Logging
   _experiments: {
     enableLogs: true,
   },
-  // Performance Monitoring
-  tracesSampleRate: 0.02, // Sample 2% of transactions for performance monitoring
-  // Session Replay
-  replaysSessionSampleRate: 0.1, // Sample 10% of sessions
+
+  // Performance Monitoring - Low sampling for minimal overhead
+  tracesSampleRate: 0.03, // Sample 3% of transactions
+
+  // Session Replay - Error-only to minimize noise and storage costs
+  replaysSessionSampleRate: 0, // Do not capture normal sessions
   replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions with errors
+
+  // Redact sensitive data before sending to Sentry
+  beforeSend(event, hint) {
+    // Redact sensitive fields from all contexts
+    const sensitivePatterns = [
+      "email",
+      "phone",
+      "token",
+      "secret",
+      "authorization",
+      "cookie",
+      "transcript",
+      "raw_audio",
+      "card",
+      "password",
+      "apikey",
+      "api_key",
+      "stripe_key",
+      "publishable_key",
+    ];
+
+    const redactObject = (obj: any): any => {
+      if (!obj || typeof obj !== "object") return obj;
+
+      if (Array.isArray(obj)) {
+        return obj.map(item => redactObject(item));
+      }
+
+      const redacted: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const keyLower = key.toLowerCase();
+        const shouldRedact = sensitivePatterns.some(pattern => keyLower.includes(pattern));
+
+        if (shouldRedact) {
+          redacted[key] = "[REDACTED]";
+        } else if (value && typeof value === "object") {
+          redacted[key] = redactObject(value);
+        } else {
+          redacted[key] = value;
+        }
+      }
+      return redacted;
+    };
+
+    // Redact request data
+    if (event.request) {
+      event.request = redactObject(event.request);
+    }
+
+    // Redact extra context
+    if (event.extra) {
+      event.extra = redactObject(event.extra);
+    }
+
+    // Redact user data (keep only id)
+    if (event.user) {
+      const userId = event.user.id;
+      event.user = { id: userId };
+    }
+
+    // Redact breadcrumbs
+    if (event.breadcrumbs) {
+      event.breadcrumbs = event.breadcrumbs.map(breadcrumb => ({
+        ...breadcrumb,
+        data: redactObject(breadcrumb.data),
+      }));
+    }
+
+    return event;
+  },
+
+  // Ignore common non-actionable errors
+  ignoreErrors: [
+    // Network errors (often not actionable)
+    "NetworkError",
+    "Network request failed",
+    "Failed to fetch",
+    "Load failed",
+
+    // Aborted requests (user navigated away)
+    "AbortError",
+    "The operation was aborted",
+
+    // ResizeObserver loop errors (benign browser quirk)
+    "ResizeObserver loop",
+
+    // Browser extension errors
+    "Extension context invalidated",
+    "chrome-extension://",
+    "moz-extension://",
+
+    // Permissions errors (expected in some cases)
+    "NotAllowedError",
+
+    // Non-errors
+    "Non-Error",
+  ],
+
+  // Ignore errors from third-party scripts
+  denyUrls: [
+    // Browser extensions
+    /extensions\//i,
+    /^chrome:\/\//i,
+    /^moz-extension:\/\//i,
+  ],
 });
 
 // Global error handler to catch any unhandled errors
