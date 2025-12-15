@@ -66,8 +66,8 @@ export const featureFlags: FeatureFlags = {
   // Debug logging disabled by default
   debugSignup: parseBoolEnv(import.meta.env.VITE_DEBUG_SIGNUP, false),
 
-  // Upgrade modal DISABLED by default (kill switch - enable when ready)
-  upgradeModalEnabled: parseBoolEnv(import.meta.env.VITE_FEATURE_UPGRADE_MODAL, false),
+  // Upgrade modal ENABLED by default (plan selection must happen in RingSnap UI)
+  upgradeModalEnabled: parseBoolEnv(import.meta.env.VITE_FEATURE_UPGRADE_MODAL, true),
 };
 
 /**
