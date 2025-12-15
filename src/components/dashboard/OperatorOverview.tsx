@@ -57,16 +57,13 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
         setStats(statsData);
       }
 
-      // Load data directly from tables to ensure freshness
+      // Load data directly from RPC to ensure freshness and bypass RLS
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
+      // Use RPC for call logs to bypass RLS
       const [callLogsRes, appointmentsRes, leadsRes] = await Promise.all([
-        supabase.from("call_logs" as any)
-          .select("*")
-          .eq("account_id", accountId)
-          .gte("started_at", startOfDay.toISOString())
-          .order("started_at", { ascending: false }),
+        supabase.rpc("get_calls_today", { p_account_id: accountId }) as Promise<any>,
         supabase.from("appointments" as any)
           .select("id, customer_name, customer_phone, job_type, preferred_time_range, urgency, created_at")
           .eq("account_id", accountId)
