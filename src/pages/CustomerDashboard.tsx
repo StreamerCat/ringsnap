@@ -25,6 +25,31 @@ import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
 
+// DEBUG COMPONENT
+function DebugCallCount({ accountId }: { accountId?: string }) {
+  const [count, setCount] = React.useState<number | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!accountId) return;
+    const check = async () => {
+      const { count, error } = await supabase
+        .from('call_logs' as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('account_id', accountId);
+
+      if (error) setError(error.message);
+      else setCount(count);
+    }
+    check();
+  }, [accountId]);
+
+  return <div className="mt-2 text-blue-600">
+    Live Call Logs Count (Direct DB Check): <strong>{count !== null ? count : 'Loading...'}</strong>
+    {error && <div className="text-red-500">Error: {error}</div>}
+  </div>
+}
+
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -346,6 +371,18 @@ export default function CustomerDashboard() {
             />
           </div>
         )}
+
+        {/* DEBUG PANEL - TEMPORARY */}
+        <div className="p-4 bg-muted/50 rounded-lg border border-dashed mb-6 text-xs font-mono">
+          <h3 className="font-bold mb-2">🔍 Debug Info</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <div>Account ID: {account?.id}</div>
+            <div>Date Filter: {new Date().setHours(0, 0, 0, 0)} ({new Date(new Date().setHours(0, 0, 0, 0)).toISOString()})</div>
+            <div>Provisioning Status: {account?.provisioning_status}</div>
+            <div>Phone: {account?.vapi_phone_number}</div>
+          </div>
+          <DebugCallCount accountId={account?.id} />
+        </div>
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
