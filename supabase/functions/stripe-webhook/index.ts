@@ -310,16 +310,17 @@ serve(async (req) => {
       }
 
       // Parse signature header
-      const signatureObj: Record<string, string> = {};
+      const signatureObj: { t?: string, v1: string[] } = { v1: [] };
       signature.split(',').forEach((pair) => {
         const [key, value] = pair.split('=');
-        signatureObj[key] = value;
+        if (key === 't') signatureObj.t = value;
+        if (key === 'v1') signatureObj.v1.push(value);
       });
 
       const timestamp = signatureObj.t;
-      const signatureV1 = signatureObj.v1;
+      const signaturesV1 = signatureObj.v1;
 
-      if (!timestamp || !signatureV1) {
+      if (!timestamp || signaturesV1.length === 0) {
         logError('Invalid stripe-signature format', baseLogOptions);
         return new Response(
           JSON.stringify({ error: 'Invalid signature format' }),
@@ -364,7 +365,16 @@ serve(async (req) => {
         .join('');
 
       // Compare signatures (constant-time comparison)
-      if (expectedSignature !== signatureV1) {
+      // Check if ANY of the provided signatures match the expected one
+      let isVerified = false;
+      for (const sig of signaturesV1) {
+        if (sig === expectedSignature) {
+          isVerified = true;
+          break;
+        }
+      }
+
+      if (!isVerified) {
         logError('Invalid webhook signature', baseLogOptions);
         return new Response(
           JSON.stringify({ error: 'Invalid signature' }),
@@ -635,6 +645,7 @@ serve(async (req) => {
         break;
       }
 
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         const customerId = subscription.customer;

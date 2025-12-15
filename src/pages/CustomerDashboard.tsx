@@ -347,6 +347,9 @@ export default function CustomerDashboard() {
               account={account}
               trialDaysRemaining={trialDaysRemaining}
               creditsBalance={creditsBalance}
+              onRefresh={() => {
+                if (profile?.id) loadDashboardData(profile.id);
+              }}
             />
           </TabsContent>
 
