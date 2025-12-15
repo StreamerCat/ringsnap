@@ -25,30 +25,6 @@ import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
 
-// DEBUG COMPONENT
-function DebugCallCount({ accountId }: { accountId?: string }) {
-  const [count, setCount] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!accountId) return;
-    const check = async () => {
-      const { count, error } = await supabase
-        .from('call_logs' as any)
-        .select('*', { count: 'exact', head: true })
-        .eq('account_id', accountId);
-
-      if (error) setError(error.message);
-      else setCount(count);
-    }
-    check();
-  }, [accountId]);
-
-  return <div className="mt-2 text-blue-600">
-    Live Call Logs Count (Direct DB Check): <strong>{count !== null ? count : 'Loading...'}</strong>
-    {error && <div className="text-red-500">Error: {error}</div>}
-  </div>
-}
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
@@ -179,12 +155,17 @@ export default function CustomerDashboard() {
       // Load parallel data (removed referral_codes fetch to avoid errors)
       // Switch from usage_logs to calls table
       const [phonesRes, assistantsRes, callsRes, creditsRes, referralsRes] = await Promise.all([
-        supabase.from("phone_numbers").select("*").eq("account_id", accountId),
-        supabase.from("assistants").select("*").eq("account_id", accountId),
-        (supabase.from("call_logs" as any).select("*").eq("account_id", accountId).gte("started_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("started_at", { ascending: false }).limit(50) as Promise<any>),
-        supabase.from("account_credits").select("*").eq("account_id", accountId).order("created_at", { ascending: false }),
-        supabase.from("referrals").select("*").eq("referrer_account_id", accountId).order("created_at", { ascending: false }),
+        supabase.from("phone_numbers").select("*").eq("account_id", accountId) as Promise<any>,
+        supabase.from("assistants").select("*").eq("account_id", accountId) as Promise<any>,
+        supabase.rpc("get_recent_calls", { p_account_id: accountId, p_limit: 50 }) as Promise<any>,
+        supabase.from("account_credits").select("*").eq("account_id", accountId).order("created_at", { ascending: false }) as Promise<any>,
+        supabase.from("referrals").select("*").eq("referrer_account_id", accountId).order("created_at", { ascending: false }) as Promise<any>,
       ]);
+
+      if (callsRes.error) {
+        console.error("Error fetching calls:", callsRes.error);
+        // Fallback to empty if RPC fails (e.g. not applied yet)
+      }
 
       setPhoneNumbers(phonesRes.data || []);
       setAssistants(assistantsRes.data || []);
@@ -260,7 +241,8 @@ export default function CustomerDashboard() {
             },
             (payload) => {
               console.log('New call received:', payload);
-              setUsageLogs(prev => [payload.new as any, ...prev]);
+              // Since we use RPC, we can just reload data, or optimistic update.
+              // Reload is safest to respect RPC logic/formatting.
               if (user) loadDashboardData(user.id);
             }
           )
@@ -371,18 +353,6 @@ export default function CustomerDashboard() {
             />
           </div>
         )}
-
-        {/* DEBUG PANEL - TEMPORARY */}
-        <div className="p-4 bg-muted/50 rounded-lg border border-dashed mb-6 text-xs font-mono">
-          <h3 className="font-bold mb-2">🔍 Debug Info</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <div>Account ID: {account?.id}</div>
-            <div>Date Filter: {new Date().setHours(0, 0, 0, 0)} ({new Date(new Date().setHours(0, 0, 0, 0)).toISOString()})</div>
-            <div>Provisioning Status: {account?.provisioning_status}</div>
-            <div>Phone: {account?.vapi_phone_number}</div>
-          </div>
-          <DebugCallCount accountId={account?.id} />
-        </div>
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
