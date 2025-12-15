@@ -690,6 +690,77 @@ serve(async (req) => {
         break;
       }
 
+      case 'checkout.session.completed': {
+        // Handle completed checkout sessions (trial → paid conversion)
+        const session = event.data.object;
+        const accountId = session.metadata?.account_id;
+        const planKey = session.metadata?.plan_key;
+        const customerId = session.customer;
+        const subscriptionId = session.subscription;
+
+        logInfo('Checkout session completed', {
+          ...baseLogOptions,
+          context: {
+            sessionId: session.id,
+            accountId,
+            planKey,
+            customerId: customerId?.substring?.(0, 15) + '...',
+            subscriptionId: subscriptionId?.substring?.(0, 15) + '...',
+          }
+        });
+
+        if (accountId && planKey) {
+          // Update account with new subscription info
+          const updateData: Record<string, unknown> = {
+            plan_type: planKey,
+            subscription_status: 'active',
+            account_status: 'active',
+          };
+
+          if (subscriptionId) {
+            updateData.stripe_subscription_id = subscriptionId;
+          }
+
+          const { error: updateError } = await supabase
+            .from('accounts')
+            .update(updateData)
+            .eq('id', accountId);
+
+          if (updateError) {
+            logError('Failed to update account after checkout', {
+              ...baseLogOptions,
+              accountId,
+              error: updateError,
+            });
+          } else {
+            currentAccountId = accountId;
+            logInfo('Account updated from checkout session', {
+              ...baseLogOptions,
+              accountId,
+              context: { planKey, subscriptionId }
+            });
+          }
+        } else if (customerId) {
+          // Fallback: find account by customer ID
+          const { data: account } = await supabase
+            .from('accounts')
+            .select('id')
+            .eq('stripe_customer_id', customerId)
+            .maybeSingle();
+
+          if (account) {
+            currentAccountId = account.id;
+            logInfo('Checkout completed but missing metadata, account found by customer', {
+              ...baseLogOptions,
+              accountId: account.id,
+              context: { customerId }
+            });
+          }
+        }
+
+        break;
+      }
+
       default:
         logInfo('Unhandled Stripe webhook event', {
           ...baseLogOptions,
