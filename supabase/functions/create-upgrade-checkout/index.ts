@@ -129,7 +129,7 @@ serve(async (req) => {
 
         // 5. Get Stripe Price ID from secrets
         const priceSecretName = PLAN_KEY_TO_SECRET[planKey];
-        const priceId = Deno.env.get(priceSecretName);
+        const priceId = Deno.env.get(priceSecretName)?.trim();
 
         if (!priceId) {
             log(`Missing Stripe price secret: ${priceSecretName}`);
