@@ -169,6 +169,11 @@ async function createVapiAssistant(
     ? "nPczCjzI2devNBz1zQrb"  // Brian
     : "21m00Tcm4TlvDq8ikWAM"; // Rachel
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serverUrl = supabaseUrl
+    ? `${supabaseUrl.replace(/\/$/, "")}/functions/v1/vapi-webhook`
+    : undefined;
+
   const assistantPayload = {
     name: `${metadata.company_name} Assistant`,
     model: {
@@ -186,6 +191,7 @@ async function createVapiAssistant(
       voiceId: voiceId,
     },
     firstMessage: `Thank you for calling ${metadata.company_name}! How can I help you today?`,
+    serverUrl: serverUrl,
   };
 
   logInfo("Creating Vapi assistant", {
