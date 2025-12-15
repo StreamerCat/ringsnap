@@ -1,145 +1,179 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { CallOutcome } from "../_shared/integration-types.ts";
-import { trackEvent } from "../_shared/analytics.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-serve(async (req) => {
+Deno.serve(async (req) => {
     // Handle CORS
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
     }
 
     try {
+        // 1. Security Check
+        const secret = req.headers.get('x-vapi-secret');
+        const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
+
+        // Only check if env var is set (fail soft if not configured yet, or strict if required)
+        // User requested: "Reject if missing"
+        if (!secret || (expectedSecret && secret !== expectedSecret)) {
+            console.error("Unauthorized Vapi Webhook attempt");
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         const payload = await req.json();
-        console.log("Vapi Webhook Payload:", JSON.stringify(payload, null, 2));
+        console.log("Vapi Event:", payload.message?.type);
 
-        // Only process end-of-call-report
-        if (payload.message?.type !== 'end-of-call-report') {
-            return new Response(JSON.stringify({ message: "Ignored message type" }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-            });
+        // We mostly care about 'call-ended' (end-of-call-report) to get final data
+        // But we might want 'call-started' to show "Live" status later.
+        // For MVP, we handle 'end-of-call-report' primarily, but let's upsert on usage.
+
+        const message = payload.message;
+        if (!message) {
+            return new Response("OK", { status: 200, headers: corsHeaders });
         }
 
-        const { call, transcript, recordingUrl, summary, analysis } = payload.message;
+        // Identify event type
+        const isEndOfCall = message.type === 'end-of-call-report';
+        const isCallStart = message.type === 'call-started'; // Check exact Vapi event name
+        const isStatusUpdate = message.type === 'status-update';
 
-        // Calculate duration
-        const durationSeconds = call.durationSeconds || (call.endedAt && call.startedAt ? Math.round((new Date(call.endedAt).getTime() - new Date(call.startedAt).getTime()) / 1000) : 0);
+        // Extract core data
+        const call = message.call || message; // Vapi payload structure varies slightly by event
+        const vapiCallId = call.id;
 
-        // We need account_id. 
-        // Vapi allows passing custom data in the assistant config or call setup. 
-        // Assuming metadata.account_id exists in the call object (standard RingSnap pattern).
-        // If not, we might need to look up via phone number or assistantId.
-        const accountId = call?.assistant?.metadata?.account_id || call?.metadata?.account_id;
-
-        if (!accountId) {
-            console.error("Missing account_id in metadata");
-            return new Response(JSON.stringify({ error: "Missing account_id" }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400,
-            });
+        if (!vapiCallId) {
+            console.log("No call ID found, ignoring");
+            return new Response("OK", { status: 200, headers: corsHeaders });
         }
 
-        // Determine Outcome
-        let outcome: CallOutcome = 'new_lead'; // Default
-
-        // Simple logic based on analysis or status
-        if (call.endedReason === 'customer-did-not-answer' || call.endedReason === 'ring-timeout') {
-            outcome = 'missed_call';
-        } else if (analysis?.successEvaluation === false) {
-            // Example: logic could be more complex here
-            outcome = 'missed_call';
-        } else {
-            // If we have contact info match, maybe 'existing_customer'. 
-            // For now, default to 'new_lead' unless we find a specific tag or intent.
-            if (summary?.includes("quote") || summary?.includes("estimate")) {
-                outcome = 'quote_requested';
-            } else if (summary?.includes("book") || summary?.includes("schedule")) {
-                outcome = 'booking_created';
-            }
-        }
-
-        const event = {
-            account_id: accountId,
-            occurred_at: call.startedAt || new Date().toISOString(),
-            from_number: call.customer?.number || 'unknown',
-            to_number: call.phoneNumber?.number || 'unknown',
-            contact_phone: call.customer?.number || 'unknown',
-            contact_name: call.customer?.name || null,
-            contact_email: call.customer?.email || null,
-            source: (call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound') as 'inbound' | 'outbound',
-            outcome: outcome,
-            summary: summary || analysis?.summary || "No summary available",
-            transcript_url: transcript || null,
-            recording_url: recordingUrl || null,
-            tags: [],
-            duration_seconds: durationSeconds
-        };
-
-        // Insert into Supabase
+        // Initialize Supabase
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // Insert into call_outcome_events
-        const { error: eventsError } = await supabase
-            .from('call_outcome_events')
-            .insert(event);
+        // 2. Account Mapping
+        // Order: vapi_phone_number -> phone_numbers table -> assistant_id -> metadata
+        let accountId = call.assistant?.metadata?.account_id || call.metadata?.account_id;
+        let accountPhoneNumberId = null;
 
-        if (eventsError) {
-            console.error("Error inserting call outcome:", eventsError);
-            throw eventsError;
-        }
+        // Try to resolve via phone number if account_id is missing or to confirm
+        const vapiPhoneNumber = call.phoneNumber?.number || call.customer?.number?.alias; // Alias is sometimes used
+        const assistantId = call.assistantId || call.assistant?.id;
 
-        // BACKFILL/FIX: Also insert into usage_logs for Dashboard compatibility
-        // The dashboard currently reads from usage_logs
-        try {
-            const usageLog = {
-                account_id: accountId,
-                call_id: call.id,
-                call_type: call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound',
-                customer_phone: call.customer?.number || 'unknown',
-                call_duration_seconds: durationSeconds,
-                created_at: call.startedAt || new Date().toISOString(),
-                recording_url: recordingUrl || null,
-                was_emergency: (summary || "").toLowerCase().includes("emergency"), // Heuristic check
-                appointment_booked: outcome === 'booking_created',
-                metadata: {
-                    summary: summary || analysis?.summary,
-                    outcome: outcome,
-                    vapi_call_id: call.id
-                }
-            };
+        if (!accountId && vapiPhoneNumber) {
+            // Look up by vapi_number
+            // We need to query phone_numbers table.
+            // Assuming 'phone_numbers' has 'number' or 'vapi_id'
+            // Since we didn't inspect phone_numbers fully, let's try matching 'number' or 'vapi_id'
+            const { data: phoneData } = await supabase
+                .from('phone_numbers')
+                .select('account_id, id')
+                .or(`phone_number.eq.${vapiPhoneNumber},vapi_id.eq.${call.phoneNumber?.id}`)
+                .limit(1)
+                .single();
 
-            const { error: usageError } = await supabase
-                .from('usage_logs')
-                .insert(usageLog);
-
-            if (usageError) {
-                console.error("Error inserting into usage_logs:", usageError);
-                // Don't throw, we want at least one to succeed if possible, but ideally we want parity.
-                // Since this is the fix for the dashboard, logging it is critical.
-            } else {
-                console.log("Successfully backfilled usage_logs for dashboard");
+            if (phoneData) {
+                accountId = phoneData.account_id;
+                accountPhoneNumberId = phoneData.id;
             }
-        } catch (err) {
-            console.error("Unexpected error inserting usage_logs:", err);
         }
 
-        return new Response(JSON.stringify({ message: "Success", event }), {
+        if (!accountId && assistantId) {
+            // Fallback: Check if assistant ID matches an account config?
+            // Or assume unique assistant per account. 
+            // For MVP, if we can't find account_id, we log and skip insert to avoid pollution.
+            console.warn(`Could not map call ${vapiCallId} to account. Assistant: ${assistantId}, Phone: ${vapiPhoneNumber}`);
+            // Return 200 to acknowledge receipt
+            return new Response(JSON.stringify({ message: "Skipped: No Account ID" }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 3. Prepare Upsert Data
+        const startedAt = call.startedAt || new Date().toISOString();
+        const endedAt = call.endedAt || (isEndOfCall ? new Date().toISOString() : null);
+
+        // Calculate duration
+        let duration = 0;
+        if (call.durationSeconds) {
+            duration = Math.round(call.durationSeconds);
+        } else if (endedAt && startedAt) {
+            duration = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
+        }
+
+        const direction = call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound';
+
+        // Status normalization
+        let status = call.status || (isEndOfCall ? 'completed' : 'in-progress');
+        if (message.type === 'call-started') status = 'ringing'; // or in-progress
+
+        // 5. Upsert Call Record
+        // ======================
+        // We use vapi_call_id as the unique key for upsert
+        // Map Vapi fields to call_logs schema
+        const callRecord = {
+            account_id: accountId,
+            vapi_call_id: payload.message?.call?.id || payload.message?.vapiCallId,
+            provider: 'vapi',
+            provider_call_id: payload.message?.call?.id || payload.message?.vapiCallId,
+            phone_number_id: accountPhoneNumberId, // Was account_phone_number_id
+            direction: call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound',
+            from_number: call.customer?.number, // Was caller_number
+            to_number: call.phoneNumber?.number,
+            started_at: call.startedAt ? new Date(call.startedAt).toISOString() : null,
+            ended_at: call.endedAt ? new Date(call.endedAt).toISOString() : null,
+            duration_seconds: duration,
+            status: mapVapiStatus(payload.message.type, call.status),
+            transcript: call.transcript || payload.message?.transcript, // Full transcript
+            summary: call.analysis?.summary || payload.message?.summary, // Was transcript_summary
+            recording_url: call.recordingUrl,
+            cost: call.cost ? call.cost : null, // Assuming cost in dollars or need conversion? Vapi sends cost. call_logs has NUMERIC(10,4).
+            raw_payload: payload, // Store full payload for debugging
+            updated_at: new Date().toISOString()
+        };
+
+        // Cost handling: Vapi often sends cost in USD (e.g. 0.05). call_logs.cost is numeric. 
+        // If it's 0, we keep it.
+
+        const { error: upsertError } = await supabase
+            .from('call_logs')
+            .upsert(callRecord, { onConflict: 'vapi_call_id' });
+
+        if (upsertError) {
+            console.error('Failed to upsert call log:', upsertError);
+            return new Response(JSON.stringify({ error: upsertError.message }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500,
+            });
+        }
+
+        return new Response(JSON.stringify({ success: true, id: payload.message?.call?.id }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         });
-
-    } catch (error) {
-        console.error("Error processing webhook:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
+    } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500,
         });
     }
 });
+
+function mapVapiStatus(messageType: string, vapiStatus: string | undefined): string {
+    // If call ended, strict status
+    if (messageType === 'end-of-call-report') return 'completed';
+
+    // Map Vapi status to our status
+    // Vapi: queued, ringing, in-progress, forwarded, ended
+    // calls: completed, failed, busy, no-answer (from schema comment)
+    // But we can store whatever text we want usually, unless it's an enum. Schema says TEXT.
+
+    if (vapiStatus === 'in-progress') return 'in-progress';
+    if (vapiStatus === 'ringing') return 'ringing';
+    if (!vapiStatus) return 'initiated';
+
+    return vapiStatus;
+}

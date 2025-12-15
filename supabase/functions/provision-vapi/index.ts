@@ -196,7 +196,7 @@ async function createVapiAssistant(
 
   logInfo("Creating Vapi assistant", {
     ...baseLogOptions,
-    context: { companyName: metadata.company_name, voice: voiceId },
+    context: { companyName: metadata.company_name, voice: voiceId, serverUrl },
   });
 
   const vapiResponse = await fetch(`${VAPI_BASE_URL}/assistant`, {

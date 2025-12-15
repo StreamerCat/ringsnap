@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS usage_logs (
 ALTER TABLE usage_logs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their account usage
+DROP POLICY IF EXISTS "Users can view their account usage" ON usage_logs;
 CREATE POLICY "Users can view their account usage"
 ON usage_logs FOR SELECT
 USING (account_id = get_user_account_id(auth.uid()));
