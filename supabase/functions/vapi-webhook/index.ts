@@ -85,31 +85,50 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        const { error } = await supabase
+        // Insert into call_outcome_events
+        const { error: eventsError } = await supabase
             .from('call_outcome_events')
             .insert(event);
 
-        if (error) {
-            console.error("Error inserting call outcome:", error);
-            throw error;
+        if (eventsError) {
+            console.error("Error inserting call outcome:", eventsError);
+            throw eventsError;
         }
 
-        // Track Lead Created in Analytics
-        if (outcome === 'new_lead' || outcome === 'quote_requested' || outcome === 'booking_created') {
-            await trackEvent(supabase, accountId, null, 'lead_created', {
+        // BACKFILL/FIX: Also insert into usage_logs for Dashboard compatibility
+        // The dashboard currently reads from usage_logs
+        try {
+            const usageLog = {
+                account_id: accountId,
                 call_id: call.id,
-                outcome: outcome,
-                summary_snippet: summary?.substring(0, 100)
-            });
-        }
+                call_type: call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound',
+                customer_phone: call.customer?.number || 'unknown',
+                call_duration_seconds: durationSeconds,
+                created_at: call.startedAt || new Date().toISOString(),
+                recording_url: recordingUrl || null,
+                was_emergency: (summary || "").toLowerCase().includes("emergency"), // Heuristic check
+                appointment_booked: outcome === 'booking_created',
+                metadata: {
+                    summary: summary || analysis?.summary,
+                    outcome: outcome,
+                    vapi_call_id: call.id
+                }
+            };
 
-        // Always track call completed
-        await trackEvent(supabase, accountId, null, 'call_completed', {
-            call_id: call.id,
-            duration: durationSeconds,
-            outcome: outcome,
-            direction: call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound'
-        });
+            const { error: usageError } = await supabase
+                .from('usage_logs')
+                .insert(usageLog);
+
+            if (usageError) {
+                console.error("Error inserting into usage_logs:", usageError);
+                // Don't throw, we want at least one to succeed if possible, but ideally we want parity.
+                // Since this is the fix for the dashboard, logging it is critical.
+            } else {
+                console.log("Successfully backfilled usage_logs for dashboard");
+            }
+        } catch (err) {
+            console.error("Unexpected error inserting usage_logs:", err);
+        }
 
         return new Response(JSON.stringify({ message: "Success", event }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
