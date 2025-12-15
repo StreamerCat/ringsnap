@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Star } from "lucide-react";
-import { UnifiedSignupRouter } from "@/components/signup/UnifiedSignupRouter";
+
 import { SiteHeader } from "@/components/SiteHeader";
 import { TradeConfig } from "./tradeConfig";
 
@@ -11,12 +11,22 @@ interface TradeHeroProps {
 }
 
 export const TradeHero = ({ config }: TradeHeroProps) => {
-  const [showSignupForm, setShowSignupForm] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const scrollToVapiDemo = () => {
     document.getElementById('vapi-chat-container')?.scrollIntoView({
       behavior: 'smooth'
     });
+  };
+
+  const handleSignup = () => {
+    // preserve existing params
+    const newParams = new URLSearchParams(searchParams);
+    // add/overwrite trade specific param
+    newParams.set('trade', config.slug);
+
+    navigate(`/start?${newParams.toString()}`);
   };
 
   return (
@@ -29,10 +39,10 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
           <div className="absolute top-20 -right-40 w-96 h-96 gradient-core opacity-10 blur-3xl rounded-full" />
           <div className="absolute bottom-20 -left-40 w-96 h-96 gradient-secondary opacity-10 blur-3xl rounded-full" />
         </div>
-        
+
         <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-28">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            
+
             {/* Left Column */}
             <div>
               <div className="space-y-8">
@@ -46,33 +56,33 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                 <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold text-charcoal">
                   {config.hero.headline}
                 </h1>
-                
+
                 <div className="space-y-4">
                   <p className="text-2xl sm:text-3xl leading-tight font-bold text-charcoal/90">
                     {config.hero.subheadline}
                   </p>
                 </div>
-                
+
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-all"
-                    onClick={() => setShowSignupForm(true)}
+                    onClick={handleSignup}
                   >
                     <PhoneCall className="mr-2" />
                     Start Free Trial
                   </Button>
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     variant="outline"
-                    className="text-lg h-14 px-8 font-semibold rounded-full transition-all hover:shadow-md" 
+                    className="text-lg h-14 px-8 font-semibold rounded-full transition-all hover:shadow-md"
                     onClick={scrollToVapiDemo}
                   >
                     Demo
                   </Button>
                 </div>
-              
+
                 {/* Trust Badges */}
                 <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-charcoal/5">
                   <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
@@ -90,7 +100,7 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                 </div>
               </div>
             </div>
-            
+
             {/* Right Column - Transcript */}
             <div className="relative">
               <div className="relative p-1 rounded-3xl bg-gradient-to-br from-primary/20 to-cream/20">
@@ -98,11 +108,11 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                   <Badge className="absolute -top-3 -right-3 px-4 py-1.5 text-xs font-bold rounded-full shadow-xl bg-primary text-primary-foreground">
                     {config.hero.pickupStat} pickup
                   </Badge>
-                  
+
                   <div className="text-xs text-foreground/40 uppercase tracking-wider mb-4">
                     Live call transcript
                   </div>
-                  
+
                   <div className="space-y-3 text-sm leading-relaxed">
                     <div>
                       <span className="font-semibold text-primary">AI:</span>
@@ -120,7 +130,7 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                       <span className="font-semibold text-primary">AI:</span>
                       <span className="text-foreground/80"> {config.hero.transcriptScenario.ai3}</span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 pt-4 border-t border-foreground/5">
                       <div className="flex items-center gap-1">
                         <div className="w-1 h-4 rounded animate-pulse bg-primary" />
@@ -133,7 +143,7 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-white rounded-full shadow-2xl border border-charcoal/20">
                 <div className="text-center">
                   <span className="text-2xl font-bold text-metric text-primary">95%</span>
@@ -141,15 +151,8 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                 </div>
               </div>
             </div>
-            
-          </div>
 
-          <UnifiedSignupRouter 
-            mode="trial" 
-            open={showSignupForm} 
-            onOpenChange={setShowSignupForm} 
-            source={`${config.slug}-hero`}
-          />
+          </div>
         </div>
       </section>
     </>
