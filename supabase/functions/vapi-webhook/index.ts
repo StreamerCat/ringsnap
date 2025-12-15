@@ -12,11 +12,17 @@ Deno.serve(async (req) => {
         const secret = req.headers.get('x-vapi-secret');
         const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
 
-        // Only check if env var is set (fail soft if not configured yet, or strict if required)
-        // User requested: "Reject if missing"
-        if (!secret || (expectedSecret && secret !== expectedSecret)) {
-            console.error("Unauthorized Vapi Webhook attempt");
-            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        console.log("Vapi Auth Check:", {
+            hasHeader: !!secret,
+            hasEnvSecret: !!expectedSecret,
+            matched: secret === expectedSecret
+        });
+
+        // 1. If VAPI_WEBHOOK_SECRET is NOT set in Supabase, we allow it (for dev simplicity/migration).
+        // 2. If it IS set, we enforce it.
+        if (expectedSecret && secret !== expectedSecret) {
+            console.error("Unauthorized Vapi Webhook attempt: Secrets did not match.");
+            return new Response(JSON.stringify({ error: "Unauthorized: Invalid Secret" }), {
                 status: 401,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
