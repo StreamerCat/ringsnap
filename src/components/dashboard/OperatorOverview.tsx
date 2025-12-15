@@ -57,13 +57,62 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
         setStats(statsData);
       }
 
+      // Load data directly from tables to ensure freshness
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const [callLogsRes, appointmentsRes, leadsRes] = await Promise.all([
+        supabase.from("call_logs" as any)
+          .select("*")
+          .eq("account_id", accountId)
+          .gte("started_at", startOfDay.toISOString())
+          .order("started_at", { ascending: false }),
+        supabase.from("appointments" as any)
+          .select("id, customer_name, customer_phone, job_type, preferred_time_range, urgency, created_at")
+          .eq("account_id", accountId)
+          .eq("status", "pending_confirmation")
+          .order("urgency", { ascending: false, nullsLast: true } as any)
+          .order("created_at", { ascending: true })
+          .limit(10),
+        supabase.from("customer_leads" as any)
+          .select("id, customer_name, customer_phone, intent, urgency, created_at, call_summary")
+          .eq("account_id", accountId)
+          .gte("created_at", startOfDay.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
+
+      if (callLogsRes.error) {
+        console.error("Failed to load call logs:", callLogsRes.error);
+      } else if (callLogsRes.data) {
+        // Manual aggregation for "Calls Today" to update instantly
+        const count = callLogsRes.data.length;
+        const duration = callLogsRes.data.reduce((acc: number, c: any) => acc + (c.duration_seconds || 0), 0);
+        const lastCall = callLogsRes.data.length > 0 ? callLogsRes.data[0].started_at : null;
+
+        setStats(prev => ({
+          ...prev!, // Assumes statsData loaded or partial update
+          // Fallbacks if prev is null
+          calls_today: count,
+          call_duration_seconds_today: duration,
+          leads_today: prev?.leads_today || 0,
+          new_leads_today: prev?.new_leads_today || 0,
+          appointment_requests_today: prev?.appointment_requests_today || 0,
+          emergency_leads_today: prev?.emergency_leads_today || 0,
+          pending_appointments: prev?.pending_appointments || 0,
+          emergency_appointments: prev?.emergency_appointments || 0,
+          last_call_at: lastCall,
+          last_lead_at: prev?.last_lead_at || null
+        }));
+      }
+
       // Load pending appointments
       const { data: appointmentsData, error: appointmentsError } = await supabase
-        .from("appointments")
+        .from("appointments" as any)
         .select("id, customer_name, customer_phone, job_type, preferred_time_range, urgency, created_at")
         .eq("account_id", accountId)
         .eq("status", "pending_confirmation")
-        .order("urgency", { ascending: false, nullsLast: true })
+        .order("urgency", { ascending: false, nullsLast: true } as any)
         .order("created_at", { ascending: true })
         .limit(10);
 
@@ -78,7 +127,7 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
       today.setHours(0, 0, 0, 0);
 
       const { data: leadsData, error: leadsError } = await supabase
-        .from("customer_leads")
+        .from("customer_leads" as any)
         .select("id, customer_name, customer_phone, intent, urgency, created_at, call_summary")
         .eq("account_id", accountId)
         .gte("created_at", today.toISOString())

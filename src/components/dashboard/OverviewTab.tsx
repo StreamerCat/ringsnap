@@ -70,7 +70,7 @@ export function OverviewTab({
                     <CardContent>
                         <div className="flex items-center gap-2">
                             <div className="text-2xl font-bold">
-                                {account.vapi_phone_number || "Provisioning..."}
+                                {(account.vapi_phone_number && account.vapi_phone_number !== "") ? account.vapi_phone_number : "Provisioning..."}
                             </div>
                             {account.vapi_phone_number && (
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyPhoneNumber}>
@@ -131,7 +131,8 @@ export function OverviewTab({
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {account.monthly_minutes_used} / {account.monthly_minutes_limit}
+                            {/* Calculate used minutes from usageLogs (which are calls now) */}
+                            {Math.ceil(usageLogs.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) / 60)} / {account.monthly_minutes_limit}
                         </div>
                         <Progress value={usagePercent} className="mt-2" />
                         <p className="text-xs text-muted-foreground mt-2">
@@ -172,7 +173,7 @@ export function OverviewTab({
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date</TableHead>
-                                    <TableHead>Customer Phone</TableHead>
+                                    <TableHead>Caller</TableHead>
                                     <TableHead>Duration</TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
@@ -181,18 +182,12 @@ export function OverviewTab({
                                 {usageLogs.slice(0, 10).map((log) => (
                                     <TableRow key={log.id}>
                                         <TableCell>
-                                            {new Date(log.created_at).toLocaleDateString()} {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(log.started_at).toLocaleDateString()} {new Date(log.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </TableCell>
-                                        <TableCell>{log.customer_phone || 'Unknown'}</TableCell>
-                                        <TableCell>{Math.ceil(log.call_duration_seconds / 60)} min</TableCell>
+                                        <TableCell>{log.from_number || log.to_number || 'Unknown'}</TableCell>
+                                        <TableCell>{Math.ceil((log.duration_seconds || 0) / 60)} min</TableCell>
                                         <TableCell>
-                                            {log.appointment_booked ? (
-                                                <Badge variant="default" className="bg-green-600">Appointment</Badge>
-                                            ) : log.was_emergency ? (
-                                                <Badge variant="destructive">Emergency</Badge>
-                                            ) : (
-                                                <Badge variant="secondary">Call</Badge>
-                                            )}
+                                            <Badge variant="secondary" className="capitalize">{log.status}</Badge>
                                         </TableCell>
                                     </TableRow>
                                 ))}

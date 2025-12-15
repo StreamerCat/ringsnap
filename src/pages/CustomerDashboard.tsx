@@ -57,23 +57,23 @@ export default function CustomerDashboard() {
     };
     initData();
 
-    // Set up Realtime subscription for usage_logs
+    // Set up Realtime subscription for calls
     let subscription: any = null;
     const setupRealtimeSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user && account?.id) {
         subscription = supabase
-          .channel('usage_logs_changes')
+          .channel('calls_changes')
           .on(
             'postgres_changes',
             {
               event: 'INSERT',
               schema: 'public',
-              table: 'usage_logs',
+              table: 'calls',
               filter: `account_id=eq.${account.id}`
             },
             (payload) => {
-              console.log('New usage log received:', payload);
+              console.log('New call received:', payload);
               // Add new log to state
               setUsageLogs(prev => [payload.new as any, ...prev]);
               // Optionally reload full dashboard data for updated stats
@@ -96,6 +96,36 @@ export default function CustomerDashboard() {
       }
     };
   }, [account?.id]);
+
+  // Polling for provisioning status
+  useEffect(() => {
+    let pollingInterval: NodeJS.Timeout;
+
+    if (account && account.provisioning_status !== 'completed' && !account.period_end) {
+      // We poll if not completed or if it looks like we are waiting for something. 
+      // Checking 'completed' is the main thing.
+      // Also check if vapi_phone_number is missing.
+      const shouldPoll = account.provisioning_status !== 'completed' || !account.vapi_phone_number;
+
+      if (shouldPoll) {
+        pollingInterval = setInterval(async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Reload just the account/profile part to be lightweight?
+            // Or just call loadDashboardData.
+            // Let's call a lighter weight refresh or full load.
+            // Full load is safer to ensure all dependent data (like phone_numbers table) is also refreshed.
+            console.log("Polling for provisioning updates...");
+            loadDashboardData(user.id);
+          }
+        }, 5000);
+      }
+    }
+
+    return () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+    };
+  }, [account, account?.provisioning_status, account?.vapi_phone_number]);
 
   const loadDashboardData = async (userId: string) => {
     try {
@@ -122,17 +152,24 @@ export default function CustomerDashboard() {
       const accountId = profileData.account_id;
 
       // Load parallel data (removed referral_codes fetch to avoid errors)
-      const [phonesRes, assistantsRes, logsRes, creditsRes, referralsRes] = await Promise.all([
+      // Switch from usage_logs to calls table
+      const [phonesRes, assistantsRes, callsRes, creditsRes, referralsRes] = await Promise.all([
         supabase.from("phone_numbers").select("*").eq("account_id", accountId),
         supabase.from("assistants").select("*").eq("account_id", accountId),
-        supabase.from("usage_logs").select("*").eq("account_id", accountId).gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }).limit(50),
+        (supabase.from("call_logs" as any).select("*").eq("account_id", accountId).gte("started_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("started_at", { ascending: false }).limit(50) as Promise<any>),
         supabase.from("account_credits").select("*").eq("account_id", accountId).order("created_at", { ascending: false }),
         supabase.from("referrals").select("*").eq("referrer_account_id", accountId).order("created_at", { ascending: false }),
       ]);
 
       setPhoneNumbers(phonesRes.data || []);
       setAssistants(assistantsRes.data || []);
-      setUsageLogs(logsRes.data || []);
+      setUsageLogs(callsRes.data || []); // We'll keep the state name 'usageLogs' for now to minimize refactors in child props, or rename it. 
+      // Rename state is cleaner: setUsageLogs -> setCalls
+      // But to follow "Minimal changes" and since I'm passing it to OverviewTab as usageLogs, I'll keep the variable name wrapper or refactor carefully. 
+      // Actually, I'll rename the state variable in a separate step or just cast it here. 
+      // Let's stick to using 'usageLogs' state variable but holding 'calls' data, 
+      // however 'calls' schema is different. I need to update OverviewTab to handle 'calls' schema.
+
       setAccountCredits(creditsRes.data || []);
       setReferrals(referralsRes.data || []);
 
@@ -160,11 +197,53 @@ export default function CustomerDashboard() {
     }
   };
 
+  // Helper to calculate usage from calls
   const calculateUsagePercent = () => {
     if (!account) return 0;
-    return Math.round((account.monthly_minutes_used / account.monthly_minutes_limit) * 100);
+    // Sum duration_seconds from usageLogs (which are now call_logs)
+    // Filter for current billing period if possible, or just this month
+    // MVP: Sum all loaded calls (last 30 days) or ideally respect billing cycle.
+    // For MVP "Usage is not updating", we'll just sum the loaded calls for now or fetch aggregate.
+    // Better: Filter logs by current month.
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const minutesUsed = usageLogs
+      .filter((c: any) => c.started_at >= startOfMonth)
+      .reduce((acc: number, c: any) => acc + (c.duration_seconds || 0), 0) / 60;
+
+    return Math.round((minutesUsed / account.monthly_minutes_limit) * 100);
   };
 
+  // Realtime subscription update
+  useEffect(() => {
+    // ...auth check...
+    // Set up Realtime subscription for call_logs
+    let subscription: any = null;
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && account?.id) {
+        subscription = supabase
+          .channel('call_logs_changes')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'call_logs',
+              filter: `account_id=eq.${account.id}`
+            },
+            (payload) => {
+              console.log('New call received:', payload);
+              setUsageLogs(prev => [payload.new as any, ...prev]);
+              if (user) loadDashboardData(user.id);
+            }
+          )
+          .subscribe();
+      }
+    };
+    // ...
+  }, [account?.id]);
   const calculateRemainingMinutes = () => {
     if (!account) return 0;
     return Math.max(0, account.monthly_minutes_limit - account.monthly_minutes_used);
