@@ -650,12 +650,37 @@ serve(async (req) => {
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
-        // Sync subscription status
+        // Extract price ID to sync plan type
+        const priceId = subscription.items?.data?.[0]?.price?.id;
+        let planTypeUpdate = {};
+
+        if (priceId) {
+          // Map price ID back to plan key
+          const starterPrice = Deno.env.get('STRIPE_PRICE_STARTER')?.trim();
+          const professionalPrice = Deno.env.get('STRIPE_PRICE_PROFESSIONAL')?.trim();
+          const premiumPrice = Deno.env.get('STRIPE_PRICE_PREMIUM')?.trim();
+
+          let planKey = null;
+          if (priceId === starterPrice) planKey = 'starter';
+          else if (priceId === professionalPrice) planKey = 'professional';
+          else if (priceId === premiumPrice) planKey = 'premium';
+
+          if (planKey) {
+            planTypeUpdate = { plan_type: planKey };
+            logInfo(`Syncing plan type from Stripe webhook: ${planKey}`, {
+              ...baseLogOptions,
+              context: { customerId, priceId }
+            });
+          }
+        }
+
+        // Sync subscription status and plan
         await supabase
           .from('accounts')
           .update({
             subscription_status: subscription.status,
-            stripe_subscription_id: subscription.id
+            stripe_subscription_id: subscription.id,
+            ...planTypeUpdate
           })
           .eq('stripe_customer_id', customerId);
 

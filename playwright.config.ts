@@ -9,7 +9,7 @@ export default defineConfig({
     reporter: 'html',
     timeout: 30000,
     use: {
-        baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173',
+        baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8080',
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },
@@ -22,7 +22,7 @@ export default defineConfig({
     // Only start webServer if PLAYWRIGHT_BASE_URL is not set and not in CI
     webServer: process.env.PLAYWRIGHT_BASE_URL || process.env.CI ? undefined : {
         command: 'npm run dev',
-        url: 'http://localhost:5173',
+        url: 'http://localhost:8080',
         reuseExistingServer: true,
         timeout: 60000,
     },

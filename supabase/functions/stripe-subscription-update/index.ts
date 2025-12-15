@@ -31,8 +31,8 @@ serve(async (req) => {
         if (!account_id || !plan_key) throw new Error('Missing params');
 
         const secretName = PLAN_KEY_TO_SECRET[plan_key];
-        const priceId = Deno.env.get(secretName || '');
-        if (!priceId) throw new Error('Invalid plan key or missing price config');
+        const priceId = Deno.env.get(secretName || '')?.trim();
+        if (!priceId) throw new Error(`Invalid plan key or missing price config for ${plan_key}`);
 
         const { data: account } = await supabaseClient
             .from('accounts')
