@@ -87,10 +87,9 @@ CREATE POLICY "Users can view their account leads"
   FOR SELECT
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_roles.account_id = customer_leads.account_id
-        AND user_roles.user_id = auth.uid()
+    account_id IN (
+      SELECT account_id FROM public.account_members
+      WHERE user_id = auth.uid()
     )
   );
 
@@ -100,10 +99,9 @@ CREATE POLICY "Users can create leads for their account"
   FOR INSERT
   TO authenticated
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_roles.account_id = customer_leads.account_id
-        AND user_roles.user_id = auth.uid()
+    account_id IN (
+      SELECT account_id FROM public.account_members
+      WHERE user_id = auth.uid()
     )
   );
 
@@ -113,17 +111,15 @@ CREATE POLICY "Users can update their account leads"
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_roles.account_id = customer_leads.account_id
-        AND user_roles.user_id = auth.uid()
+    account_id IN (
+      SELECT account_id FROM public.account_members
+      WHERE user_id = auth.uid()
     )
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_roles.account_id = customer_leads.account_id
-        AND user_roles.user_id = auth.uid()
+    account_id IN (
+      SELECT account_id FROM public.account_members
+      WHERE user_id = auth.uid()
     )
   );
 
