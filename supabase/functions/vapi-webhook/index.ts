@@ -70,7 +70,8 @@ Deno.serve(async (req) => {
             const { data: phoneData } = await supabase
                 .from('phone_numbers')
                 .select('account_id, id')
-                .or(`phone_number.eq.${vapiPhoneNumber},vapi_id.eq.${call.phoneNumber?.id}`)
+                // Fix: Check vapi_phone_id (actual column) OR vapi_id (legacy)
+                .or(`phone_number.eq.${vapiPhoneNumber},vapi_phone_id.eq.${call.phoneNumber?.id},vapi_id.eq.${call.phoneNumber?.id}`)
                 .limit(1)
                 .single();
 
