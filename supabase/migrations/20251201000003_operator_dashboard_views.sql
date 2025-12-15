@@ -7,12 +7,12 @@ SELECT
   account_id,
   COUNT(*) as calls_count,
   SUM(duration_seconds) as total_duration_seconds,
-  SUM(cost_cents) as total_cost_cents,
+  SUM(cost) as total_cost_cents,
   ROUND(AVG(duration_seconds)) as avg_duration_seconds,
-  MAX(created_at) as last_call_at
-FROM public.usage_logs
-WHERE created_at >= CURRENT_DATE
-  AND created_at < CURRENT_DATE + INTERVAL '1 day'
+  MAX(started_at) as last_call_at
+FROM public.call_logs
+WHERE started_at >= CURRENT_DATE
+  AND started_at < CURRENT_DATE + INTERVAL '1 day'
 GROUP BY account_id;
 
 -- View: Leads today by account
