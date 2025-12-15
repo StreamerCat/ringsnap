@@ -27,10 +27,10 @@ import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
 
 // DEBUG COMPONENT
 function DebugCallCount({ accountId }: { accountId?: string }) {
-  const [count, setCount] = React.useState<number | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [count, setCount] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!accountId) return;
     const check = async () => {
       const { count, error } = await supabase
