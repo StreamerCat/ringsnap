@@ -87,6 +87,12 @@ Deno.serve(async (req) => {
             const vapiApiKey = Deno.env.get("VAPI_API_KEY");
             if (!vapiApiKey) throw new Error("VAPI_API_KEY not configured");
 
+            // Construct Webhook URL
+            const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+            const serverUrl = supabaseUrl
+                ? `${supabaseUrl.replace(/\/$/, "")}/functions/v1/vapi-webhook`
+                : undefined;
+
             // Patch the assistant
             const vapiRes = await fetch(`${VAPI_BASE_URL}/assistant/${account.vapi_assistant_id}`, {
                 method: "PATCH",
@@ -102,7 +108,8 @@ Deno.serve(async (req) => {
                                 content: template_body
                             }
                         ]
-                    }
+                    },
+                    serverUrl: serverUrl
                 })
             });
 
