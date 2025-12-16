@@ -5,6 +5,19 @@
 [build.environment]
   # Stripe publishable key is meant to be public; tell Netlify not to treat it as a secret
   SECRETS_SCAN_OMIT_KEYS = "VITE_STRIPE_PUBLISHABLE_KEY"
+  # Sentry release tagging using Netlify's commit reference
+  VITE_SENTRY_RELEASE = "${COMMIT_REF}"
+
+# Optional: Install Netlify's Sentry Build Plugin for automatic source map upload
+# Run: netlify plugins:install netlify-plugin-sentry
+# Or add to netlify.toml:
+#
+# [[plugins]]
+#   package = "netlify-plugin-sentry"
+#   [plugins.inputs]
+#     sentryOrg = "your-sentry-org"
+#     sentryProject = "your-sentry-project"
+#     sentryAuthToken = "${SENTRY_AUTH_TOKEN}"  # Set as Netlify env var
 
 # SPA fallback - serve index.html for all routes so React Router can handle routing
 [[redirects]]
