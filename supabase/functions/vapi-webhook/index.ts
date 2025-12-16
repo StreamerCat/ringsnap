@@ -136,20 +136,37 @@ Deno.serve(async (req) => {
         }
 
         // ========================================
-        // 3. Security Check (optional)
+        // 3. Security Check
         // ========================================
-        const secret = req.headers.get('x-vapi-secret');
+        const authMode = Deno.env.get('VAPI_WEBHOOK_AUTH_MODE') || 'secret';
         const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
+        const incomingSecret = req.headers.get('x-vapi-secret');
 
-        if (expectedSecret && secret !== expectedSecret) {
-            console.error(JSON.stringify({
-                event: "vapi_webhook_unauthorized",
-                providerCallId,
-            }));
-            return new Response(JSON.stringify({ error: "Unauthorized" }), {
-                status: 401,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
+        // Only enforce if mode is 'secret' (default) AND a secret is actually configured
+        if (authMode === 'secret' && expectedSecret) {
+            if (!incomingSecret || incomingSecret !== expectedSecret) {
+                const errorMsg = incomingSecret ? "Secret mismatch" : "Missing secret header";
+
+                // Write to inbox so we can debug *why* it failed (e.g. wrong config)
+                await writeToInbox(supabase, {
+                    provider_call_id: providerCallId,
+                    provider_phone_number_id: providerPhoneNumberId,
+                    reason: "unauthorized",
+                    payload: body,
+                    error: errorMsg,
+                });
+
+                console.error(JSON.stringify({
+                    event: "vapi_webhook_unauthorized",
+                    providerCallId,
+                    error: errorMsg
+                }));
+
+                return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                    status: 401,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
         }
 
         // ========================================
