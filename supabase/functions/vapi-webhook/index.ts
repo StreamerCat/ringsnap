@@ -1,85 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
+import { extractCallDetails, VapiCall, VapiMessage } from "./call_parser.ts";
 
 /**
  * Vapi Webhook Handler
  * 
  * Processes Vapi server events (call-started, end-of-call-report, status-update)
  * and upserts call data into call_logs table.
- * 
- * Mapping Strategy:
- * 1. Primary: provider_phone_number_id → phone_numbers.provider_phone_number_id
- * 2. Secondary: e164 → phone_numbers.e164_number OR phone_numbers.phone_number
- * 
- * On any failure, writes to call_webhook_inbox for debugging.
  */
-
-interface VapiCall {
-    id?: string;
-    type?: string;
-    status?: string;
-    startedAt?: string;
-    createdAt?: string; // Fallback
-    endedAt?: string;
-    durationSeconds?: number;
-    phoneNumberId?: string; // New field seen in payload
-    transport?: {
-        to?: string;
-        from?: string;
-    };
-    customer?: {
-        number?: string;
-        name?: string;
-    };
-    phoneNumber?: {
-        id?: string;
-        number?: string;
-    };
-    assistant?: {
-        id?: string;
-        metadata?: {
-            account_id?: string;
-        };
-    };
-    assistantId?: string;
-    transcript?: string;
-    recordingUrl?: string;
-    cost?: number;
-    analysis?: {
-        summary?: string;
-        successEvaluation?: boolean | string;
-        structuredData?: Record<string, unknown>;
-    };
-    // Tool results for booking detection
-    messages?: Array<{
-        role?: string;
-        toolCalls?: Array<{
-            function?: {
-                name?: string;
-                arguments?: string;
-            };
-        }>;
-        toolCallResult?: {
-            name?: string;
-            result?: string;
-        };
-    }>;
-    toolCalls?: Array<{
-        name?: string;
-        arguments?: Record<string, unknown>;
-        result?: unknown;
-    }>;
-}
-
-interface VapiMessage {
-    type: string;
-    call?: VapiCall;
-    transcript?: string;
-    summary?: string;
-    endedAt?: string; // Message-level endedAt
-    recordingUrl?: string;
-    cost?: number;
-}
 
 interface MappingResult {
     accountId: string | null;
@@ -93,7 +21,6 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders });
     }
 
-    // Initialize Supabase early for inbox writes
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -103,26 +30,20 @@ Deno.serve(async (req) => {
     let providerPhoneNumberId: string | null = null;
 
     try {
-        // ========================================
-        // 1. Parse and normalize payload
-        // ========================================
         body = await req.json();
 
+        // Normalize message vs body structure
         const message: VapiMessage = (body as any).message ?? body;
         const type = message.type;
 
         if (!type) {
-            // Not a structured Vapi event, acknowledge silently
             return new Response("OK", { status: 200, headers: corsHeaders });
         }
 
         const call: VapiCall = message.call ?? (message as unknown as VapiCall);
         providerCallId = call.id ?? null;
-
-        // Robust extraction of PhoneNumberID
         providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
 
-        // Structured log
         console.log(JSON.stringify({
             event: "vapi_webhook_received",
             type,
@@ -131,9 +52,7 @@ Deno.serve(async (req) => {
             hasCall: !!call.id,
         }));
 
-        // ========================================
-        // 2. Validate required fields
-        // ========================================
+        // Validation
         if (!providerCallId) {
             await writeToInbox(supabase, {
                 provider_call_id: null,
@@ -146,19 +65,14 @@ Deno.serve(async (req) => {
             return new Response("OK", { status: 200, headers: corsHeaders });
         }
 
-        // ========================================
-        // 3. Security Check
-        // ========================================
+        // Security Check
         const authMode = Deno.env.get('VAPI_WEBHOOK_AUTH_MODE') || 'secret';
         const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
         const incomingSecret = req.headers.get('x-vapi-secret');
 
-        // Only enforce if mode is 'secret' (default) AND a secret is actually configured
         if (authMode === 'secret' && expectedSecret) {
             if (!incomingSecret || incomingSecret !== expectedSecret) {
                 const errorMsg = incomingSecret ? "Secret mismatch" : "Missing secret header";
-
-                // Write to inbox so we can debug *why* it failed (e.g. wrong config)
                 await writeToInbox(supabase, {
                     provider_call_id: providerCallId,
                     provider_phone_number_id: providerPhoneNumberId,
@@ -166,23 +80,11 @@ Deno.serve(async (req) => {
                     payload: body,
                     error: errorMsg,
                 });
-
-                console.error(JSON.stringify({
-                    event: "vapi_webhook_unauthorized",
-                    providerCallId,
-                    error: errorMsg
-                }));
-
-                return new Response(JSON.stringify({ error: "Unauthorized" }), {
-                    status: 401,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
+                return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
             }
         }
 
-        // ========================================
-        // 4. Map to account (sequential lookups)
-        // ========================================
+        // Account Mapping
         const mappingResult = await mapToAccount(supabase, call);
 
         if (!mappingResult.accountId) {
@@ -193,26 +95,13 @@ Deno.serve(async (req) => {
                 payload: body,
                 error: `Could not map to account. Method tried: ${mappingResult.method}`,
             });
-            console.log(JSON.stringify({
-                event: "vapi_webhook_unmapped",
-                providerCallId,
-                providerPhoneNumberId,
-                method: mappingResult.method,
-            }));
-            return new Response(JSON.stringify({ message: "Skipped: unmapped" }), {
-                status: 200,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
+            return new Response(JSON.stringify({ message: "Skipped: unmapped" }), { status: 200, headers: corsHeaders });
         }
 
-        // ========================================
-        // 5. Build call record
-        // ========================================
+        // Extraction & Build Record
         const callRecord = buildCallRecord(call, message, mappingResult, body);
 
-        // ========================================
-        // 6. Upsert to call_logs
-        // ========================================
+        // Upsert
         const { error: upsertError } = await supabase
             .from('call_logs')
             .upsert(callRecord, { onConflict: 'vapi_call_id' });
@@ -225,35 +114,20 @@ Deno.serve(async (req) => {
                 payload: body,
                 error: upsertError.message,
             });
-            console.error(JSON.stringify({
-                event: "vapi_webhook_upsert_failed",
-                providerCallId,
-                error: upsertError.message,
-            }));
-            // Return 200 to prevent Vapi retries (we have the data in inbox)
-            return new Response(JSON.stringify({ error: "upsert_failed", stored_to_inbox: true }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-            });
+            console.error("Upsert failed:", upsertError);
+            return new Response(JSON.stringify({ error: "upsert_failed" }), { status: 200, headers: corsHeaders });
         }
 
         console.log(JSON.stringify({
             event: "vapi_webhook_success",
             type,
-            providerCallId,
-            accountId: mappingResult.accountId,
-            mappingMethod: mappingResult.method,
+            providerCallId
         }));
 
-        return new Response(JSON.stringify({ success: true, id: providerCallId }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-        });
+        return new Response(JSON.stringify({ success: true, id: providerCallId }), { status: 200, headers: corsHeaders });
 
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-
-        // Try to write to inbox on any error
         try {
             await writeToInbox(supabase, {
                 provider_call_id: providerCallId,
@@ -262,26 +136,14 @@ Deno.serve(async (req) => {
                 payload: body ?? { error: "failed to parse body" },
                 error: errorMessage,
             });
-        } catch (inboxErr) {
-            console.error("Failed to write to inbox:", inboxErr);
-        }
-
-        console.error(JSON.stringify({
-            event: "vapi_webhook_error",
-            providerCallId,
-            error: errorMessage,
-        }));
-
-        // Return 200 to prevent Vapi retries
-        return new Response(JSON.stringify({ error: errorMessage, stored_to_inbox: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-        });
+        } catch { }
+        console.error("Webhook exception:", errorMessage);
+        return new Response(JSON.stringify({ error: errorMessage }), { status: 200, headers: corsHeaders });
     }
 });
 
 /**
- * Map call to account using sequential lookups (not OR chains)
+ * Map call to account
  */
 async function mapToAccount(
     supabase: ReturnType<typeof createClient>,
@@ -290,66 +152,39 @@ async function mapToAccount(
     const providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId;
     const calleeE164 = call.phoneNumber?.number ?? call.transport?.to;
 
-    // Method 1: Check assistant metadata (fastest if set)
-    const metadataAccountId = call.assistant?.metadata?.account_id;
-    if (metadataAccountId) {
-        return { accountId: metadataAccountId, phoneNumberId: null, method: "metadata" };
+    // 1. Assistant Metadata
+    if (call.assistant?.metadata?.account_id) {
+        return { accountId: call.assistant.metadata.account_id, phoneNumberId: null, method: "metadata" };
     }
 
-    // Method 2: Primary - by provider_phone_number_id (new canonical column)
+    // 2. Provider Phone Number ID
     if (providerPhoneNumberId) {
         const { data } = await supabase
             .from('phone_numbers')
             .select('id, account_id')
             .eq('provider_phone_number_id', providerPhoneNumberId)
             .maybeSingle();
+        if (data?.account_id) return { accountId: data.account_id, phoneNumberId: data.id, method: "provider_phone_number_id" };
 
-        if (data?.account_id) {
-            return { accountId: data.account_id, phoneNumberId: data.id, method: "provider_phone_number_id" };
-        }
-
-        // Method 2b: Fallback to legacy vapi_phone_id column
-        const { data: legacyData } = await supabase
-            .from('phone_numbers')
-            .select('id, account_id')
-            .eq('vapi_phone_id', providerPhoneNumberId)
-            .maybeSingle();
-
-        if (legacyData?.account_id) {
-            return { accountId: legacyData.account_id, phoneNumberId: legacyData.id, method: "vapi_phone_id" };
-        }
+        // Legacy check
+        const { data: legacy } = await supabase.from('phone_numbers').select('id, account_id').eq('vapi_phone_id', providerPhoneNumberId).maybeSingle();
+        if (legacy?.account_id) return { accountId: legacy.account_id, phoneNumberId: legacy.id, method: "vapi_phone_id" };
     }
 
-    // Method 3: Secondary - by e164 number
+    // 3. E164 Number
     if (calleeE164) {
-        // Try new e164_number column first
-        const { data: e164Data } = await supabase
-            .from('phone_numbers')
-            .select('id, account_id')
-            .eq('e164_number', calleeE164)
-            .maybeSingle();
+        const { data } = await supabase.from('phone_numbers').select('id, account_id').eq('e164_number', calleeE164).maybeSingle();
+        if (data?.account_id) return { accountId: data.account_id, phoneNumberId: data.id, method: "e164_number" };
 
-        if (e164Data?.account_id) {
-            return { accountId: e164Data.account_id, phoneNumberId: e164Data.id, method: "e164_number" };
-        }
-
-        // Fallback to legacy phone_number column
-        const { data: legacyE164Data } = await supabase
-            .from('phone_numbers')
-            .select('id, account_id')
-            .eq('phone_number', calleeE164)
-            .maybeSingle();
-
-        if (legacyE164Data?.account_id) {
-            return { accountId: legacyE164Data.account_id, phoneNumberId: legacyE164Data.id, method: "phone_number" };
-        }
+        const { data: legacy } = await supabase.from('phone_numbers').select('id, account_id').eq('phone_number', calleeE164).maybeSingle();
+        if (legacy?.account_id) return { accountId: legacy.account_id, phoneNumberId: legacy.id, method: "phone_number" };
     }
 
     return { accountId: null, phoneNumberId: null, method: "none" };
 }
 
 /**
- * Build call record for upsert with outcome extraction
+ * Build call record
  */
 function buildCallRecord(
     call: VapiCall,
@@ -360,7 +195,7 @@ function buildCallRecord(
     const isEndOfCall = message.type === 'end-of-call-report';
     const isCallStarted = message.type === 'call-started';
 
-    // Timestamp & Duration Logic
+    // Normalize Timestamps
     const startedAt = call.startedAt ?? call.createdAt;
     const endedAt = call.endedAt ?? message.endedAt;
 
@@ -368,42 +203,24 @@ function buildCallRecord(
     if (call.durationSeconds) {
         durationSeconds = Math.round(call.durationSeconds);
     } else if (endedAt && startedAt) {
-        durationSeconds = Math.round(
-            (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000
-        );
+        durationSeconds = Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000);
     }
 
-    // Determine status
+    // Status
     let status = call.status || (isEndOfCall ? 'completed' : 'in-progress');
-    // Normalize Vapi status to our DB enum
     if (status === 'ringing' || status === 'queued') status = 'in_progress';
     if (isCallStarted) status = 'in_progress';
     if (isEndOfCall) status = 'completed';
 
-    // Direction
+    // Info
     const direction = call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound';
-
-    // Extract caller info
     const callerPhone = call.customer?.number ?? null;
-    const callerName = extractCallerName(call, message);
-    const reason = extractReason(call);
 
-    // Detect booking from tool calls
-    const bookingInfo = detectBooking(call, message);
-    const booked = bookingInfo.booked;
-    const appointmentStart = bookingInfo.appointmentStart;
-    const appointmentEnd = bookingInfo.appointmentEnd;
+    // Use Enahnced Parser
+    const details = extractCallDetails(call, message);
 
-    // Lead captured = has name AND phone, but only set on end-of-call
-    const leadCaptured = isEndOfCall && !!callerName && !!callerPhone;
-
-    // Determine outcome
-    let outcome: string | null = null;
-    if (isEndOfCall) {
-        if (booked) outcome = 'booked';
-        else if (leadCaptured) outcome = 'lead';
-        else outcome = 'other';
-    }
+    // Only capture outcome details on end-of-call to avoid overwrites
+    // BUT we still want to calculate them to see what we WOULD save
 
     const record: Record<string, unknown> = {
         account_id: mapping.accountId,
@@ -428,143 +245,23 @@ function buildCallRecord(
         record.recording_url = call.recordingUrl ?? message.recordingUrl ?? null;
         record.cost = call.cost ?? message.cost ?? null;
 
-        // Metadata fields
-        record.caller_name = callerName;
-        record.reason = reason;
-        record.outcome = outcome;
-        record.booked = booked;
-        record.lead_captured = leadCaptured;
-        if (appointmentStart) record.appointment_start = appointmentStart;
-        if (appointmentEnd) record.appointment_end = appointmentEnd;
+        // Rich Details from Parser
+        record.caller_name = details.callerName;
+        record.reason = details.reason;
+        record.outcome = details.outcome;
+        record.booked = details.booked;
+        record.lead_captured = details.leadCaptured;
+
+        if (details.appointmentStart) record.appointment_start = details.appointmentStart;
+        if (details.appointmentEnd) record.appointment_end = details.appointmentEnd;
+        if (details.appointmentWindow) record.appointment_window = details.appointmentWindow;
     }
 
     return record;
 }
 
 /**
- * Extract caller name with improved fallback
- */
-function extractCallerName(call: VapiCall, message: VapiMessage): string | null {
-    // 1. Check customer.name
-    if (call.customer?.name) return call.customer.name;
-
-    // 2. Check analysis structured data
-    const structuredData = call.analysis?.structuredData ?? (message as any).analysis?.structuredData;
-
-    if (structuredData) {
-        if (typeof structuredData.callerName === 'string') return structuredData.callerName;
-        if (typeof structuredData.customerName === 'string') return structuredData.customerName;
-        if (typeof structuredData.name === 'string') return structuredData.name;
-    }
-
-    // 3. Check tool calls arguments
-    if (call.toolCalls) {
-        for (const tc of call.toolCalls) {
-            const args = tc.arguments;
-            if (args) {
-                if (typeof args.customerName === 'string') return args.customerName;
-                if (typeof args.name === 'string') return args.name;
-            }
-        }
-    }
-
-    return null;
-}
-
-/**
- * Extract reason for call from summary or analysis
- */
-function extractReason(call: VapiCall): string | null {
-    // Check structured data first
-    if (call.analysis?.structuredData) {
-        const data = call.analysis.structuredData;
-        if (typeof data.reason === 'string') return data.reason;
-        if (typeof data.callReason === 'string') return data.callReason;
-        if (typeof data.intent === 'string') return data.intent;
-    }
-
-    // If summary is short enough, use it as reason
-    const summary = call.analysis?.summary;
-    if (summary && summary.length <= 200) {
-        return summary;
-    }
-
-    return null;
-}
-
-/**
- * Detect booking from tool calls or analysis
- */
-function detectBooking(call: VapiCall, message: VapiMessage): {
-    booked: boolean;
-    appointmentStart: string | null;
-    appointmentEnd: string | null;
-} {
-    // Check structured data (location varies)
-    const structuredData = call.analysis?.structuredData ?? (message as any).analysis?.structuredData;
-
-    if (structuredData) {
-        if (structuredData.appointmentBooked === true || structuredData.booked === true) {
-            return {
-                booked: true,
-                appointmentStart: typeof structuredData.appointmentStart === 'string' ? structuredData.appointmentStart : null,
-                appointmentEnd: typeof structuredData.appointmentEnd === 'string' ? structuredData.appointmentEnd : null,
-            };
-        }
-    }
-
-    // Check success evaluation
-    const successEval = call.analysis?.successEvaluation ?? (message as any).analysis?.successEvaluation;
-    if (successEval === true || successEval === 'true') {
-        if (structuredData?.appointmentTime) {
-            return { booked: true, appointmentStart: null, appointmentEnd: null };
-        }
-    }
-
-    // Check tool calls for scheduling-related tools
-    if (call.toolCalls) {
-        for (const tc of call.toolCalls) {
-            const name = tc.name?.toLowerCase() ?? '';
-            // Common scheduling tool patterns
-            if (name.includes('schedule') || name.includes('book') || name.includes('appointment') || name.includes('calendar')) {
-                const result = tc.result;
-                // If tool returned success
-                if (result && typeof result === 'object' && (result as any).success === true) {
-                    const args = tc.arguments ?? {};
-                    return {
-                        booked: true,
-                        appointmentStart: typeof args.startTime === 'string' ? args.startTime : null,
-                        appointmentEnd: typeof args.endTime === 'string' ? args.endTime : null,
-                    };
-                }
-            }
-        }
-    }
-
-    // Check message tool call results
-    if (call.messages) {
-        for (const msg of call.messages) {
-            if (msg.toolCallResult) {
-                const name = msg.toolCallResult.name?.toLowerCase() ?? '';
-                if (name.includes('schedule') || name.includes('book') || name.includes('appointment')) {
-                    try {
-                        const resultData = JSON.parse(msg.toolCallResult.result ?? '{}');
-                        if (resultData.success || resultData.booked || resultData.confirmed) {
-                            return { booked: true, appointmentStart: null, appointmentEnd: null };
-                        }
-                    } catch {
-                        // Ignore parse errors
-                    }
-                }
-            }
-        }
-    }
-
-    return { booked: false, appointmentStart: null, appointmentEnd: null };
-}
-
-/**
- * Write failed webhook to inbox for debugging
+ * Write to Inbox
  */
 async function writeToInbox(
     supabase: ReturnType<typeof createClient>,
@@ -585,7 +282,7 @@ async function writeToInbox(
             payload: data.payload,
             error: data.error,
         });
-    } catch (err) {
-        console.error("Failed to write to call_webhook_inbox:", err);
+    } catch (e) {
+        console.error("Inbox write failed", e);
     }
 }
