@@ -21,6 +21,11 @@ interface VapiCall {
     startedAt?: string;
     endedAt?: string;
     durationSeconds?: number;
+    phoneNumberId?: string; // New field seen in payload
+    transport?: {
+        to?: string;
+        from?: string;
+    };
     customer?: {
         number?: string;
         name?: string;
@@ -109,7 +114,9 @@ Deno.serve(async (req) => {
 
         const call: VapiCall = message.call ?? (message as unknown as VapiCall);
         providerCallId = call.id ?? null;
-        providerPhoneNumberId = call.phoneNumber?.id ?? null;
+
+        // Robust extraction of PhoneNumberID
+        providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
 
         // Structured log
         console.log(JSON.stringify({
@@ -276,8 +283,8 @@ async function mapToAccount(
     supabase: ReturnType<typeof createClient>,
     call: VapiCall
 ): Promise<MappingResult> {
-    const providerPhoneNumberId = call.phoneNumber?.id;
-    const calleeE164 = call.phoneNumber?.number;
+    const providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId;
+    const calleeE164 = call.phoneNumber?.number ?? call.transport?.to;
 
     // Method 1: Check assistant metadata (fastest if set)
     const metadataAccountId = call.assistant?.metadata?.account_id;
