@@ -382,19 +382,19 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4 max-w-7xl">
-        {/* Header - shows company name, first name, and Vapi number */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{account.company_name}</h1>
+      <div className="container mx-auto py-4 sm:py-8 px-3 sm:px-4 max-w-7xl">
+        {/* Header - responsive: stacks on mobile */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-3xl font-bold truncate">{account.company_name}</h1>
               {account.is_test_account && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                  TEST ACCOUNT
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 whitespace-nowrap">
+                  TEST
                 </span>
               )}
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground truncate">
               {profile.name?.split(' ')[0] || profile.name}
             </p>
             {account.vapi_phone_number && (
@@ -403,11 +403,11 @@ export default function CustomerDashboard() {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/")}>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" className="h-9" onClick={() => navigate("/")}>
               Home
             </Button>
-            <Button variant="outline" onClick={async () => {
+            <Button variant="outline" size="sm" className="h-9" onClick={async () => {
               try {
                 await signOutUser();
               } finally {
@@ -429,42 +429,44 @@ export default function CustomerDashboard() {
           </div>
         )}
 
-        {/* Main Tabs */}
+        {/* Main Tabs - horizontal scroll on mobile */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-4 lg:grid-cols-8 mb-8">
-            <TabsTrigger value="today">
-              <Calendar className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Today</span>
-            </TabsTrigger>
-            <TabsTrigger value="overview">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="phone-numbers">
-              <Phone className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Phones</span>
-            </TabsTrigger>
-            <TabsTrigger value="assistants">
-              <Users className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Assistant</span>
-            </TabsTrigger>
-            <TabsTrigger value="team">
-              <Users className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Team</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Settings</span>
-            </TabsTrigger>
-            <TabsTrigger value="billing">
-              <CreditCard className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Billing</span>
-            </TabsTrigger>
-            <TabsTrigger value="referrals">
-              <Gift className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Earn</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-8">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-8 gap-1">
+              <TabsTrigger value="today" className="flex-shrink-0 px-3">
+                <Calendar className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Today</span>
+              </TabsTrigger>
+              <TabsTrigger value="overview" className="flex-shrink-0 px-3">
+                <TrendingUp className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="phone-numbers" className="flex-shrink-0 px-3">
+                <Phone className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Phones</span>
+              </TabsTrigger>
+              <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
+                <Users className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Assistant</span>
+              </TabsTrigger>
+              <TabsTrigger value="team" className="flex-shrink-0 px-3">
+                <Users className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Team</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex-shrink-0 px-3">
+                <Settings className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Settings</span>
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="flex-shrink-0 px-3">
+                <CreditCard className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Billing</span>
+              </TabsTrigger>
+              <TabsTrigger value="referrals" className="flex-shrink-0 px-3">
+                <Gift className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Earn</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="today">
             <TodayTab accountId={account.id} />
