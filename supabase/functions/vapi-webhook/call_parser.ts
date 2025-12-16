@@ -1,0 +1,355 @@
+/**
+ * call_parser.ts
+ * 
+ * Logic for extracting rich data from Vapi call payloads.
+ * Pure functions only - easy to unit test.
+ */
+
+// ==========================================
+// Interfaces
+// ==========================================
+
+export interface VapiCall {
+    id?: string;
+    type?: string;
+    status?: string;
+    startedAt?: string;
+    createdAt?: string;
+    endedAt?: string;
+    durationSeconds?: number;
+    phoneNumberId?: string;
+    transport?: {
+        to?: string;
+        from?: string;
+    };
+    customer?: {
+        number?: string;
+        name?: string;
+    };
+    phoneNumber?: {
+        id?: string;
+        number?: string;
+    };
+    assistant?: {
+        id?: string;
+        metadata?: {
+            account_id?: string;
+        };
+    };
+    transcript?: string;
+    recordingUrl?: string;
+    cost?: number;
+    analysis?: {
+        summary?: string;
+        successEvaluation?: boolean | string;
+        structuredData?: Record<string, unknown>;
+    };
+    messages?: Array<{
+        role?: string;
+        toolCalls?: Array<{
+            function?: {
+                name?: string;
+                arguments?: string;
+            };
+        }>;
+        toolCallResult?: {
+            name?: string;
+            result?: string;
+        };
+    }>;
+    toolCalls?: Array<{
+        name?: string;
+        arguments?: Record<string, unknown>;
+        result?: unknown;
+    }>;
+}
+
+export interface VapiMessage {
+    type: string;
+    call?: VapiCall;
+    transcript?: string;
+    summary?: string;
+    endedAt?: string;
+    recordingUrl?: string;
+    cost?: number;
+}
+
+export interface CallExtractionResult {
+    callerName: string | null;
+    reason: string | null;
+    booked: boolean;
+    appointmentStart: string | null;
+    appointmentEnd: string | null;
+    appointmentWindow: string | null;
+    outcome: 'booked' | 'lead' | 'other' | null;
+    leadCaptured: boolean;
+}
+
+// ==========================================
+// Main Extraction Function
+// ==========================================
+
+export function extractCallDetails(call: VapiCall, message: VapiMessage): CallExtractionResult {
+    // 1. Normalize Data Sources
+    // Priority: Message Analysis > Call Analysis
+    const analysis = (message as any).analysis ?? call.analysis;
+    const structuredData = analysis?.structuredData ?? {};
+    const successEval = analysis?.successEvaluation; // boolean or string "true"
+
+    // Priority: Message Transcript > Call Transcript
+    const transcript = (message.transcript ?? call.transcript ?? "").toLowerCase();
+    const summary = (message.summary ?? analysis?.summary ?? "").toLowerCase();
+
+    // 2. Extract Fields
+    const callerName = extractCallerName(call, transcript, structuredData);
+    const reason = extractReason(call, transcript, structuredData, summary);
+
+    const { booked, appointmentStart, appointmentEnd, appointmentWindow } = detectBooking(
+        call,
+        message,
+        transcript,
+        summary,
+        structuredData,
+        successEval
+    );
+
+    // 3. Determine Outcome
+    // Lead Captured if we have Name AND Phone (Phone is checked in index.ts usually, but we assume if we found a name we are good candidates)
+    // Note: index.ts logic checks (isEndOfCall && name && phone).
+    // Here we just return what we found.
+    const leadCaptured = !!callerName;
+
+    let outcome: 'booked' | 'lead' | 'other' = 'other';
+    if (booked) {
+        outcome = 'booked';
+    } else if (leadCaptured) {
+        outcome = 'lead';
+    }
+
+    return {
+        callerName,
+        reason,
+        booked,
+        appointmentStart,
+        appointmentEnd,
+        appointmentWindow,
+        outcome,
+        leadCaptured
+    };
+}
+
+// ==========================================
+// Helper Functions
+// ==========================================
+
+export function extractCallerName(
+    call: VapiCall,
+    transcript: string,
+    structuredData: Record<string, any>
+): string | null {
+    // 1. Structured Data (Highest Priority)
+    if (typeof structuredData.callerName === 'string') return structuredData.callerName;
+    if (typeof structuredData.customerName === 'string') return structuredData.customerName;
+    if (typeof structuredData.name === 'string') return structuredData.name;
+
+    // 2. Customer Object
+    if (call.customer?.name) return call.customer.name;
+
+    // 3. Tool Arguments (e.g. if 'saveContact' tool was called)
+    if (call.toolCalls) {
+        for (const tc of call.toolCalls) {
+            const args = tc.arguments;
+            if (args) {
+                if (typeof args.customerName === 'string') return args.customerName;
+                if (typeof args.name === 'string') return args.name;
+            }
+        }
+    }
+
+    // 4. Transcript Regex Fallback
+    // Matches: "my name is John Doe", "this is Jane"
+    // Be careful with false positives, stick to strong patterns
+    const namePatterns = [
+        /my name is ([a-z\s]+?)(?:$|\.|,|and)/i,
+        /this is ([a-z\s]+?)(?:$|\.|,|and)/i,
+        /speaking with ([a-z\s]+?)(?:$|\.|,|and)/i
+    ];
+
+    for (const pattern of namePatterns) {
+        const match = transcript.match(pattern);
+        if (match && match[1]) {
+            const name = match[1].trim();
+            // Filter out common false positives
+            if (name.length > 2 && name.length < 30 && !name.includes('to help') && !name.includes('vapi')) {
+                return capitalize(name);
+            }
+        }
+    }
+
+    return null;
+}
+
+export function extractReason(
+    call: VapiCall,
+    transcript: string,
+    structuredData: Record<string, any>,
+    summary: string
+): string | null {
+    // 1. Structured Data
+    if (typeof structuredData.reason === 'string') return structuredData.reason;
+    if (typeof structuredData.callReason === 'string') return structuredData.callReason;
+    if (typeof structuredData.intent === 'string') return structuredData.intent;
+
+    // 2. Summary Heuristic
+    // Often the summary starts with "The user called to..."
+    if (summary) {
+        // If summary is short, use it entirely
+        if (summary.length < 150) return summary;
+        // Otherwise try to extract the first sentence
+        const firstSentence = summary.split('.')[0];
+        if (firstSentence.length > 10) return firstSentence;
+    }
+
+    return null;
+}
+
+
+export function detectBooking(
+    call: VapiCall,
+    message: VapiMessage,
+    transcript: string,
+    summary: string,
+    structuredData: Record<string, any>,
+    successEval: boolean | string | undefined
+): { booked: boolean, appointmentStart: string | null, appointmentEnd: string | null, appointmentWindow: string | null } {
+
+    // ==================================================
+    // PRIORITY 1: Structured Output
+    // ==================================================
+    if (structuredData.booked === true || structuredData.appointmentBooked === true) {
+        return {
+            booked: true,
+            appointmentStart: asString(structuredData.appointmentStart),
+            appointmentEnd: asString(structuredData.appointmentEnd),
+            appointmentWindow: asString(structuredData.appointmentWindow)
+                ?? (asString(structuredData.appointmentTime) && !isIsoDate(asString(structuredData.appointmentTime)) ? asString(structuredData.appointmentTime) : null)
+        };
+    }
+
+    // ==================================================
+    // PRIORITY 2: Tool Call Success
+    // ==================================================
+    // Check main call tool calls
+    if (call.toolCalls) {
+        for (const tc of call.toolCalls) {
+            if (isBookingTool(tc.name)) {
+                // If the tool returned success
+                if (isToolSuccess(tc.result)) {
+                    const args = tc.arguments ?? {};
+                    return {
+                        booked: true,
+                        // If tool args have ISO times, use them. If they have text, maybe put in window.
+                        appointmentStart: asString(args.startTime),
+                        appointmentEnd: asString(args.endTime),
+                        appointmentWindow: null // assume tools use specific times usually
+                    };
+                }
+            }
+        }
+    }
+    // Check message history tool calls (sometimes newer Vapi format puts them here)
+    if (call.messages) {
+        for (const msg of call.messages) {
+            if (msg.toolCallResult) {
+                if (isBookingTool(msg.toolCallResult.name)) {
+                    const result = parseToolResult(msg.toolCallResult.result);
+                    if (isToolSuccess(result)) {
+                        return { booked: true, appointmentStart: null, appointmentEnd: null, appointmentWindow: null };
+                    }
+                }
+            }
+        }
+    }
+
+    // ==================================================
+    // PRIORITY 3: Success Eval + Confirmation Phrases
+    // ==================================================
+    const isSuccess = successEval === true || successEval === 'true';
+
+    // Strong booking phrases in transcript
+    const bookingPhrases = [
+        "you're all set for",
+        "you remain all set for",
+        "i have you down for",
+        "scheduled for",
+        "booked for",
+        "see you on",
+        "see you then"
+    ];
+
+    const hasBookingPhrase = bookingPhrases.some(phrase => transcript.includes(phrase));
+    const summaryIndicatesBooking = summary.includes("book") || summary.includes("schedul") || summary.includes("appointment");
+
+    if ((isSuccess && summaryIndicatesBooking) || hasBookingPhrase) {
+        // Try to capture window from transcript
+        // Logic: "You're all set for Wednesday afternoon" -> capture "Wednesday afternoon"
+        let window: string | null = null;
+        for (const phrase of bookingPhrases) {
+            const regex = new RegExp(`${phrase}\\s+([a-zA-Z0-9\\s]+?)(?:\\.|$)`, 'i');
+            const match = transcript.match(regex);
+            if (match && match[1]) {
+                window = match[1].trim();
+                break;
+            }
+        }
+
+        return {
+            booked: true,
+            appointmentStart: null,
+            appointmentEnd: null,
+            appointmentWindow: window ?? "Booked (Time not parsed)"
+        };
+    }
+
+    return { booked: false, appointmentStart: null, appointmentEnd: null, appointmentWindow: null };
+}
+
+// --------------------------------------------------------------------------
+// Utilities
+// --------------------------------------------------------------------------
+
+function asString(val: unknown): string | null {
+    if (typeof val === 'string') return val;
+    return null;
+}
+
+function isIsoDate(str: string | null): boolean {
+    if (!str) return false;
+    // Simple check for ISO-like structure (YYYY-MM-DD...)
+    return /^\d{4}-\d{2}-\d{2}T/.test(str);
+}
+
+function capitalize(str: string): string {
+    return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function isBookingTool(name?: string): boolean {
+    if (!name) return false;
+    const n = name.toLowerCase();
+    return n.includes('schedule') || n.includes('book') || n.includes('appointment') || n.includes('calendar');
+}
+
+function isToolSuccess(result: unknown): boolean {
+    if (!result) return false;
+    if (typeof result === 'object' && (result as any).success === true) return true;
+    return false;
+}
+
+function parseToolResult(resultStr?: string): any {
+    if (!resultStr) return {};
+    try {
+        return JSON.parse(resultStr);
+    } catch {
+        return {};
+    }
+}
