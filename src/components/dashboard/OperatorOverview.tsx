@@ -336,8 +336,68 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
         </Card>
       )}
 
-      {/* Today's Leads Table */}
-      {leads.length > 0 && (
+      {/* Today's Calls Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Today's Call Log</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {calls.length === 0 ? (
+            <p className="text-center text-muted-foreground py-4">No calls today</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Caller</TableHead>
+                  <TableHead className="hidden md:table-cell">Reason</TableHead>
+                  <TableHead>Outcome</TableHead>
+                  <TableHead>Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {calls.map((call: any) => {
+                  const getOutcomeBadge = () => {
+                    if (call.outcome === 'booked' || call.booked) return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
+                    if (call.outcome === 'lead' || call.lead_captured) return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
+                    return <Badge variant="outline" className="capitalize text-muted-foreground">{call.outcome || call.status}</Badge>;
+                  };
+                  return (
+                    <TableRow key={call.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {formatTime(call.started_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{call.caller_name || call.from_number || "Unknown"}</span>
+                          {call.caller_name && <span className="text-xs text-muted-foreground">{call.from_number}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell max-w-[200px]">
+                        <div className="truncate text-sm" title={call.reason || call.summary}>
+                          {call.reason || (call.summary ? call.summary.substring(0, 40) + "..." : "-")}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 items-start">
+                          {getOutcomeBadge()}
+                          {call.appointment_window && (
+                            <span className="text-xs text-muted-foreground">{call.appointment_window}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{Math.ceil((call.duration_seconds || 0) / 60)}m</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pending Appointments Table */}
+      {pendingAppointments.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Today's Leads</CardTitle>

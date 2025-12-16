@@ -174,23 +174,73 @@ export function OverviewTab({
                                 <TableRow>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Caller</TableHead>
-                                    <TableHead>Duration</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <TableHead className="hidden md:table-cell">Reason</TableHead>
+                                    <TableHead>Outcome</TableHead>
+                                    <TableHead className="text-right">Duration</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {usageLogs.slice(0, 10).map((log) => (
-                                    <TableRow key={log.id}>
-                                        <TableCell>
-                                            {new Date(log.started_at).toLocaleDateString()} {new Date(log.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </TableCell>
-                                        <TableCell>{log.from_number || log.to_number || 'Unknown'}</TableCell>
-                                        <TableCell>{Math.ceil((log.duration_seconds || 0) / 60)} min</TableCell>
-                                        <TableCell>
-                                            <Badge variant="secondary" className="capitalize">{log.status}</Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {usageLogs.slice(0, 50).map((log: any) => {
+                                    // Helper to format appointment info
+                                    const getOutcomeBadge = () => {
+                                        if (log.outcome === 'booked' || log.booked) {
+                                            return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
+                                        }
+                                        if (log.outcome === 'lead' || log.lead_captured) {
+                                            return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
+                                        }
+                                        return <Badge variant="secondary" className="capitalize">{log.status}</Badge>;
+                                    };
+
+                                    const getAppointmentText = () => {
+                                        if (log.appointment_window) return log.appointment_window;
+                                        if (log.appointment_start) {
+                                            return new Date(log.appointment_start).toLocaleString([], {
+                                                weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                                            });
+                                        }
+                                        return null;
+                                    };
+
+                                    return (
+                                        <TableRow key={log.id}>
+                                            <TableCell className="whitespace-nowrap">
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">
+                                                        {new Date(log.started_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {new Date(log.started_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-semibold">{log.caller_name || log.from_number || "Unknown"}</span>
+                                                    {log.caller_name && <span className="text-xs text-muted-foreground">{log.from_number}</span>}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="hidden md:table-cell max-w-[200px]">
+                                                <div className="truncate text-sm" title={log.reason || log.summary}>
+                                                    {log.reason || (log.summary ? log.summary.substring(0, 50) + "..." : "-")}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    {getOutcomeBadge()}
+                                                    {(log.booked || log.outcome === 'booked') && getAppointmentText() && (
+                                                        <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                                                            {getAppointmentText()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {Math.ceil((log.duration_seconds || 0) / 60)} min
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     )}
