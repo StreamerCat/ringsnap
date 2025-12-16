@@ -1,0 +1,31 @@
+{
+    "message": {
+        "type": "end-of-call-report",
+        "call": {
+            "id": "call_test_12345678",
+            "type": "inboundPhoneCall",
+            "status": "ended",
+            "startedAt": "2024-12-16T15:00:00.000Z",
+            "endedAt": "2024-12-16T15:03:45.000Z",
+            "durationSeconds": 225,
+            "customer": {
+                "number": "+15551234567"
+            },
+            "phoneNumber": {
+                "id": "pn_your_vapi_phone_id_here",
+                "number": "+19705551234"
+            },
+            "assistant": {
+                "id": "asst_test_assistant_id",
+                "metadata": {}
+            },
+            "assistantId": "asst_test_assistant_id",
+            "transcript": "Hi, thanks for calling ABC Plumbing. How can I help you today? I have a leaky faucet. Let me help you schedule a service visit...",
+            "recordingUrl": "https://example.com/recordings/call_test_12345678.mp3",
+            "cost": 0.0523,
+            "analysis": {
+                "summary": "Customer called about a leaky faucet. Scheduled service appointment for tomorrow at 2pm."
+            }
+        }
+    }
+}
