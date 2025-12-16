@@ -221,64 +221,109 @@ export default function CustomerDashboard() {
     return Math.round((minutesUsed / account.monthly_minutes_limit) * 100);
   };
 
-  // Realtime subscription update + polling fallback
+  // Realtime subscription + burst polling for near real-time updates
   useEffect(() => {
     let subscription: any = null;
     let pollingInterval: NodeJS.Timeout | null = null;
+    let burstTimeout: NodeJS.Timeout | null = null;
+    let isInBurstMode = true;
+    let userId: string | null = null;
 
-    const setupRealtimeSubscription = async () => {
+    // Merge a single call into usageLogs state
+    const mergeCall = (newCall: any) => {
+      setUsageLogs((prev) => {
+        const existingIndex = prev.findIndex((c: any) => c.id === newCall.id);
+        if (existingIndex >= 0) {
+          // Update existing call
+          const updated = [...prev];
+          updated[existingIndex] = { ...updated[existingIndex], ...newCall };
+          return updated;
+        } else {
+          // Insert new call at the beginning
+          return [newCall, ...prev];
+        }
+      });
+    };
+
+    const setupRealtimeAndPolling = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user && account?.id) {
-        // Subscribe to both INSERT and UPDATE events (upserts often create UPDATEs)
-        subscription = supabase
-          .channel('call_logs_changes')
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'call_logs',
-              filter: `account_id=eq.${account.id}`
-            },
-            (payload) => {
-              console.log('New call received:', payload);
-              if (user) loadDashboardData(user.id);
-            }
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'call_logs',
-              filter: `account_id=eq.${account.id}`
-            },
-            (payload) => {
-              console.log('Call updated:', payload);
-              if (user) loadDashboardData(user.id);
-            }
-          )
-          .subscribe();
+      if (!user || !account?.id) return;
+      userId = user.id;
 
-        // Polling fallback: refresh every 60 seconds in case Realtime misses something
+      // Subscribe to both INSERT and UPDATE events
+      subscription = supabase
+        .channel('call_logs_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'call_logs',
+            filter: `account_id=eq.${account.id}`
+          },
+          (payload) => {
+            console.log('New call received:', payload.new);
+            mergeCall(payload.new);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'call_logs',
+            filter: `account_id=eq.${account.id}`
+          },
+          (payload) => {
+            console.log('Call updated:', payload.new);
+            mergeCall(payload.new);
+          }
+        )
+        .subscribe();
+
+      // Burst polling: 5 seconds for first 60 seconds (for test call UX)
+      const BURST_INTERVAL = 5000;
+      const NORMAL_INTERVAL = 30000;
+      const BURST_DURATION = 60000;
+
+      const startPolling = (interval: number) => {
+        if (pollingInterval) clearInterval(pollingInterval);
         pollingInterval = setInterval(() => {
-          console.log('Polling call logs...');
-          if (user) loadDashboardData(user.id);
-        }, 60000);
-      }
+          // Pause polling when tab is hidden
+          if (document.hidden) return;
+          console.log(`Polling call logs (${isInBurstMode ? 'burst' : 'normal'})...`);
+          loadDashboardData(userId!);
+        }, interval);
+      };
+
+      // Start with burst polling
+      startPolling(BURST_INTERVAL);
+
+      // After 60 seconds, switch to normal polling
+      burstTimeout = setTimeout(() => {
+        isInBurstMode = false;
+        startPolling(NORMAL_INTERVAL);
+      }, BURST_DURATION);
     };
 
     if (account?.id) {
-      setupRealtimeSubscription();
+      setupRealtimeAndPolling();
     }
 
+    // Visibility change listener - restart polling when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden && userId && account?.id) {
+        // Immediate refresh when tab becomes visible
+        loadDashboardData(userId);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      if (subscription) {
-        supabase.removeChannel(subscription);
-      }
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
+      if (subscription) supabase.removeChannel(subscription);
+      if (pollingInterval) clearInterval(pollingInterval);
+      if (burstTimeout) clearTimeout(burstTimeout);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [account?.id]);
   const calculateRemainingMinutes = () => {

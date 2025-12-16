@@ -23,6 +23,7 @@ interface VapiCall {
     durationSeconds?: number;
     customer?: {
         number?: string;
+        name?: string;
     };
     phoneNumber?: {
         id?: string;
@@ -40,7 +41,28 @@ interface VapiCall {
     cost?: number;
     analysis?: {
         summary?: string;
+        successEvaluation?: boolean | string;
+        structuredData?: Record<string, unknown>;
     };
+    // Tool results for booking detection
+    messages?: Array<{
+        role?: string;
+        toolCalls?: Array<{
+            function?: {
+                name?: string;
+                arguments?: string;
+            };
+        }>;
+        toolCallResult?: {
+            name?: string;
+            result?: string;
+        };
+    }>;
+    toolCalls?: Array<{
+        name?: string;
+        arguments?: Record<string, unknown>;
+        result?: unknown;
+    }>;
 }
 
 interface VapiMessage {
@@ -299,7 +321,7 @@ async function mapToAccount(
 }
 
 /**
- * Build call record for upsert
+ * Build call record for upsert with outcome extraction
  */
 function buildCallRecord(
     call: VapiCall,
@@ -308,6 +330,7 @@ function buildCallRecord(
     rawPayload: unknown
 ): Record<string, unknown> {
     const isEndOfCall = message.type === 'end-of-call-report';
+    const isCallStarted = message.type === 'call-started';
 
     // Calculate duration
     let durationSeconds = 0;
@@ -321,8 +344,8 @@ function buildCallRecord(
 
     // Determine status
     let status = call.status || (isEndOfCall ? 'completed' : 'in-progress');
-    if (message.type === 'call-started') {
-        status = 'ringing';
+    if (isCallStarted) {
+        status = 'in_progress';
     } else if (isEndOfCall) {
         status = 'completed';
     }
@@ -330,26 +353,187 @@ function buildCallRecord(
     // Direction
     const direction = call.type === 'inboundPhoneCall' ? 'inbound' : 'outbound';
 
-    return {
+    // Extract caller info
+    const callerPhone = call.customer?.number ?? null;
+    const callerName = extractCallerName(call);
+    const reason = extractReason(call);
+
+    // Detect booking from tool calls
+    const bookingInfo = detectBooking(call);
+    const booked = bookingInfo.booked;
+    const appointmentStart = bookingInfo.appointmentStart;
+    const appointmentEnd = bookingInfo.appointmentEnd;
+
+    // Lead captured = has name AND phone, but only set on end-of-call
+    const leadCaptured = isEndOfCall && !!callerName && !!callerPhone;
+
+    // Determine outcome: booked > lead > other
+    let outcome: string | null = null;
+    if (isEndOfCall) {
+        if (booked) {
+            outcome = 'booked';
+        } else if (leadCaptured) {
+            outcome = 'lead';
+        } else {
+            outcome = 'other';
+        }
+    }
+
+    // Build record - only include non-null values for end-of-call
+    // For call-started, include minimal fields
+    const record: Record<string, unknown> = {
         account_id: mapping.accountId,
-        vapi_call_id: call.id, // Keep using vapi_call_id as unique key
+        vapi_call_id: call.id,
         provider: 'vapi',
-        provider_call_id: call.id, // Also populate provider_call_id if column exists
+        provider_call_id: call.id,
         phone_number_id: mapping.phoneNumberId,
         direction,
-        from_number: call.customer?.number ?? null,
+        from_number: callerPhone,
         to_number: call.phoneNumber?.number ?? null,
         started_at: call.startedAt ? new Date(call.startedAt).toISOString() : null,
-        ended_at: call.endedAt ? new Date(call.endedAt).toISOString() : null,
-        duration_seconds: durationSeconds,
         status,
-        transcript: call.transcript ?? message.transcript ?? null,
-        summary: call.analysis?.summary ?? message.summary ?? null,
-        recording_url: call.recordingUrl ?? null,
-        cost: call.cost ?? null,
-        raw_payload: rawPayload,
         updated_at: new Date().toISOString(),
     };
+
+    // Only add these on end-of-call to avoid null overwrites
+    if (isEndOfCall) {
+        record.ended_at = call.endedAt ? new Date(call.endedAt).toISOString() : null;
+        record.duration_seconds = durationSeconds;
+        record.transcript = call.transcript ?? message.transcript ?? null;
+        record.summary = call.analysis?.summary ?? message.summary ?? null;
+        record.recording_url = call.recordingUrl ?? null;
+        record.cost = call.cost ?? null;
+        record.raw_payload = rawPayload;
+        record.caller_name = callerName;
+        record.reason = reason;
+        record.outcome = outcome;
+        record.booked = booked;
+        record.lead_captured = leadCaptured;
+        if (appointmentStart) record.appointment_start = appointmentStart;
+        if (appointmentEnd) record.appointment_end = appointmentEnd;
+    }
+
+    return record;
+}
+
+/**
+ * Extract caller name from call data
+ */
+function extractCallerName(call: VapiCall): string | null {
+    // 1. Check customer.name directly
+    if (call.customer?.name) {
+        return call.customer.name;
+    }
+
+    // 2. Check structured data
+    if (call.analysis?.structuredData) {
+        const data = call.analysis.structuredData;
+        if (typeof data.callerName === 'string') return data.callerName;
+        if (typeof data.customerName === 'string') return data.customerName;
+        if (typeof data.name === 'string') return data.name;
+    }
+
+    // 3. Check tool call results (common patterns)
+    if (call.toolCalls) {
+        for (const tc of call.toolCalls) {
+            const args = tc.arguments;
+            if (args && typeof args.customerName === 'string') return args.customerName;
+            if (args && typeof args.name === 'string') return args.name;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Extract reason for call from summary or analysis
+ */
+function extractReason(call: VapiCall): string | null {
+    // Check structured data first
+    if (call.analysis?.structuredData) {
+        const data = call.analysis.structuredData;
+        if (typeof data.reason === 'string') return data.reason;
+        if (typeof data.callReason === 'string') return data.callReason;
+        if (typeof data.intent === 'string') return data.intent;
+    }
+
+    // If summary is short enough, use it as reason
+    const summary = call.analysis?.summary;
+    if (summary && summary.length <= 200) {
+        return summary;
+    }
+
+    return null;
+}
+
+/**
+ * Detect booking from tool calls or analysis
+ */
+function detectBooking(call: VapiCall): {
+    booked: boolean;
+    appointmentStart: string | null;
+    appointmentEnd: string | null;
+} {
+    // Check structured data
+    if (call.analysis?.structuredData) {
+        const data = call.analysis.structuredData;
+        if (data.appointmentBooked === true || data.booked === true) {
+            return {
+                booked: true,
+                appointmentStart: typeof data.appointmentStart === 'string' ? data.appointmentStart : null,
+                appointmentEnd: typeof data.appointmentEnd === 'string' ? data.appointmentEnd : null,
+            };
+        }
+    }
+
+    // Check success evaluation (some assistants return this)
+    if (call.analysis?.successEvaluation === true) {
+        // Only consider it booked if there's appointment evidence
+        if (call.analysis.structuredData?.appointmentTime) {
+            return { booked: true, appointmentStart: null, appointmentEnd: null };
+        }
+    }
+
+    // Check tool calls for scheduling-related tools
+    if (call.toolCalls) {
+        for (const tc of call.toolCalls) {
+            const name = tc.name?.toLowerCase() ?? '';
+            // Common scheduling tool patterns
+            if (name.includes('schedule') || name.includes('book') || name.includes('appointment') || name.includes('calendar')) {
+                const result = tc.result;
+                // If tool returned success
+                if (result && typeof result === 'object' && (result as any).success === true) {
+                    const args = tc.arguments ?? {};
+                    return {
+                        booked: true,
+                        appointmentStart: typeof args.startTime === 'string' ? args.startTime : null,
+                        appointmentEnd: typeof args.endTime === 'string' ? args.endTime : null,
+                    };
+                }
+            }
+        }
+    }
+
+    // Check message tool call results
+    if (call.messages) {
+        for (const msg of call.messages) {
+            if (msg.toolCallResult) {
+                const name = msg.toolCallResult.name?.toLowerCase() ?? '';
+                if (name.includes('schedule') || name.includes('book') || name.includes('appointment')) {
+                    try {
+                        const resultData = JSON.parse(msg.toolCallResult.result ?? '{}');
+                        if (resultData.success || resultData.booked || resultData.confirmed) {
+                            return { booked: true, appointmentStart: null, appointmentEnd: null };
+                        }
+                    } catch {
+                        // Ignore parse errors
+                    }
+                }
+            }
+        }
+    }
+
+    return { booked: false, appointmentStart: null, appointmentEnd: null };
 }
 
 /**

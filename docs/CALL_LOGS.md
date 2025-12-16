@@ -1,103 +1,132 @@
 # Call Logs System Documentation
 
-This document describes the call logging pipeline for RingSnap.
+## Overview
 
-## Canonical Naming
+Real-time call logging from Vapi to dashboard with outcome tracking (Booked, Lead, Other).
 
-| Canonical Name | Description | Example |
-|----------------|-------------|---------|
-| `e164_number` | Phone number in E.164 format | `+19705551234` |
-| `provider` | Telephony/agent platform | `vapi` |
-| `provider_phone_number_id` | Vapi phoneNumber.id | `pn_abc123` |
-| `provider_call_id` | Vapi call.id | `call_xyz789` |
-| `provider_assistant_id` | Vapi assistant.id | `asst_def456` |
+## Timing Targets
 
-## Database Tables
+| Event | Target |
+|-------|--------|
+| Call starts | Row appears in 1-3 seconds |
+| Call ends | Row updates in 3-15 seconds |
+| Dashboard | Updates without manual refresh |
 
-### `call_logs`
-Stores all call records. Key columns:
-- `vapi_call_id` (TEXT, UNIQUE) - Primary upsert key
-- `account_id` (UUID) - Links to accounts
-- `phone_number_id` (UUID) - Links to phone_numbers
-- `provider_call_id` (TEXT) - Same as vapi_call_id for now
-- `from_number`, `to_number` - E.164 strings
-- `started_at`, `ended_at`, `duration_seconds`
-- `status` - completed, in-progress, ringing, failed
-- `transcript`, `summary`, `recording_url`
-- `raw_payload` (JSONB) - Nulled after 7 days
+## Dashboard Update Strategy
 
-### `call_webhook_inbox`
-Dead letter queue for failed webhooks. Check here when calls don't appear.
-- `reason` - Why ingestion failed (missing_call_id, unmapped_account, upsert_failed, exception)
-- `payload` - Full webhook payload for debugging
-- `resolved` - Mark true after investigating
+### Realtime Subscription
+- Subscribes to `postgres_changes` on `call_logs` table
+- Listens to both `INSERT` and `UPDATE` events
+- Merges incoming data directly into state (no full reload)
 
-### `phone_numbers`
-Canonical phone number table. Key columns:
-- `provider_phone_number_id` - Vapi phoneNumber.id (new canonical)
-- `vapi_phone_id` - Legacy column, still populated
-- `e164_number` - Phone in E.164 format (new canonical)
-- `phone_number` - Legacy column, still populated
-- `twilio_phone_number_sid` - Twilio SID if available
+### Burst Polling (for test call UX)
+- First 60 seconds: polls every 5 seconds
+- After 60 seconds: polls every 30 seconds
+- Pauses when tab is hidden (visibility API)
+- Immediate refresh when tab becomes visible
 
-## Webhook Mapping Logic
+---
 
-The vapi-webhook uses sequential lookups (not OR chains):
+## Outcome Detection
 
-1. **Metadata** - Check `call.assistant.metadata.account_id`
-2. **provider_phone_number_id** - `phone_numbers.provider_phone_number_id`
-3. **vapi_phone_id** (legacy) - `phone_numbers.vapi_phone_id`
-4. **e164_number** - `phone_numbers.e164_number`
-5. **phone_number** (legacy) - `phone_numbers.phone_number`
+### Outcome Values
+| Outcome | Meaning |
+|---------|---------|
+| `booked` | Appointment was scheduled |
+| `lead` | Caller name and phone captured, no appointment |
+| `other` | Neither of the above |
 
-If all methods fail, the webhook writes to `call_webhook_inbox` with reason "unmapped_account".
+### How Outcomes Are Determined
 
-## Debugging Unmapped Calls
+**Booked Detection:**
+1. `analysis.structuredData.booked === true` or `appointmentBooked === true`
+2. Tool call named `schedule*`, `book*`, `appointment*`, or `calendar*` that returned success
+3. `analysis.successEvaluation === true` with appointment evidence
 
+**Lead Detection:**
+- `caller_name` is present AND `from_number` is present
+- Only set when call ends (`end-of-call-report`)
+
+### Caller Name Extraction
+Sources checked in order:
+1. `customer.name` field
+2. `analysis.structuredData.callerName` or `.customerName` or `.name`
+3. Tool call arguments containing `.customerName` or `.name`
+
+### Reason Extraction
+1. `analysis.structuredData.reason` or `.callReason` or `.intent`
+2. Summary field if ≤200 characters
+
+---
+
+## Webhook Events
+
+We handle only two events:
+
+| Event | Action |
+|-------|--------|
+| `call-started` | Create minimal row with `status: in_progress` |
+| `end-of-call-report` | Update row with duration, transcript, outcome, etc. |
+
+### Minimal vs Full Record
+- `call-started`: Only creates `account_id`, `vapi_call_id`, `from_number`, `to_number`, `started_at`, `status`
+- `end-of-call-report`: Adds `ended_at`, `duration_seconds`, `transcript`, `summary`, `cost`, `outcome`, `booked`, `lead_captured`, `appointment_start/end`
+
+This prevents null overwrites when the end-of-call arrives before call-started is processed.
+
+---
+
+## Data Retention
+
+| Field | Retention |
+|-------|-----------|
+| `raw_payload` | Nulled after 7 days |
+| `transcript` | Nulled after 30 days |
+
+Job: `call-logs-cleanup` runs daily.
+
+---
+
+## Debugging
+
+### Check webhook inbox for failures
 ```sql
--- Check inbox for failures
 SELECT * FROM call_webhook_inbox 
 WHERE resolved = false 
-ORDER BY received_at DESC 
+ORDER BY received_at DESC;
+```
+
+### Check call logs for an account
+```sql
+SELECT id, status, outcome, booked, lead_captured, caller_name, created_at
+FROM call_logs 
+WHERE account_id = '<uuid>'
+ORDER BY created_at DESC
 LIMIT 20;
+```
 
--- Find unmapped phone number
-SELECT provider_phone_number_id, payload->'message'->'call'->'phoneNumber' 
-FROM call_webhook_inbox 
-WHERE reason = 'unmapped_account';
-
--- Check phone number identity view
+### Phone number identity view
+```sql
 SELECT * FROM phone_number_identity 
-WHERE vapi_phone_id = 'pn_xxx';
+WHERE vapi_phone_id = '<provider_phone_id>';
 ```
 
-## Retention Policy
+---
 
-| Field | Retention | Implementation |
-|-------|-----------|----------------|
-| `raw_payload` | 7 days | `call-logs-cleanup` job |
-| `transcript` | 30 days | `call-logs-cleanup` job |
+## Database Schema
 
-## Reconciliation
-
-The `vapi-reconcile-calls` job runs every 15 minutes if `CALL_RECONCILE_ENABLED=true`.
-- Fetches last 2 hours of calls from Vapi API
-- Only processes numbers in our `phone_numbers` table
-- Rate limited to 100 calls per run
-- Writes failures to `call_webhook_inbox`
-
-## Frontend Refresh
-
-- **Realtime**: Subscribes to INSERT + UPDATE on `call_logs`
-- **Polling Fallback**: 60-second interval refresh
-- **RPCs**: `get_recent_calls(p_account_id, p_limit)`, `get_calls_today(p_account_id)`
-
-## Test Webhook
-
-```bash
-# Post test payload
-curl -X POST https://<project>.supabase.co/functions/v1/vapi-webhook \
-  -H "Content-Type: application/json" \
-  -H "x-vapi-secret: <secret>" \
-  -d @fixtures/vapi-end-of-call-report.json
+### call_logs columns (outcome-related)
+```sql
+caller_name TEXT          -- Extracted from transcript/tool calls
+reason TEXT               -- Why they called
+outcome TEXT              -- booked, lead, other
+booked BOOLEAN            -- True if appointment scheduled
+lead_captured BOOLEAN     -- True if name+phone captured
+appointment_start TIMESTAMPTZ
+appointment_end TIMESTAMPTZ
 ```
+
+### Indexes
+- `idx_call_logs_outcome` - Filter by outcome
+- `idx_call_logs_leads` - Find leads needing follow-up
+- `idx_call_logs_booked` - Find booked appointments
