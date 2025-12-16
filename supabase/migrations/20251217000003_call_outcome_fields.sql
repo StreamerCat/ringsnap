@@ -47,7 +47,12 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_booked
 
 -- =============================================================================
 -- PHASE 3: Update RPCs to return new columns
+-- Must drop first if return type changes
 -- =============================================================================
+
+-- Drop existing functions (return type is changing)
+DROP FUNCTION IF EXISTS public.get_recent_calls(uuid, integer);
+DROP FUNCTION IF EXISTS public.get_calls_today(uuid);
 
 -- Update get_recent_calls to include outcome fields
 CREATE OR REPLACE FUNCTION public.get_recent_calls(
