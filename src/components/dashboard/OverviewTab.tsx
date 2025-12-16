@@ -58,11 +58,11 @@ export function OverviewTab({
     };
 
     return (
-        <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {/* 1. Your Number (New) - Spans 2 cols on large if needed, or just 1 */}
-                <Card className="col-span-1 border-primary/20 bg-primary/5">
+        <div className="space-y-4 sm:space-y-6">
+            {/* Stats Cards - 2 cols mobile, 4 cols desktop */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                {/* 1. Your Number */}
+                <Card className="col-span-2 sm:col-span-1 border-primary/20 bg-primary/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-primary">Your RingSnap Number</CardTitle>
                         <Phone className="h-4 w-4 text-primary" />

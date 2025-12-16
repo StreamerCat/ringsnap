@@ -233,9 +233,9 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Stats Cards - stack on mobile, 3 cols on tablet+ */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Calls Today</CardTitle>
@@ -341,57 +341,59 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
         <CardHeader>
           <CardTitle className="text-lg">Today's Call Log</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 sm:p-6">
           {calls.length === 0 ? (
             <p className="text-center text-muted-foreground py-4">No calls today</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Caller</TableHead>
-                  <TableHead className="hidden md:table-cell">Reason</TableHead>
-                  <TableHead>Outcome</TableHead>
-                  <TableHead>Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {calls.map((call: any) => {
-                  const getOutcomeBadge = () => {
-                    if (call.outcome === 'booked' || call.booked) return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
-                    if (call.outcome === 'lead' || call.lead_captured) return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
-                    return <Badge variant="outline" className="capitalize text-muted-foreground">{call.outcome || call.status}</Badge>;
-                  };
-                  return (
-                    <TableRow key={call.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {formatTime(call.started_at)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{call.caller_name || call.from_number || "Unknown"}</span>
-                          {call.caller_name && <span className="text-xs text-muted-foreground">{call.from_number}</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell max-w-[200px]">
-                        <div className="truncate text-sm" title={call.reason || call.summary}>
-                          {call.reason || (call.summary ? call.summary.substring(0, 40) + "..." : "-")}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1 items-start">
-                          {getOutcomeBadge()}
-                          {call.appointment_window && (
-                            <span className="text-xs text-muted-foreground">{call.appointment_window}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{Math.ceil((call.duration_seconds || 0) / 60)}m</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Caller</TableHead>
+                    <TableHead className="hidden md:table-cell">Reason</TableHead>
+                    <TableHead>Outcome</TableHead>
+                    <TableHead>Duration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {calls.map((call: any) => {
+                    const getOutcomeBadge = () => {
+                      if (call.outcome === 'booked' || call.booked) return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
+                      if (call.outcome === 'lead' || call.lead_captured) return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
+                      return <Badge variant="outline" className="capitalize text-muted-foreground">{call.outcome || call.status}</Badge>;
+                    };
+                    return (
+                      <TableRow key={call.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {formatTime(call.started_at)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{call.caller_name || call.from_number || "Unknown"}</span>
+                            {call.caller_name && <span className="text-xs text-muted-foreground">{call.from_number}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell max-w-[200px]">
+                          <div className="truncate text-sm" title={call.reason || call.summary}>
+                            {call.reason || (call.summary ? call.summary.substring(0, 40) + "..." : "-")}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 items-start">
+                            {getOutcomeBadge()}
+                            {call.appointment_window && (
+                              <span className="text-xs text-muted-foreground">{call.appointment_window}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{Math.ceil((call.duration_seconds || 0) / 60)}m</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
