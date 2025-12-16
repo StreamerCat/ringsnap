@@ -93,3 +93,6 @@ verify_jwt = false
 [functions.provision-vapi]
 verify_jwt = false
 
+[functions.vapi-webhook]
+verify_jwt = false
+
