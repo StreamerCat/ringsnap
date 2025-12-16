@@ -221,14 +221,15 @@ export default function CustomerDashboard() {
     return Math.round((minutesUsed / account.monthly_minutes_limit) * 100);
   };
 
-  // Realtime subscription update
+  // Realtime subscription update + polling fallback
   useEffect(() => {
-    // ...auth check...
-    // Set up Realtime subscription for call_logs
     let subscription: any = null;
+    let pollingInterval: NodeJS.Timeout | null = null;
+
     const setupRealtimeSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user && account?.id) {
+        // Subscribe to both INSERT and UPDATE events (upserts often create UPDATEs)
         subscription = supabase
           .channel('call_logs_changes')
           .on(
@@ -241,15 +242,44 @@ export default function CustomerDashboard() {
             },
             (payload) => {
               console.log('New call received:', payload);
-              // Since we use RPC, we can just reload data, or optimistic update.
-              // Reload is safest to respect RPC logic/formatting.
+              if (user) loadDashboardData(user.id);
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'call_logs',
+              filter: `account_id=eq.${account.id}`
+            },
+            (payload) => {
+              console.log('Call updated:', payload);
               if (user) loadDashboardData(user.id);
             }
           )
           .subscribe();
+
+        // Polling fallback: refresh every 60 seconds in case Realtime misses something
+        pollingInterval = setInterval(() => {
+          console.log('Polling call logs...');
+          if (user) loadDashboardData(user.id);
+        }, 60000);
       }
     };
-    // ...
+
+    if (account?.id) {
+      setupRealtimeSubscription();
+    }
+
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
   }, [account?.id]);
   const calculateRemainingMinutes = () => {
     if (!account) return 0;
