@@ -34,12 +34,49 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
   const [stats, setStats] = useState<OperatorStats | null>(null);
   const [pendingAppointments, setPendingAppointments] = useState<PendingAppointment[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  const [calls, setCalls] = useState<any[]>([]);
 
+  // Burst polling: 5s for first 60s, then 30s
   useEffect(() => {
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let burstTimeout: NodeJS.Timeout | null = null;
+    let isInBurstMode = true;
+
+    const BURST_INTERVAL = 5000;
+    const NORMAL_INTERVAL = 30000;
+    const BURST_DURATION = 60000;
+
+    // Initial load
     loadOperatorData();
-    // Refresh every 60 seconds
-    const interval = setInterval(loadOperatorData, 60000);
-    return () => clearInterval(interval);
+
+    const startPolling = (interval: number) => {
+      if (pollingInterval) clearInterval(pollingInterval);
+      pollingInterval = setInterval(() => {
+        if (document.hidden) return; // Pause when tab hidden
+        loadOperatorData();
+      }, interval);
+    };
+
+    // Start burst polling
+    startPolling(BURST_INTERVAL);
+
+    // Switch to normal after 60s
+    burstTimeout = setTimeout(() => {
+      isInBurstMode = false;
+      startPolling(NORMAL_INTERVAL);
+    }, BURST_DURATION);
+
+    // Visibility change handler
+    const handleVisibility = () => {
+      if (!document.hidden) loadOperatorData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+      if (burstTimeout) clearTimeout(burstTimeout);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [accountId]);
 
   const loadOperatorData = async () => {
@@ -82,19 +119,24 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
       if (callLogsRes.error) {
         console.error("Failed to load call logs:", callLogsRes.error);
       } else if (callLogsRes.data) {
-        // Manual aggregation for "Calls Today" to update instantly
+        setCalls(callLogsRes.data);
+
+        // Aggregate stats from call_logs including outcomes
         const count = callLogsRes.data.length;
         const duration = callLogsRes.data.reduce((acc: number, c: any) => acc + (c.duration_seconds || 0), 0);
         const lastCall = callLogsRes.data.length > 0 ? callLogsRes.data[0].started_at : null;
 
+        // Count outcomes from new fields
+        const bookedCount = callLogsRes.data.filter((c: any) => c.booked === true || c.outcome === 'booked').length;
+        const leadsCount = callLogsRes.data.filter((c: any) => c.lead_captured === true || c.outcome === 'lead').length;
+
         setStats(prev => ({
-          ...prev!, // Assumes statsData loaded or partial update
-          // Fallbacks if prev is null
+          ...prev!,
           calls_today: count,
           call_duration_seconds_today: duration,
-          leads_today: prev?.leads_today || 0,
-          new_leads_today: prev?.new_leads_today || 0,
-          appointment_requests_today: prev?.appointment_requests_today || 0,
+          leads_today: leadsCount + (prev?.leads_today || 0), // Add to existing leads from customer_leads
+          new_leads_today: leadsCount,
+          appointment_requests_today: bookedCount,
           emergency_leads_today: prev?.emergency_leads_today || 0,
           pending_appointments: prev?.pending_appointments || 0,
           emergency_appointments: prev?.emergency_appointments || 0,
