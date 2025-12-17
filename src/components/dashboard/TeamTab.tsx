@@ -192,13 +192,13 @@ export function TeamTab({ accountId }: TeamTabProps) {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                    <h2 className="text-2xl font-bold">Team Management</h2>
-                    <p className="text-muted-foreground">Manage team members and their access levels</p>
+                    <h2 className="text-xl sm:text-2xl font-bold">Team Management</h2>
+                    <p className="text-sm text-muted-foreground">Manage team members and access levels</p>
                 </div>
-                <Button onClick={() => setShowInviteDialog(true)}>
+                <Button onClick={() => setShowInviteDialog(true)} size="sm" className="w-full sm:w-auto">
                     <UserPlus className="mr-2 h-4 w-4" />
                     Invite Member
                 </Button>

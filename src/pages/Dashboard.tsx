@@ -3,15 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { hasRoleAccess } from "@/lib/auth/roles";
 import { SalesTab } from "@/components/dashboard/SalesTab";
-import { SignupsTab } from "@/components/dashboard/SignupsTab";
-import { UsageTab } from "@/components/dashboard/UsageTab";
-import { SystemHealthTab } from "@/components/dashboard/SystemHealthTab";
 
 const PLAN_PRICING: Record<string, number> = {
   starter: 297,
@@ -24,6 +20,8 @@ export default function Dashboard() {
   const [dateFilter, setDateFilter] = useState("30");
   const [userId, setUserId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isAdminOrOwner, setIsAdminOrOwner] = useState(false);
+  const [userProfileName, setUserProfileName] = useState<string | null>(null);
   const [salesRepFilter, setSalesRepFilter] = useState("all");
 
   useEffect(() => {
@@ -39,6 +37,17 @@ export default function Dashboard() {
 
       setUserId(user.id);
 
+      // Fetch user's profile name for filtering
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", user.id)
+        .single();
+
+      if (profileData?.name) {
+        setUserProfileName(profileData.name);
+      }
+
       const { data: staffRole, error } = await supabase
         .from("staff_roles" as any)
         .select("role")
@@ -52,7 +61,11 @@ export default function Dashboard() {
       }
 
       const role = (staffRole as any)?.role;
-      setIsOwner(hasRoleAccess(role, ['sales']));
+      const hasSalesAccess = hasRoleAccess(role, ['sales']);
+      setIsOwner(hasSalesAccess);
+
+      // Check if platform owner/admin for showing all accounts vs filtered
+      setIsAdminOrOwner(role === 'platform_owner' || role === 'platform_admin');
     };
 
     checkAuth();
@@ -113,7 +126,7 @@ export default function Dashboard() {
       return account;
     },
     enabled: !!userId,
-    refetchInterval: (data) => (data?.provisioning_status === "completed" ? false : 5000), // Poll if not complete
+    refetchInterval: (query) => (query.state.data?.provisioning_status === "completed" ? false : 5000), // Poll if not complete
   });
 
   const salesRepOptions = useMemo(() => {
@@ -239,7 +252,7 @@ export default function Dashboard() {
 
       <div className="container mx-auto p-6 space-y-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sales Dashboard</h1>
 
           <Select value={dateFilter} onValueChange={setDateFilter}>
             <SelectTrigger className="w-[180px]">
@@ -254,30 +267,11 @@ export default function Dashboard() {
           </Select>
         </div>
 
-        <Tabs defaultValue="sales" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="sales">Sales</TabsTrigger>
-            <TabsTrigger value="signups">Signups & Funnel</TabsTrigger>
-            <TabsTrigger value="usage">Usage & Calls</TabsTrigger>
-            <TabsTrigger value="health">System Health</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="sales" className="space-y-6">
-            <SalesTab dateFilter={dateFilter} />
-          </TabsContent>
-
-          <TabsContent value="signups" className="space-y-6">
-            <SignupsTab dateFilter={dateFilter} />
-          </TabsContent>
-
-          <TabsContent value="usage" className="space-y-6">
-            <UsageTab dateFilter={dateFilter} />
-          </TabsContent>
-
-          <TabsContent value="health" className="space-y-6">
-            <SystemHealthTab dateFilter={dateFilter} />
-          </TabsContent>
-        </Tabs>
+        {/* Sales accounts - filtered for sales reps, all for admins */}
+        <SalesTab
+          dateFilter={dateFilter}
+          salesRepNameFilter={isAdminOrOwner ? undefined : userProfileName || undefined}
+        />
       </div>
     </div>
   );

@@ -11,7 +11,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Activity, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Loader2, Activity, AlertTriangle, ShieldAlert, DollarSign, TrendingUp } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SignupsTab } from "@/components/dashboard/SignupsTab";
+import { UsageTab } from "@/components/dashboard/UsageTab";
+import { SystemHealthTab } from "@/components/dashboard/SystemHealthTab";
 
 interface ProvisioningStatusRow {
   provisioning_status: string;
@@ -95,6 +99,7 @@ const AdminMonitoring = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [dateFilter, setDateFilter] = useState("7");
+  const [activeTab, setActiveTab] = useState("monitoring");
 
   useEffect(() => {
     const verifyAccess = async () => {
@@ -286,6 +291,37 @@ const AdminMonitoring = () => {
     }
   }, [provisioningFailuresError, toast]);
 
+  // MRR calculation from active accounts
+  const PLAN_PRICING: Record<string, number> = {
+    starter: 99,
+    professional: 199,
+    premium: 399,
+  };
+
+  const { data: mrrData } = useQuery({
+    queryKey: ["admin-monitoring", "mrr-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("plan_type, subscription_status")
+        .in("subscription_status", ["active", "trial"]);
+
+      if (error) throw error;
+
+      const totalMrr = (data || []).reduce((sum, acc) => {
+        const planKey = (acc.plan_type || "starter").toLowerCase();
+        return sum + (PLAN_PRICING[planKey] || 99);
+      }, 0);
+
+      const activeCount = (data || []).filter(a => a.subscription_status === "active").length;
+      const trialCount = (data || []).filter(a => a.subscription_status === "trial").length;
+
+      return { totalMrr, activeCount, trialCount, totalAccounts: (data || []).length };
+    },
+    enabled: isAuthorized,
+    staleTime: 60_000,
+  });
+
   const filteredCallStats = useMemo(() => {
     if (!callStats || callStats.length === 0) return [] as DailyCallStat[];
     if (dateFilter === "all") return callStats;
@@ -406,339 +442,407 @@ const AdminMonitoring = () => {
           </div>
         </div>
 
-        <div className="grid gap-6">
+        {/* MRR Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-4 mb-6">
           <Card>
-            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  Provisioning status
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {totalAccountsTracked} accounts actively tracked
-                </p>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Estimated MRR</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {provisioningLoading ? (
-                <div className="flex h-32 items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {statusCards.map((row) => (
-                    <div key={row.provisioning_status} className="rounded-lg border bg-white p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <Badge className={row.style}>
-                          {row.provisioning_status || "Unknown"}
-                        </Badge>
-                        <span className="text-2xl font-semibold text-slate-900">{row.account_count}</span>
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {row.accounts_with_errors} with errors
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Last failure: {formatDateTime(row.last_failure_at)}
-                      </p>
-                    </div>
-                  ))}
-                  {statusCards.length === 0 && (
-                    <div className="col-span-full flex h-24 items-center justify-center rounded-lg border bg-white">
-                      <p className="text-sm text-muted-foreground">No provisioning data available.</p>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="text-2xl font-bold">${mrrData?.totalMrr?.toLocaleString() || 0}</div>
+              <p className="text-xs text-muted-foreground">Monthly recurring revenue</p>
             </CardContent>
           </Card>
-
           <Card>
-            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldAlert className="h-5 w-5 text-primary" />
-                  Call volume & minute consumption
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Monitor platform usage and capacity across accounts.
-                </p>
-              </div>
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select window" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="all">All time</SelectItem>
-                </SelectContent>
-              </Select>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Accounts</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-6">
-              {callStatsLoading ? (
-                <div className="flex h-40 items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : (
-                <>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-lg border bg-white p-4 shadow-sm">
-                      <p className="text-sm text-muted-foreground">Total calls</p>
-                      <p className="text-2xl font-semibold text-slate-900">{callMetrics.totalCalls}</p>
-                    </div>
-                    <div className="rounded-lg border bg-white p-4 shadow-sm">
-                      <p className="text-sm text-muted-foreground">Minutes consumed</p>
-                      <p className="text-2xl font-semibold text-slate-900">
-                        {callMetrics.totalMinutes.toFixed(1)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border bg-white p-4 shadow-sm">
-                      <p className="text-sm text-muted-foreground">Average call length</p>
-                      <p className="text-2xl font-semibold text-slate-900">
-                        {callMetrics.averageDuration} sec
-                      </p>
-                    </div>
-                    <div className="rounded-lg border bg-white p-4 shadow-sm">
-                      <p className="text-sm text-muted-foreground">Estimated cost</p>
-                      <p className="text-2xl font-semibold text-slate-900">
-                        ${ (callMetrics.totalCost / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-                      </p>
-                    </div>
-                  </div>
-
-                  <ChartContainer config={chartConfig} className="h-[260px] w-full">
-                    <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="callsGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--color-calls)" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="var(--color-calls)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="call_date"
-                        tickFormatter={(value) => {
-                          const date = new Date(value);
-                          return Number.isNaN(date.getTime())
-                            ? value
-                            : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-                        }}
-                      />
-                      <YAxis allowDecimals={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area
-                        type="monotone"
-                        dataKey="call_count"
-                        stroke="var(--color-calls)"
-                        fill="url(#callsGradient)"
-                        strokeWidth={2}
-                        name="Calls"
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                </>
-              )}
+            <CardContent>
+              <div className="text-2xl font-bold">{mrrData?.activeCount || 0}</div>
+              <p className="text-xs text-muted-foreground">Paying customers</p>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Trial Accounts</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{mrrData?.trialCount || 0}</div>
+              <p className="text-xs text-muted-foreground">In trial period</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{mrrData?.totalAccounts || 0}</div>
+              <p className="text-xs text-muted-foreground">Active + Trial</p>
+            </CardContent>
+          </Card>
+        </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-primary" />
-                  Recent edge function errors
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {edgeErrorsLoading ? (
-                  <div className="flex h-32 items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        {/* Main Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+            <TabsTrigger value="signups">Signups & Funnel</TabsTrigger>
+            <TabsTrigger value="usage">Usage & Calls</TabsTrigger>
+            <TabsTrigger value="health">System Health</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="monitoring" className="space-y-4">
+            <div className="grid gap-6">
+              <Card>
+                <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-primary" />
+                      Provisioning status
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {totalAccountsTracked} accounts actively tracked
+                    </p>
                   </div>
-                ) : (
-                  <ScrollArea className="h-[320px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Timestamp</TableHead>
-                          <TableHead>Function</TableHead>
-                          <TableHead>Account</TableHead>
-                          <TableHead>Severity</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {edgeFunctionErrors.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground">
-                              No edge function errors recorded in the selected window.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          edgeFunctionErrors.map((error) => {
-                            const severityKey = error.severity?.toLowerCase() || "low";
-                            const severityStyle = severityStyles[severityKey] || severityStyles.low;
-                            const detailMessage =
-                              error.error_message ||
-                              error.alert_details?.message ||
-                              error.alert_details?.error ||
-                              "View alert details for full context.";
-
-                            return (
-                              <TableRow key={error.id} className="align-top">
-                                <TableCell className="min-w-[140px] text-sm">
-                                  <div className="font-medium text-slate-900">{formatDateTime(error.created_at)}</div>
-                                  <p className="text-xs text-muted-foreground truncate max-w-[220px]">
-                                    {detailMessage}
-                                  </p>
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <div className="font-medium text-slate-900">
-                                    {error.function_name || error.alert_details?.function || "Unknown"}
-                                  </div>
-                                  {error.request_id && (
-                                    <p className="text-xs text-muted-foreground">Request: {error.request_id}</p>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <div className="font-medium text-slate-900">
-                                    {error.company_name || "Unassigned"}
-                                  </div>
-                                  {error.account_id && (
-                                    <p className="text-xs text-muted-foreground">{error.account_id}</p>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={severityStyle}>
-                                    {error.severity || "low"}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldAlert className="h-5 w-5 text-primary" />
-                  Flagged accounts & provisioning failures
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900 mb-2">Accounts requiring review</h3>
-                  {flaggedAccountsLoading ? (
-                    <div className="flex h-24 items-center justify-center">
+                </CardHeader>
+                <CardContent>
+                  {provisioningLoading ? (
+                    <div className="flex h-32 items-center justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     </div>
                   ) : (
-                    <ScrollArea className="h-[180px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Alerts</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {flaggedAccounts.length === 0 ? (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      {statusCards.map((row) => (
+                        <div key={row.provisioning_status} className="rounded-lg border bg-white p-4 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <Badge className={row.style}>
+                              {row.provisioning_status || "Unknown"}
+                            </Badge>
+                            <span className="text-2xl font-semibold text-slate-900">{row.account_count}</span>
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {row.accounts_with_errors} with errors
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Last failure: {formatDateTime(row.last_failure_at)}
+                          </p>
+                        </div>
+                      ))}
+                      {statusCards.length === 0 && (
+                        <div className="col-span-full flex h-24 items-center justify-center rounded-lg border bg-white">
+                          <p className="text-sm text-muted-foreground">No provisioning data available.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ShieldAlert className="h-5 w-5 text-primary" />
+                      Call volume & minute consumption
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Monitor platform usage and capacity across accounts.
+                    </p>
+                  </div>
+                  <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select window" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Last 7 days</SelectItem>
+                      <SelectItem value="30">Last 30 days</SelectItem>
+                      <SelectItem value="90">Last 90 days</SelectItem>
+                      <SelectItem value="all">All time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {callStatsLoading ? (
+                    <div className="flex h-40 items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-lg border bg-white p-4 shadow-sm">
+                          <p className="text-sm text-muted-foreground">Total calls</p>
+                          <p className="text-2xl font-semibold text-slate-900">{callMetrics.totalCalls}</p>
+                        </div>
+                        <div className="rounded-lg border bg-white p-4 shadow-sm">
+                          <p className="text-sm text-muted-foreground">Minutes consumed</p>
+                          <p className="text-2xl font-semibold text-slate-900">
+                            {callMetrics.totalMinutes.toFixed(1)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border bg-white p-4 shadow-sm">
+                          <p className="text-sm text-muted-foreground">Average call length</p>
+                          <p className="text-2xl font-semibold text-slate-900">
+                            {callMetrics.averageDuration} sec
+                          </p>
+                        </div>
+                        <div className="rounded-lg border bg-white p-4 shadow-sm">
+                          <p className="text-sm text-muted-foreground">Estimated cost</p>
+                          <p className="text-2xl font-semibold text-slate-900">
+                            ${(callMetrics.totalCost / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <ChartContainer config={chartConfig} className="h-[260px] w-full">
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="callsGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="var(--color-calls)" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="var(--color-calls)" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="call_date"
+                            tickFormatter={(value) => {
+                              const date = new Date(value);
+                              return Number.isNaN(date.getTime())
+                                ? value
+                                : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                            }}
+                          />
+                          <YAxis allowDecimals={false} />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <Area
+                            type="monotone"
+                            dataKey="call_count"
+                            stroke="var(--color-calls)"
+                            fill="url(#callsGradient)"
+                            strokeWidth={2}
+                            name="Calls"
+                          />
+                        </AreaChart>
+                      </ChartContainer>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-primary" />
+                      Recent edge function errors
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {edgeErrorsLoading ? (
+                      <div className="flex h-32 items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[320px]">
+                        <Table>
+                          <TableHeader>
                             <TableRow>
-                              <TableCell colSpan={3} className="text-center text-muted-foreground">
-                                No flagged accounts right now.
-                              </TableCell>
+                              <TableHead>Timestamp</TableHead>
+                              <TableHead>Function</TableHead>
+                              <TableHead>Account</TableHead>
+                              <TableHead>Severity</TableHead>
                             </TableRow>
-                          ) : (
-                            flaggedAccounts.map((account) => {
-                              const statusKey = account.provisioning_status?.toLowerCase() || "unknown";
-                              const statusStyle = provisioningStatusStyles[statusKey] || provisioningStatusStyles.unknown;
-                              return (
-                                <TableRow key={account.account_id}>
-                                  <TableCell className="text-sm">
-                                    <div className="font-medium text-slate-900">{account.company_name}</div>
-                                    <p className="text-xs text-muted-foreground">
-                                      {account.flagged_reason || "Check alert log"}
-                                    </p>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge className={statusStyle}>
-                                      {account.provisioning_status || "Unknown"}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-sm">
-                                    <div className="font-medium text-slate-900">{account.total_alerts || 0}</div>
-                                    {account.alert_types && account.alert_types.length > 0 && (
-                                      <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                                        {account.alert_types.join(", ")}
+                          </TableHeader>
+                          <TableBody>
+                            {edgeFunctionErrors.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                                  No edge function errors recorded in the selected window.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              edgeFunctionErrors.map((error) => {
+                                const severityKey = error.severity?.toLowerCase() || "low";
+                                const severityStyle = severityStyles[severityKey] || severityStyles.low;
+                                const detailMessage =
+                                  error.error_message ||
+                                  error.alert_details?.message ||
+                                  error.alert_details?.error ||
+                                  "View alert details for full context.";
+
+                                return (
+                                  <TableRow key={error.id} className="align-top">
+                                    <TableCell className="min-w-[140px] text-sm">
+                                      <div className="font-medium text-slate-900">{formatDateTime(error.created_at)}</div>
+                                      <p className="text-xs text-muted-foreground truncate max-w-[220px]">
+                                        {detailMessage}
                                       </p>
-                                    )}
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="font-medium text-slate-900">
+                                        {error.function_name || error.alert_details?.function || "Unknown"}
+                                      </div>
+                                      {error.request_id && (
+                                        <p className="text-xs text-muted-foreground">Request: {error.request_id}</p>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="font-medium text-slate-900">
+                                        {error.company_name || "Unassigned"}
+                                      </div>
+                                      {error.account_id && (
+                                        <p className="text-xs text-muted-foreground">{error.account_id}</p>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge className={severityStyle}>
+                                        {error.severity || "low"}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ShieldAlert className="h-5 w-5 text-primary" />
+                      Flagged accounts & provisioning failures
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2">Accounts requiring review</h3>
+                      {flaggedAccountsLoading ? (
+                        <div className="flex h-24 items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : (
+                        <ScrollArea className="h-[180px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Account</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Alerts</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {flaggedAccounts.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                    No flagged accounts right now.
                                   </TableCell>
                                 </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900 mb-2">Recent provisioning failures</h3>
-                  {provisioningFailuresLoading ? (
-                    <div className="flex h-24 items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              ) : (
+                                flaggedAccounts.map((account) => {
+                                  const statusKey = account.provisioning_status?.toLowerCase() || "unknown";
+                                  const statusStyle = provisioningStatusStyles[statusKey] || provisioningStatusStyles.unknown;
+                                  return (
+                                    <TableRow key={account.account_id}>
+                                      <TableCell className="text-sm">
+                                        <div className="font-medium text-slate-900">{account.company_name}</div>
+                                        <p className="text-xs text-muted-foreground">
+                                          {account.flagged_reason || "Check alert log"}
+                                        </p>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge className={statusStyle}>
+                                          {account.provisioning_status || "Unknown"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        <div className="font-medium text-slate-900">{account.total_alerts || 0}</div>
+                                        {account.alert_types && account.alert_types.length > 0 && (
+                                          <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                                            {account.alert_types.join(", ")}
+                                          </p>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })
+                              )}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
                     </div>
-                  ) : (
-                    <ScrollArea className="h-[160px]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Error</TableHead>
-                            <TableHead>Updated</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {provisioningFailures.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={3} className="text-center text-muted-foreground">
-                                No provisioning failures detected.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            provisioningFailures.map((failure) => (
-                              <TableRow key={`${failure.account_id}-${failure.updated_at}`}>
-                                <TableCell className="text-sm">
-                                  <div className="font-medium text-slate-900">{failure.company_name}</div>
-                                  <p className="text-xs text-muted-foreground">
-                                    Status: {failure.provisioning_status || "Unknown"}
-                                  </p>
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <p className="max-w-[200px] truncate text-muted-foreground">
-                                    {failure.provisioning_error || "—"}
-                                  </p>
-                                </TableCell>
-                                <TableCell className="text-sm">{formatDateTime(failure.updated_at)}</TableCell>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2">Recent provisioning failures</h3>
+                      {provisioningFailuresLoading ? (
+                        <div className="flex h-24 items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : (
+                        <ScrollArea className="h-[160px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Account</TableHead>
+                                <TableHead>Error</TableHead>
+                                <TableHead>Updated</TableHead>
                               </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                            </TableHeader>
+                            <TableBody>
+                              {provisioningFailures.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                    No provisioning failures detected.
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                provisioningFailures.map((failure) => (
+                                  <TableRow key={`${failure.account_id}-${failure.updated_at}`}>
+                                    <TableCell className="text-sm">
+                                      <div className="font-medium text-slate-900">{failure.company_name}</div>
+                                      <p className="text-xs text-muted-foreground">
+                                        Status: {failure.provisioning_status || "Unknown"}
+                                      </p>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      <p className="max-w-[200px] truncate text-muted-foreground">
+                                        {failure.provisioning_error || "—"}
+                                      </p>
+                                    </TableCell>
+                                    <TableCell className="text-sm">{formatDateTime(failure.updated_at)}</TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signups" className="space-y-4">
+            <SignupsTab dateFilter={dateFilter} />
+          </TabsContent>
+
+          <TabsContent value="usage" className="space-y-4">
+            <UsageTab dateFilter={dateFilter} />
+          </TabsContent>
+
+          <TabsContent value="health" className="space-y-4">
+            <SystemHealthTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

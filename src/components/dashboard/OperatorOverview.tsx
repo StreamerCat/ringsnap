@@ -438,19 +438,6 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
           </CardContent>
         </Card>
       )}
-
-      {/* Empty state */}
-      {pendingAppointments.length === 0 && leads.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">All Quiet Today</h3>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              No pending appointments or leads yet. Your AI assistant is ready to handle incoming calls.
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
