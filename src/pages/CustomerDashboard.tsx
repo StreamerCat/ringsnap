@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
-  Calendar, Loader2
+  Calendar, Loader2, Bot, UsersRound
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
@@ -446,11 +446,11 @@ export default function CustomerDashboard() {
                 <span className="hidden sm:inline text-xs">Phones</span>
               </TabsTrigger>
               <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
-                <Users className="h-4 w-4 sm:mr-1" />
+                <Bot className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Assistant</span>
               </TabsTrigger>
               <TabsTrigger value="team" className="flex-shrink-0 px-3">
-                <Users className="h-4 w-4 sm:mr-1" />
+                <UsersRound className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Team</span>
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex-shrink-0 px-3">

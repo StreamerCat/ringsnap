@@ -87,21 +87,20 @@ export function OverviewTab({
                 {/* 2. Account Status & Billing */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Plan & Billing</CardTitle>
+                        <CardTitle className="text-sm font-medium">Plan</CardTitle>
                         <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-between">
-                            <Badge variant={account.subscription_status === 'active' ? 'default' : 'secondary'}>
+                    <CardContent className="space-y-2">
+                        <div className="flex flex-col gap-1">
+                            <span className="text-lg font-bold uppercase">{account.plan_type || 'Free'}</span>
+                            <Badge variant={account.subscription_status === 'active' ? 'default' : 'secondary'} className="w-fit text-xs">
                                 {account.subscription_status}
                             </Badge>
-                            <span className="text-sm font-medium uppercase text-muted-foreground">{account.plan_type}</span>
                         </div>
-
                         <Button
                             variant="outline"
                             size="sm"
-                            className="w-full mt-3 h-8"
+                            className="w-full h-8 text-xs"
                             onClick={() => {
                                 if (featureFlags.upgradeModalEnabled && onOpenUpgradeModal) {
                                     onOpenUpgradeModal();
@@ -126,17 +125,17 @@ export function OverviewTab({
                 {/* 3. Monthly Usage */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Monthly Usage</CardTitle>
+                        <CardTitle className="text-sm font-medium">Usage</CardTitle>
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {/* Calculate used minutes from usageLogs (which are calls now) */}
-                            {Math.ceil(usageLogs.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) / 60)} / {account.monthly_minutes_limit}
+                    <CardContent className="space-y-2">
+                        <div className="text-lg font-bold">
+                            {Math.ceil(usageLogs.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) / 60)}
+                            <span className="text-sm font-normal text-muted-foreground"> / {account.monthly_minutes_limit} min</span>
                         </div>
-                        <Progress value={usagePercent} className="mt-2" />
-                        <p className="text-xs text-muted-foreground mt-2">
-                            {usagePercent}% used this cycle
+                        <Progress value={usagePercent} className="h-2" />
+                        <p className="text-xs text-muted-foreground">
+                            {usagePercent}% used
                         </p>
                     </CardContent>
                 </Card>
@@ -145,16 +144,18 @@ export function OverviewTab({
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">
-                            {account.subscription_status === 'trial' ? 'Trial Days Left' : 'Credits Balance'}
+                            {account.subscription_status === 'trial' ? 'Trial' : 'Credits'}
                         </CardTitle>
                         <AlertCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">
-                            {account.subscription_status === 'trial' ? trialDaysRemaining : `$${creditsBalance.toFixed(2)}`}
+                        <div className="text-lg font-bold">
+                            {account.subscription_status === 'trial'
+                                ? `${trialDaysRemaining} days`
+                                : `$${creditsBalance.toFixed(2)}`}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                            {account.subscription_status === 'trial' ? 'Upgrade to continue' : 'Available credits'}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {account.subscription_status === 'trial' ? 'remaining' : 'available'}
                         </p>
                     </CardContent>
                 </Card>
