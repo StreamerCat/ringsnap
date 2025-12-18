@@ -1,6 +1,13 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -43,9 +50,54 @@ export function OverviewTab({
 }: OverviewTabProps) {
     const [billingLoading, setBillingLoading] = useState(false);
 
+    // Date filter state
+    const [dateFilter, setDateFilter] = useState<string>("all");
+
     // Call details drawer state (behind flag)
     const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+
+    // Filter logs based on date range
+    const filteredLogs = useMemo(() => {
+        if (dateFilter === "all") return usageLogs;
+
+        const now = new Date();
+        let startDate: Date;
+
+        switch (dateFilter) {
+            case "3days":
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 3);
+                break;
+            case "week":
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 7);
+                break;
+            case "month":
+                startDate = new Date(now);
+                startDate.setMonth(now.getMonth() - 1);
+                break;
+            default:
+                return usageLogs;
+        }
+
+        startDate.setHours(0, 0, 0, 0);
+        return usageLogs.filter((log: any) => new Date(log.started_at) >= startDate);
+    }, [usageLogs, dateFilter]);
+
+    // Format phone number nicely
+    const formatPhoneNumber = (phone: string | null | undefined): string => {
+        if (!phone) return "Unknown";
+        // Remove non-digits
+        const digits = phone.replace(/\D/g, "");
+        // Format US numbers
+        if (digits.length === 10) {
+            return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+        } else if (digits.length === 11 && digits.startsWith("1")) {
+            return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+        }
+        return phone;
+    };
 
     const handleManageBilling = async () => {
         setBillingLoading(true);
@@ -179,11 +231,22 @@ export function OverviewTab({
 
             {/* Recent Calls Table */}
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                     <CardTitle>Recent Activity</CardTitle>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Filter by date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Time</SelectItem>
+                            <SelectItem value="3days">Last 3 Days</SelectItem>
+                            <SelectItem value="week">This Week</SelectItem>
+                            <SelectItem value="month">This Month</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </CardHeader>
                 <CardContent>
-                    {usageLogs.length === 0 ? (
+                    {filteredLogs.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No calls yet</p>
                     ) : (
                         <Table>
@@ -200,7 +263,7 @@ export function OverviewTab({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {usageLogs.slice(0, 50).map((log: any) => {
+                                {filteredLogs.slice(0, 50).map((log: any) => {
                                     // Improved outcome detection: check multiple fields for booked appointment
                                     const getOutcomeBadge = () => {
                                         // Check multiple signals for a booked appointment
@@ -280,8 +343,15 @@ export function OverviewTab({
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className="font-semibold">{log.caller_name || log.from_number || "Unknown"}</span>
-                                                    {log.caller_name && <span className="text-xs text-muted-foreground">{log.from_number}</span>}
+                                                    <span className="font-semibold">
+                                                        {log.caller_name || (log.from_number ? formatPhoneNumber(log.from_number) : "Unknown caller")}
+                                                    </span>
+                                                    {log.caller_name && log.from_number && (
+                                                        <span className="text-xs text-muted-foreground">{formatPhoneNumber(log.from_number)}</span>
+                                                    )}
+                                                    {!log.caller_name && log.from_number && (
+                                                        <span className="text-xs text-muted-foreground">Unknown caller</span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell max-w-[200px]">
