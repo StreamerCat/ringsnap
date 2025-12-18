@@ -43,6 +43,7 @@ const HVAC = lazy(() => import("./pages/trades/HVAC"));
 const Electricians = lazy(() => import("./pages/trades/Electricians"));
 const Roofing = lazy(() => import("./pages/trades/Roofing"));
 const Difference = lazy(() => import("./pages/Difference"));
+const Pricing = lazy(() => import("./pages/Pricing"));
 const Activation = lazy(() => import("./pages/Activation"));
 
 const queryClient = new QueryClient();
@@ -126,6 +127,7 @@ const App = () => (
               <Route path="/roofing" element={<Roofing />} />
               {/* Marketing landing pages */}
               <Route path="/difference" element={<Difference />} />
+              <Route path="/pricing" element={<Pricing />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

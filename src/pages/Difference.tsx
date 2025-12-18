@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
-const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
+import { PricingTeaserCard } from "@/components/PricingTeaserCard";
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
@@ -319,27 +319,7 @@ const Difference = () => {
                 {/* SECTION 8: Pricing Teaser */}
                 <section className="section-spacer-compact bg-muted/30">
                     <div className="container mx-auto px-4 max-w-4xl">
-                        <div className="text-center mb-8">
-                            <h2 className="text-h2 mb-4">Simple pricing, no per agent fees</h2>
-                        </div>
-
-                        <Card className="card-tier-2 max-w-md mx-auto">
-                            <CardContent className="p-6 text-center">
-                                <p className="text-muted-foreground mb-4">
-                                    Starting at <span className="font-bold text-2xl text-foreground">$297/month</span>
-                                </p>
-                                <p className="text-sm text-muted-foreground mb-6">
-                                    Transparent pricing. No setup fees. Cancel anytime.
-                                </p>
-                                <Button
-                                    variant="gradient"
-                                    className="rounded-full px-8"
-                                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                                >
-                                    See Pricing <ArrowRight className="ml-2 w-4 h-4" />
-                                </Button>
-                            </CardContent>
-                        </Card>
+                        <PricingTeaserCard headingLevel="h2" />
                     </div>
                 </section>
 
@@ -429,10 +409,9 @@ const Difference = () => {
                     </div>
                 </section>
 
-                {/* Full Pricing Section */}
+                {/* Footer Section */}
                 <ErrorBoundary>
                     <Suspense fallback={<div className="w-full h-64 flex items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-                        <ContractorPricing />
                         <ContractorFooter />
                     </Suspense>
                 </ErrorBoundary>
