@@ -387,10 +387,9 @@ businesses rely on</h2>
                     </div>
                 </section>
 
-                {/* Full Pricing Section */}
+                {/* Footer Section */}
                 <ErrorBoundary>
                     <Suspense fallback={<div className="w-full h-64 flex items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-                        <ContractorPricing />
                         <ContractorFooter />
                     </Suspense>
                 </ErrorBoundary>
