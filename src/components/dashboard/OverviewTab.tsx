@@ -93,8 +93,8 @@ export function OverviewTab({
 
     return (
         <div className="space-y-4 sm:space-y-6">
-            {/* Stats Cards - 2 cols mobile, 4 cols desktop */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {/* Stats Cards - 2 cols mobile, 3 cols desktop */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
                 {/* 1. Your Number */}
                 <Card className="col-span-2 sm:col-span-1 border-primary/20 bg-primary/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -174,25 +174,7 @@ export function OverviewTab({
                     </CardContent>
                 </Card>
 
-                {/* 4. Trial/Credits */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            {account.subscription_status === 'trial' ? 'Trial' : 'Credits'}
-                        </CardTitle>
-                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-bold">
-                            {account.subscription_status === 'trial'
-                                ? `${trialDaysRemaining} days`
-                                : `$${creditsBalance.toFixed(2)}`}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {account.subscription_status === 'trial' ? 'remaining' : 'available'}
-                        </p>
-                    </CardContent>
-                </Card>
+                {/* Credits card removed per user request */}
             </div>
 
             {/* Recent Calls Table */}
