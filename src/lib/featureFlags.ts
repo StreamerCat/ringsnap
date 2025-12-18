@@ -106,16 +106,16 @@ export const featureFlags: FeatureFlags = {
   // Upgrade modal ENABLED by default (plan selection must happen in RingSnap UI)
   upgradeModalEnabled: parseBoolEnv(import.meta.env.VITE_FEATURE_UPGRADE_MODAL, true),
 
-  // Activation onboarding: OFF in prod, ON in dev/staging
+  // Activation onboarding: ENABLED in all environments
   activationOnboardingEnabled: parseBoolEnv(
     import.meta.env.VITE_FEATURE_ACTIVATION_ONBOARDING,
-    !isProd
+    true
   ),
 
-  // Reporting wow: OFF in prod, ON in dev/staging
+  // Reporting wow: ENABLED in all environments
   reportingWowEnabled: parseBoolEnv(
     import.meta.env.VITE_FEATURE_REPORTING_WOW,
-    !isProd
+    true
   ),
 };
 

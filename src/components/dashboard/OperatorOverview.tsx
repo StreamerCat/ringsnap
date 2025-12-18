@@ -36,6 +36,18 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
   const [leads, setLeads] = useState<any[]>([]);
   const [calls, setCalls] = useState<any[]>([]);
 
+  // Format phone number nicely
+  const formatPhoneNumber = (phone: string | null | undefined): string => {
+    if (!phone) return "Unknown";
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits.startsWith("1")) {
+      return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    return phone;
+  };
+
   // Burst polling: 5s for first 60s, then 30s
   useEffect(() => {
     let pollingInterval: NodeJS.Timeout | null = null;
@@ -393,8 +405,15 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">{call.caller_name || call.from_number || "Unknown"}</span>
-                            {call.caller_name && <span className="text-xs text-muted-foreground">{call.from_number}</span>}
+                            <span className="font-medium">
+                              {call.caller_name || (call.from_number ? formatPhoneNumber(call.from_number) : "Unknown caller")}
+                            </span>
+                            {call.caller_name && call.from_number && (
+                              <span className="text-xs text-muted-foreground">{formatPhoneNumber(call.from_number)}</span>
+                            )}
+                            {!call.caller_name && call.from_number && (
+                              <span className="text-xs text-muted-foreground">Unknown caller</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell max-w-[200px]">
