@@ -54,6 +54,8 @@ import { ChatButtons, ChatButtonOption } from "@/components/onboarding-chat/Chat
 import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { extractUserError, logClientError } from "@/lib/errors";
+import { trackFunnelEvent, trackCheckpoint, trackConversion, trackFormEvent, trackTiming } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
 
 
 // Chat step types
@@ -402,6 +404,7 @@ function OnboardingChatInner() {
         // Start the chat
         // Start the chat
         setStep("phone");
+        trackFunnelEvent("onboarding_started", { lead_id: lead.id, email: lead.email });
 
         await showTypingDelay(800);
         const userName = lead.full_name?.split(" ")[0] || "there";
@@ -504,6 +507,7 @@ function OnboardingChatInner() {
     addMessage("user", value);
     setData((prev) => ({ ...prev, phone: value }));
     setStep("company");
+    trackCheckpoint("onboarding_phone_collected");
     await showTypingDelay();
     addMessage("assistant", "Got it. What's the name of your business?");
   };
@@ -519,6 +523,7 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, companyName: value.trim() }));
 
     setStep("trade");
+    trackCheckpoint("onboarding_company_collected", { company_name: value.trim() });
     await showTypingDelay();
     addMessage("assistant", "What type of service do you provide?");
   };
@@ -535,6 +540,7 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, trade: value }));
 
     setStep("website");
+    trackCheckpoint("onboarding_trade_collected", { trade: value });
     await showTypingDelay();
     addMessage(
       "assistant",
@@ -576,6 +582,7 @@ function OnboardingChatInner() {
     }
 
     setStep("hours");
+    trackCheckpoint("onboarding_website_collected", { skipped });
     await showTypingDelay();
     addMessage("assistant", "When is your business typically available to take calls?");
   };
@@ -640,6 +647,7 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, businessHours: hoursData }));
 
     setStep("voice");
+    trackCheckpoint("onboarding_hours_collected", { type: value });
     await showTypingDelay();
     addMessage("assistant", "What voice would you like your AI receptionist to have?");
   };
@@ -667,6 +675,7 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, assistantGender: gender }));
 
     setStep("goal");
+    trackCheckpoint("onboarding_voice_collected", { gender });
     await showTypingDelay();
     addMessage("assistant", "What's the main thing you want your AI receptionist to do?");
   };
@@ -678,8 +687,10 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, primaryGoal: value }));
 
     setStep("plan");
+    trackCheckpoint("onboarding_goal_collected", { goal: value });
     await showTypingDelay();
     addMessage(
+      "assistant",
       "Excellent! You're almost done. We'll set you up on our standard Starter Plan ($297/mo) with a 3-day free trial."
     );
 
@@ -741,6 +752,7 @@ function OnboardingChatInner() {
 
     setIsProcessing(true);
     addMessage("user", "Payment submitted");
+    trackFormEvent("onboarding_payment", "submit", { plan: data.planType });
 
     try {
       // Create payment method - default for bypass mode

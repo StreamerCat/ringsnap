@@ -1,10 +1,13 @@
 import { Helmet } from "react-helmet";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ContractorHero } from "@/components/ContractorHero";
 import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteHeader } from "@/components/SiteHeader";
+import { trackFunnelEvent, trackPageLoad } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
+import { Button } from "@/components/ui/button";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -16,6 +19,12 @@ const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Index = () => {
+  // Track landing page view for funnel analytics
+  useEffect(() => {
+    trackPageLoad('Index');
+    trackFunnelEvent('landing_page_view');
+  }, []);
+
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
