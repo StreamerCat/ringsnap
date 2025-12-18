@@ -92,7 +92,7 @@ export function VapiChatWidget() {
                     size="compact"
 
                     // Customization
-                    buttonColor="#D97757" // Terracotta
+                    buttonColor="#D67256" // Updated Terracotta
                     title="Talk with RingSnap"
                     subtitle="We're here to help"
                     // idleButtonText="Get Help" // Vapi SDK distinct prop for this? 
