@@ -16,6 +16,7 @@ import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboard
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
 import * as Sentry from "@sentry/react";
+import { useVapiWidget } from "@/lib/VapiWidgetContext";
 
 // Tab Components
 import { TodayTab } from "@/components/dashboard/TodayTab";
@@ -33,6 +34,7 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { setWidgetContext } = useVapiWidget();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "today");
@@ -150,6 +152,8 @@ export default function CustomerDashboard() {
         return;
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+
       if (!profileData.accounts) throw new Error("Account not found. Your account may still be setting up.");
 
       setProfile(profileData);
@@ -160,6 +164,17 @@ export default function CustomerDashboard() {
         userId,
         accountId: profileData.account_id,
         plan: profileData.accounts.plan_type,
+      });
+
+      // Update Vapi Widget Context
+      setWidgetContext({
+        customerName: profileData.name,
+        customerEmail: user?.email,
+        accountId: profileData.account_id,
+        planName: profileData.accounts.plan_type,
+        minutesLimit: profileData.accounts.monthly_minutes_limit,
+        minutesUsed: profileData.accounts.monthly_minutes_used,
+        provisioningStatus: profileData.accounts.provisioning_status
       });
 
       const accountId = profileData.account_id;
