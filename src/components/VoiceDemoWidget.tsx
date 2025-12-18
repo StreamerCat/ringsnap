@@ -21,10 +21,11 @@ export const VoiceDemoWidget = () => {
     const loadVapiConfig = async (retryCount = 0) => {
       try {
         setDemoState('initializing');
-        console.log('[Voice Demo] Loading configuration...', { retryCount });
+        const fetchUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`;
+        console.log('[Voice Demo] Loading configuration...', { retryCount, url: fetchUrl });
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vapi-demo-call`,
+          fetchUrl,
           {
             method: 'POST',
             headers: {
