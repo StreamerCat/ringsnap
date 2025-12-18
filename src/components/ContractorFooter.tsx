@@ -3,7 +3,7 @@ import { Phone, Mail, MapPin, Shield } from "lucide-react";
 export const ContractorFooter = () => {
   const faqs = [{
     question: "Will it sound like a robot?",
-    answer: "No. Our AI uses advanced voice technology that sounds completely natural. Customers typically can't tell they're speaking with AI. We offer premium voice cloning on Professional and Premium plans to match your team's voice exactly."
+    answer: "No. Our AI uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
   }, {
     question: "What if it's a gas leak or electrical fire?",
     answer: "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The AI provides full context of the situation before transfer so you know exactly what you're walking into."
@@ -81,108 +81,103 @@ export const ContractorFooter = () => {
     }]
   };
   return <footer className="bg-gradient-to-br from-cream/30 to-off-white border-t border-charcoal/20">
-      {/* FAQ Section */}
-      <div className="container mx-auto px-4 py-16">
-        <h2 className="text-3xl font-bold text-center mb-8">Common Questions from Contractors</h2>
-        <Accordion type="single" collapsible className="max-w-3xl mx-auto">
-          {faqs.map((faq, index) => <AccordionItem key={index} value={`item-${index}`}>
-              <AccordionTrigger className="text-left font-semibold">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {faq.answer}
-              </AccordionContent>
-            </AccordionItem>)}
-        </Accordion>
-      </div>
+    {/* FAQ Section */}
+    <div className="container mx-auto px-4 py-16">
+      <h2 className="text-3xl font-bold text-center mb-8">Common Questions from Contractors</h2>
+      <Accordion type="single" collapsible className="max-w-3xl mx-auto">
+        {faqs.map((faq, index) => <AccordionItem key={index} value={`item-${index}`}>
+          <AccordionTrigger className="text-left font-semibold">
+            {faq.question}
+          </AccordionTrigger>
+          <AccordionContent className="text-muted-foreground">
+            {faq.answer}
+          </AccordionContent>
+        </AccordionItem>)}
+      </Accordion>
+    </div>
 
-      {/* Footer Links */}
-      <div className="border-t">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid md:grid-cols-5 gap-8 mb-12">
-            {/* Brand Column */}
-            <div className="md:col-span-1 space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 gradient-core rounded-lg flex items-center justify-center">
-                  <Phone className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-bold text-lg">RingSnap</span>
+    {/* Footer Links */}
+    <div className="border-t">
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid md:grid-cols-5 gap-8 mb-12">
+          {/* Brand Column */}
+          <div className="md:col-span-1 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 gradient-core rounded-lg flex items-center justify-center">
+                <Phone className="w-4 h-4 text-white" />
               </div>
-              <p className="text-sm text-foreground/60 font-secondary">
-                Made to sound human.
-              </p>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                
-                
-              </div>
+              <span className="font-bold text-lg">RingSnap</span>
             </div>
+            <p className="text-sm text-foreground/60 font-secondary">
+              Built to book jobs and protect your time.
+            </p>
+            <div className="space-y-2 text-sm text-muted-foreground">
 
-            {/* Product Links */}
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2">
-                {footerLinks.product.map((link, index) => <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                      {link.label}
-                    </a>
-                  </li>)}
-              </ul>
-            </div>
 
-            {/* For Contractors */}
-            <div>
-              <h3 className="font-semibold mb-4">For Contractors</h3>
-              <ul className="space-y-2">
-                {footerLinks.trades.map((link, index) => <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                      {link.label}
-                    </a>
-                  </li>)}
-              </ul>
-            </div>
-
-            {/* Resources */}
-            <div>
-              <h3 className="font-semibold mb-4">Resources</h3>
-              <ul className="space-y-2">
-                {footerLinks.resources.map((link, index) => <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                      {link.label}
-                    </a>
-                  </li>)}
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2">
-                {footerLinks.company.map((link, index) => <li key={index}>
-                    <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                      {link.label}
-                    </a>
-                  </li>)}
-              </ul>
             </div>
           </div>
 
-          {/* Bottom Bar */}
-          <div className="border-t pt-8">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <p className="text-sm text-muted-foreground">© 2025 RingSnap • All rights reserved</p>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                <Shield className="w-4 h-4 text-primary" />
-                  SOC 2 Compliant
-                </span>
-                <span className="flex items-center gap-1">
-                  <Shield className="w-4 h-4 text-primary" />
-                  HIPAA Compliant
-                </span>
-              </div>
+          {/* Product Links */}
+          <div>
+            <h3 className="font-semibold mb-4">Product</h3>
+            <ul className="space-y-2">
+              {footerLinks.product.map((link, index) => <li key={index}>
+                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
+                  {link.label}
+                </a>
+              </li>)}
+            </ul>
+          </div>
+
+          {/* For Contractors */}
+          <div>
+            <h3 className="font-semibold mb-4">For Contractors</h3>
+            <ul className="space-y-2">
+              {footerLinks.trades.map((link, index) => <li key={index}>
+                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
+                  {link.label}
+                </a>
+              </li>)}
+            </ul>
+          </div>
+
+          {/* Resources */}
+          <div>
+            <h3 className="font-semibold mb-4">Resources</h3>
+            <ul className="space-y-2">
+              {footerLinks.resources.map((link, index) => <li key={index}>
+                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
+                  {link.label}
+                </a>
+              </li>)}
+            </ul>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h3 className="font-semibold mb-4">Company</h3>
+            <ul className="space-y-2">
+              {footerLinks.company.map((link, index) => <li key={index}>
+                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
+                  {link.label}
+                </a>
+              </li>)}
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="border-t pt-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-muted-foreground">© 2025 RingSnap • All rights reserved</p>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>Data encrypted in transit</span>
+              <span className="text-muted-foreground/50">•</span>
+              <span>Account-level access controls</span>
             </div>
           </div>
         </div>
       </div>
-    </footer>;
+    </div>
+  </footer>;
 };

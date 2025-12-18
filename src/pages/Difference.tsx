@@ -8,42 +8,30 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import {
-    Phone,
-    PhoneCall,
-    CheckCircle2,
-    Clock,
-    Star,
-    Settings,
-    FileText,
-    Users,
-    Brain,
-    Briefcase,
-    MessageSquare,
-    ArrowRight,
-    Shield
-} from "lucide-react";
-
-const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
-const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
-const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
-const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
-
+import { Phone, PhoneCall, CheckCircle2, Clock, Star, Settings, FileText, Users, Brain, Briefcase, MessageSquare, ArrowRight, Shield } from "lucide-react";
+const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({
+  default: m.ContractorTestimonials
+})));
+const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({
+  default: m.ContractorPricing
+})));
+const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({
+  default: m.ContractorFooter
+})));
+const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({
+  default: m.MobileFooterCTA
+})));
 const Difference = () => {
-    const navigate = useNavigate();
-
-    const scrollToDemo = () => {
-        document.getElementById("mechanism-section")?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    return (
-        <>
+  const navigate = useNavigate();
+  const scrollToDemo = () => {
+    document.getElementById("mechanism-section")?.scrollIntoView({
+      behavior: "smooth"
+    });
+  };
+  return <>
             <Helmet>
                 <title>The RingSnap Difference | Trained Front Desk for Home Services</title>
-                <meta
-                    name="description"
-                    content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes. Built for contractors."
-                />
+                <meta name="description" content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes. Built for contractors." />
                 <link rel="canonical" href="https://www.getringsnap.com/difference" />
                 <meta property="og:title" content="The RingSnap Difference | Trained Front Desk for Home Services" />
                 <meta property="og:description" content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes." />
@@ -56,10 +44,7 @@ const Difference = () => {
 
             <SiteHeader />
             <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0 pt-14">
-                <a
-                    href="#main-content"
-                    className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:shadow-lg"
-                >
+                <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:shadow-lg">
                     Skip to main content
                 </a>
 
@@ -70,29 +55,15 @@ const Difference = () => {
                             <h1 className="text-h1 mb-6">
                                 The trained front desk that books jobs and gets sharper over time
                             </h1>
-                            <p className="text-body-default text-muted-foreground max-w-3xl mx-auto mb-8 text-lg leading-relaxed">
-                                Built for home services. RingSnap answers in under 2 rings, handles real conversations,
-                                follows your rules, and uses outcomes and patterns to improve talk tracks and routing
-                                over time, within boundaries you control.
-                            </p>
+                            <p className="text-body-default text-muted-foreground max-w-3xl mx-auto mb-8 text-lg leading-relaxed">Built for home service pros. RingSnap answers in under 2 rings, handles real conversations, follows your rules, and uses outcomes and patterns to improve talk tracks and routing over time, within boundaries you control.</p>
 
                             {/* CTAs */}
                             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
-                                <Button
-                                    size="lg"
-                                    variant="gradient"
-                                    className="text-lg h-14 px-8 rounded-full"
-                                    onClick={scrollToDemo}
-                                >
+                                <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full" onClick={scrollToDemo}>
                                     <PhoneCall className="mr-2 w-5 h-5" />
                                     Hear a Live Call
                                 </Button>
-                                <Button
-                                    size="lg"
-                                    variant="outline"
-                                    className="text-lg h-14 px-8 rounded-full border-2"
-                                    onClick={() => navigate('/start')}
-                                >
+                                <Button size="lg" variant="outline" className="text-lg h-14 px-8 rounded-full border-2" onClick={() => navigate('/start')}>
                                     Start Free Trial
                                 </Button>
                             </div>
@@ -181,7 +152,8 @@ const Difference = () => {
                 <section className="section-spacer bg-muted/30">
                     <div className="container mx-auto px-4 max-w-6xl">
                         <div className="text-center mb-10">
-                            <h2 className="text-h2 mb-4">It learns the instincts that great businesses rely on</h2>
+                            <h2 className="text-h2 mb-4">It learns the instincts that great
+businesses rely on</h2>
                         </div>
 
                         {/* Bento Cards */}
@@ -273,9 +245,7 @@ const Difference = () => {
                         <div className="relative">
                             {/* Helper line above */}
                             <div className="bg-muted/30 pt-8 pb-0">
-                                <p className="text-center text-sm text-muted-foreground">
-                                    Not demos. These are production outcomes from home service teams.
-                                </p>
+                                <p className="text-center text-sm text-muted-foreground">Not demos. These are real outcomes from home service teams.</p>
                             </div>
                             <ContractorTestimonials />
                         </div>
@@ -331,11 +301,9 @@ const Difference = () => {
                                 <p className="text-sm text-muted-foreground mb-6">
                                     Transparent pricing. No setup fees. Cancel anytime.
                                 </p>
-                                <Button
-                                    variant="gradient"
-                                    className="rounded-full px-8"
-                                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                                >
+                                <Button variant="gradient" className="rounded-full px-8" onClick={() => document.getElementById('pricing')?.scrollIntoView({
+                behavior: 'smooth'
+              })}>
                                     See Pricing <ArrowRight className="ml-2 w-4 h-4" />
                                 </Button>
                             </CardContent>
@@ -408,21 +376,11 @@ const Difference = () => {
                         </h2>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <Button
-                                size="lg"
-                                variant="gradient"
-                                className="text-lg h-14 px-8 rounded-full"
-                                onClick={scrollToDemo}
-                            >
+                            <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full" onClick={scrollToDemo}>
                                 <PhoneCall className="mr-2 w-5 h-5" />
                                 Hear a Live Call
                             </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                className="text-lg h-14 px-8 rounded-full border-2"
-                                onClick={() => navigate('/start')}
-                            >
+                            <Button size="lg" variant="outline" className="text-lg h-14 px-8 rounded-full border-2" onClick={() => navigate('/start')}>
                                 Start Free Trial
                             </Button>
                         </div>
@@ -439,8 +397,6 @@ const Difference = () => {
 
                 <MobileFooterCTA />
             </main>
-        </>
-    );
+        </>;
 };
-
 export default Difference;
