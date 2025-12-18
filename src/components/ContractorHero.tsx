@@ -59,9 +59,7 @@ export const ContractorHero = () => {
               <Button size="lg" variant="outline" className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md" style={{
                 borderColor: 'hsl(var(--charcoal) / 0.3)',
                 color: 'hsl(var(--charcoal))'
-              }} onClick={() => document.getElementById('pricing')?.scrollIntoView({
-                behavior: 'smooth'
-              })}>
+              }} onClick={() => navigate('/pricing')}>
                 See pricing
               </Button>
             </div>

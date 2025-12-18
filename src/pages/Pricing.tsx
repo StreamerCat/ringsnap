@@ -47,11 +47,11 @@ const Pricing = () => {
                             className="text-h1 mb-6"
                             style={{ color: 'hsl(var(--charcoal))' }}
                         >
-                            Stop Missing Calls.{" "}
-                            <span style={{ color: 'hsl(var(--primary))' }}>Start Booking More Jobs.</span>
+                            Pricing as simple as a{" "}
+                            <span style={{ color: 'hsl(var(--primary))' }}>handshake</span>
                         </h1>
                         <p className="text-body-default text-muted-foreground max-w-2xl mx-auto mb-8 text-lg leading-relaxed">
-                            24/7 call coverage that books appointments, routes urgent calls, and gives you full visibility. Choose by call volume. Upgrade anytime.
+                            Transparent pricing. No setup fees. Cancel anytime.
                         </p>
 
                         {/* Risk Reversal Trust Bar */}
