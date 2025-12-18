@@ -201,15 +201,35 @@ export function OverviewTab({
                             </TableHeader>
                             <TableBody>
                                 {usageLogs.slice(0, 50).map((log: any) => {
-                                    // Helper to format appointment info
+                                    // Improved outcome detection: check multiple fields for booked appointment
                                     const getOutcomeBadge = () => {
-                                        if (log.outcome === 'booked' || log.booked) {
+                                        // Check multiple signals for a booked appointment
+                                        const isBooked = log.outcome === 'booked' ||
+                                            log.booked === true ||
+                                            log.appointment_window ||
+                                            log.appointment_start;
+                                        if (isBooked) {
                                             return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
                                         }
                                         if (log.outcome === 'lead' || log.lead_captured) {
                                             return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
                                         }
-                                        return <Badge variant="secondary" className="capitalize">{log.status}</Badge>;
+                                        // Only show status badge if there's a meaningful status
+                                        if (log.status === 'completed' || log.status === 'ended') {
+                                            return <Badge variant="secondary">Completed</Badge>;
+                                        }
+                                        return <Badge variant="secondary" className="capitalize">{log.status || 'Call'}</Badge>;
+                                    };
+
+                                    // Summarize reason to a few words
+                                    const getSummarizedReason = () => {
+                                        const text = log.reason || log.summary || '';
+                                        if (!text) return '-';
+                                        const firstSentence = text.split(/[.!?]/)[0];
+                                        if (firstSentence.length > 50) {
+                                            return firstSentence.substring(0, 47) + '...';
+                                        }
+                                        return firstSentence || text.substring(0, 50);
                                     };
 
                                     const getAppointmentText = () => {

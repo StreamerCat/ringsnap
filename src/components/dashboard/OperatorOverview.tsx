@@ -358,11 +358,34 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                 </TableHeader>
                 <TableBody>
                   {calls.map((call: any) => {
+                    // Improved outcome detection: check multiple fields for booked appointment
                     const getOutcomeBadge = () => {
-                      if (call.outcome === 'booked' || call.booked) return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
+                      // Check multiple signals for a booked appointment
+                      const isBooked = call.outcome === 'booked' ||
+                        call.booked === true ||
+                        call.appointment_window ||
+                        call.appointment_start;
+                      if (isBooked) return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
                       if (call.outcome === 'lead' || call.lead_captured) return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
-                      return <Badge variant="outline" className="capitalize text-muted-foreground">{call.outcome || call.status}</Badge>;
+                      // Only show status badge if there's a meaningful status
+                      if (call.status === 'completed' || call.status === 'ended') {
+                        return <Badge variant="secondary">Completed</Badge>;
+                      }
+                      return <Badge variant="outline" className="capitalize text-muted-foreground">{call.outcome || call.status || 'Call'}</Badge>;
                     };
+
+                    // Summarize reason to a few words
+                    const getSummarizedReason = () => {
+                      const text = call.reason || call.summary || '';
+                      if (!text) return '-';
+                      // Truncate to ~40 chars or first sentence
+                      const firstSentence = text.split(/[.!?]/)[0];
+                      if (firstSentence.length > 50) {
+                        return firstSentence.substring(0, 47) + '...';
+                      }
+                      return firstSentence || text.substring(0, 50);
+                    };
+
                     return (
                       <TableRow key={call.id}>
                         <TableCell className="whitespace-nowrap">
@@ -375,15 +398,17 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell max-w-[200px]">
-                          <div className="truncate text-sm" title={call.reason || call.summary}>
-                            {call.reason || (call.summary ? call.summary.substring(0, 40) + "..." : "-")}
+                          <div className="text-sm text-muted-foreground" title={call.reason || call.summary}>
+                            {getSummarizedReason()}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1 items-start">
                             {getOutcomeBadge()}
-                            {call.appointment_window && (
-                              <span className="text-xs text-muted-foreground">{call.appointment_window}</span>
+                            {(call.appointment_window || call.appointment_start) && (
+                              <span className="text-xs text-green-700 dark:text-green-400">
+                                {call.appointment_window || new Date(call.appointment_start).toLocaleDateString()}
+                              </span>
                             )}
                           </div>
                         </TableCell>

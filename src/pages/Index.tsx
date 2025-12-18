@@ -13,7 +13,7 @@ const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator"
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
 const CompetitorComparison = lazy(() => import("@/components/CompetitorComparison").then(m => ({ default: m.CompetitorComparison })));
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({ default: m.ContractorTestimonials })));
-const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
+import { PricingTeaserCard } from "@/components/PricingTeaserCard";
 
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
@@ -209,7 +209,11 @@ const Index = () => {
               <SolutionDemo />
               <NextStepsStrip />
               <CallValueCalculator />
-              <ContractorPricing />
+              <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
+                <div className="container mx-auto px-4 max-w-4xl">
+                  <PricingTeaserCard headingLevel="h2" />
+                </div>
+              </section>
               <ContractorFooter />
             </Suspense>
           </ErrorBoundary>
