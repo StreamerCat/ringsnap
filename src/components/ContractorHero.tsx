@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logo from "@/assets/RS_logo_color.svg";
-
 export const ContractorHero = () => {
   const navigate = useNavigate();
   const scrollToVapiDemo = () => {
@@ -28,7 +27,6 @@ export const ContractorHero = () => {
 
           <div className="space-y-8">
             <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{
-              color: 'hsl(var(--charcoal))'
             }}>
               Stop Missing Calls. Start Booking Jobs.
             </h1>
@@ -61,9 +59,7 @@ export const ContractorHero = () => {
               <Button size="lg" variant="outline" className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md" style={{
                 borderColor: 'hsl(var(--charcoal) / 0.3)',
                 color: 'hsl(var(--charcoal))'
-              }} onClick={() => document.getElementById('pricing')?.scrollIntoView({
-                behavior: 'smooth'
-              })}>
+              }} onClick={() => navigate('/pricing')}>
                 See pricing
               </Button>
             </div>
