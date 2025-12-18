@@ -16,9 +16,9 @@ export const ContractorPricing = () => {
   };
 
   const comparisonData = [
-    { option: "Full-time Receptionist", cost: "$3,000-4,000/month", issues: "Benefits, sick days, 9-5 only" },
-    { option: "Answering Service", cost: "$500-1,200/month", issues: "Robotic, can't book appointments" },
-    { option: "AI Receptionist", cost: "$297/month", issues: "24/7/365, books jobs, sounds human" },
+    { option: "Full-time Receptionist", cost: "$3,000-4,000/month", issues: "Benefits, sick days, limited hours" },
+    { option: "Answering Service", cost: "$500-1,200/month", issues: "Generic scripts, no booking, limited visibility" },
+    { option: "RingSnap", cost: "$297/month", issues: "24/7 booking, urgent call transfer rules, full call logs" },
   ];
 
   const pricingTiers = [
@@ -31,11 +31,11 @@ export const ContractorPricing = () => {
       overage: "$0.16/minute",
       overageContext: "Most customers use 1,000-1,400 min/month",
       features: [
-        "Answer 95% of calls automatically",
+        "24/7 call answering",
         "Books appointments automatically",
-        "Call recordings & transcripts",
-        "Google Calendar + Zapier",
-        "Basic analytics"
+        "Urgent call transfer with context",
+        "Call recordings and transcripts",
+        "Google Calendar + Zapier"
       ],
       cta: "Start Free Trial",
       badge: null,
@@ -51,10 +51,10 @@ export const ContractorPricing = () => {
       overageContext: "Most customers stay within plan limits",
       features: [
         "Everything in Starter, PLUS:",
-        "Premium voice cloning",
+        "Branded voice options",
+        "Urgent call transfer rules",
         "Smart call routing to crew",
         "Multi-language (EN + ES)",
-        "Advanced analytics",
         "Priority support"
       ],
       cta: "Start Free Trial",
@@ -71,7 +71,7 @@ export const ContractorPricing = () => {
       overageContext: "Rarely needed at this tier",
       features: [
         "Everything in Professional, PLUS:",
-        "Custom brand voice cloning",
+        "Custom brand voice",
         "Dedicated success manager",
         "API + custom webhooks",
         "Multi-location dashboard",
@@ -103,9 +103,9 @@ export const ContractorPricing = () => {
             <p className="text-xs text-muted-foreground mt-1">247 contractors rated onboarding + support experience.</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">Stays on the job</div>
-            <div className="mt-2 text-2xl font-bold text-primary">95% call capture</div>
-            <p className="text-xs text-muted-foreground mt-1">Emergency, overflow, and after-hours calls booked automatically.</p>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">Always on</div>
+            <div className="mt-2 text-2xl font-bold text-primary">24/7 coverage</div>
+            <p className="text-xs text-muted-foreground mt-1">After hours, overflow, and urgent calls handled with rules you control.</p>
           </div>
         </div>
 
@@ -113,7 +113,7 @@ export const ContractorPricing = () => {
         <div className="max-w-3xl mx-auto mb-12">
           <Card className="border-2">
             <CardContent className="p-6">
-              <h3 className="font-bold text-lg mb-4 text-center">Compare Your Options</h3>
+              <h3 className="font-bold text-lg mb-4 text-center">Compare the Common Options</h3>
               <div className="space-y-3">
                 {comparisonData.map((item, index) => (
                   <div
@@ -239,17 +239,16 @@ export const ContractorPricing = () => {
             </div>
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-primary" />
-              <span>99.9% uptime SLA</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-primary" />
-              <span>HIPAA compliant</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-primary" />
               <span>Your number stays the same</span>
             </div>
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-primary" />
+              <span>Full call logs and transcripts</span>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Security: Encrypted in transit. Account-level access controls.
+          </p>
         </div>
 
         {/* Usage Guide Section */}

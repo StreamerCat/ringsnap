@@ -87,8 +87,8 @@ export const SolutionDemo = () => {
           <Card className="card-tier-2 text-center">
             <CardContent className="space-y-3 p-0">
               <MessageCircle className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
-              <h3 className="font-bold text-base sm:text-lg">Sounds human</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground">89% of callers cannot tell it's AI.</p>
+              <h3 className="font-bold text-base sm:text-lg">Professional conversations</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">Every caller gets a fast, helpful answer.</p>
             </CardContent>
           </Card>
           <Card className="card-tier-2 text-center">
@@ -200,13 +200,13 @@ export const SolutionDemo = () => {
             </div>
             <div className="flex flex-col items-center gap-2">
               <Shield className="w-6 h-6 text-primary" />
-              <div className="font-semibold">HIPAA Compliant</div>
-              <div className="text-sm text-muted-foreground">Your customer data is secure</div>
+              <div className="font-semibold">Secure by design</div>
+              <div className="text-sm text-muted-foreground">Your data stays in your account</div>
             </div>
             <div className="flex flex-col items-center gap-2">
               <MessageCircle className="w-6 h-6 text-primary" />
               <div className="font-semibold">Natural Conversations</div>
-              <div className="text-sm text-muted-foreground">Customers can't tell it's AI</div>
+              <div className="text-sm text-muted-foreground">Professional, helpful answers every time</div>
             </div>
           </div>
         </div>

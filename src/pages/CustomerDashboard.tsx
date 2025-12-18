@@ -460,10 +460,11 @@ export default function CustomerDashboard() {
                 <Phone className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Phones</span>
               </TabsTrigger>
-              <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
+              {/* Commented out - will add later */}
+              {/* <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
                 <Bot className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Assistant</span>
-              </TabsTrigger>
+              </TabsTrigger> */}
               <TabsTrigger value="team" className="flex-shrink-0 px-3">
                 <UsersRound className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Team</span>
@@ -476,10 +477,11 @@ export default function CustomerDashboard() {
                 <CreditCard className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Billing</span>
               </TabsTrigger>
-              <TabsTrigger value="referrals" className="flex-shrink-0 px-3">
+              {/* Commented out - will add later */}
+              {/* <TabsTrigger value="referrals" className="flex-shrink-0 px-3">
                 <Gift className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Earn</span>
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
           </div>
 
@@ -503,9 +505,10 @@ export default function CustomerDashboard() {
             <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
           </TabsContent>
 
-          <TabsContent value="assistants">
+          {/* Commented out - will add later */}
+          {/* <TabsContent value="assistants">
             <AssistantsTab account={account} assistants={assistants} />
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="team">
             <TeamTab accountId={account.id} />
@@ -531,11 +534,12 @@ export default function CustomerDashboard() {
             />
           </TabsContent>
 
-          <TabsContent value="referrals">
+          {/* Commented out - will add later */}
+          {/* <TabsContent value="referrals">
             <ReferralsTab
               referralStats={referralStats}
             />
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
 
         {/* Upgrade Modal - controlled by feature flag */}
