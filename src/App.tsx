@@ -45,7 +45,6 @@ const Roofing = lazy(() => import("./pages/trades/Roofing"));
 const Difference = lazy(() => import("./pages/Difference"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Activation = lazy(() => import("./pages/Activation"));
-const Pricing = lazy(() => import("./pages/Pricing"));
 
 const queryClient = new QueryClient();
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
