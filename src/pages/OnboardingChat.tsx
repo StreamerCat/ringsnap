@@ -1292,7 +1292,7 @@ function OnboardingChatInner() {
               )}
 
               {step === "complete" && phoneNumber && (
-                <div className="space-y-4">
+                <div className="space-y-4" data-testid="onboarding-complete-view">
                   <div className="p-6 border-2 border-green-200 rounded-lg bg-green-50 text-center">
                     <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
                     <h3 className="text-xl font-bold text-green-800 mb-2">You're All Set!</h3>
@@ -1314,7 +1314,12 @@ function OnboardingChatInner() {
                     </ol>
                   </div>
 
-                  <Button className="w-full mb-4" size="lg" onClick={goToDashboard}>
+                  <Button
+                    className="w-full mb-4"
+                    size="lg"
+                    onClick={goToDashboard}
+                    data-testid="go-to-dashboard-button"
+                  >
                     Go to Dashboard
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </Button>
