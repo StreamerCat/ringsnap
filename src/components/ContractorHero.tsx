@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logo from "@/assets/RS_logo_color.svg";
-
 export const ContractorHero = () => {
   const navigate = useNavigate();
   const scrollToVapiDemo = () => {
@@ -29,16 +28,12 @@ export const ContractorHero = () => {
             <div className="space-y-8">
               <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{
               color: 'hsl(var(--charcoal))'
-            }}>
-                Stop Losing $4K+/Month to Unanswered Calls
-              </h1>
+            }}>Stop Losing Revenue to Unanswered Calls</h1>
               
               <div className="space-y-4">
                 <p className="text-2xl sm:text-3xl leading-tight font-bold" style={{
                 color: 'hsl(var(--charcoal) / 0.9)'
-              }}>
-                  The AI Receptionist Built for Home Service Pros
-                </p>
+              }}>The Receptionist Built for Home Service Pros</p>
                 <p className="text-lg sm:text-xl leading-relaxed font-secondary" style={{
                 color: 'hsl(var(--charcoal) / 0.7)'
               }}>
