@@ -70,11 +70,10 @@ const Index = () => {
     "featureList": [
       "Answers in under 1 second",
       "Books appointments automatically",
-      "Sounds completely human",
       "24/7/365 availability",
       "Multi-language support",
       "Emergency call routing",
-      "HIPAA compliant",
+      "Full call logs and transcripts",
       "10-minute setup"
     ]
   };
@@ -84,10 +83,10 @@ const Index = () => {
     "@type": "Organization",
     "name": "RingSnap",
     "alternateName": "RingSnap AI Answering Service",
-    "description": "AI answering service that sounds human. Made for contractors who never want to miss a call.",
+    "description": "AI answering service built for contractors. Never miss a call, book more jobs.",
     "url": "https://www.getringsnap.com",
     "logo": "https://www.getringsnap.com/assets/RS_logo_color.svg",
-    "slogan": "Made to sound human",
+    "slogan": "Built to book jobs",
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+1-800-AI-CALLS",
@@ -117,7 +116,7 @@ const Index = () => {
         "name": "Will it sound like a robot?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. Our AI uses advanced voice technology that sounds completely natural. Customers typically can't tell they're speaking with AI. We offer premium voice cloning on Professional and Growth plans to match your team's voice exactly."
+          "text": "No. Our AI uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
         }
       },
       {
@@ -153,7 +152,7 @@ const Index = () => {
         <title>RingSnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
         <meta
           name="description"
-          content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. RingSnap's AI receptionist answers in under 1 second and your customers won't know it's AI. Try free for 3 days."
+          content="Never miss a call. Book jobs 24/7. RingSnap's AI receptionist answers in under 1 second with professional call handling. Try free for 3 days."
         />
         <meta
           name="keywords"
@@ -163,7 +162,7 @@ const Index = () => {
 
         {/* Open Graph */}
         <meta property="og:title" content="RingSnap: AI that Answers Like a Human" />
-        <meta property="og:description" content="Never miss a call. Book jobs 24/7. Sound warm, not robotic. Your customers won't know it's AI." />
+        <meta property="og:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.getringsnap.com/" />
         <meta property="og:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
@@ -171,7 +170,7 @@ const Index = () => {
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="RingSnap: AI that Answers Like a Human" />
-        <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. AI that sounds warm and human." />
+        <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
         <meta name="twitter:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
 
         {/* Structured Data */}

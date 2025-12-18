@@ -47,12 +47,11 @@ const Pricing = () => {
                             className="text-h1 mb-6"
                             style={{ color: 'hsl(var(--charcoal))' }}
                         >
-                            Stop Losing{" "}
-                            <span style={{ color: 'hsl(var(--primary))' }}>$5,000+/month</span>{" "}
-                            to Missed Calls
+                            Stop Missing Calls.{" "}
+                            <span style={{ color: 'hsl(var(--primary))' }}>Start Booking More Jobs.</span>
                         </h1>
                         <p className="text-body-default text-muted-foreground max-w-2xl mx-auto mb-8 text-lg leading-relaxed">
-                            Simple, transparent pricing with no hidden fees. Choose the plan that fits your business.
+                            24/7 call coverage that books appointments, routes urgent calls, and gives you full visibility. Choose by call volume. Upgrade anytime.
                         </p>
 
                         {/* Risk Reversal Trust Bar */}
