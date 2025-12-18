@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { jsPDF } from 'jspdf';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { SalesPasswordGate } from "@/components/SalesPasswordGate";

@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet-async";
 import { lazy, Suspense } from "react";
 import { TradeHero } from "@/components/trades/TradeHero";
 import { TradePainPoints } from "@/components/trades/TradePainPoints";
@@ -24,12 +24,12 @@ const Electricians = () => {
         <meta name="description" content={config.seo.description} />
         <meta name="keywords" content={config.seo.keywords} />
         <link rel="canonical" href={config.seo.canonical} />
-        
+
         <meta property="og:title" content={config.seo.title} />
         <meta property="og:description" content={config.seo.description} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={config.seo.canonical} />
-        
+
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={config.seo.title} />
         <meta name="twitter:description" content={config.seo.description} />

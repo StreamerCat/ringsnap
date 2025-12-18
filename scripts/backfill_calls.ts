@@ -40,7 +40,7 @@ async function runBackfill() {
 
     for (const row of calls) {
         let needsUpdate = false;
-        let updateData: any = {};
+        const updateData: any = {};
 
         // Parse raw payload if available
         let vapiCall: VapiCall | null = null;
