@@ -6,6 +6,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
+import { trackClick, trackFunnelEvent } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
 
 // Components
 import { InvoicesList } from "./billing/InvoicesList";
@@ -72,6 +74,7 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
             ? "Are you sure you want to cancel your trial? Your phone number will be released."
             : "Are you sure you want to cancel your subscription? It will remain active until the end of the current billing period.";
 
+        trackClick("cancel_subscription_initiated", { is_trial: isTrialing });
         if (!window.confirm(message)) return;
 
         setCancelingSubscription(true);
@@ -91,6 +94,11 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                     : "Your subscription will remain active until the end of the billing period.",
             });
 
+            trackFunnelEvent(isTrialing ? "cancellation_completed" : "cancellation_completed", {
+                type: isTrialing ? 'trial' : 'subscription',
+                account_id: account.id
+            });
+
             if (onRefresh) onRefresh();
             else window.location.reload();
         } catch (error: any) {
@@ -99,6 +107,9 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                 title: "Error",
                 description: "Failed to cancel. Please contact support.",
                 variant: "destructive"
+            });
+            Sentry.captureException(error, {
+                extra: { account_id: account.id, is_trial: isTrialing }
             });
         } finally {
             setCancelingSubscription(false);
@@ -145,7 +156,13 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                                 )}
                             </CardTitle>
                         </div>
-                        <Button onClick={() => setUpgradeModalOpen(true)} className="gap-2">
+                        <Button
+                            onClick={() => {
+                                trackClick("billing_upgrade_click", { current_plan: account.plan_type });
+                                setUpgradeModalOpen(true);
+                            }}
+                            className="gap-2"
+                        >
                             <Sparkles className="h-4 w-4" />
                             {isTrialing ? "Upgrade Now" : "Change Plan"}
                         </Button>

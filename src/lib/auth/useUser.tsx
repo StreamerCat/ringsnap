@@ -8,6 +8,7 @@ import type { User } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { setUserContext, clearUserContext } from "@/lib/sentry-tracking";
 
 type UseUserResult = {
   user: User | null;
@@ -59,8 +60,16 @@ export function useUser(): UseUserResult {
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (isMounted) {
-        setUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
         setIsLoading(false);
+
+        // Update Sentry user context
+        if (currentUser) {
+          setUserContext({ userId: currentUser.id });
+        } else {
+          clearUserContext();
+        }
       }
     });
 

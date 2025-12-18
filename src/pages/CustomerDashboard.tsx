@@ -14,6 +14,8 @@ import {
 import { featureFlags } from "@/lib/featureFlags";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
+import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
 
 // Tab Components
 import { TodayTab } from "@/components/dashboard/TodayTab";
@@ -54,6 +56,8 @@ export default function CustomerDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await loadDashboardData(user.id);
+        // Track page load after data is ready
+        trackPageLoad('CustomerDashboard');
       }
     };
     initData();
@@ -149,6 +153,13 @@ export default function CustomerDashboard() {
 
       setProfile(profileData);
       setAccount(profileData.accounts);
+
+      // Set Sentry context for error tracking
+      setUserContext({
+        userId,
+        accountId: profileData.account_id,
+        plan: profileData.accounts.plan_type,
+      });
 
       const accountId = profileData.account_id;
 
@@ -532,6 +543,14 @@ export default function CustomerDashboard() {
             accountId={account.id}
           />
         )}
+        {/* Temporary Sentry Test Trigger - only visible in dev or specific condition */}
+        <div className="hidden">
+          <Button id="sentry-test-error" onClick={() => {
+            const error = new Error("Test Sentry Error: RingSnap Phase 2 Integration Check");
+            Sentry.captureException(error);
+            console.log("Triggered test sentry error:", error);
+          }}>Test Sentry</Button>
+        </div>
       </div>
     </div>
   );

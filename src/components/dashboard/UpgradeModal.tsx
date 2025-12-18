@@ -7,6 +7,8 @@ import { Loader2, Check, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { DASHBOARD_PLANS, PlanDef, PlanKey } from "@/lib/billing/dashboardPlans";
+import { trackClick, trackFunnelEvent, trackConversion, trackCheckpoint } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
 
 interface UpgradeModalProps {
     open: boolean;
@@ -37,6 +39,10 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
         }
 
         setUpgrading(true);
+        trackFunnelEvent("upgrade_initiated", {
+            account_id: accountId,
+            plan: selectedPlan
+        });
         try {
             const { data, error } = await supabase.functions.invoke("create-upgrade-checkout", {
                 body: {
@@ -60,10 +66,16 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
             }
 
             if (data?.url) {
+                trackCheckpoint("upgrade_checkout_redirect", { url: data.url });
                 // Redirect to Stripe
                 window.location.href = data.url;
             } else if (data?.success) {
                 // Subscription was updated in-place (no checkout redirect needed)
+                trackConversion("upgrade_completed", 0, {
+                    plan: selectedPlan,
+                    account_id: accountId
+                });
+                trackFunnelEvent("upgrade_completed", { account_id: accountId, plan: selectedPlan });
                 toast({
                     title: "Plan Updated!",
                     description: `Your plan has been changed to ${selectedPlan}. Changes take effect immediately.`,
@@ -80,6 +92,9 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                 title: "Change Plan Failed",
                 description: error.message || "Could not process plan change. Please try again.",
                 variant: "destructive",
+            });
+            Sentry.captureException(error, {
+                extra: { account_id: accountId, plan: selectedPlan }
             });
         } finally {
             setUpgrading(false);
@@ -123,6 +138,7 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                                     }`}
                                 onClick={() => {
                                     if (isPlanSelectable) {
+                                        trackClick("upgrade_plan_selected", { plan: plan.key });
                                         setSelectedPlan(plan.key);
                                     }
                                 }}

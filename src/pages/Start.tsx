@@ -25,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { captureSignupLead } from '@/lib/api/leads';
 import { useUser } from '@/lib/auth/useUser';
+import { trackFunnelEvent, trackFormEvent, trackPageLoad } from '@/lib/sentry-tracking';
 
 // Store lead_id in localStorage for persistence
 const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
@@ -137,6 +138,12 @@ export default function Start() {
     };
   }, [user, isAuthLoading, navigate, existingLeadId]);
 
+  // Track page load for funnel analytics
+  useEffect(() => {
+    trackPageLoad('Start');
+    trackFunnelEvent('signup_started', { source: searchParams.get('utm_source') || 'direct' });
+  }, [searchParams]);
+
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -170,10 +177,12 @@ export default function Start() {
     }
 
     if (!validateEmail(trimmedEmail)) {
+      trackFormEvent('signup_form', 'validation_error', { field: 'email' });
       toast.error('Please enter a valid email address');
       return;
     }
 
+    trackFormEvent('signup_form', 'submit', { has_utm: !!searchParams.get('utm_source') });
     setIsSubmitting(true);
 
     try {
@@ -208,6 +217,9 @@ export default function Start() {
 
       // Store lead_id for persistence
       storeLeadId(leadId);
+
+      // Track successful lead capture
+      trackFunnelEvent('signup_completed', { lead_id: leadId });
 
       // Show success feedback
       toast.success('Great! Loading your setup...');
