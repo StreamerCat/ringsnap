@@ -128,7 +128,6 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                         return (
                             <Card
                                 key={plan.key}
-                                data-testid="plan-card"
                                 className={`relative cursor-pointer transition-all ${isCurrentPlan
                                     ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
                                     : isPlanSelectable
@@ -213,7 +212,6 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                         onClick={handleUpgrade}
                         disabled={!selectedPlan || upgrading}
                         className="min-w-[140px]"
-                        data-testid="upgrade-confirm-button"
                     >
                         {upgrading ? (
                             <>

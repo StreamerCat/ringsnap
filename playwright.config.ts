@@ -10,34 +10,10 @@ export default defineConfig({
     timeout: 30000,
     use: {
         baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8080',
-        trace: 'retain-on-failure',
-        video: 'on-first-retry',
+        trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },
     projects: [
-        // Auth setup - runs first to create storageState
-        {
-            name: 'setup',
-            testMatch: /.*\.setup\.ts/,
-        },
-        {
-            name: 'smoke',
-            testMatch: /.*smoke\.spec\.ts|.*billing\.spec\.ts/,
-            dependencies: ['setup'],
-            use: {
-                ...devices['Desktop Chrome'],
-                storageState: 'tests/.auth/user.json',
-            },
-        },
-        {
-            name: 'full',
-            testIgnore: /.*skip-ci.*/,
-            dependencies: ['setup'],
-            use: {
-                ...devices['Desktop Chrome'],
-                storageState: 'tests/.auth/user.json',
-            },
-        },
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
