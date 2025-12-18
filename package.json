@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "test:smoke:api": "vitest run tests/smoke/api.test.ts",
     "typecheck": "tsc --noEmit",
     "test:voice-demo": "bash scripts/test-voice-demo.sh",
     "test:vapi-demo": "bash scripts/test-voice-demo.sh",
