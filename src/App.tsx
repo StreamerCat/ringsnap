@@ -9,6 +9,9 @@ import * as Sentry from "@sentry/react";
 
 import { withAuthGuard } from "@/lib/auth/useUser";
 
+import { VapiWidgetProvider } from "@/lib/VapiWidgetContext";
+import { VapiChatWidget } from "@/components/VapiChatWidget";
+
 // Eager load Index for immediate LCP
 import Index from "./pages/Index";
 
@@ -74,68 +77,70 @@ const App = () => (
   >
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Suspense fallback={
-            <div className="flex h-screen w-full items-center justify-center bg-background">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          }>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              {/* Canonical signup/onboarding flow */}
-              <Route path="/start" element={<Start />} />
-              <Route path="/onboarding-chat" element={<OnboardingChat />} />
-              <Route path="/setup/assistant" element={<ProvisioningStatus />} />
-              <Route path="/onboarding-status" element={<ProvisioningStatus />} />
-              <Route path="/activation" element={<Activation />} />
-              {/* <Route path="/setup-status" element={<SetupStatus />} /> */}
+        <VapiWidgetProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Suspense fallback={
+              <div className="flex h-screen w-full items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            }>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                {/* Canonical signup/onboarding flow */}
+                <Route path="/start" element={<Start />} />
+                <Route path="/onboarding-chat" element={<OnboardingChat />} />
+                <Route path="/setup/assistant" element={<ProvisioningStatus />} />
+                <Route path="/onboarding-status" element={<ProvisioningStatus />} />
+                <Route path="/activation" element={<Activation />} />
+                {/* <Route path="/setup-status" element={<SetupStatus />} /> */}
 
-              {/* Legacy signup routes - redirect to canonical paths */}
-              <Route path="/signup" element={<SignupRedirect />} />
-              <Route path="/signup/form" element={<SignupRedirect />} />
-              <Route path="/onboarding" element={<OnboardingRedirect />} />
-              {/* Auth routes */}
-              <Route path="/login" element={<AuthLogin />} />
-              <Route path="/reset-password" element={<PasswordReset />} />
-              <Route path="/auth/login" element={<AuthLogin />} />
-              <Route path="/signin" element={<AuthLogin />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/auth/magic-callback" element={<MagicCallback />} />
-              <Route path="/auth/staff-invite" element={<StaffInvite />} />
-              {/* Settings */}
-              <Route path="/settings/security" element={<SecuritySettings />} />
-              <Route path="/settings/integrations/jobber" element={<JobberIntegration />} />
-              {/* App routes */}
-              <Route path="/sales" element={<Sales />} />
-              <Route path="/form-preview" element={<FormPreview />} />
-              <Route path="/trial-preview" element={<TrialFlowPreview />} />
-              <Route path="/salesdash" element={<Dashboard />} />
-              <Route path="/dashboard" element={<ProtectedCustomerDashboard />} />
-              <Route path="/dashboard/team" element={<TeamManagement />} />
-              <Route path="/trial-confirmation" element={<TrialConfirmation />} />
-              <Route path="/admin/monitoring" element={<AdminMonitoring />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              {/* Legal pages */}
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              {/* Trade-specific landing pages */}
-              <Route path="/plumbers" element={<Plumbers />} />
-              <Route path="/hvac" element={<HVAC />} />
-              <Route path="/electricians" element={<Electricians />} />
-              <Route path="/roofing" element={<Roofing />} />
-              {/* Marketing landing pages */}
-              <Route path="/difference" element={<Difference />} />
-              <Route path="/pricing" element={<Pricing />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+                {/* Legacy signup routes - redirect to canonical paths */}
+                <Route path="/signup" element={<SignupRedirect />} />
+                <Route path="/signup/form" element={<SignupRedirect />} />
+                <Route path="/onboarding" element={<OnboardingRedirect />} />
+                {/* Auth routes */}
+                <Route path="/login" element={<AuthLogin />} />
+                <Route path="/reset-password" element={<PasswordReset />} />
+                <Route path="/auth/login" element={<AuthLogin />} />
+                <Route path="/signin" element={<AuthLogin />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/magic-callback" element={<MagicCallback />} />
+                <Route path="/auth/staff-invite" element={<StaffInvite />} />
+                {/* Settings */}
+                <Route path="/settings/security" element={<SecuritySettings />} />
+                <Route path="/settings/integrations/jobber" element={<JobberIntegration />} />
+                {/* App routes */}
+                <Route path="/sales" element={<Sales />} />
+                <Route path="/form-preview" element={<FormPreview />} />
+                <Route path="/trial-preview" element={<TrialFlowPreview />} />
+                <Route path="/salesdash" element={<Dashboard />} />
+                <Route path="/dashboard" element={<ProtectedCustomerDashboard />} />
+                <Route path="/dashboard/team" element={<TeamManagement />} />
+                <Route path="/trial-confirmation" element={<TrialConfirmation />} />
+                <Route path="/admin/monitoring" element={<AdminMonitoring />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
+                {/* Legal pages */}
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                {/* Trade-specific landing pages */}
+                <Route path="/plumbers" element={<Plumbers />} />
+                <Route path="/hvac" element={<HVAC />} />
+                <Route path="/electricians" element={<Electricians />} />
+                <Route path="/roofing" element={<Roofing />} />
+                {/* Marketing landing pages */}
+                <Route path="/difference" element={<Difference />} />
+                <Route path="/pricing" element={<Pricing />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter >
+        </VapiWidgetProvider>
       </TooltipProvider>
-    </QueryClientProvider>
-  </Sentry.ErrorBoundary>
+    </QueryClientProvider >
+  </Sentry.ErrorBoundary >
 );
 
 export default App;
