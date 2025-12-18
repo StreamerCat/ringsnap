@@ -4,6 +4,11 @@
  * Simple feature flag system for RingSnap.
  * Flags can be controlled via environment variables or defaults.
  *
+ * Environment Tier Detection:
+ *   - Set VITE_ENV_TIER=prod|staging|dev in your .env file
+ *   - Production defaults OFF for new features
+ *   - Dev/staging defaults ON for new features
+ *
  * Usage:
  *   import { featureFlags } from '@/lib/featureFlags';
  *   if (featureFlags.twoStepSignup) { ... }
@@ -37,6 +42,23 @@ export interface FeatureFlags {
    * Set via: VITE_FEATURE_UPGRADE_MODAL=true
    */
   upgradeModalEnabled: boolean;
+
+  /**
+   * Enable post-provisioning Activation screen (wow moment).
+   * Shows phone number, test call CTA, and forwarding instructions.
+   *
+   * Default: OFF in production, ON in dev/staging
+   * Set via: VITE_FEATURE_ACTIVATION_ONBOARDING=true
+   */
+  activationOnboardingEnabled: boolean;
+
+  /**
+   * Enable enhanced reporting UI (call details drawer, lead scores).
+   *
+   * Default: OFF in production, ON in dev/staging
+   * Set via: VITE_FEATURE_REPORTING_WOW=true
+   */
+  reportingWowEnabled: boolean;
 }
 
 /**
@@ -50,6 +72,21 @@ function parseBoolEnv(value: string | undefined, defaultValue: boolean): boolean
 }
 
 /**
+ * Determine if we're in production environment.
+ * Uses VITE_ENV_TIER if set, otherwise falls back to Vite's PROD flag.
+ */
+function isProductionEnv(): boolean {
+  const tier = import.meta.env.VITE_ENV_TIER;
+  if (tier) {
+    return tier === 'prod';
+  }
+  // Fallback: use Vite's build-time flag
+  return import.meta.env.PROD;
+}
+
+const isProd = isProductionEnv();
+
+/**
  * Feature flags instance
  *
  * Note: In Vite, environment variables are replaced at build time.
@@ -57,7 +94,7 @@ function parseBoolEnv(value: string | undefined, defaultValue: boolean): boolean
  * 1. Add to .env file: VITE_FEATURE_TWO_STEP_SIGNUP=true
  * 2. Restart the dev server
  *
- * Default values are set to enable the new flow by default.
+ * Production defaults OFF for new features, dev/staging defaults ON.
  */
 export const featureFlags: FeatureFlags = {
   // Enable two-step signup by default (new canonical flow)
@@ -68,6 +105,18 @@ export const featureFlags: FeatureFlags = {
 
   // Upgrade modal ENABLED by default (plan selection must happen in RingSnap UI)
   upgradeModalEnabled: parseBoolEnv(import.meta.env.VITE_FEATURE_UPGRADE_MODAL, true),
+
+  // Activation onboarding: OFF in prod, ON in dev/staging
+  activationOnboardingEnabled: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_ACTIVATION_ONBOARDING,
+    !isProd
+  ),
+
+  // Reporting wow: OFF in prod, ON in dev/staging
+  reportingWowEnabled: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_REPORTING_WOW,
+    !isProd
+  ),
 };
 
 /**
@@ -81,7 +130,9 @@ export function logFeatureFlags(): void {
 
 // Log on module load in development
 if (import.meta.env.DEV) {
+  console.log('[FeatureFlags] Environment tier:', import.meta.env.VITE_ENV_TIER || 'not set (using PROD flag)');
   console.log('[FeatureFlags] Two-step signup:', featureFlags.twoStepSignup ? 'ENABLED' : 'DISABLED');
   console.log('[FeatureFlags] Upgrade modal:', featureFlags.upgradeModalEnabled ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Activation onboarding:', featureFlags.activationOnboardingEnabled ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Reporting wow:', featureFlags.reportingWowEnabled ? 'ENABLED' : 'DISABLED');
 }
-

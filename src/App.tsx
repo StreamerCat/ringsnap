@@ -43,6 +43,7 @@ const HVAC = lazy(() => import("./pages/trades/HVAC"));
 const Electricians = lazy(() => import("./pages/trades/Electricians"));
 const Roofing = lazy(() => import("./pages/trades/Roofing"));
 const Difference = lazy(() => import("./pages/Difference"));
+const Activation = lazy(() => import("./pages/Activation"));
 
 const queryClient = new QueryClient();
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
@@ -87,6 +88,7 @@ const App = () => (
               <Route path="/onboarding-chat" element={<OnboardingChat />} />
               <Route path="/setup/assistant" element={<ProvisioningStatus />} />
               <Route path="/onboarding-status" element={<ProvisioningStatus />} />
+              <Route path="/activation" element={<Activation />} />
               {/* <Route path="/setup-status" element={<SetupStatus />} /> */}
 
               {/* Legacy signup routes - redirect to canonical paths */}

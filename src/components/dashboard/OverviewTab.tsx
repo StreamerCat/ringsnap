@@ -9,6 +9,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Clock, Phone, TrendingUp, CheckCircle, AlertCircle, CreditCard, Loader2, Copy, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { featureFlags } from "@/lib/featureFlags";
+import { CallDetailsDrawer } from "./CallDetailsDrawer";
+import {
+    calculateLeadScore,
+    getLeadScoreLabel,
+    getLeadScoreClasses,
+    getLeadScoreReason,
+    type CallLog
+} from "@/lib/leadScore";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface OverviewTabProps {
     account: any;
@@ -29,6 +42,10 @@ export function OverviewTab({
     onOpenUpgradeModal
 }: OverviewTabProps) {
     const [billingLoading, setBillingLoading] = useState(false);
+
+    // Call details drawer state (behind flag)
+    const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
+    const [drawerOpen, setDrawerOpen] = useState(false);
 
     const handleManageBilling = async () => {
         setBillingLoading(true);
@@ -55,6 +72,23 @@ export function OverviewTab({
             navigator.clipboard.writeText(account.vapi_phone_number);
             toast.success("Number copied!");
         }
+    };
+
+    // Handle row click to open drawer (only when flag enabled)
+    const handleRowClick = (log: any) => {
+        if (!featureFlags.reportingWowEnabled) return;
+        setSelectedCall({
+            id: log.id,
+            caller_name: log.caller_name,
+            caller_phone: log.from_number,
+            duration_seconds: log.duration_seconds,
+            reason: log.reason,
+            transcript_summary: log.summary,
+            booked: log.booked,
+            lead_captured: log.lead_captured,
+            outcome: log.outcome,
+        });
+        setDrawerOpen(true);
     };
 
     return (
@@ -177,6 +211,9 @@ export function OverviewTab({
                                     <TableHead>Caller</TableHead>
                                     <TableHead className="hidden md:table-cell">Reason</TableHead>
                                     <TableHead>Outcome</TableHead>
+                                    {featureFlags.reportingWowEnabled && (
+                                        <TableHead className="hidden sm:table-cell">Score</TableHead>
+                                    )}
                                     <TableHead className="text-right">Duration</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -203,8 +240,32 @@ export function OverviewTab({
                                         return null;
                                     };
 
+                                    // Lead score calculation (only when flag enabled)
+                                    const score = featureFlags.reportingWowEnabled
+                                        ? calculateLeadScore({
+                                            booked: log.booked,
+                                            lead_captured: log.lead_captured,
+                                            outcome: log.outcome,
+                                            reason: log.reason,
+                                            duration_seconds: log.duration_seconds,
+                                        })
+                                        : 0;
+                                    const scoreLabel = getLeadScoreLabel(score);
+                                    const scoreClasses = getLeadScoreClasses(score);
+                                    const scoreReason = getLeadScoreReason({
+                                        booked: log.booked,
+                                        lead_captured: log.lead_captured,
+                                        outcome: log.outcome,
+                                        reason: log.reason,
+                                        duration_seconds: log.duration_seconds,
+                                    });
+
                                     return (
-                                        <TableRow key={log.id}>
+                                        <TableRow
+                                            key={log.id}
+                                            className={featureFlags.reportingWowEnabled ? "cursor-pointer hover:bg-muted/50" : ""}
+                                            onClick={() => handleRowClick(log)}
+                                        >
                                             <TableCell className="whitespace-nowrap">
                                                 <div className="flex flex-col">
                                                     <span className="font-medium">
@@ -236,6 +297,21 @@ export function OverviewTab({
                                                     )}
                                                 </div>
                                             </TableCell>
+                                            {featureFlags.reportingWowEnabled && (
+                                                <TableCell className="hidden sm:table-cell">
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border cursor-help ${scoreClasses}`}>
+                                                                {score}
+                                                            </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top" className="max-w-[200px]">
+                                                            <p className="font-medium">{scoreLabel}</p>
+                                                            <p className="text-xs">{scoreReason}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TableCell>
+                                            )}
                                             <TableCell className="text-right">
                                                 {Math.ceil((log.duration_seconds || 0) / 60)} min
                                             </TableCell>
@@ -247,6 +323,16 @@ export function OverviewTab({
                     )}
                 </CardContent>
             </Card>
+
+            {/* Call Details Drawer (behind flag) */}
+            {featureFlags.reportingWowEnabled && (
+                <CallDetailsDrawer
+                    open={drawerOpen}
+                    onOpenChange={setDrawerOpen}
+                    call={selectedCall}
+                />
+            )}
         </div>
     );
 }
+

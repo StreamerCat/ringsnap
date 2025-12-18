@@ -26,6 +26,7 @@ import { TeamTab } from "@/components/dashboard/TeamTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
+import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
 
 
 export default function CustomerDashboard() {
@@ -429,6 +430,9 @@ export default function CustomerDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Provisioning Banner - shows when provisioning incomplete */}
+        <ProvisioningBanner account={account} />
 
         {/* Usage Warning */}
         {usagePercent >= 80 && (

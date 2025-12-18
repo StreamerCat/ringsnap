@@ -14,4 +14,4 @@ User-agent: *
 Allow: /
 Disallow: /sales
 
-Sitemap: https://ringsnap.lovable.app/sitemap.xml
+Sitemap: https://getringsnap.com/sitemap.xml

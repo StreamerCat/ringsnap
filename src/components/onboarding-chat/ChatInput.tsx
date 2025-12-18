@@ -45,11 +45,13 @@ export function ChatInput({
         maxLength={props.maxLength}
         inputMode={props.inputMode}
         className="flex-1"
+        data-testid="chat-input"
       />
       <Button
         type="submit"
         size="icon"
         disabled={(!allowEmpty && !value.trim()) || disabled}
+        data-testid="chat-send-button"
       >
         <Send className="h-4 w-4" />
       </Button>

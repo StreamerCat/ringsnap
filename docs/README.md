@@ -14,16 +14,24 @@ Welcome to the RingSnap documentation. RingSnap is an AI-powered answering servi
 
 ### Feature Guides
 - **[Customizing Your AI](./customizing-your-ai.md)** — Custom instructions, hours, voice settings
-- **[Integrations](./integrations.md)** — Google Calendar, Zapier, Jobber, API
+- **[Integrations](./integrations.md)** — Google Calendar, Zapier, Jobber, SMS
 - **[Billing & Subscriptions](./billing.md)** — Plans, payments, upgrades
 - **[Team Management](./team-management.md)** — Invite users, manage roles
 - **[Call Logs](./CALL_LOGS.md)** — Understanding your call activity
+
+### Developer Documentation
+- **[API Reference](./api.md)** — REST API for Premium plan customers
+
+### Security & Compliance
+- **[Security & Privacy](./security-privacy.md)** — Data handling, encryption, compliance
 
 ### Trade-Specific Guides
 - **[Plumbers Guide](./trades/plumbers.md)** — Emergency handling, water heater calls
 - **[HVAC Guide](./trades/hvac.md)** — Seasonal strategies, rush handling
 - **[Electricians Guide](./trades/electricians.md)** — Safety-critical calls, EV chargers
 - **[Roofers Guide](./trades/roofers.md)** — Storm surges, insurance claims
+- **[Landscapers Guide](./trades/landscapers.md)** — Seasonal services, property sizing
+- **[General Contractors Guide](./trades/general-contractors.md)** — Project qualification, remodels
 
 ---
 
@@ -35,9 +43,11 @@ Welcome to the RingSnap documentation. RingSnap is an AI-powered answering servi
 | Forward my phone number | [Call Forwarding](./call-forwarding.md) |
 | Customize my AI | [Customizing Your AI](./customizing-your-ai.md) |
 | Connect integrations | [Integrations Guide](./integrations.md) |
+| Use the API | [API Reference](./api.md) |
 | Manage billing | [Billing Guide](./billing.md) |
 | Invite team members | [Team Management](./team-management.md) |
 | View pricing | [Getting Started](./getting-started.md#pricing-plans) |
+| Understand security | [Security & Privacy](./security-privacy.md) |
 | Troubleshoot an issue | [Help Center](./help-center.md#troubleshooting) |
 | Get trade-specific tips | [Trade Guides](#trade-specific-guides) |
 | Quick reference | [Quick Reference Card](./quick-reference.md) |
@@ -65,24 +75,22 @@ RingSnap answers calls in under 1 second, handles real conversations, follows yo
 - **Emergency handling** — critical calls transferred immediately
 - **Call recording & transcripts** — review every conversation
 - **Multi-language support** — English and Spanish
+- **Enterprise security** — encrypted, isolated, compliant
 
 ---
 
 ## Documentation Overview
 
-| Document | Pages | Purpose |
-|----------|-------|---------|
-| Getting Started | ~6 | Setup guide |
-| Help Center | ~11 | FAQ & troubleshooting |
-| Call Forwarding | ~5 | Carrier instructions |
-| Customizing AI | ~7 | AI configuration |
-| Integrations | ~6 | Connect your tools |
-| Billing | ~6 | Plan management |
-| Team Management | ~4 | User permissions |
-| Quick Reference | ~3 | Cheat sheet |
-| Trade Guides | ~6 each | Industry-specific tips |
+| Category | Documents | Purpose |
+|----------|-----------|---------|
+| **Getting Started** | 3 docs | Setup and onboarding |
+| **Help & Support** | 1 doc | FAQ & troubleshooting |
+| **Feature Guides** | 5 docs | Core features |
+| **Developer** | 1 doc | API integration |
+| **Security** | 1 doc | Privacy & compliance |
+| **Trade Guides** | 6 docs | Industry-specific tips |
 
-**Total: ~60+ pages of documentation**
+**Total: 17 documentation files**
 
 ---
 
@@ -90,7 +98,8 @@ RingSnap answers calls in under 1 second, handles real conversations, follows yo
 
 - **Email**: support@getringsnap.com
 - **Billing**: billing@getringsnap.com
-- **Integrations**: integrations@getringsnap.com
+- **API Support**: api@getringsnap.com
+- **Security**: security@getringsnap.com
 - **Website**: [getringsnap.com](https://www.getringsnap.com)
 - **Dashboard**: [getringsnap.com/dashboard](https://www.getringsnap.com/dashboard)
 

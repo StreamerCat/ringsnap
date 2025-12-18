@@ -1,12 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle2, AlertCircle, ArrowRight, Phone, Copy, ExternalLink } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, ArrowRight, Phone, Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { featureFlags } from "@/lib/featureFlags";
+import * as Sentry from "@sentry/react";
 
-const TIMEOUT_MS = 20000; // 20 seconds
+const TIMEOUT_MS = 60000; // 60 seconds
+const STUCK_THRESHOLD_MS = 30000; // Log to Sentry after 30s
+
+// localStorage helper for activation seen (fail-open)
+function getActivationSeen(accountId: string | null): boolean {
+    if (!accountId) return false;
+    try {
+        return localStorage.getItem(`activationSeen:${accountId}`) === 'true';
+    } catch {
+        return false; // Fail open
+    }
+}
+
+function setActivationSeen(accountId: string | null): void {
+    if (!accountId) return;
+    try {
+        localStorage.setItem(`activationSeen:${accountId}`, 'true');
+    } catch {
+        // Fail open
+    }
+}
 
 export default function ProvisioningStatus() {
     const navigate = useNavigate();
@@ -14,6 +36,10 @@ export default function ProvisioningStatus() {
     const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
+    const [accountId, setAccountId] = useState<string | null>(null);
+
+    // One-time guard for Sentry breadcrumb
+    const sentryLoggedRef = useRef(false);
 
     // Copy phone number to clipboard
     const copyPhoneNumber = () => {
@@ -22,6 +48,31 @@ export default function ProvisioningStatus() {
             toast.success("Phone number copied to clipboard!");
         }
     };
+
+    // Manual refresh function
+    const handleManualRefresh = useCallback(() => {
+        window.location.reload();
+    }, []);
+
+    // Handle navigation on ready
+    const handleReadyNavigation = useCallback(() => {
+        if (featureFlags.activationOnboardingEnabled && !getActivationSeen(accountId)) {
+            setActivationSeen(accountId);
+            navigate("/activation", { replace: true });
+        } else {
+            navigate("/dashboard", { replace: true });
+        }
+    }, [navigate, accountId]);
+
+    // Handle continue to dashboard (with incomplete flag if not ready)
+    const handleContinueToDashboard = useCallback(() => {
+        if (status === "ready") {
+            handleReadyNavigation();
+        } else {
+            // Navigate with incomplete provisioning flag
+            navigate("/dashboard?provisioning=incomplete", { replace: true });
+        }
+    }, [status, navigate, handleReadyNavigation]);
 
     // Poll for status with timeout
     useEffect(() => {
@@ -36,7 +87,7 @@ export default function ProvisioningStatus() {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
-                    navigate("/auth/login");
+                    navigate("/auth/login", { replace: true });
                     return;
                 }
 
@@ -47,14 +98,30 @@ export default function ProvisioningStatus() {
                     .single();
 
                 if (profile?.account_id && active) {
+                    setAccountId(profile.account_id);
+
                     const { data: account } = await supabase
                         .from("accounts")
-                        .select("provisioning_status, vapi_phone_number")
+                        .select("provisioning_status, vapi_phone_number, vapi_assistant_id")
                         .eq("id", profile.account_id)
                         .single();
 
                     if (account && active) {
-                        if (account.provisioning_status === "completed") {
+                        const currentElapsed = Date.now() - startTime;
+                        setElapsedTime(currentElapsed);
+
+                        // Strict completion logic: BOTH phone AND assistant required
+                        const hasPhone = account.vapi_phone_number && account.vapi_phone_number.trim() !== "";
+                        const hasAssistant = !!account.vapi_assistant_id;
+                        const statusCompleted = account.provisioning_status === "completed";
+
+                        // Complete = hasPhone AND hasAssistant AND statusCompleted
+                        const isComplete = hasPhone && hasAssistant && statusCompleted;
+
+                        // Fallback: ready if phone + assistant exist even without status
+                        const isReadyFallback = hasPhone && hasAssistant;
+
+                        if (isComplete || isReadyFallback) {
                             setStatus("ready");
                             setPhoneNumber(account.vapi_phone_number);
                             if (timerRef.current) clearInterval(timerRef.current);
@@ -65,13 +132,37 @@ export default function ProvisioningStatus() {
                             if (timeoutRef.current) clearTimeout(timeoutRef.current);
                         } else {
                             setStatus("pending");
-                            setElapsedTime(Date.now() - startTime);
+
+                            // One-time Sentry breadcrumb when stuck > 30s
+                            if (currentElapsed > STUCK_THRESHOLD_MS && !sentryLoggedRef.current) {
+                                sentryLoggedRef.current = true;
+                                Sentry.addBreadcrumb({
+                                    category: 'provisioning',
+                                    message: 'Provisioning stuck > 30s',
+                                    level: 'warning',
+                                    data: {
+                                        accountId: profile.account_id,
+                                        elapsedMs: currentElapsed,
+                                        hasPhone,
+                                        hasAssistant,
+                                        status: account.provisioning_status,
+                                    }
+                                });
+                                console.warn('[ProvisioningStatus] Stuck > 30s', {
+                                    accountId: profile.account_id,
+                                    hasPhone,
+                                    hasAssistant,
+                                });
+                            }
                         }
                     }
                 }
                 if (active) setLoading(false);
             } catch (error) {
                 console.error("Error checking provisioning status:", error);
+                Sentry.captureException(error, {
+                    tags: { component: 'ProvisioningStatus' }
+                });
             }
         };
 
@@ -130,6 +221,16 @@ export default function ProvisioningStatus() {
                                 <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-xs">
                                     Thinking... Provisioning phone number...
                                 </div>
+                                {/* Manual Refresh Button */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleManualRefresh}
+                                    className="text-slate-500 hover:text-slate-700"
+                                >
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                    Refresh Status
+                                </Button>
                             </div>
                         )}
 
@@ -161,6 +262,16 @@ export default function ProvisioningStatus() {
                                         <li>Setting up call routing and forwarding</li>
                                     </ul>
                                 </div>
+                                {/* Manual Refresh Button */}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleManualRefresh}
+                                    className="mt-2"
+                                >
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                    Refresh Status
+                                </Button>
                             </div>
                         )}
 
@@ -267,7 +378,7 @@ export default function ProvisioningStatus() {
                                     <Button
                                         className="w-full gap-2"
                                         size="lg"
-                                        onClick={() => navigate("/dashboard")}
+                                        onClick={handleReadyNavigation}
                                     >
                                         Go to Dashboard
                                         <ArrowRight className="h-4 w-4" />
@@ -282,7 +393,7 @@ export default function ProvisioningStatus() {
                                         variant="outline"
                                         className="w-full gap-2"
                                         size="lg"
-                                        onClick={() => navigate("/dashboard")}
+                                        onClick={handleContinueToDashboard}
                                     >
                                         Go to Dashboard
                                         <ArrowRight className="h-4 w-4" />
@@ -297,3 +408,4 @@ export default function ProvisioningStatus() {
         </div>
     );
 }
+

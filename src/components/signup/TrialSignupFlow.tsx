@@ -519,7 +519,7 @@ export const TrialSignupFlow = ({
     switch (currentStep) {
       case 1:
         return (
-          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6">
+          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6" data-testid="signup-form-step-1">
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold">Start Your Free Trial</h2>
               <p className="text-sm text-muted-foreground">
@@ -567,7 +567,7 @@ export const TrialSignupFlow = ({
 
       case 2:
         return (
-          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6">
+          <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-6" data-testid="signup-form-step-2">
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold">Tell Us About Your Business</h2>
               <p className="text-sm text-muted-foreground">
