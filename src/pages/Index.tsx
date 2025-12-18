@@ -6,6 +6,8 @@ import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteHeader } from "@/components/SiteHeader";
 import { trackFunnelEvent, trackPageLoad } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
+import { Button } from "@/components/ui/button";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));

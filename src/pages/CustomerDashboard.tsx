@@ -543,14 +543,6 @@ export default function CustomerDashboard() {
             accountId={account.id}
           />
         )}
-        {/* Temporary Sentry Test Trigger - only visible in dev or specific condition */}
-        <div className="hidden">
-          <Button id="sentry-test-error" onClick={() => {
-            const error = new Error("Test Sentry Error: RingSnap Phase 2 Integration Check");
-            Sentry.captureException(error);
-            console.log("Triggered test sentry error:", error);
-          }}>Test Sentry</Button>
-        </div>
       </div>
     </div>
   );
