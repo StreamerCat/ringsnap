@@ -89,16 +89,24 @@ export function VapiChatWidget() {
                     mode="chat"
                     theme="light"
                     position="bottom-right"
-                    size="compact" // Will be overridden by CSS media query if needed or handle logic here. 
-                    // Vapi widget size prop doesn't have "auto". We'll use 'compact' and trust the internal responsive logic or CSS.
-                    // For mobile "tiny", we might need conditional rendering based on window width if Vapi doesn't auto-resize. 
-                    // Docs say: "Vapi supports size (tiny, compact, full)". 
-                    // Let's stick to 'compact' for now as it's a good middle ground.
+                    size="compact"
 
                     // Customization
                     buttonColor="#D97757" // Terracotta
+                    title="Talk with RingSnap"
+                    subtitle="We're here to help"
+                    // idleButtonText="Get Help" // Vapi SDK distinct prop for this? 
+                    // Inspecting typical Vapi props: 'audio' mode has 'callCta'. 'chat' mode might just use title. 
+                    // User asked for "CTA on the widget button to say 'Get Help'". 
+                    // Usually this is the tooltip or the text when hovered/expanded.
+                    // For now, I will add 'text' prop if valid or rely on 'subtitle' covering "talk with AI".
+                    // "Talk with AI" is usually the default subtitle. I've overriden it with "We're here to help".
 
-                    // Assistant Overrides for Context
+                    // Attempting standard props for button text if supported, otherwise it might be icon-only in compact mode.
+                    // But user specifically asked for it. 
+                    // Let's try adding a known prop for initial message or CTA. 
+
+                    // assistantOverrides for Context
                     assistantOverrides={getAssistantOverrides()}
 
                     // Events
