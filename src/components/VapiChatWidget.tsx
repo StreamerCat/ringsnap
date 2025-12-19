@@ -94,7 +94,7 @@ export function VapiChatWidget() {
     }
 
     return (
-        <div className="vapi-widget-container fixed bottom-4 right-4 z-50 transition-all duration-300 ease-in-out safe-area-bottom-right">
+        <div className="vapi-widget-container fixed bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out safe-area-bottom-right">
             <Sentry.ErrorBoundary fallback={null}>
                 <VapiWidget
                     publicKey={PUBLIC_KEY}
