@@ -52,31 +52,24 @@ export function VapiChatWidget() {
         EXCLUDED_PREFIXES.some(prefix => path.startsWith(prefix));
     const shouldShow = !isExcluded;
 
-    // Debug log for troubleshooting (can be removed later)
-    // console.log(`VapiWidget: path=${path}, excluded=${isExcluded}, show=${shouldShow}`);
+    // Debug log for troubleshooting
+    console.log(`[VapiWidget Debug] Init`, {
+        path,
+        isExcluded,
+        shouldShow,
+        hasPublicKey: !!PUBLIC_KEY,
+        hasAssistantId: !!ASSISTANT_ID,
+        publicKeyMasked: PUBLIC_KEY ? `${PUBLIC_KEY.slice(0, 4)}...` : 'missing'
+    });
 
-    // Construct assistant overrides based on context
-    const getAssistantOverrides = () => {
-        // Basic context for all users
-        const variableValues: Record<string, any> = {
-            pagePath: location.pathname,
-            isLoggedIn: !!widgetContext.accountId,
-            ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
-        };
-
-        // Add UTM params if present in URL
-        const searchParams = new URLSearchParams(location.search);
-        if (searchParams.get('utm_source')) variableValues.utmSource = searchParams.get('utm_source');
-        if (searchParams.get('utm_medium')) variableValues.utmMedium = searchParams.get('utm_medium');
-        if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
-
-        return {
-            variableValues
-        };
-    };
+    // Check environment variables specifically
+    if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
+    if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
-        if (!PUBLIC_KEY || !ASSISTANT_ID) console.warn("Vapi Widget: Missing keys");
+        console.log("[VapiWidget Debug] Widget hidden", {
+            reason: !shouldShow ? "Route Excluded" : "Missing Keys"
+        });
         return null;
     }
 
