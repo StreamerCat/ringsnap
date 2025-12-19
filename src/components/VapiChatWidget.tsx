@@ -66,6 +66,26 @@ export function VapiChatWidget() {
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
     if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
+    // Construct assistant overrides based on context
+    const getAssistantOverrides = () => {
+        // Basic context for all users
+        const variableValues: Record<string, any> = {
+            pagePath: location.pathname,
+            isLoggedIn: !!widgetContext.accountId,
+            ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
+        };
+
+        // Add UTM params if present in URL
+        const searchParams = new URLSearchParams(location.search);
+        if (searchParams.get('utm_source')) variableValues.utmSource = searchParams.get('utm_source');
+        if (searchParams.get('utm_medium')) variableValues.utmMedium = searchParams.get('utm_medium');
+        if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
+
+        return {
+            variableValues
+        };
+    };
+
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
             reason: !shouldShow ? "Route Excluded" : "Missing Keys"
