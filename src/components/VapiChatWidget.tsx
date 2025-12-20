@@ -137,9 +137,23 @@ export function VapiChatWidget() {
         if (searchParams.get('utm_medium')) variableValues.utmMedium = searchParams.get('utm_medium');
         if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
 
+        // Return overrides structure. 
+        // Note: 'firstMessage' must be inside 'assistant' object to override the assistant config properly.
         return {
             variableValues,
-            firstMessage: config.initialMessage
+            assistant: {
+                firstMessage: config.initialMessage,
+                // Ensure model/voice settings from dashboard/template aren't accidentally wiped if this is a partial update,
+                // but usually Vapi merges this.
+                model: {
+                    messages: [
+                        {
+                            role: "system",
+                            content: config.initialMessage // Redundant but ensures chat context knows the greeting
+                        }
+                    ]
+                }
+            }
         };
     }, [
         location.pathname,
