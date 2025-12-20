@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import Vapi from "@vapi-ai/web";
 // Using the web SDK directly for more control or the react SDK wrapper? 
@@ -121,8 +121,8 @@ export function VapiChatWidget() {
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
     if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
-    // Construct assistant overrides based on context
-    const getAssistantOverrides = () => {
+    // Construct assistant overrides based on context - Memoized to prevent widget thrashing
+    const assistantOverrides = useMemo(() => {
         // Basic context for all users
         const variableValues: Record<string, any> = {
             pagePath: location.pathname,
@@ -141,7 +141,13 @@ export function VapiChatWidget() {
             variableValues,
             firstMessage: config.initialMessage
         };
-    };
+    }, [
+        location.pathname,
+        location.search,
+        widgetContext,
+        widgetMode,
+        config.initialMessage
+    ]);
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
@@ -174,7 +180,7 @@ export function VapiChatWidget() {
                     subtitle={config.subtitle}
 
                     // assistantOverrides for Context and First Message
-                    assistantOverrides={getAssistantOverrides()}
+                    assistantOverrides={assistantOverrides}
 
                     // Events
                     onCallStart={() => {
