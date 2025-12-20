@@ -12,7 +12,8 @@ const PUBLIC_KEY = import.meta.env.VITE_VAPI_PUBLIC_KEY;
 const ASSISTANT_ID = import.meta.env.VITE_VAPI_WIDGET_ASSISTANT_ID;
 
 // Excluded routes where widget should NOT appear
-const EXCLUDED_ROUTES = [
+// Routes where widget should clearly NOT appear (Auth, Checkout, Legal)
+const HIDDEN_EXACT_ROUTES = [
     "/login",
     "/signup",
     "/signin",
@@ -31,10 +32,26 @@ const EXCLUDED_ROUTES = [
     "/trial-preview"
 ];
 
-const EXCLUDED_PREFIXES = [
-    "/auth/",
-    "/billing/",
-    "/settings/integrations"
+const HIDDEN_PREFIXES = [
+    "/auth/"
+    // Removed billing and settings to allow Customer Mode there
+];
+
+const STAFF_PREFIXES = [
+    "/salesdash",
+    "/admin",
+    "/internal",
+    "/staff",
+    "/monitoring",
+    "/ops"
+];
+
+const CUSTOMER_PREFIXES = [
+    "/dashboard",
+    "/app",
+    "/settings",
+    "/billing",
+    "/account"
 ];
 
 export function VapiChatWidget() {
@@ -48,19 +65,57 @@ export function VapiChatWidget() {
         path = path.slice(0, -1);
     }
 
-    const isExcluded = EXCLUDED_ROUTES.includes(path) ||
-        EXCLUDED_PREFIXES.some(prefix => path.startsWith(prefix));
-    const shouldShow = !isExcluded;
+    // Helper functions for route classification
+    const isStaffRoute = STAFF_PREFIXES.some(prefix => path.startsWith(prefix));
+    const isCustomerRoute = CUSTOMER_PREFIXES.some(prefix => path.startsWith(prefix));
+    const isPricingPage = path === '/pricing';
+    const isHiddenRoute = HIDDEN_EXACT_ROUTES.includes(path) ||
+        HIDDEN_PREFIXES.some(prefix => path.startsWith(prefix));
+
+    const shouldShow = !isHiddenRoute && !isStaffRoute;
 
     // Debug log for troubleshooting
     console.log(`[VapiWidget Debug] Init`, {
         path,
-        isExcluded,
+        isStaffRoute,
+        isHiddenRoute,
         shouldShow,
         hasPublicKey: !!PUBLIC_KEY,
         hasAssistantId: !!ASSISTANT_ID,
         publicKeyMasked: PUBLIC_KEY ? `${PUBLIC_KEY.slice(0, 4)}...` : 'missing'
     });
+
+    // Determine Widget Mode
+    let widgetMode: 'marketing' | 'pricing' | 'customer' = 'marketing';
+    if (isCustomerRoute || (widgetContext.accountId && !isStaffRoute)) {
+        widgetMode = 'customer';
+    } else if (isPricingPage) {
+        widgetMode = 'pricing';
+    }
+
+    // Config for "Riley" Persona
+    const RILEY_CONFIG = {
+        marketing: {
+            title: "RingSnap Concierge",
+            subtitle: "Pricing, setup, answers",
+            // placeholder: "Ask a question…", // Not standard Vapi prop, omitting to avoid react warnings
+            initialMessage: "Hi, I’m Riley. What can I help with today? Pricing, setup, or how RingSnap handles calls?"
+        },
+        pricing: {
+            title: "RingSnap Concierge",
+            subtitle: "Pricing, setup, answers",
+            initialMessage: "Hi, I’m Riley. Want help choosing the right plan based on your call volume?"
+        },
+        customer: {
+            title: "RingSnap Support",
+            subtitle: "Support and onboarding",
+            initialMessage: "Hi, I’m Riley. What are you working on right now? Setup, call logs, booking, or billing?"
+        }
+    };
+
+    const config = RILEY_CONFIG[widgetMode];
+    // Remount only on context change (Auth or Mode switch)
+    const modeKey = `${!!widgetContext.accountId ? "in" : "out"}:${widgetMode}`;
 
     // Check environment variables specifically
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
@@ -72,6 +127,7 @@ export function VapiChatWidget() {
         const variableValues: Record<string, any> = {
             pagePath: location.pathname,
             isLoggedIn: !!widgetContext.accountId,
+            widgetMode,
             ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
         };
 
@@ -82,21 +138,29 @@ export function VapiChatWidget() {
         if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
 
         return {
-            variableValues
+            variableValues,
+            firstMessage: config.initialMessage
         };
     };
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
-            reason: !shouldShow ? "Route Excluded" : "Missing Keys"
+            reason: !shouldShow ? (isStaffRoute ? "Staff Route" : "Hidden Route") : "Missing Keys"
         });
         return null;
     }
 
+
+    // Dynamic Mobile Positioning
+    // Marketing/Pricing pages have a sticky footer (MobileFooterCTA) -> use bottom-28
+    // Dashboard/Customer pages do NOT have a sticky footer -> use standard bottom-4
+    const mobileBottomClass = widgetMode === 'customer' ? 'bottom-4' : 'bottom-28';
+
     return (
-        <div className="vapi-widget-container fixed bottom-28 md:bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out safe-area-bottom-right">
+        <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out safe-area-bottom-right`}>
             <Sentry.ErrorBoundary fallback={null}>
                 <VapiWidget
+                    key={modeKey}
                     publicKey={PUBLIC_KEY}
                     assistantId={ASSISTANT_ID}
                     mode="chat"
@@ -105,21 +169,11 @@ export function VapiChatWidget() {
                     size="compact"
 
                     // Customization
-                    buttonColor="#D67256" // Updated Terracotta
-                    title="Talk with RingSnap"
-                    subtitle="We're here to help"
-                    // idleButtonText="Get Help" // Vapi SDK distinct prop for this? 
-                    // Inspecting typical Vapi props: 'audio' mode has 'callCta'. 'chat' mode might just use title. 
-                    // User asked for "CTA on the widget button to say 'Get Help'". 
-                    // Usually this is the tooltip or the text when hovered/expanded.
-                    // For now, I will add 'text' prop if valid or rely on 'subtitle' covering "talk with AI".
-                    // "Talk with AI" is usually the default subtitle. I've overriden it with "We're here to help".
+                    buttonColor="#D67256" // Terracotta
+                    title={config.title}
+                    subtitle={config.subtitle}
 
-                    // Attempting standard props for button text if supported, otherwise it might be icon-only in compact mode.
-                    // But user specifically asked for it. 
-                    // Let's try adding a known prop for initial message or CTA. 
-
-                    // assistantOverrides for Context
+                    // assistantOverrides for Context and First Message
                     assistantOverrides={getAssistantOverrides()}
 
                     // Events
