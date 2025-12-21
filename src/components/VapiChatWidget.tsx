@@ -94,18 +94,17 @@ export function VapiChatWidget() {
         marketing: {
             title: "RingSnap Concierge",
             subtitle: "Pricing, setup, answers",
-            // placeholder: "Ask a question…", // Not standard Vapi prop, omitting to avoid react warnings
-            initialMessage: "Hi, I’m Riley. What can I help with today? Pricing, setup, or how RingSnap handles calls?"
+            initialMessage: "Hi, I'm Riley. What can I help with today? Pricing, setup, or how RingSnap handles calls?"
         },
         pricing: {
             title: "RingSnap Concierge",
             subtitle: "Pricing, setup, answers",
-            initialMessage: "Hi, I’m Riley. Want help choosing the right plan based on your call volume?"
+            initialMessage: "Hi, I'm Riley. Want help choosing the right plan based on your call volume?"
         },
         customer: {
             title: "RingSnap Support",
             subtitle: "Support and onboarding",
-            initialMessage: "Hi, I’m Riley. What are you working on right now? Setup, call logs, booking, or billing?"
+            initialMessage: "Hi, I'm Riley. What are you working on right now? Setup, call logs, booking, or billing?"
         }
     };
 
@@ -117,19 +116,29 @@ export function VapiChatWidget() {
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
     if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
-    // Construct assistant overrides based on context - DIAGNOSTIC MODE
-    const assistantOverrides = useMemo(() => {
-        // Hardcoded minimal payload to verify connection and rule out data issues
-        return {
-            variableValues: {
-                isTest: true,
-                mode: widgetMode
-            },
-            assistant: {
-                firstMessage: config.initialMessage
-            }
+    // ORIGINAL WORKING STRUCTURE: assistantOverrides returns { variableValues } ONLY
+    // The assistant's firstMessage should be set in the Vapi dashboard, not overridden here.
+    const getAssistantOverrides = () => {
+        // Basic context for all users
+        const variableValues: Record<string, any> = {
+            pagePath: location.pathname,
+            isLoggedIn: !!widgetContext.accountId,
+            widgetMode,
+            ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
         };
-    }, [widgetMode, config.initialMessage]);
+
+        // Add UTM params if present in URL
+        const searchParams = new URLSearchParams(location.search);
+        if (searchParams.get('utm_source')) variableValues.utmSource = searchParams.get('utm_source');
+        if (searchParams.get('utm_medium')) variableValues.utmMedium = searchParams.get('utm_medium');
+        if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
+
+        // CRITICAL: Return ONLY variableValues. Do NOT include 'assistant' or 'firstMessage'.
+        // Those belong in the Vapi dashboard configuration, not runtime overrides.
+        return {
+            variableValues
+        };
+    };
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
@@ -139,8 +148,6 @@ export function VapiChatWidget() {
     }
 
     // Dynamic Mobile Positioning
-    // Marketing/Pricing pages have a sticky footer (MobileFooterCTA) -> use bottom-28
-    // Dashboard/Customer pages do NOT have a sticky footer -> use standard bottom-4
     const mobileBottomClass = widgetMode === 'customer' ? 'bottom-4' : 'bottom-28';
 
     return (
@@ -160,13 +167,12 @@ export function VapiChatWidget() {
                     title={config.title}
                     subtitle={config.subtitle}
 
-                    // assistantOverrides for Context and First Message
-                    assistantOverrides={assistantOverrides}
+                    // ORIGINAL WORKING PATTERN: pass function result directly
+                    assistantOverrides={getAssistantOverrides()}
 
                     // Events
                     onCallStart={() => {
                         Sentry.addBreadcrumb({ category: 'vapi', message: 'Call/Chat started', level: 'info' });
-                        // Could track analytics event here
                     }}
                     onCallEnd={() => {
                         Sentry.addBreadcrumb({ category: 'vapi', message: 'Call/Chat ended', level: 'info' });
@@ -177,13 +183,9 @@ export function VapiChatWidget() {
                     }}
                     onMessage={(message: any) => {
                         // Log messages for debug but don't spam Sentry
-                        // console.debug("Vapi Message:", message);
                     }}
 
-                    // Consent (Note: Ensure SDK supports these props, otherwise they might need to be passed differently)
-                    // The React SDK VapiWidget props typescript definition might not include 'require-consent' directly if it's strict,
-                    // but it passes props down to the web component.
-                    // @ts-ignore - helping TS with web-component props
+                    // @ts-ignore - web-component props
                     requireConsent="true"
                     termsContent="By chatting, you agree to our [Privacy Policy](/privacy) and [Terms of Service](/terms)."
                     localStorageKey="ringsnap_vapi_consent"
