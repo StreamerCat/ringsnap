@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Vapi from "@vapi-ai/web";
-// Using the web SDK directly for more control or the react SDK wrapper? 
-// The plan said @vapi-ai/client-sdk-react. Let's use the React component as requested.
-// But wait, the React SDK <VapiWidget> is the easiest integration.
 import { VapiWidget } from "@vapi-ai/client-sdk-react";
 import * as Sentry from "@sentry/react";
 import { useVapiWidget } from "@/lib/VapiWidgetContext";
@@ -11,7 +8,6 @@ import { useVapiWidget } from "@/lib/VapiWidgetContext";
 const PUBLIC_KEY = import.meta.env.VITE_VAPI_PUBLIC_KEY;
 const ASSISTANT_ID = import.meta.env.VITE_VAPI_WIDGET_ASSISTANT_ID;
 
-// Excluded routes where widget should NOT appear
 // Routes where widget should clearly NOT appear (Auth, Checkout, Legal)
 const HIDDEN_EXACT_ROUTES = [
     "/login",
@@ -131,16 +127,30 @@ export function VapiChatWidget() {
             ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
         };
 
+        const sanitizedVariables: Record<string, any> = {};
+
+        Object.entries(rawVariables).forEach(([key, value]) => {
+            if (value === null || value === undefined) return;
+            // Allow string, number, boolean. Convert others to string or skip.
+            if (typeof value === 'object') {
+                // Skip complex objects to avoid errors, unless it's null (handled above)
+                return;
+            }
+            sanitizedVariables[key] = value;
+        });
+
         // Add UTM params if present in URL
         const searchParams = new URLSearchParams(location.search);
-        if (searchParams.get('utm_source')) variableValues.utmSource = searchParams.get('utm_source');
-        if (searchParams.get('utm_medium')) variableValues.utmMedium = searchParams.get('utm_medium');
-        if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
+        if (searchParams.get('utm_source')) sanitizedVariables.utmSource = searchParams.get('utm_source');
+        if (searchParams.get('utm_medium')) sanitizedVariables.utmMedium = searchParams.get('utm_medium');
+        if (searchParams.get('utm_campaign')) sanitizedVariables.utmCampaign = searchParams.get('utm_campaign');
+
+        // Log the sanitized payload to debug
+        // console.log("[VapiWidget Debug] Overrides Payload:", sanitizedVariables);
 
         // Return overrides structure. 
-        // Note: 'firstMessage' must be inside 'assistant' object to override the assistant config properly.
         return {
-            variableValues,
+            variableValues: sanitizedVariables,
             assistant: {
                 firstMessage: config.initialMessage
             }
@@ -153,7 +163,6 @@ export function VapiChatWidget() {
         });
         return null;
     }
-
 
     // Dynamic Mobile Positioning
     // Marketing/Pricing pages have a sticky footer (MobileFooterCTA) -> use bottom-28
