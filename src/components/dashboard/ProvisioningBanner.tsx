@@ -23,16 +23,11 @@ export function ProvisioningBanner({ account }: ProvisioningBannerProps) {
     if (!account) return null;
 
     // Check if provisioning is actually complete
-    const isFullyProvisioned =
-        account.provisioning_status === 'completed' &&
-        account.vapi_phone_number &&
-        account.vapi_assistant_id;
+    // PRIMARY: provisioning_status is the source of truth
+    const isFullyProvisioned = account.provisioning_status === 'completed';
 
-    // Only show banner if NOT fully provisioned AND missing resources
-    const shouldShow = !isFullyProvisioned && (
-        !account.vapi_phone_number ||
-        !account.vapi_assistant_id
-    );
+    // Only show banner if provisioning is NOT complete
+    const shouldShow = !isFullyProvisioned;
 
     if (!shouldShow) return null;
 
