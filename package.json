@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test:voice-demo": "bash scripts/test-voice-demo.sh",
     "test:vapi-demo": "bash scripts/test-voice-demo.sh",
+    "test:smoke:api": "playwright test --project=api-smoke",
     "audit:perf": "echo 'Run: npx lighthouse <url> --output json --output-path ./audit-report.json' # Placeholder for agent",
     "audit:seo": "echo 'Run: npx lighthouse <url> --only-categories=seo'",
     "audit:a11y": "echo 'Run: npx axe <url>'",
@@ -83,6 +84,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.9.1",
