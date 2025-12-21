@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import Vapi from "@vapi-ai/web";
 import { VapiWidget } from "@vapi-ai/client-sdk-react";
@@ -117,19 +117,19 @@ export function VapiChatWidget() {
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
     if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
-    // Construct assistant overrides based on context
-    const getAssistantOverrides = () => {
-        // Basic context for all users
-        const variableValues: Record<string, any> = {
+    // Construct assistant overrides based on context - Memoized to prevent widget thrashing
+    const assistantOverrides = useMemo(() => {
+        const sanitizedVariables: Record<string, any> = {};
+
+        // Prepare variable values - Sanitize inputs to prevent 400 Errors
+        // Vapi expects a flat map of strings/numbers/booleans. Complex objects or nulls break it.
+        // Inlining the object to avoid ReferenceError on intermediate variable.
+        Object.entries({
             pagePath: location.pathname,
             isLoggedIn: !!widgetContext.accountId,
             widgetMode,
             ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
-        };
-
-        const sanitizedVariables: Record<string, any> = {};
-
-        Object.entries(rawVariables).forEach(([key, value]) => {
+        }).forEach(([key, value]) => {
             if (value === null || value === undefined) return;
             // Allow string, number, boolean. Convert others to string or skip.
             if (typeof value === 'object') {
@@ -155,7 +155,13 @@ export function VapiChatWidget() {
                 firstMessage: config.initialMessage
             }
         };
-    };
+    }, [
+        location.pathname,
+        location.search,
+        widgetContext,
+        widgetMode,
+        config.initialMessage
+    ]);
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
@@ -187,7 +193,7 @@ export function VapiChatWidget() {
                     subtitle={config.subtitle}
 
                     // assistantOverrides for Context and First Message
-                    assistantOverrides={getAssistantOverrides()}
+                    assistantOverrides={assistantOverrides}
 
                     // Events
                     onCallStart={() => {
