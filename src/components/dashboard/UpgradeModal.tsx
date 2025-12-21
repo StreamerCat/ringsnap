@@ -25,8 +25,11 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
     // Normalize current plan key for comparison
     const normalizedCurrentPlan = (currentPlanKey?.toLowerCase() || "starter") as PlanKey;
 
-    // Get all plans (allow downgrades/cross-grades)
-    const availablePlans = DASHBOARD_PLANS.filter(p => p.key !== normalizedCurrentPlan);
+    // Get current plan index to filter for upgrades only
+    const currentPlanIndex = DASHBOARD_PLANS.findIndex(p => p.key === normalizedCurrentPlan);
+
+    // Only show plans that are higher tier than current (upgrades only)
+    const upgradePlans = DASHBOARD_PLANS.filter((_, index) => index > currentPlanIndex);
 
     const handleUpgrade = async () => {
         if (!selectedPlan) {
@@ -101,10 +104,8 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
         }
     };
 
-    // If no available plans (unlikely unless plans list is empty)
-    if (availablePlans.length === 0 && DASHBOARD_PLANS.length === 0) {
-        return null;
-    }
+    // If no upgrade plans available and user is on top tier, we'll show a message in the modal instead
+    // Don't return null here - we want to show the modal with appropriate messaging
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,45 +116,38 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                         Change Your Plan
                     </DialogTitle>
                     <DialogDescription>
-                        Upgrade or downgrade your plan to fit your needs.
+                        {upgradePlans.length > 0
+                            ? "Upgrade to get more minutes and features."
+                            : "You're on our top plan! Contact us for enterprise options."}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4 md:grid-cols-2 lg:grid-cols-3">
-                    {DASHBOARD_PLANS.map((plan) => {
-                        const isCurrentPlan = plan.key === normalizedCurrentPlan;
-                        const isPlanSelectable = !isCurrentPlan;
+                    {upgradePlans.length === 0 ? (
+                        <div className="col-span-full text-center py-8">
+                            <p className="text-muted-foreground">You're on our Premium plan - the best we offer!</p>
+                            <p className="text-sm text-muted-foreground mt-2">Contact us for enterprise needs.</p>
+                        </div>
+                    ) : upgradePlans.map((plan) => {
                         const isSelected = selectedPlan === plan.key;
 
                         return (
                             <Card
                                 key={plan.key}
-                                data-testid="plan-card"
-                                className={`relative cursor-pointer transition-all ${isCurrentPlan
-                                    ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
-                                    : isPlanSelectable
-                                        ? isSelected
-                                            ? "border-primary ring-2 ring-primary shadow-lg"
-                                            : "hover:border-primary/50 hover:shadow-md"
-                                        : "opacity-50 cursor-not-allowed"
+                                className={`relative cursor-pointer transition-all ${isSelected
+                                    ? "border-primary ring-2 ring-primary shadow-lg"
+                                    : "hover:border-primary/50 hover:shadow-md"
                                     }`}
                                 onClick={() => {
-                                    if (isPlanSelectable) {
-                                        trackClick("upgrade_plan_selected", { plan: plan.key });
-                                        setSelectedPlan(plan.key);
-                                    }
+                                    trackClick("upgrade_plan_selected", { plan: plan.key });
+                                    setSelectedPlan(plan.key);
                                 }}
                             >
-                                {plan.recommended && !isCurrentPlan && (
+                                {plan.recommended && (
                                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                                         <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                                             Most Popular
                                         </Badge>
-                                    </div>
-                                )}
-                                {isCurrentPlan && (
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                                        <Badge variant="secondary">Current Plan</Badge>
                                     </div>
                                 )}
 
@@ -213,7 +207,6 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                         onClick={handleUpgrade}
                         disabled={!selectedPlan || upgrading}
                         className="min-w-[140px]"
-                        data-testid="upgrade-confirm-button"
                     >
                         {upgrading ? (
                             <>
@@ -228,6 +221,6 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                     </Button>
                 </div>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

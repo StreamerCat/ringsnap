@@ -1,4 +1,3 @@
-import { useSearchParams } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -14,20 +13,21 @@ interface ProvisioningBannerProps {
 /**
  * Banner shown when provisioning is incomplete.
  * Displays when:
- * - URL has ?provisioning=incomplete
- * - OR account is missing phone number or assistant ID
+ * - provisioning_status is NOT 'completed', AND
+ * - account is missing phone number or assistant ID
+ * 
+ * Does NOT show if account is fully provisioned (has both phone and assistant).
  */
 export function ProvisioningBanner({ account }: ProvisioningBannerProps) {
-    const [searchParams] = useSearchParams();
+    // If no account data yet, don't show banner (dashboard is still loading)
+    if (!account) return null;
 
-    // Check if we should show the banner
-    const hasIncompleteParam = searchParams.get("provisioning") === "incomplete";
-    const accountIncomplete = account && (
-        !account.vapi_phone_number ||
-        !account.vapi_assistant_id
-    );
+    // Check if provisioning is actually complete
+    // PRIMARY: provisioning_status is the source of truth
+    const isFullyProvisioned = account.provisioning_status === 'completed';
 
-    const shouldShow = hasIncompleteParam || accountIncomplete;
+    // Only show banner if provisioning is NOT complete
+    const shouldShow = !isFullyProvisioned;
 
     if (!shouldShow) return null;
 

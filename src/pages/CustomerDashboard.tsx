@@ -9,13 +9,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
-  Calendar, Loader2, Bot, UsersRound
+  Calendar, Loader2, Bot, UsersRound, CalendarCheck
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
 import * as Sentry from "@sentry/react";
+import { useVapiWidget } from "@/lib/VapiWidgetContext";
 
 // Tab Components
 import { TodayTab } from "@/components/dashboard/TodayTab";
@@ -26,6 +27,7 @@ import { TeamTab } from "@/components/dashboard/TeamTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
+import { CalendarTab } from "@/components/dashboard/CalendarTab";
 import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
 
 
@@ -33,6 +35,7 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { setWidgetContext } = useVapiWidget();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "today");
@@ -150,6 +153,8 @@ export default function CustomerDashboard() {
         return;
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+
       if (!profileData.accounts) throw new Error("Account not found. Your account may still be setting up.");
 
       setProfile(profileData);
@@ -160,6 +165,17 @@ export default function CustomerDashboard() {
         userId,
         accountId: profileData.account_id,
         plan: profileData.accounts.plan_type,
+      });
+
+      // Update Vapi Widget Context
+      setWidgetContext({
+        customerName: profileData.name,
+        customerEmail: user?.email,
+        accountId: profileData.account_id,
+        planName: profileData.accounts.plan_type,
+        minutesLimit: profileData.accounts.monthly_minutes_limit,
+        minutesUsed: profileData.accounts.monthly_minutes_used,
+        provisioningStatus: profileData.accounts.provisioning_status
       });
 
       const accountId = profileData.account_id;
@@ -460,10 +476,15 @@ export default function CustomerDashboard() {
                 <Phone className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Phones</span>
               </TabsTrigger>
-              <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
+              <TabsTrigger value="calendar" className="flex-shrink-0 px-3">
+                <CalendarCheck className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Calendar</span>
+              </TabsTrigger>
+              {/* Commented out - will add later */}
+              {/* <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
                 <Bot className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Assistant</span>
-              </TabsTrigger>
+              </TabsTrigger> */}
               <TabsTrigger value="team" className="flex-shrink-0 px-3">
                 <UsersRound className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Team</span>
@@ -476,10 +497,11 @@ export default function CustomerDashboard() {
                 <CreditCard className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Billing</span>
               </TabsTrigger>
-              <TabsTrigger value="referrals" className="flex-shrink-0 px-3">
+              {/* Commented out - will add later */}
+              {/* <TabsTrigger value="referrals" className="flex-shrink-0 px-3">
                 <Gift className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Earn</span>
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
           </div>
 
@@ -503,9 +525,14 @@ export default function CustomerDashboard() {
             <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
           </TabsContent>
 
-          <TabsContent value="assistants">
-            <AssistantsTab account={account} assistants={assistants} />
+          <TabsContent value="calendar">
+            <CalendarTab calls={usageLogs} />
           </TabsContent>
+
+          {/* Commented out - will add later */}
+          {/* <TabsContent value="assistants">
+            <AssistantsTab account={account} assistants={assistants} />
+          </TabsContent> */}
 
           <TabsContent value="team">
             <TeamTab accountId={account.id} />
@@ -531,11 +558,12 @@ export default function CustomerDashboard() {
             />
           </TabsContent>
 
-          <TabsContent value="referrals">
+          {/* Commented out - will add later */}
+          {/* <TabsContent value="referrals">
             <ReferralsTab
               referralStats={referralStats}
             />
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
 
         {/* Upgrade Modal - controlled by feature flag */}

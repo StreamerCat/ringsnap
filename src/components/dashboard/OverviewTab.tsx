@@ -1,6 +1,13 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +29,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { isBookedCall } from "@/lib/appointments";
 
 interface OverviewTabProps {
     account: any;
@@ -43,9 +51,54 @@ export function OverviewTab({
 }: OverviewTabProps) {
     const [billingLoading, setBillingLoading] = useState(false);
 
+    // Date filter state
+    const [dateFilter, setDateFilter] = useState<string>("all");
+
     // Call details drawer state (behind flag)
     const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+
+    // Filter logs based on date range
+    const filteredLogs = useMemo(() => {
+        if (dateFilter === "all") return usageLogs;
+
+        const now = new Date();
+        let startDate: Date;
+
+        switch (dateFilter) {
+            case "3days":
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 3);
+                break;
+            case "week":
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 7);
+                break;
+            case "month":
+                startDate = new Date(now);
+                startDate.setMonth(now.getMonth() - 1);
+                break;
+            default:
+                return usageLogs;
+        }
+
+        startDate.setHours(0, 0, 0, 0);
+        return usageLogs.filter((log: any) => new Date(log.started_at) >= startDate);
+    }, [usageLogs, dateFilter]);
+
+    // Format phone number nicely
+    const formatPhoneNumber = (phone: string | null | undefined): string => {
+        if (!phone) return "Unknown";
+        // Remove non-digits
+        const digits = phone.replace(/\D/g, "");
+        // Format US numbers
+        if (digits.length === 10) {
+            return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+        } else if (digits.length === 11 && digits.startsWith("1")) {
+            return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+        }
+        return phone;
+    };
 
     const handleManageBilling = async () => {
         setBillingLoading(true);
@@ -93,8 +146,8 @@ export function OverviewTab({
 
     return (
         <div className="space-y-4 sm:space-y-6">
-            {/* Stats Cards - 2 cols mobile, 4 cols desktop */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {/* Stats Cards - 2 cols mobile, 3 cols desktop */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
                 {/* 1. Your Number */}
                 <Card className="col-span-2 sm:col-span-1 border-primary/20 bg-primary/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -174,34 +227,27 @@ export function OverviewTab({
                     </CardContent>
                 </Card>
 
-                {/* 4. Trial/Credits */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            {account.subscription_status === 'trial' ? 'Trial' : 'Credits'}
-                        </CardTitle>
-                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-bold">
-                            {account.subscription_status === 'trial'
-                                ? `${trialDaysRemaining} days`
-                                : `$${creditsBalance.toFixed(2)}`}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {account.subscription_status === 'trial' ? 'remaining' : 'available'}
-                        </p>
-                    </CardContent>
-                </Card>
+                {/* Credits card removed per user request */}
             </div>
 
             {/* Recent Calls Table */}
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                     <CardTitle>Recent Activity</CardTitle>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Filter by date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Time</SelectItem>
+                            <SelectItem value="3days">Last 3 Days</SelectItem>
+                            <SelectItem value="week">This Week</SelectItem>
+                            <SelectItem value="month">This Month</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </CardHeader>
                 <CardContent>
-                    {usageLogs.length === 0 ? (
+                    {filteredLogs.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">No calls yet</p>
                     ) : (
                         <Table>
@@ -218,16 +264,30 @@ export function OverviewTab({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {usageLogs.slice(0, 50).map((log: any) => {
-                                    // Helper to format appointment info
+                                {filteredLogs.slice(0, 50).map((log: any) => {
+                                    // Use shared detection for booked status
                                     const getOutcomeBadge = () => {
-                                        if (log.outcome === 'booked' || log.booked) {
+                                        if (isBookedCall(log)) {
                                             return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
                                         }
                                         if (log.outcome === 'lead' || log.lead_captured) {
                                             return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
                                         }
-                                        return <Badge variant="secondary" className="capitalize">{log.status}</Badge>;
+                                        if (log.status === 'completed' || log.status === 'ended') {
+                                            return <Badge variant="secondary">Completed</Badge>;
+                                        }
+                                        return <Badge variant="secondary" className="capitalize">{log.status || 'Call'}</Badge>;
+                                    };
+
+                                    // Summarize reason to a few words
+                                    const getSummarizedReason = () => {
+                                        const text = log.reason || log.summary || '';
+                                        if (!text) return '-';
+                                        const firstSentence = text.split(/[.!?]/)[0];
+                                        if (firstSentence.length > 50) {
+                                            return firstSentence.substring(0, 47) + '...';
+                                        }
+                                        return firstSentence || text.substring(0, 50);
                                     };
 
                                     const getAppointmentText = () => {
@@ -278,8 +338,15 @@ export function OverviewTab({
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className="font-semibold">{log.caller_name || log.from_number || "Unknown"}</span>
-                                                    {log.caller_name && <span className="text-xs text-muted-foreground">{log.from_number}</span>}
+                                                    <span className="font-semibold">
+                                                        {log.caller_name || (log.from_number ? formatPhoneNumber(log.from_number) : "Unknown caller")}
+                                                    </span>
+                                                    {log.caller_name && log.from_number && (
+                                                        <span className="text-xs text-muted-foreground">{formatPhoneNumber(log.from_number)}</span>
+                                                    )}
+                                                    {!log.caller_name && log.from_number && (
+                                                        <span className="text-xs text-muted-foreground">Unknown caller</span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell max-w-[200px]">

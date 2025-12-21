@@ -60,12 +60,12 @@ export function TeamTab({ accountId }: TeamTabProps) {
             if (error) throw error;
             setMembers(data as any || []);
         } catch (error: any) {
+            // Only log, don't toast - empty results or permission issues  
+            // are not necessarily errors for a new account with no members yet.
+            // The UI will show the empty state which is the intended UX.
             console.error("Failed to load team members:", error);
-            toast({
-                title: "Error",
-                description: "Failed to load team members",
-                variant: "destructive"
-            });
+            // If error is a permission error or table doesn't exist, just show empty state
+            setMembers([]);
         } finally {
             setLoading(false);
         }
@@ -113,9 +113,23 @@ export function TeamTab({ accountId }: TeamTabProps) {
             loadMembers();
         } catch (error: any) {
             console.error("Failed to invite member:", error);
+            // Extract better error message from edge function response
+            let errorMsg = "Failed to send invitation. Please try again.";
+            if (error.message) {
+                try {
+                    const parsed = JSON.parse(error.message);
+                    errorMsg = parsed.error || error.message;
+                } catch {
+                    errorMsg = error.message;
+                }
+            }
+            // Handle common error case: user already exists
+            if (errorMsg.toLowerCase().includes("already") || errorMsg.toLowerCase().includes("exists")) {
+                errorMsg = "This email is already registered. They can sign in and join the team.";
+            }
             toast({
-                title: "Error",
-                description: error.message || "Failed to send invitation",
+                title: "Invite Failed",
+                description: errorMsg,
                 variant: "destructive"
             });
         } finally {
