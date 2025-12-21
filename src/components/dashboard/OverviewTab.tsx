@@ -29,6 +29,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { isBookedCall } from "@/lib/appointments";
 
 interface OverviewTabProps {
     account: any;
@@ -264,20 +265,14 @@ export function OverviewTab({
                             </TableHeader>
                             <TableBody>
                                 {filteredLogs.slice(0, 50).map((log: any) => {
-                                    // Improved outcome detection: check multiple fields for booked appointment
+                                    // Use shared detection for booked status
                                     const getOutcomeBadge = () => {
-                                        // Check multiple signals for a booked appointment
-                                        const isBooked = log.outcome === 'booked' ||
-                                            log.booked === true ||
-                                            log.appointment_window ||
-                                            log.appointment_start;
-                                        if (isBooked) {
+                                        if (isBookedCall(log)) {
                                             return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
                                         }
                                         if (log.outcome === 'lead' || log.lead_captured) {
                                             return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
                                         }
-                                        // Only show status badge if there's a meaningful status
                                         if (log.status === 'completed' || log.status === 'ended') {
                                             return <Badge variant="secondary">Completed</Badge>;
                                         }

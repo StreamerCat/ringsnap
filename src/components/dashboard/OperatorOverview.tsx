@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Phone, Users, Calendar, Clock, AlertTriangle, TrendingUp } from "lucide-react";
+import { Phone, Users, Calendar, Clock, AlertTriangle, CalendarCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CallDetailsDrawer } from "./CallDetailsDrawer";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  isBookedCall,
+  deriveAppointmentMetrics,
+  formatPhoneNumber,
+  type CallLogWithAppointment
+} from "@/lib/appointments";
+import { type CallLog } from "@/lib/leadScore";
 
 interface OperatorStats {
   calls_today: number;
@@ -19,34 +28,21 @@ interface OperatorStats {
   last_lead_at: string | null;
 }
 
-interface PendingAppointment {
-  id: string;
-  customer_name: string;
-  customer_phone: string;
-  job_type: string | null;
-  preferred_time_range: string | null;
-  urgency: string | null;
-  created_at: string;
-}
-
 export function OperatorOverview({ accountId }: { accountId: string }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<OperatorStats | null>(null);
-  const [pendingAppointments, setPendingAppointments] = useState<PendingAppointment[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
   const [calls, setCalls] = useState<any[]>([]);
 
-  // Format phone number nicely
-  const formatPhoneNumber = (phone: string | null | undefined): string => {
-    if (!phone) return "Unknown";
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length === 10) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    } else if (digits.length === 11 && digits.startsWith("1")) {
-      return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    }
-    return phone;
-  };
+  // Drawer state
+  const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Derive appointment metrics from calls using shared lib
+  const appointmentMetrics = useMemo(() => {
+    return deriveAppointmentMetrics(calls as CallLogWithAppointment[]);
+  }, [calls]);
 
   // Burst polling: 5s for first 60s, then 30s
   useEffect(() => {
@@ -111,15 +107,8 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
       startOfDay.setHours(0, 0, 0, 0);
 
       // Use RPC for call logs to bypass RLS
-      const [callLogsRes, appointmentsRes, leadsRes] = await Promise.all([
+      const [callLogsRes, leadsRes] = await Promise.all([
         supabase.rpc("get_calls_today", { p_account_id: accountId }) as Promise<any>,
-        supabase.from("appointments" as any)
-          .select("id, customer_name, customer_phone, job_type, preferred_time_range, urgency, created_at")
-          .eq("account_id", accountId)
-          .eq("status", "pending_confirmation")
-          .order("urgency", { ascending: false, nullsLast: true } as any)
-          .order("created_at", { ascending: true })
-          .limit(10),
         supabase.from("customer_leads" as any)
           .select("id, customer_name, customer_phone, intent, urgency, created_at, call_summary")
           .eq("account_id", accountId)
@@ -138,15 +127,15 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
         const duration = callLogsRes.data.reduce((acc: number, c: any) => acc + (c.duration_seconds || 0), 0);
         const lastCall = callLogsRes.data.length > 0 ? callLogsRes.data[0].started_at : null;
 
-        // Count outcomes from new fields
-        const bookedCount = callLogsRes.data.filter((c: any) => c.booked === true || c.outcome === 'booked').length;
+        // Count outcomes using shared detection
+        const bookedCount = callLogsRes.data.filter((c: any) => isBookedCall(c)).length;
         const leadsCount = callLogsRes.data.filter((c: any) => c.lead_captured === true || c.outcome === 'lead').length;
 
         setStats(prev => ({
           ...prev!,
           calls_today: count,
           call_duration_seconds_today: duration,
-          leads_today: leadsCount + (prev?.leads_today || 0), // Add to existing leads from customer_leads
+          leads_today: leadsCount + (prev?.leads_today || 0),
           new_leads_today: leadsCount,
           appointment_requests_today: bookedCount,
           emergency_leads_today: prev?.emergency_leads_today || 0,
@@ -155,22 +144,6 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
           last_call_at: lastCall,
           last_lead_at: prev?.last_lead_at || null
         }));
-      }
-
-      // Load pending appointments
-      const { data: appointmentsData, error: appointmentsError } = await supabase
-        .from("appointments" as any)
-        .select("id, customer_name, customer_phone, job_type, preferred_time_range, urgency, created_at")
-        .eq("account_id", accountId)
-        .eq("status", "pending_confirmation")
-        .order("urgency", { ascending: false, nullsLast: true } as any)
-        .order("created_at", { ascending: true })
-        .limit(10);
-
-      if (appointmentsError) {
-        console.error("Failed to load appointments:", appointmentsError);
-      } else {
-        setPendingAppointments(appointmentsData || []);
       }
 
       // Load today's leads
@@ -229,6 +202,22 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
       default:
         return <Badge variant="outline">Normal</Badge>;
     }
+  };
+
+  // Handle row click to open drawer
+  const handleRowClick = (call: any) => {
+    setSelectedCall({
+      id: call.id,
+      caller_name: call.caller_name,
+      caller_phone: call.from_number,
+      duration_seconds: call.duration_seconds,
+      reason: call.reason,
+      transcript_summary: call.summary,
+      booked: call.booked,
+      lead_captured: call.lead_captured,
+      outcome: call.outcome,
+    });
+    setDrawerOpen(true);
   };
 
   if (loading) {
@@ -293,60 +282,31 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
           </CardContent>
         </Card>
 
+        {/* Appointments Booked Card - derives from call logs */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Appointments</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Appointments Booked</CardTitle>
+            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.pending_appointments || 0}</div>
-            {(stats?.emergency_appointments || 0) > 0 && (
-              <Badge variant="destructive" className="mt-1 gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {stats?.emergency_appointments} emergency
-              </Badge>
-            )}
-            {stats?.pending_appointments === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">All caught up!</p>
-            )}
+            <div className="text-2xl font-bold">{appointmentMetrics.bookedTodayCount}</div>
+            {appointmentMetrics.nextEvent ? (
+              <div className="mt-1 space-y-0.5">
+                <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                  Next: {appointmentMetrics.nextEvent.displayWhen}
+                  {appointmentMetrics.nextEvent.displayDay && ` · ${appointmentMetrics.nextEvent.displayDay}`}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {appointmentMetrics.nextEvent.customerName}
+                  {appointmentMetrics.nextEvent.customerPhone && ` · ${formatPhoneNumber(appointmentMetrics.nextEvent.customerPhone)}`}
+                </p>
+              </div>
+            ) : appointmentMetrics.bookedTodayCount === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">No appointments booked today</p>
+            ) : null}
           </CardContent>
         </Card>
       </div>
-
-      {/* Pending Appointments Table */}
-      {pendingAppointments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Pending Appointments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Job Type</TableHead>
-                  <TableHead>Preferred Time</TableHead>
-                  <TableHead>Urgency</TableHead>
-                  <TableHead>Received</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingAppointments.map((apt) => (
-                  <TableRow key={apt.id}>
-                    <TableCell className="font-medium">{apt.customer_name}</TableCell>
-                    <TableCell>{apt.customer_phone}</TableCell>
-                    <TableCell>{apt.job_type || "-"}</TableCell>
-                    <TableCell>{apt.preferred_time_range || "-"}</TableCell>
-                    <TableCell>{getUrgencyBadge(apt.urgency)}</TableCell>
-                    <TableCell>{formatTime(apt.created_at)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Today's Calls Table */}
       <Card>
@@ -354,6 +314,10 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
           <CardTitle className="text-lg">Today's Call Log</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
+          {/* Tip text */}
+          <p className="text-xs text-muted-foreground mb-3 px-4 sm:px-0">
+            💡 Tap a call to see details
+          </p>
           {calls.length === 0 ? (
             <p className="text-center text-muted-foreground py-4">No calls today</p>
           ) : (
@@ -370,16 +334,14 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                 </TableHeader>
                 <TableBody>
                   {calls.map((call: any) => {
-                    // Improved outcome detection: check multiple fields for booked appointment
+                    // Use shared detection for booked status
                     const getOutcomeBadge = () => {
-                      // Check multiple signals for a booked appointment
-                      const isBooked = call.outcome === 'booked' ||
-                        call.booked === true ||
-                        call.appointment_window ||
-                        call.appointment_start;
-                      if (isBooked) return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
-                      if (call.outcome === 'lead' || call.lead_captured) return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
-                      // Only show status badge if there's a meaningful status
+                      if (isBookedCall(call)) {
+                        return <Badge className="bg-green-600 hover:bg-green-700">Booked</Badge>;
+                      }
+                      if (call.outcome === 'lead' || call.lead_captured) {
+                        return <Badge className="bg-blue-600 hover:bg-blue-700">Lead</Badge>;
+                      }
                       if (call.status === 'completed' || call.status === 'ended') {
                         return <Badge variant="secondary">Completed</Badge>;
                       }
@@ -390,7 +352,6 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                     const getSummarizedReason = () => {
                       const text = call.reason || call.summary || '';
                       if (!text) return '-';
-                      // Truncate to ~40 chars or first sentence
                       const firstSentence = text.split(/[.!?]/)[0];
                       if (firstSentence.length > 50) {
                         return firstSentence.substring(0, 47) + '...';
@@ -399,7 +360,12 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                     };
 
                     return (
-                      <TableRow key={call.id}>
+                      <TableRow
+                        key={call.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleRowClick(call)}
+                        data-testid="call-row"
+                      >
                         <TableCell className="whitespace-nowrap">
                           {formatTime(call.started_at)}
                         </TableCell>
@@ -442,8 +408,8 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
         </CardContent>
       </Card>
 
-      {/* Pending Appointments Table */}
-      {pendingAppointments.length > 0 && (
+      {/* Today's Leads Table */}
+      {leads.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Today's Leads</CardTitle>
@@ -482,6 +448,14 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Call Details Drawer */}
+      <CallDetailsDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        call={selectedCall}
+        side={isMobile ? "bottom" : "right"}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
-  Calendar, Loader2, Bot, UsersRound
+  Calendar, Loader2, Bot, UsersRound, CalendarCheck
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
@@ -27,6 +27,7 @@ import { TeamTab } from "@/components/dashboard/TeamTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
+import { CalendarTab } from "@/components/dashboard/CalendarTab";
 import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
 
 
@@ -475,6 +476,10 @@ export default function CustomerDashboard() {
                 <Phone className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Phones</span>
               </TabsTrigger>
+              <TabsTrigger value="calendar" className="flex-shrink-0 px-3">
+                <CalendarCheck className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Calendar</span>
+              </TabsTrigger>
               {/* Commented out - will add later */}
               {/* <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
                 <Bot className="h-4 w-4 sm:mr-1" />
@@ -518,6 +523,10 @@ export default function CustomerDashboard() {
 
           <TabsContent value="phone-numbers">
             <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
+          </TabsContent>
+
+          <TabsContent value="calendar">
+            <CalendarTab calls={usageLogs} />
           </TabsContent>
 
           {/* Commented out - will add later */}

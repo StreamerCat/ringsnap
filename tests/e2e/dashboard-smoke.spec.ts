@@ -125,3 +125,54 @@ test.describe('Dashboard Components @auth @skip-ci', () => {
         }
     });
 });
+
+/**
+ * Dashboard Improvements Tests
+ * New tests for appointments card, call details drawer, and calendar tab
+ * Requires authentication - skipped in CI
+ */
+test.describe('Dashboard Improvements @auth @skip-ci', () => {
+    test.skip('Today tab - row click opens details drawer', async ({ page }) => {
+        await page.goto('/dashboard?tab=today');
+
+        // Wait for page to load
+        await page.waitForLoadState('networkidle');
+
+        // Check for call rows with data-testid
+        const callRow = page.locator('[data-testid="call-row"]').first();
+        const hasRows = await callRow.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (hasRows) {
+            // Click the row
+            await callRow.click();
+
+            // Expect drawer to be visible
+            const drawer = page.locator('[data-testid="call-details-drawer"]');
+            await expect(drawer).toBeVisible({ timeout: 3000 });
+        } else {
+            // Assert empty state text is visible
+            await expect(page.locator('text=No calls today')).toBeVisible();
+        }
+    });
+
+    test.skip('Calendar tab renders with month navigation', async ({ page }) => {
+        await page.goto('/dashboard?tab=calendar');
+
+        // Wait for page to load
+        await page.waitForLoadState('networkidle');
+
+        // Check calendar tab content exists
+        const calendarTab = page.locator('[data-testid="calendar-tab"]');
+        await expect(calendarTab).toBeVisible({ timeout: 5000 });
+
+        // Check month title exists
+        const monthTitle = page.locator('[data-testid="calendar-month-title"]');
+        await expect(monthTitle).toBeVisible();
+
+        // Verify navigation buttons exist
+        await expect(page.locator('button:has(svg.lucide-chevron-left)')).toBeVisible();
+        await expect(page.locator('button:has(svg.lucide-chevron-right)')).toBeVisible();
+    });
+});
+
+
