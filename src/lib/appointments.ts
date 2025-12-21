@@ -69,6 +69,35 @@ function cleanValue(value: string | null | undefined): string | null {
 }
 
 /**
+ * Extract caller name from summary text using common Vapi patterns.
+ * Returns null if no high-confidence name is found.
+ */
+function extractNameFromSummary(summary: string | null | undefined): string | null {
+    if (!summary || isSentinelValue(summary)) return null;
+
+    // clean multiline
+    const s = summary.replace(/\r?\n/g, ' ').trim();
+
+    // Pattern 1: "Incoming call from [Name]" or "Call from [Name]"
+    const fromMatch = s.match(/(?:incoming call |call |received |call received )?from ([A-Z][a-z]+(?: [A-Z][a-z]+)+)/i);
+    if (fromMatch && fromMatch[1]) return fromMatch[1].trim();
+
+    // Pattern 2: "The caller, [Name], ..."
+    const callerComma = s.match(/caller, ([A-Z][a-z]+(?: [A-Z][a-z]+)+),/i);
+    if (callerComma && callerComma[1]) return callerComma[1].trim();
+
+    // Pattern 3: "Caller is [Name]"
+    const callerIs = s.match(/caller (?:is|is named) ([A-Z][a-z]+(?: [A-Z][a-z]+)+)/i);
+    if (callerIs && callerIs[1]) return callerIs[1].trim();
+
+    // Pattern 4: "Name: [Name]" (Explicit label)
+    const nameLabel = s.match(/(?:name|caller): ([A-Z][a-z]+(?: [A-Z][a-z]+)+)/i);
+    if (nameLabel && nameLabel[1]) return nameLabel[1].trim();
+
+    return null;
+}
+
+/**
  * Get display name from a call with priority order and sentinel handling.
  * Priority: caller_name → customer_name → lead_name → from_number → "Unknown caller"
  */
@@ -80,6 +109,11 @@ export function getDisplayName(call: CallLogWithAppointment | null | undefined):
         || cleanValue(call.lead_name);
 
     if (name) return name;
+
+    // Fallback: Try to extract from summary
+    // (This handles cases where RPC doesn't return caller_name but summary has it)
+    const extracted = extractNameFromSummary(call.summary);
+    if (extracted) return extracted;
 
     // Fall back to formatted phone number
     if (call.from_number && !isSentinelValue(call.from_number)) {
