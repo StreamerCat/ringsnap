@@ -11,6 +11,8 @@ import {
   isBookedCall,
   deriveAppointmentMetrics,
   formatPhoneNumber,
+  getDisplayName,
+  isSentinelValue,
   type CallLogWithAppointment
 } from "@/lib/appointments";
 import { type CallLog } from "@/lib/leadScore";
@@ -372,13 +374,10 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium">
-                              {call.caller_name || (call.from_number ? formatPhoneNumber(call.from_number) : "Unknown caller")}
+                              {getDisplayName(call)}
                             </span>
-                            {call.caller_name && call.from_number && (
+                            {!isSentinelValue(call.caller_name) && call.from_number && !isSentinelValue(call.from_number) && (
                               <span className="text-xs text-muted-foreground">{formatPhoneNumber(call.from_number)}</span>
-                            )}
-                            {!call.caller_name && call.from_number && (
-                              <span className="text-xs text-muted-foreground">Unknown caller</span>
                             )}
                           </div>
                         </TableCell>

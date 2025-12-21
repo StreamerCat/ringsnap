@@ -29,7 +29,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { isBookedCall } from "@/lib/appointments";
+import { isBookedCall, getDisplayName, isSentinelValue, formatPhoneNumber } from "@/lib/appointments";
 
 interface OverviewTabProps {
     account: any;
@@ -85,20 +85,6 @@ export function OverviewTab({
         startDate.setHours(0, 0, 0, 0);
         return usageLogs.filter((log: any) => new Date(log.started_at) >= startDate);
     }, [usageLogs, dateFilter]);
-
-    // Format phone number nicely
-    const formatPhoneNumber = (phone: string | null | undefined): string => {
-        if (!phone) return "Unknown";
-        // Remove non-digits
-        const digits = phone.replace(/\D/g, "");
-        // Format US numbers
-        if (digits.length === 10) {
-            return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-        } else if (digits.length === 11 && digits.startsWith("1")) {
-            return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-        }
-        return phone;
-    };
 
     const handleManageBilling = async () => {
         setBillingLoading(true);
@@ -339,13 +325,10 @@ export function OverviewTab({
                                             <TableCell>
                                                 <div className="flex flex-col">
                                                     <span className="font-semibold">
-                                                        {log.caller_name || (log.from_number ? formatPhoneNumber(log.from_number) : "Unknown caller")}
+                                                        {getDisplayName(log)}
                                                     </span>
-                                                    {log.caller_name && log.from_number && (
+                                                    {!isSentinelValue(log.caller_name) && log.from_number && !isSentinelValue(log.from_number) && (
                                                         <span className="text-xs text-muted-foreground">{formatPhoneNumber(log.from_number)}</span>
-                                                    )}
-                                                    {!log.caller_name && log.from_number && (
-                                                        <span className="text-xs text-muted-foreground">Unknown caller</span>
                                                     )}
                                                 </div>
                                             </TableCell>
