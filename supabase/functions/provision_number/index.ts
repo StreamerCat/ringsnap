@@ -301,14 +301,24 @@ serve(async (req) => {
     console.log("[provision_number] Final status:", finalStatus);
 
     // Upsert phone record
-    console.log("[provision_number] Upserting phone record");
+    const phoneNumberValue = finalPhone?.number || `+1${areaCode}0000000`;
+    console.log("[provision_number] PROVISION_UPSERT_START", {
+      accountId,
+      vapiPhoneId: vapiId,
+      phoneNumber: phoneNumberValue,
+      status: finalStatus
+    });
+
     const phoneRecord = {
       account_id: accountId,
-      vapi_id: vapiId,
-      phone_number: finalPhone?.number || `+1${areaCode}0000000`,
+      vapi_phone_id: vapiId,  // Use canonical column (has UNIQUE constraint)
+      provider_phone_number_id: vapiId,  // Also populate canonical provider ID
+      phone_number: phoneNumberValue,
+      e164_number: phoneNumberValue,  // Canonical E.164 format
       area_code: areaCode,
       provider: "vapi",
       status: finalStatus,
+      is_primary: true,
       provisioning_attempts: 1,
       last_polled_at: new Date().toISOString(),
       activated_at: finalStatus === "active" ? new Date().toISOString() : null,
@@ -317,11 +327,16 @@ serve(async (req) => {
 
     const { data: inserted, error: upsertError } = await supabase
       .from("phone_numbers")
-      .upsert(phoneRecord, { onConflict: "vapi_id" })
-      .select()
+      .upsert(phoneRecord, { onConflict: "vapi_phone_id" })  // Match UNIQUE constraint
+      .select("id, phone_number, activated_at")
       .single();
 
-    console.log("[provision_number] Upsert result:", { inserted, upsertError });
+    console.log("[provision_number] PROVISION_UPSERT_RESULT", {
+      success: !upsertError,
+      phoneRowId: inserted?.id,
+      activatedAt: inserted?.activated_at,
+      error: upsertError?.message
+    });
 
     if (upsertError) {
       console.error("[provision_number] Failed to upsert phone record:", upsertError);
@@ -333,18 +348,41 @@ serve(async (req) => {
       });
     }
 
-    // Update account with phone link
+    // Update account with phone link and phone number string
+    // Note: Keep status as 'active' (not 'completed') - provision_number only handles phone, not assistant
     const accountUpdateStatus = finalStatus === "active" ? "active" : "pending";
+    const phoneNumberStr = inserted?.phone_number || phoneRecord.phone_number;
 
-    console.log("[provision_number] Updating account with phone info");
-    await supabase
+    console.log("[provision_number] PROVISION_ACCOUNT_UPDATE", {
+      accountId,
+      status: accountUpdateStatus,
+      phoneNumber: phoneNumberStr,
+      phoneRowId: inserted?.id
+    });
+
+    const { error: accountUpdateError } = await supabase
       .from("accounts")
       .update({
         provisioning_status: accountUpdateStatus,
+        vapi_phone_number: phoneNumberStr,  // Actual phone string for UI
+        phone_number_e164: phoneNumberStr,  // Canonical E.164 field
         vapi_phone_number_id: inserted?.id,
         phone_provisioned_at: finalStatus === "active" ? new Date().toISOString() : null
       })
       .eq("id", accountId);
+
+    if (accountUpdateError) {
+      console.error("[provision_number] PROVISION_ACCOUNT_UPDATE_FAILED", {
+        accountId,
+        error: accountUpdateError.message
+      });
+    } else {
+      console.log("[provision_number] PROVISION_ACCOUNT_UPDATE_SUCCESS", {
+        accountId,
+        phoneRowId: inserted?.id,
+        activatedAt: inserted?.activated_at
+      });
+    }
 
     // Log success
     await supabase.from("provisioning_logs").insert({

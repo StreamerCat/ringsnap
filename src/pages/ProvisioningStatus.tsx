@@ -110,23 +110,55 @@ export default function ProvisioningStatus() {
                         const currentElapsed = Date.now() - startTime;
                         setElapsedTime(currentElapsed);
 
-                        // Strict completion logic: BOTH phone AND assistant required
-                        const hasPhone = account.vapi_phone_number && account.vapi_phone_number.trim() !== "";
-                        const hasAssistant = !!account.vapi_assistant_id;
+                        // PRIMARY: provisioning_status is the source of truth
                         const statusCompleted = account.provisioning_status === "completed";
 
-                        // Complete = hasPhone AND hasAssistant AND statusCompleted
-                        const isComplete = hasPhone && hasAssistant && statusCompleted;
-
-                        // Fallback: ready if phone + assistant exist even without status
-                        const isReadyFallback = hasPhone && hasAssistant;
-
-                        if (isComplete || isReadyFallback) {
+                        if (statusCompleted) {
+                            // If phone number is on account, use it; otherwise fetch from phone_numbers
+                            let phoneNum = account.vapi_phone_number;
+                            if (!phoneNum || phoneNum.trim() === "") {
+                                const { data: pn } = await supabase
+                                    .from("phone_numbers")
+                                    .select("phone_number")
+                                    .eq("account_id", profile.account_id)
+                                    .eq("is_primary", true)
+                                    .single();
+                                phoneNum = pn?.phone_number || null;
+                            }
                             setStatus("ready");
-                            setPhoneNumber(account.vapi_phone_number);
+                            setPhoneNumber(phoneNum);
                             if (timerRef.current) clearInterval(timerRef.current);
                             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-                        } else if (account.provisioning_status?.startsWith("failed")) {
+                            return;
+                        }
+
+                        // LEGACY FALLBACK: Only if phone_numbers shows truly provisioned primary
+                        // Requires: status='active', is_primary=true, activated_at IS NOT NULL
+                        const { data: phoneRecord } = await supabase
+                            .from("phone_numbers")
+                            .select("phone_number, status, is_primary, activated_at")
+                            .eq("account_id", profile.account_id)
+                            .eq("is_primary", true)
+                            .single();
+
+                        const legacyReady = phoneRecord?.status === "active"
+                            && phoneRecord?.is_primary === true
+                            && phoneRecord?.activated_at !== null;
+
+                        if (legacyReady) {
+                            console.warn("[ProvisioningStatus] Using legacy fallback", {
+                                accountId: profile.account_id,
+                                phoneNumber: phoneRecord.phone_number
+                            });
+                            setStatus("ready");
+                            setPhoneNumber(phoneRecord.phone_number);
+                            if (timerRef.current) clearInterval(timerRef.current);
+                            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                            return;
+                        }
+
+                        // Check for failed state
+                        if (account.provisioning_status?.startsWith("failed")) {
                             setStatus("failed");
                             if (timerRef.current) clearInterval(timerRef.current);
                             if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -143,15 +175,18 @@ export default function ProvisioningStatus() {
                                     data: {
                                         accountId: profile.account_id,
                                         elapsedMs: currentElapsed,
-                                        hasPhone,
-                                        hasAssistant,
+                                        hasPhone: !!account.vapi_phone_number,
+                                        hasAssistant: !!account.vapi_assistant_id,
                                         status: account.provisioning_status,
+                                        legacyPhoneStatus: phoneRecord?.status,
+                                        legacyActivatedAt: phoneRecord?.activated_at
                                     }
                                 });
                                 console.warn('[ProvisioningStatus] Stuck > 30s', {
                                     accountId: profile.account_id,
-                                    hasPhone,
-                                    hasAssistant,
+                                    provisioningStatus: account.provisioning_status,
+                                    phoneRecordStatus: phoneRecord?.status,
+                                    activatedAt: phoneRecord?.activated_at
                                 });
                             }
                         }
