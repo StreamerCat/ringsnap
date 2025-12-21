@@ -23,11 +23,10 @@ export const ContractorHero = () => {
 
         {/* Left Column */}
         <div>
-          <img src={logo} alt="RingSnap AI Receptionist for Contractors" className="h-10 sm:h-12 lg:h-14 w-auto mb-6 sm:mb-8 mx-auto sm:mx-0" />
+          
 
           <div className="space-y-8">
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{
-            }}>
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{}}>
               Stop Missing Calls. Start Booking Jobs.
             </h1>
 
