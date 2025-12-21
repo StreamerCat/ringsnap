@@ -117,51 +117,19 @@ export function VapiChatWidget() {
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
     if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
-    // Construct assistant overrides based on context - Memoized to prevent widget thrashing
+    // Construct assistant overrides based on context - DIAGNOSTIC MODE
     const assistantOverrides = useMemo(() => {
-        const sanitizedVariables: Record<string, any> = {};
-
-        // Prepare variable values - Sanitize inputs to prevent 400 Errors
-        // Vapi expects a flat map of strings/numbers/booleans. Complex objects or nulls break it.
-        // Inlining the object to avoid ReferenceError on intermediate variable.
-        Object.entries({
-            pagePath: location.pathname,
-            isLoggedIn: !!widgetContext.accountId,
-            widgetMode,
-            ...widgetContext // Spread dashboard context (customerName, accountId, etc.)
-        }).forEach(([key, value]) => {
-            if (value === null || value === undefined) return;
-            // Allow string, number, boolean. Convert others to string or skip.
-            if (typeof value === 'object') {
-                // Skip complex objects to avoid errors, unless it's null (handled above)
-                return;
-            }
-            sanitizedVariables[key] = value;
-        });
-
-        // Add UTM params if present in URL
-        const searchParams = new URLSearchParams(location.search);
-        if (searchParams.get('utm_source')) sanitizedVariables.utmSource = searchParams.get('utm_source');
-        if (searchParams.get('utm_medium')) sanitizedVariables.utmMedium = searchParams.get('utm_medium');
-        if (searchParams.get('utm_campaign')) sanitizedVariables.utmCampaign = searchParams.get('utm_campaign');
-
-        // Log the sanitized payload to debug
-        // console.log("[VapiWidget Debug] Overrides Payload:", sanitizedVariables);
-
-        // Return overrides structure. 
+        // Hardcoded minimal payload to verify connection and rule out data issues
         return {
-            variableValues: sanitizedVariables,
+            variableValues: {
+                isTest: true,
+                mode: widgetMode
+            },
             assistant: {
                 firstMessage: config.initialMessage
             }
         };
-    }, [
-        location.pathname,
-        location.search,
-        widgetContext,
-        widgetMode,
-        config.initialMessage
-    ]);
+    }, [widgetMode, config.initialMessage]);
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
