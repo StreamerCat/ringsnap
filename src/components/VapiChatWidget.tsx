@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Vapi from "@vapi-ai/web";
 import { VapiWidget } from "@vapi-ai/client-sdk-react";
@@ -117,11 +117,10 @@ export function VapiChatWidget() {
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
     if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
 
-    // Construct assistant overrides based on context - Memoized to prevent widget thrashing
-    const assistantOverrides = useMemo(() => {
-        // Prepare variable values - Sanitize inputs to prevent 400 Errors
-        // Vapi expects a flat map of strings/numbers/booleans. Complex objects or nulls break it.
-        const rawVariables: Record<string, any> = {
+    // Construct assistant overrides based on context
+    const getAssistantOverrides = () => {
+        // Basic context for all users
+        const variableValues: Record<string, any> = {
             pagePath: location.pathname,
             isLoggedIn: !!widgetContext.accountId,
             widgetMode,
@@ -156,13 +155,7 @@ export function VapiChatWidget() {
                 firstMessage: config.initialMessage
             }
         };
-    }, [
-        location.pathname,
-        location.search,
-        widgetContext,
-        widgetMode,
-        config.initialMessage
-    ]);
+    };
 
     if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
         console.log("[VapiWidget Debug] Widget hidden", {
@@ -194,7 +187,7 @@ export function VapiChatWidget() {
                     subtitle={config.subtitle}
 
                     // assistantOverrides for Context and First Message
-                    assistantOverrides={assistantOverrides}
+                    assistantOverrides={getAssistantOverrides()}
 
                     // Events
                     onCallStart={() => {
