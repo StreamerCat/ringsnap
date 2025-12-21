@@ -2,6 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Phone, Clock, Calendar, FileText, Target, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
     calculateLeadScore,
     getLeadScoreLabel,
@@ -19,6 +20,8 @@ interface CallDetailsDrawerProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     call: CallLog | null;
+    /** Sheet opening side - "right" for desktop, "bottom" for mobile */
+    side?: "right" | "bottom";
 }
 
 /**
@@ -34,7 +37,7 @@ interface CallDetailsDrawerProps {
  * - Lead score with explanation tooltip
  * - Suggested next step
  */
-export function CallDetailsDrawer({ open, onOpenChange, call }: CallDetailsDrawerProps) {
+export function CallDetailsDrawer({ open, onOpenChange, call, side = "right" }: CallDetailsDrawerProps) {
     if (!call) return null;
 
     const score = calculateLeadScore(call);
@@ -83,7 +86,14 @@ export function CallDetailsDrawer({ open, onOpenChange, call }: CallDetailsDrawe
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetContent
+                side={side}
+                className={cn(
+                    "overflow-y-auto",
+                    side === "bottom" ? "h-[85vh] rounded-t-lg" : "w-full sm:max-w-lg"
+                )}
+                data-testid="call-details-drawer"
+            >
                 <SheetHeader>
                     <SheetTitle className="flex items-center gap-2">
                         <Phone className="h-5 w-5" />
