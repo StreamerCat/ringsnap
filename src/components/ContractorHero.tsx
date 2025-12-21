@@ -52,8 +52,8 @@ export const ContractorHero = () => {
               <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md" style={{
                 borderColor: 'hsl(var(--charcoal) / 0.3)',
                 color: 'hsl(var(--charcoal))'
-              }} onClick={() => navigate('/login')}>
-                Sign In
+              }} onClick={scrollToVapiDemo}>
+                Hear it Live
               </Button>
               <Button size="lg" variant="outline" className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md" style={{
                 borderColor: 'hsl(var(--charcoal) / 0.3)',
