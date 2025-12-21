@@ -80,7 +80,7 @@ const Pricing = () => {
                                 <div className="animate-pulse text-muted-foreground">Loading pricing...</div>
                             </div>
                         }>
-                            <ContractorPricing />
+                            <ContractorPricing showHeading={false} className="pt-0 sm:pt-0 lg:pt-0" />
                             <ContractorFooter />
                         </Suspense>
                     </ErrorBoundary>
