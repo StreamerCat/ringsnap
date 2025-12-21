@@ -472,13 +472,13 @@ export default function CustomerDashboard() {
                 <TrendingUp className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Overview</span>
               </TabsTrigger>
-              <TabsTrigger value="phone-numbers" className="flex-shrink-0 px-3">
-                <Phone className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Phones</span>
-              </TabsTrigger>
               <TabsTrigger value="calendar" className="flex-shrink-0 px-3">
                 <CalendarCheck className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Calendar</span>
+              </TabsTrigger>
+              <TabsTrigger value="phone-numbers" className="flex-shrink-0 px-3">
+                <Phone className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Phones</span>
               </TabsTrigger>
               {/* Commented out - will add later */}
               {/* <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
@@ -521,12 +521,12 @@ export default function CustomerDashboard() {
             />
           </TabsContent>
 
-          <TabsContent value="phone-numbers">
-            <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
-          </TabsContent>
-
           <TabsContent value="calendar">
             <CalendarTab calls={usageLogs} />
+          </TabsContent>
+
+          <TabsContent value="phone-numbers">
+            <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
           </TabsContent>
 
           {/* Commented out - will add later */}
