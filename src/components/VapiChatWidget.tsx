@@ -142,17 +142,7 @@ export function VapiChatWidget() {
         return {
             variableValues,
             assistant: {
-                firstMessage: config.initialMessage,
-                // Ensure model/voice settings from dashboard/template aren't accidentally wiped if this is a partial update,
-                // but usually Vapi merges this.
-                model: {
-                    messages: [
-                        {
-                            role: "system",
-                            content: config.initialMessage // Redundant but ensures chat context knows the greeting
-                        }
-                    ]
-                }
+                firstMessage: config.initialMessage
             }
         };
     }, [
