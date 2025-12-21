@@ -103,7 +103,7 @@ export const ContractorHero = () => {
 
               <div className="space-y-3 text-sm leading-relaxed">
                 <div>
-                  <span className="font-semibold text-gradient-core">AI:</span>
+                  <span className="font-semibold text-gradient-core">RingSnap:</span>
                   <span className="text-foreground/80"> Thanks for calling Summit Plumbing. How can I help?</span>
                 </div>
                 <div>
@@ -111,11 +111,11 @@ export const ContractorHero = () => {
                   <span className="text-foreground/80"> I have a burst pipe in the basement, water everywhere!</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-gradient-core">AI:</span>
+                  <span className="font-semibold text-gradient-core">RingSnap:</span>
                   <span className="text-foreground/80"> That's an emergency. Turn your main shutoff valve clockwise. I'm routing our on-call tech now. What's your address?</span>
                 </div>
                 <div>
-                  <span className="font-semibold text-gradient-core">AI:</span>
+                  <span className="font-semibold text-gradient-core">RingSnap:</span>
                   <span className="text-foreground/80"> Got it. You're scheduled for arrival in 45 minutes. Text confirmation sent.</span>
                 </div>
 
