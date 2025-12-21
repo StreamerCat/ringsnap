@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+
+import { createContext, useContext, useState, ReactNode } from "react";
 
 interface VapiWidgetContextType {
     setWidgetContext: (context: Record<string, any>) => void;
