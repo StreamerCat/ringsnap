@@ -192,7 +192,11 @@ serve(async (req) => {
 
     } catch (error: any) {
         console.error('Unhandled cancel error:', error);
-        await captureError(error, { phase: logContext.phase });
+        try {
+            await captureError(error, { phase: logContext.phase });
+        } catch (e) {
+            console.error('Failed to capture error:', e);
+        }
         return errorResponse(500, 'Internal Server Error', 'INTERNAL_ERROR', { error: error.message });
     }
 });
