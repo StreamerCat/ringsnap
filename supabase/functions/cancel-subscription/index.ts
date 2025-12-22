@@ -63,12 +63,15 @@ serve(async (req) => {
         let account_id: string;
         try {
             const body = await req.json();
+            log('Received body', { body: JSON.stringify(body) });
             account_id = body.account_id;
-        } catch (e) {
+        } catch (e: any) {
+            log('JSON parse error', { error: e.message });
             return errorResponse(400, 'Invalid JSON body', 'INVALID_JSON');
         }
 
         if (!account_id) {
+            log('Missing account_id in body');
             return errorResponse(400, 'Missing account_id', 'MISSING_PARAM');
         }
 
