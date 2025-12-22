@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
+// Sentry imports removed - causing Deno runtime incompatibility
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -17,8 +17,7 @@ serve(async (req) => {
     const requestId = crypto.randomUUID();
     const logContext = { requestId, phase: 'init' };
 
-    // Initialize Sentry for error tracking
-    initSentry('cancel-subscription', { correlationId: requestId });
+    // Sentry initialization removed for compatibility
 
     // Helper for structured logging
     const log = (msg: string, data: any = {}) => {
@@ -195,11 +194,6 @@ serve(async (req) => {
 
     } catch (error: any) {
         console.error('Unhandled cancel error:', error);
-        try {
-            await captureError(error, { phase: logContext.phase });
-        } catch (e) {
-            console.error('Failed to capture error:', e);
-        }
         return errorResponse(500, 'Internal Server Error', 'INTERNAL_ERROR', { error: error.message });
     }
 });
