@@ -54,7 +54,7 @@ export function ProvisioningStatus({
   pollingInterval = 10000, // Increased default (Realtime is primary)
   disabled = false,
 }: ProvisioningStatusProps) {
-  const [status, setStatus] = useState<"idle" | "provisioning" | "active" | "failed">("provisioning");
+  const [status, setStatus] = useState<"idle" | "provisioning" | "processing" | "active" | "completed" | "failed">("provisioning");
   const [progress, setProgress] = useState(10);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +203,7 @@ export function ProvisioningStatus({
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("name, phone")
@@ -250,7 +250,7 @@ export function ProvisioningStatus({
         <>
           <Loader2 className="h-16 w-16 animate-spin mx-auto text-primary" />
           <div className="space-y-2">
-            <h3 className="text-xl font-semibold">Creating your AI receptionist...</h3>
+            <h3 className="text-xl font-semibold">Creating your RingSnap Agent...</h3>
             <p className="text-muted-foreground">
               This typically takes 60-90 seconds
             </p>
@@ -279,7 +279,7 @@ export function ProvisioningStatus({
                 <strong>What's happening:</strong>
                 <ul className="mt-2 space-y-1 list-disc list-inside">
                   <li>Provisioning your phone number</li>
-                  <li>Creating your AI assistant</li>
+                  <li>Creating your Voice Agent</li>
                   <li>Configuring call routing</li>
                 </ul>
               </AlertDescription>
@@ -315,7 +315,7 @@ export function ProvisioningStatus({
         <>
           <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
           <div className="space-y-2">
-            <h3 className="text-2xl font-bold text-green-600">Your AI receptionist is ready!</h3>
+            <h3 className="text-2xl font-bold text-green-600">Your RingSnap Agent is ready!</h3>
             <p className="text-muted-foreground">
               Setup completed in {formatTime(elapsedTime)}
             </p>

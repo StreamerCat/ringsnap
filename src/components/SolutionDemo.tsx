@@ -179,7 +179,7 @@ export const SolutionDemo = () => {
               </div>
               <h3 className="font-bold text-lg">Transfers Critical Calls</h3>
               <p className="text-sm text-muted-foreground">
-                Gas leaks, electrical fires, or customer insists on speaking to you? AI transfers immediately with full
+                Gas leaks, electrical fires, or customer insists on speaking to you? RingSnap transfers immediately with full
                 context.
               </p>
               <div className="pt-2 border-t">

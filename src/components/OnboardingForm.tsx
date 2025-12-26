@@ -410,9 +410,9 @@ export function OnboardingForm({
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader className="space-y-2 text-center">
-          <DialogTitle className="text-2xl font-bold">Set up your RingSnap assistant</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">Set up your RingSnap Agent</DialogTitle>
           <DialogDescription>
-            We just need a few details to provision your phone number and configure your AI assistant.
+            We just need a few details to provision your phone number and configure your Voice Agent.
           </DialogDescription>
         </DialogHeader>
 
@@ -608,7 +608,7 @@ export function OnboardingForm({
               <div>
                 <h3 className="text-lg font-semibold">Tell us about your business</h3>
                 <p className="text-sm text-muted-foreground">
-                  These details help us personalize call handling and script the assistant appropriately.
+                  These details help us personalize call handling and script the Agent appropriately.
                 </p>
               </div>
 

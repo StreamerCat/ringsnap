@@ -28,7 +28,7 @@ const PLANS = [
     priceLabel: "$297/mo",
     calls: "≤80 calls/mo",
     features: [
-      "AI phone receptionist",
+      "Virtual receptionist",
       "Call forwarding",
       "24/7 availability",
       "Email support",
@@ -43,7 +43,7 @@ const PLANS = [
     features: [
       "Everything in Starter",
       "Priority routing",
-      "Advanced AI voice",
+      "Advanced voice agent",
       "Phone & chat support",
       "Call recording",
     ],

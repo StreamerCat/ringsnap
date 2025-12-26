@@ -288,7 +288,7 @@ export default function Start() {
                   Stop Losing $4K+/Month to Unanswered Calls
                 </h1>
                 <p className="text-muted-foreground">
-                  Get your AI receptionist in under 2 minutes
+                  Get your Virtual Receptionist in under 2 minutes
                 </p>
               </div>
 

@@ -99,7 +99,7 @@ export default function AISignup() {
           "assistant",
           <>
             <p className="mb-2">👋 Welcome to RingSnap!</p>
-            <p className="mb-2">I'm here to help you get your AI phone receptionist up and running in just 2 minutes.</p>
+            <p className="mb-2">I'm here to help you get your Virtual Receptionist up and running in just 2 minutes.</p>
             <p>Ready to start your free trial?</p>
           </>
         );
@@ -241,7 +241,7 @@ export default function AISignup() {
     await showTypingDelay();
     addMessage(
       "assistant",
-      "Great! What's your main goal for your AI phone assistant?"
+      "Great! What's your main goal for your Voice Agent?"
     );
   };
 
@@ -340,7 +340,7 @@ export default function AISignup() {
         "assistant",
         <>
           <p className="mb-3 text-lg">🎉 <strong>Welcome to RingSnap!</strong></p>
-          <p className="mb-2">Your account is being set up right now. We're provisioning your AI phone receptionist - this usually takes less than a minute.</p>
+          <p className="mb-2">Your account is being set up right now. We're provisioning your Virtual Receptionist - this usually takes less than a minute.</p>
           <p>Click below to continue to your setup dashboard.</p>
         </>
       );

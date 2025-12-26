@@ -282,7 +282,7 @@ export function SelfServeTrialFlow({
       // Success - move to provisioning step
       setAccountId(data.account_id);
       setCurrentStep(7);
-      toast.success("Trial started! Setting up your AI receptionist...");
+      toast.success("Trial started! Setting up your Agent...");
     } catch (error) {
       console.error("Trial signup error:", error);
       toast.error(error instanceof Error ? error.message : "Signup failed");
@@ -370,9 +370,9 @@ export function SelfServeTrialFlow({
           {currentStep === 3 && (
             <>
               <DialogHeader>
-                <DialogTitle>How should your AI operate?</DialogTitle>
+                <DialogTitle>How should your Agent operate?</DialogTitle>
                 <DialogDescription>
-                  Customize your AI receptionist's behavior
+                  Customize your Agent's behavior
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
@@ -395,7 +395,7 @@ export function SelfServeTrialFlow({
           {currentStep === 4 && (
             <>
               <DialogHeader>
-                <DialogTitle>Choose your AI voice</DialogTitle>
+                <DialogTitle>Choose your voice</DialogTitle>
                 <DialogDescription>
                   Select the voice your customers will hear
                 </DialogDescription>

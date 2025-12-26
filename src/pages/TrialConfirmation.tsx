@@ -38,7 +38,7 @@ export default function TrialConfirmation() {
             Welcome to RingSnap! 🎉
           </h1>
           <p className="text-xl text-gray-600">
-            Your AI assistant is being set up right now
+            Your RingSnap Agent is being set up right now
           </p>
         </div>
 
@@ -53,7 +53,7 @@ export default function TrialConfirmation() {
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold">Setup in Progress</h2>
                 <p className="text-gray-600">
-                  We're personalizing your AI assistant based on your business details.
+                  We're personalizing your Agent based on your business details.
                   This usually takes about 5-10 minutes.
                 </p>
               </div>
@@ -69,7 +69,7 @@ export default function TrialConfirmation() {
                 </li>
                 <li className="flex items-center gap-3 text-gray-600">
                   <div className="h-2 w-2 rounded-full bg-blue-600"></div>
-                  Training your AI on your business information
+                  Training your Agent on your business information
                 </li>
                 <li className="flex items-center gap-3 text-gray-600">
                   <div className="h-2 w-2 rounded-full bg-blue-600"></div>

@@ -145,7 +145,7 @@ export default function Activation() {
                         <CheckCircle2 className="h-8 w-8 text-green-600" />
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900">
-                        🎉 Your AI Assistant is Live!
+                        🎉 Your RingSnap Agent is Live!
                     </h1>
                     <p className="text-slate-600">
                         Your RingSnap number is ready. Let's get you taking calls.
@@ -182,7 +182,7 @@ export default function Activation() {
                             Step 1: Test Your Assistant
                         </h2>
                         <p className="text-sm text-slate-600">
-                            Call your RingSnap number now to hear your AI assistant in action.
+                            Call your RingSnap number now to hear your Agent in action.
                         </p>
                         <a
                             href={`tel:${account.vapi_phone_number}`}

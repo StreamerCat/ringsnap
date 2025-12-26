@@ -56,7 +56,7 @@ export function VoiceSelector({
       name="assistantGender"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>AI Receptionist Voice *</FormLabel>
+          <FormLabel>Agent Voice *</FormLabel>
           <FormDescription>
             Choose the voice your customers will hear
           </FormDescription>

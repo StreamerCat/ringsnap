@@ -207,7 +207,7 @@ export const VoiceDemoWidget = () => {
               </svg>
             </div>
             <p className="text-xl font-semibold text-[#2C3639]">Call in Progress</p>
-            <p className="text-sm text-muted-foreground mt-2">AI receptionist is listening...</p>
+            <p className="text-sm text-muted-foreground mt-2">RingSnap Agent is listening...</p>
           </div>
           <button
             onClick={endCall}

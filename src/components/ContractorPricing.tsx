@@ -35,7 +35,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
       price: "$297",
       description: "Solo Contractors & Small Crews",
       minutes: "1,500 minutes included",
-      receptionist: "1 AI receptionist",
+      receptionist: "1 Voice Agent",
       overage: "$0.16/minute",
       overageContext: "Most customers use 1,000-1,400 min/month",
       features: [
@@ -54,7 +54,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
       price: "$547",
       description: "Growing Contractors with Multiple Crews",
       minutes: "3,500 minutes included",
-      receptionist: "3 AI receptionists",
+      receptionist: "3 Voice Agents",
       overage: "$0.13/minute",
       overageContext: "Most customers stay within plan limits",
       features: [
@@ -74,7 +74,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
       price: "$947",
       description: "Multi-Location Contractors & Franchises",
       minutes: "7,000 minutes included",
-      receptionist: "5 AI receptionists",
+      receptionist: "5 Voice Agents",
       overage: "$0.11/minute",
       overageContext: "Rarely needed at this tier",
       features: [
@@ -98,7 +98,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
           <>
             <hr className="section-divider mb-8 sm:mb-12" />
             <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4" style={{ color: 'hsl(var(--charcoal))' }}>
+              <h2 className="text-h2 mb-4">
                 Pricing as simple as <span style={{ color: 'hsl(var(--primary))' }}>a handshake</span>
               </h2>
               <p className="text-fluid-body text-muted-foreground leading-relaxed">
@@ -343,7 +343,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
         {/* Final Strong CTA - Condensed */}
         <div className="max-w-4xl mx-auto mt-12 text-center space-y-6 p-6 rounded-2xl bg-gradient-to-br from-cream/30 to-white border-2 border-primary/20">
           <div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
+            <h2 className="text-h2 mb-4">
               Your Next Customer Is Calling. <span style={{ color: 'hsl(var(--primary))' }}>Will You Answer?</span>
             </h2>
             <p className="text-base leading-relaxed" style={{ color: 'hsl(var(--charcoal) / 0.7)' }}>

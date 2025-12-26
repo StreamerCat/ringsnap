@@ -42,7 +42,7 @@ export const MobileFooterCTA = () => {
       <div className="container mx-auto px-4 pt-4 pb-4 flex gap-3">
         <Button
           className="flex-1 h-12 rounded-full bg-primary text-white active:scale-95 transition-transform shadow-md text-sm font-semibold"
-          aria-label="Start your free 3-day trial with RingSnap AI receptionist"
+          aria-label="Start your free 3-day trial with RingSnap Virtual Receptionist"
           onClick={handleSignup}
         >
           <PhoneCall className="w-4 h-4" />

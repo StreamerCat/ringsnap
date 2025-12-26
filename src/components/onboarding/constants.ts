@@ -49,7 +49,7 @@ export const PLANS: PlanConfig[] = [
     price: 297,
     calls: "≤80 calls/mo",
     features: [
-      "AI phone receptionist",
+      "Virtual receptionist",
       "Call forwarding",
       "24/7 availability",
       "Email support",
@@ -77,7 +77,7 @@ export const PLANS: PlanConfig[] = [
     features: [
       "Everything in Professional",
       "Dedicated account manager",
-      "Custom AI training",
+      "Custom Agent configuration",
       "Multi-location support",
       "Advanced analytics",
     ],
@@ -85,7 +85,7 @@ export const PLANS: PlanConfig[] = [
 ];
 
 /**
- * Voice options for AI assistant
+ * Voice options for your Agent
  */
 export const VOICE_OPTIONS: VoiceOption[] = [
   {
@@ -172,10 +172,10 @@ export const SELF_SERVE_STEPS = [
   { number: 1, label: "Your Information", description: "Basic contact details" },
   { number: 2, label: "Business Basics", description: "Company and trade" },
   { number: 3, label: "Business Details", description: "Optional configuration" },
-  { number: 4, label: "Choose Voice", description: "AI assistant voice" },
+  { number: 4, label: "Choose Voice", description: "Agent voice" },
   { number: 5, label: "Select Plan", description: "Choose your plan" },
   { number: 6, label: "Payment", description: "Secure payment setup" },
-  { number: 7, label: "Setting Up", description: "Creating your AI" },
+  { number: 7, label: "Setting Up", description: "Configuring Agent" },
   { number: 8, label: "Ready!", description: "Your phone is ready" },
 ] as const;
 
@@ -186,8 +186,8 @@ export const SALES_STEPS = [
   { number: 1, label: "Customer Setup", description: "All information" },
   { number: 2, label: "Select Plan", description: "Choose plan" },
   { number: 3, label: "Payment", description: "Card information" },
-  { number: 4, label: "Provisioning", description: "Setting up AI" },
-  { number: 5, label: "Demo Ready!", description: "Test the AI" },
+  { number: 4, label: "Provisioning", description: "Setting up Agent" },
+  { number: 5, label: "Demo Ready!", description: "Test your Agent" },
 ] as const;
 
 /**
@@ -198,7 +198,7 @@ export const ERROR_MESSAGES = {
   CARD_ELEMENT_NOT_FOUND: "Card element not found. Please refresh the page.",
   PAYMENT_FAILED: "Payment failed. Please check your card details.",
   TRIAL_CREATION_FAILED: "Trial creation failed. Please try again.",
-  PROVISIONING_FAILED: "Failed to set up your AI receptionist. Please contact support.",
+  PROVISIONING_FAILED: "Failed to set up your RingSnap Agent. Please contact support.",
   NETWORK_ERROR: "Network error. Please check your connection.",
   VALIDATION_ERROR: "Please complete all required fields correctly.",
   TERMS_NOT_ACCEPTED: "Please accept the terms of service to continue.",
@@ -209,7 +209,7 @@ export const ERROR_MESSAGES = {
  * Success messages
  */
 export const SUCCESS_MESSAGES = {
-  ACCOUNT_ACTIVATED: "Account activated! Setting up AI receptionist...",
-  PROVISIONING_COMPLETE: "Your AI receptionist is ready!",
+  ACCOUNT_ACTIVATED: "Account activated! Setting up RingSnap Agent...",
+  PROVISIONING_COMPLETE: "Your RingSnap Agent is ready!",
   PAYMENT_VERIFIED: "Payment method verified successfully.",
 } as const;

@@ -39,8 +39,8 @@ export function ReferralShareInterface({ referralCode, accountId }: ReferralShar
   };
 
   const shareViaEmail = () => {
-    const subject = "Get $25 off RingSnap AI Phone Service!";
-    const body = `Hey! I'm using RingSnap to never miss another customer call, and I thought you might like it too.\n\nUse my referral link to get $25 off your first month:\n${referralLink}\n\nThey have AI receptionists that answer 24/7, book appointments, and handle customer questions automatically. Pretty cool!\n\nLet me know if you have any questions about it.`;
+    const subject = "Get $25 off RingSnap Phone Service!";
+    const body = `Hey! I'm using RingSnap to never miss another customer call, and I thought you might like it too.\n\nUse my referral link to get $25 off your first month:\n${referralLink}\n\nThey have virtual receptionists that answer 24/7, book appointments, and handle customer questions automatically. Pretty cool!\n\nLet me know if you have any questions about it.`;
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 

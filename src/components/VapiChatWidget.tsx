@@ -110,7 +110,7 @@ export function VapiChatWidget() {
 
     const config = RILEY_CONFIG[widgetMode];
     // Remount only on context change (Auth or Mode switch)
-    const modeKey = `${!!widgetContext.accountId ? "in" : "out"}:${widgetMode}`;
+    const modeKey = `${widgetContext.accountId ? "in" : "out"}:${widgetMode}`;
 
     // Check environment variables specifically
     if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
@@ -185,7 +185,7 @@ export function VapiChatWidget() {
                         // Log messages for debug but don't spam Sentry
                     }}
 
-                    // @ts-ignore - web-component props
+                    // @ts-expect-error - web-component props
                     requireConsent="true"
                     termsContent="By chatting, you agree to our [Privacy Policy](/privacy) and [Terms of Service](/terms)."
                     localStorageKey="ringsnap_vapi_consent"

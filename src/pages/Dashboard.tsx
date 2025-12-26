@@ -246,7 +246,7 @@ export default function Dashboard() {
           }`}>
           {accountStatus.provisioning_status?.startsWith("failed")
             ? "We hit a snag setting up your assistant. Please check your email for next steps."
-            : "Setting up your AI Assistant... (This may take a few minutes)"}
+            : "Setting up your RingSnap Agent... (This may take a few minutes)"}
         </div>
       )}
 

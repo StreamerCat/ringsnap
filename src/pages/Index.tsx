@@ -28,8 +28,8 @@ const Index = () => {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "RingSnap - AI Answering Service for Contractors",
-    "description": "Human-sounding AI receptionist that answers calls 24/7, books jobs automatically, and connects with customers warmly. Made for plumbers, HVAC, electrical, and roofing contractors.",
+    "name": "RingSnap - Virtual Receptionist for Contractors",
+    "description": "Human-sounding virtual receptionist that answers calls 24/7, books jobs automatically, and connects with customers warmly. Made for plumbers, HVAC, electrical, and roofing contractors.",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "offers": [
@@ -82,14 +82,14 @@ const Index = () => {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "RingSnap",
-    "alternateName": "RingSnap AI Answering Service",
-    "description": "AI answering service built for contractors. Never miss a call, book more jobs.",
+    "alternateName": "RingSnap Answering Service",
+    "description": "Virtual answering service built for contractors. Never miss a call, book more jobs.",
     "url": "https://www.getringsnap.com",
     "logo": "https://www.getringsnap.com/assets/RS_logo_color.svg",
     "slogan": "Built to book jobs",
     "contactPoint": {
       "@type": "ContactPoint",
-      "telephone": "+1-800-AI-CALLS",
+      "telephone": "+1-800-555-0199",
       "contactType": "customer support",
       "availableLanguage": ["English", "Spanish"]
     }
@@ -116,7 +116,7 @@ const Index = () => {
         "name": "Will it sound like a robot?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. Our AI uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
+          "text": "No. Our system uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
         }
       },
       {
@@ -124,7 +124,7 @@ const Index = () => {
         "name": "What if it's a gas leak or electrical fire?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The AI provides full context of the situation before transfer so you know exactly what you're walking into."
+          "text": "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The system provides full context of the situation before transfer so you know exactly what you're walking into."
         }
       },
       {
@@ -132,7 +132,7 @@ const Index = () => {
         "name": "Can it handle Spanish-speaking customers?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Professional and Growth plans include multi-language support. The AI seamlessly switches between English and Spanish based on the customer's preference."
+          "text": "Yes. Professional and Growth plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference."
         }
       },
       {
@@ -140,7 +140,7 @@ const Index = () => {
         "name": "Do I need to change my phone number?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. You keep your existing phone number. Setup takes about 10 minutes—just forward your number to your AI receptionist."
+          "text": "No. You keep your existing phone number. Setup takes about 10 minutes—just forward your number to your RingSnap Agent."
         }
       }
     ]
@@ -149,19 +149,19 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>RingSnap: AI that Answers Like a Human | 24/7 Call Service for Contractors</title>
+        <title>RingSnap: The 24/7 Virtual Receptionist for Contractors</title>
         <meta
           name="description"
-          content="Never miss a call. Book jobs 24/7. RingSnap's AI receptionist answers in under 1 second with professional call handling. Try free for 3 days."
+          content="Never miss a call. Book jobs 24/7. RingSnap's virtual receptionist answers in under 1 second with professional call handling. Try free for 3 days."
         />
         <meta
           name="keywords"
-          content="AI answering service, contractor receptionist, human-sounding AI, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, AI voice agent, warm AI assistant"
+          content="virtual answering service, contractor receptionist, human-sounding receptionist, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, voice agent, virtual assistant"
         />
         <link rel="canonical" href="https://www.getringsnap.com/" />
 
         {/* Open Graph */}
-        <meta property="og:title" content="RingSnap: AI that Answers Like a Human" />
+        <meta property="og:title" content="RingSnap: The 24/7 Virtual Receptionist" />
         <meta property="og:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.getringsnap.com/" />
@@ -169,7 +169,7 @@ const Index = () => {
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="RingSnap: AI that Answers Like a Human" />
+        <meta name="twitter:title" content="RingSnap: The 24/7 Virtual Receptionist" />
         <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
         <meta name="twitter:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
 

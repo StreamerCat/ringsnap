@@ -12,19 +12,19 @@ const Pricing = () => {
     return (
         <>
             <Helmet>
-                <title>Pricing | RingSnap AI Answering Service for Contractors</title>
+                <title>Pricing | RingSnap Virtual Answering Service for Contractors</title>
                 <meta
                     name="description"
-                    content="Simple, transparent pricing for RingSnap AI answering service. Starting at $297/month. No setup fees. No per-agent fees. 3-day free trial. Cancel anytime."
+                    content="Simple, transparent pricing for RingSnap virtual answering service. Starting at $297/month. No setup fees. No per-agent fees. 3-day free trial. Cancel anytime."
                 />
                 <link rel="canonical" href="https://www.getringsnap.com/pricing" />
-                <meta property="og:title" content="Pricing | RingSnap AI Answering Service" />
+                <meta property="og:title" content="Pricing | RingSnap Virtual Answering Service" />
                 <meta property="og:description" content="Simple pricing. No per-agent fees. Starting at $297/month with a 3-day free trial." />
                 <meta property="og:type" content="website" />
                 <meta property="og:url" content="https://www.getringsnap.com/pricing" />
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content="Pricing | RingSnap" />
-                <meta name="twitter:description" content="AI answering service pricing. No setup fees. Cancel anytime." />
+                <meta name="twitter:description" content="Virtual receptionist pricing. No setup fees. Cancel anytime." />
             </Helmet>
 
             <SiteHeader />

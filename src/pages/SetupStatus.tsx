@@ -175,7 +175,7 @@ export default function SetupStatus() {
               </div>
               <CardTitle className="text-2xl">Setting Up Your Assistant</CardTitle>
               <CardDescription>
-                We're provisioning your phone number and configuring your AI assistant.
+                We're provisioning your phone number and configuring your RingSnap Agent.
                 This usually takes under a minute.
               </CardDescription>
             </>
@@ -188,7 +188,7 @@ export default function SetupStatus() {
               </div>
               <CardTitle className="text-2xl">Your Assistant is Ready!</CardTitle>
               <CardDescription>
-                {companyName && `${companyName}'s AI assistant is now active and ready to take calls.`}
+                {companyName && `${companyName}'s RingSnap Agent is now active and ready to take calls.`}
               </CardDescription>
             </>
           )}
@@ -200,7 +200,7 @@ export default function SetupStatus() {
               </div>
               <CardTitle className="text-2xl">Setup Failed</CardTitle>
               <CardDescription>
-                We encountered an issue while setting up your assistant.
+                We encountered an issue while setting up your Agent.
                 This is usually temporary. Please try again.
               </CardDescription>
             </>
@@ -220,12 +220,12 @@ export default function SetupStatus() {
           {onboardingStatus === "active" && phoneNumber && (
             <div className="bg-muted rounded-lg p-6 text-center">
               <Phone className="h-8 w-8 mx-auto mb-3 text-primary" />
-              <p className="text-sm text-muted-foreground mb-2">Your AI Phone Number</p>
+              <p className="text-sm text-muted-foreground mb-2">Your Business Line</p>
               <p className="text-3xl font-bold tracking-tight">
                 {formatPhoneNumber(phoneNumber)}
               </p>
               <p className="text-sm text-muted-foreground mt-4">
-                Share this number with your customers. Your AI assistant will answer calls 24/7.
+                Share this number with your customers. Your Agent will answer calls 24/7.
               </p>
             </div>
           )}
@@ -283,7 +283,7 @@ export default function SetupStatus() {
           {onboardingStatus === "provisioning" && (
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                This page will automatically update when your assistant is ready.
+                This page will automatically update when your Agent is ready.
               </p>
             </div>
           )}

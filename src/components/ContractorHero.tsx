@@ -23,20 +23,20 @@ export const ContractorHero = () => {
 
         {/* Left Column */}
         <div>
-          
+
 
           <div className="space-y-8">
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold" style={{}}>
+            <h1 className="text-h1">
               Stop Missing Calls. Start Booking Jobs.
             </h1>
 
             <div className="space-y-4">
-              <p className="text-2xl sm:text-3xl leading-tight font-bold" style={{
+              <h2 className="text-h3" style={{
                 color: 'hsl(var(--charcoal) / 0.9)'
               }}>
                 24/7 Call Coverage for Home Service Teams
-              </p>
-              <p className="text-lg sm:text-xl leading-relaxed font-secondary" style={{
+              </h2>
+              <p className="text-body-default text-lg sm:text-xl" style={{
                 color: 'hsl(var(--charcoal) / 0.7)'
               }}>
                 Answers fast, qualifies the caller, books the appointment, or escalates urgent jobs. You control the rules and see exactly what happened on every call.
