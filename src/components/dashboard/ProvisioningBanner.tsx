@@ -24,7 +24,8 @@ export function ProvisioningBanner({ account }: ProvisioningBannerProps) {
 
     // Check if provisioning is actually complete
     // PRIMARY: provisioning_status is the source of truth
-    const isFullyProvisioned = account.provisioning_status === 'completed';
+    // We also accept 'active' as completed (set by standalone provision_number job)
+    const isFullyProvisioned = account.provisioning_status === 'completed' || account.provisioning_status === 'active';
 
     // Only show banner if provisioning is NOT complete
     const shouldShow = !isFullyProvisioned;
