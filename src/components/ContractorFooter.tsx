@@ -1,5 +1,5 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Phone, Mail, MapPin, Shield } from "lucide-react";
+import { Phone } from "lucide-react";
 export const ContractorFooter = () => {
   const faqs = [{
     question: "Will it sound like a robot?",
@@ -32,10 +32,10 @@ export const ContractorFooter = () => {
       href: "#solution"
     }, {
       label: "Pricing",
-      href: "#pricing"
+      href: "/pricing"
     }, {
-      label: "Demo",
-      href: "#demo"
+      label: "The Difference",
+      href: "/difference"
     }, {
       label: "ROI Calculator",
       href: "#calculator"
@@ -48,31 +48,12 @@ export const ContractorFooter = () => {
       href: "/hvac"
     }, {
       label: "For Electricians",
-      href: "/electrical"
+      href: "/electricians"
     }, {
       label: "For Roofing",
       href: "/roofing"
     }],
-    resources: [{
-      label: "Blog",
-      href: "/blog"
-    }, {
-      label: "Case Studies",
-      href: "/case-studies"
-    }, {
-      label: "Documentation",
-      href: "/docs"
-    }, {
-      label: "Support",
-      href: "/support"
-    }],
     company: [{
-      label: "About",
-      href: "/about"
-    }, {
-      label: "Contact",
-      href: "/contact"
-    }, {
       label: "Privacy Policy",
       href: "/privacy"
     }, {
@@ -99,9 +80,9 @@ export const ContractorFooter = () => {
     {/* Footer Links */}
     <div className="border-t">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid md:grid-cols-5 gap-8 mb-12">
+        <div className="grid md:grid-cols-4 gap-8 mb-12">
           {/* Brand Column */}
-          <div className="md:col-span-1 space-y-4">
+          <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 gradient-core rounded-lg flex items-center justify-center">
                 <Phone className="w-4 h-4 text-white" />
@@ -111,10 +92,6 @@ export const ContractorFooter = () => {
             <p className="text-sm text-foreground/60 font-secondary">
               Built to book jobs and protect your time.
             </p>
-            <div className="space-y-2 text-sm text-muted-foreground">
-
-
-            </div>
           </div>
 
           {/* Product Links */}
@@ -141,21 +118,9 @@ export const ContractorFooter = () => {
             </ul>
           </div>
 
-          {/* Resources */}
+          {/* Legal */}
           <div>
-            <h3 className="font-semibold mb-4">Resources</h3>
-            <ul className="space-y-2">
-              {footerLinks.resources.map((link, index) => <li key={index}>
-                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                  {link.label}
-                </a>
-              </li>)}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <h3 className="font-semibold mb-4">Company</h3>
+            <h3 className="font-semibold mb-4">Legal</h3>
             <ul className="space-y-2">
               {footerLinks.company.map((link, index) => <li key={index}>
                 <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
