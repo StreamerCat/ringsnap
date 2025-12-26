@@ -26,6 +26,7 @@ BEGIN
       last_call_at IS NULL 
       OR last_call_at < (now() - p_min_silence_interval)
     )
+    AND (is_reserved IS FALSE) -- Ensure we never allocate reserved numbers
   ORDER BY 
     released_at ASC NULLS FIRST -- Prefer numbers waiting longest
   LIMIT 1
