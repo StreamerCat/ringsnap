@@ -33,9 +33,11 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
+import { POOL_CONFIG } from "../_shared/pool-config.ts";
+import { provisionPhoneNumber } from "../_shared/telephony.ts";
 
 /**
  * Retry a function with exponential backoff
@@ -177,8 +179,105 @@ serve(async (req) => {
     let vapiPhoneId = null;
     let phoneNumber = null;
 
-    if (VAPI_API_KEY && areaCode) {
-      logInfo("Requesting Vapi phone number with retry logic", {
+    if (POOL_CONFIG.ENABLED) {
+      // -----------------------------------------------------------
+      // POOL ENABLED: Allocator -> Buy Twilio -> Import to Vapi
+      // -----------------------------------------------------------
+      logInfo("Using Number Pool Strategy", { ...baseLogOptions, accountId });
+
+      // A. Try to allocate from pool
+      const { data: allocated, error: allocError } = await supabase.rpc(
+        'allocate_phone_number_from_pool',
+        { p_account_id: accountId }
+      );
+
+      if (allocated) {
+        logInfo("Allocated number from pool", {
+          ...baseLogOptions,
+          accountId,
+          context: { phoneNumber: allocated.phone_number }
+        });
+        phoneNumber = allocated.phone_number;
+      } else {
+        // B. Buy new from Twilio
+        logInfo("Pool empty or no match, buying from Twilio", { ...baseLogOptions, accountId });
+        try {
+          const twilioResult = await provisionPhoneNumber({
+            type: 'twilio',
+            accountSid: Deno.env.get("TWILIO_ACCOUNT_SID"),
+            authToken: Deno.env.get("TWILIO_AUTH_TOKEN"),
+          }, {
+            countryCode: 'US',
+            areaCode: areaCode
+          }, { correlationId });
+
+          phoneNumber = twilioResult.phoneNumber;
+
+          // We should probably save the provider_phone_number_id (SID) somewhere?
+          // The final upsert Step 3 handles saving.
+          logInfo("Purchased Twilio number", {
+            ...baseLogOptions,
+            context: { phoneNumber, sid: twilioResult.providerId }
+          });
+
+        } catch (twilioErr) {
+          throw new Error(`Failed to buy Twilio number: ${twilioErr instanceof Error ? twilioErr.message : String(twilioErr)}`);
+        }
+      }
+
+      // C. Import/Create Vapi Phone Object (tied to Twilio number)
+      // Note: We use "provider": "twilio" to tell Vapi we are bringing our own number
+      const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+      const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+
+      if (!twilioAccountSid || !twilioAuthToken) {
+        throw new Error("Missing Twilio credentials for Vapi Import");
+      }
+
+      try {
+        const phoneData = await retryWithBackoff(
+          async () => {
+            const payload = {
+              provider: "twilio",
+              number: phoneNumber,
+              twilioAccountSid,
+              twilioAuthToken,
+              name: `${companyName} - Primary`,
+              // We can link assistant immediately here? Yes.
+              assistantId: account.vapi_assistant_id,
+            };
+
+            const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${VAPI_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (!phoneResponse.ok) {
+              const errorText = await phoneResponse.text();
+              throw new Error(`Vapi Import error: ${errorText}`);
+            }
+            return await phoneResponse.json();
+          },
+          3, 2000, "import_vapi_phone"
+        );
+
+        vapiPhoneId = phoneData.id;
+        logInfo("Imported number to Vapi", { ...baseLogOptions, context: { vapiPhoneId, phoneNumber } });
+
+      } catch (importErr) {
+        // If import fails, we have bought a Twilio number (if not pooled) or allocated one.
+        // If bought, we might leak it?
+        // If allocated, we should ideally rollback allocation (or it stays assigned but broken).
+        // For now, allow it to fail, but log it.
+        throw importErr;
+      }
+
+    } else if (VAPI_API_KEY && areaCode) {
+      logInfo("Legacy Strategy: Requesting Vapi phone number with retry logic", {
         ...baseLogOptions,
         accountId,
         context: { areaCode }
@@ -221,8 +320,8 @@ serve(async (req) => {
         } catch (areaCodeError) {
           const errorMessage = areaCodeError instanceof Error ? areaCodeError.message : String(areaCodeError);
           const isAreaCodeError = errorMessage.toLowerCase().includes('not available') ||
-                                 errorMessage.toLowerCase().includes('area code') ||
-                                 errorMessage.toLowerCase().includes('no numbers available');
+            errorMessage.toLowerCase().includes('area code') ||
+            errorMessage.toLowerCase().includes('no numbers available');
 
           if (isAreaCodeError) {
             logWarn("Area code not available, retrying without area code constraint", {

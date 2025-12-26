@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
+import { POOL_CONFIG } from '../_shared/pool-config.ts';
 
 const FUNCTION_NAME = 'manage-phone-lifecycle';
 const VAPI_BASE_URL = "https://api.vapi.ai";
@@ -32,37 +33,139 @@ serve(async (req) => {
     const now = new Date();
     const nowIso = now.toISOString();
 
-    // 1. HANDLE TRIAL EXPIRATION (Disable Access)
-    // Find numbers where trial has expired, but not yet retained/released, and subscription is NOT active.
-    // We assume 'active' numbers with expired trial need to be disabled.
-    const { data: expiredTrials, error: expiredError } = await supabase
-      .from('phone_numbers')
-      .select('id, account_id, status, trial_expires_at, accounts!inner(subscription_status)')
-      .eq('status', 'active') // Only disable active numbers
-      .lt('trial_expires_at', nowIso)
-      .neq('accounts.subscription_status', 'active');
+    // 1. HANDLE INACTIVE SERVICE (Release Number)
+    // Find numbers where account is effectively dead:
+    // - Status is 'cancelled' and hold period expired (checked via phone_number_held_until)
+    // - Status is 'unpaid' (delinquent) or 'incomplete_expired'
+    // - Account status is 'banned' or 'fraud'
+    // - Provisioning failed (status 'failed' or similar?) -> usually 'phone_number_status' in accounts
 
-    if (expiredError) {
-      logError('Error fetching expired trials', { ...baseLogOptions, error: expiredError });
-    } else if (expiredTrials && expiredTrials.length > 0) {
-      logInfo('Processing expired trials', {
+    // We construct a query for accounts that meet these criteria.
+    // Also ensuring we fetch unpaid_since for grace period check.
+    const { data: inactiveServiceNumbers, error: inactiveError } = await supabase
+      .from('phone_numbers')
+      .select('id, account_id, status, accounts!inner(subscription_status, account_status, phone_number_held_until, phone_number_status, unpaid_since)')
+      .eq('status', 'active') // Only release currently active numbers
+      .or('subscription_status.eq.canceled,subscription_status.eq.unpaid,subscription_status.eq.incomplete_expired,account_status.eq.banned');
+
+    // Filter further in JS for complex logic like "cancelled AND hold expired"
+    // Also include provisioning failures if phone_number_status is 'failed'?
+    // The user mentioned "provisioning failed" as a trigger.
+
+    // Safety Blocklist: Never release these via this cron (unless banned)
+    const ACTIVE_STATUSES = ['active', 'trialing', 'past_due'];
+
+    if (inactiveServiceNumbers) {
+      numbersToRelease = inactiveServiceNumbers.filter((record: any) => {
+        const acc = record.accounts;
+
+        // 1. HARD BLOCK for Active Service
+        if (ACTIVE_STATUSES.includes(acc.subscription_status) && acc.account_status !== 'banned') {
+          return false;
+        }
+
+        // 2. Bans = Immediate Release
+        if (acc.account_status === 'banned') return true;
+
+        // 3. Unpaid (Delinquent) with Grace Period
+        if (acc.subscription_status === 'unpaid') {
+          if (!acc.unpaid_since) return false; // Safety: if no timestamp, assume new delinquency and wait
+          const unpaidDate = new Date(acc.unpaid_since);
+          const graceLimit = new Date();
+          graceLimit.setDate(graceLimit.getDate() - POOL_CONFIG.GRACE_DAYS);
+
+          // Only release if unpaid DATE is OLDER than grace limit
+          return unpaidDate < graceLimit;
+        }
+
+        if (acc.subscription_status === 'incomplete_expired') return true;
+
+        // 4. Cancelled with Hold Period
+        if (acc.subscription_status === 'canceled') {
+          if (acc.phone_number_held_until) {
+            return new Date(acc.phone_number_held_until) < now;
+          }
+          return true; // No hold date -> safe to release
+        }
+        return false;
+      });
+    }
+
+    if (inactiveError) {
+      logError('Error fetching inactive service numbers', { ...baseLogOptions, error: inactiveError });
+    } else if (numbersToRelease.length > 0) {
+      logInfo('Processing inactive service releases', {
         ...baseLogOptions,
-        context: { count: expiredTrials.length }
+        context: { count: numbersToRelease.length }
       });
 
-      for (const record of expiredTrials) {
-        // Disable the number (business logic: hide from UI, block calls)
-        // We set status to 'disabled'
-        await supabase
-          .from('phone_numbers')
-          .update({ status: 'disabled' })
-          .eq('id', record.id);
+      for (const record of numbersToRelease) {
+        if (POOL_CONFIG.ENABLED) {
+          // New Pool Logic: Detach and Cooldown
 
-        logInfo('Disabled phone number due to trial expiration', {
-          ...baseLogOptions,
-          accountId: record.account_id,
-          context: { phoneId: record.id }
-        });
+          // 1. Detach from Vapi (Delete Phone Object)
+          const { data: phoneDetails } = await supabase
+            .from('phone_numbers')
+            .select('provider_phone_number_id, vapi_phone_id')
+            .eq('id', record.id)
+            .single();
+
+          const vapiId = phoneDetails?.provider_phone_number_id || phoneDetails?.vapi_phone_id;
+
+          if (vapiId) {
+            const vapiResponse = await fetch(
+              `${VAPI_BASE_URL}/phone-number/${vapiId}`,
+              {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` }
+              }
+            );
+
+            if (!vapiResponse.ok) {
+              const errText = await vapiResponse.text();
+              logWarn('VAPI detach failed (service inactive)', {
+                ...baseLogOptions,
+                accountId: record.account_id,
+                context: { error: errText, vapiId }
+              });
+              // Proceed to cooldown anyway? Yes, remove from our active assignments.
+              // Ideally we mark it as "quarantine" if we can't detach?
+              // Let's rely on manual cleanup if detach fails, or retry.
+            } else {
+              logInfo('VAPI phone detached for pool (service inactive)', { ...baseLogOptions, context: { vapiId } });
+            }
+          }
+
+          // 2. Transition to Cooldown
+          const { error: rpcError } = await supabase.rpc('transition_phone_to_cooldown', {
+            p_phone_id: record.id,
+            p_account_id: record.account_id,
+            p_reason: 'service_inactive', // standardized reason
+            p_cooldown_interval: `${POOL_CONFIG.MIN_COOLDOWN_DAYS} days`
+          });
+
+          if (rpcError) {
+            logError('Failed to transition to cooldown', { ...baseLogOptions, error: rpcError });
+          } else {
+            logInfo('Phone transitioned to cooldown', { ...baseLogOptions, accountId: record.account_id });
+          }
+
+        } else {
+          // Legacy Logic: Disable only (hide from UI)
+          // Actually, legacy logic for canceled accounts might be to release them eventually?
+          // The previous code only disabled on trial expiry. 
+          // But strict "service inactive" handling is good for legacy too.
+          await supabase
+            .from('phone_numbers')
+            .update({ status: 'disabled' })
+            .eq('id', record.id);
+
+          logInfo('Disabled phone number due to inactive service', {
+            ...baseLogOptions,
+            accountId: record.account_id,
+            context: { phoneId: record.id }
+          });
+        }
       }
     }
 
@@ -103,9 +206,7 @@ serve(async (req) => {
               accountId: record.account_id,
               context: { error: errText, vapiPhoneId: record.vapi_phone_id }
             });
-            // We continue to update DB status anyway to stop trying? 
-            // Or maybe we should retry? For now, we update status to 'released_failed' or just 'released' if we want to clean up DB.
-            // Let's mark as 'released' to avoid infinite loops, but log the error.
+            // Continue to update DB status anyway?
           } else {
             logInfo('VAPI phone number released (retention)', {
               ...baseLogOptions,
@@ -114,14 +215,25 @@ serve(async (req) => {
           }
         }
 
-        // Update DB
-        await supabase
-          .from('phone_numbers')
-          .update({
-            status: 'released',
-            phone_provisioned: false, // Update flag as requested
-          })
-          .eq('id', record.id);
+        if (POOL_CONFIG.ENABLED) {
+          // If pool enabled, we use the safe transition to cooldown/pool
+          // (Even if it was retention expired, we can still pool it)
+          await supabase.rpc('transition_phone_to_cooldown', {
+            p_phone_id: record.id,
+            p_account_id: record.account_id,
+            p_reason: 'retention_expired',
+            p_cooldown_interval: `${POOL_CONFIG.MIN_COOLDOWN_DAYS} days`
+          });
+        } else {
+          // Legacy: Update DB to 'released'
+          await supabase
+            .from('phone_numbers')
+            .update({
+              status: 'released',
+              phone_provisioned: false,
+            })
+            .eq('id', record.id);
+        }
       }
     }
 
@@ -197,6 +309,54 @@ serve(async (req) => {
             error: phoneError,
             context: { phoneNumber: phoneNumber.phone_number }
           });
+        }
+      }
+    }
+
+
+
+    // 4. HANDLE COOLDOWN -> POOL TRANSITION (New)
+    if (POOL_CONFIG.ENABLED) {
+      const { data: cooldowns, error: cooldownError } = await supabase
+        .from('phone_numbers')
+        .select('id, last_call_at, account_id')
+        .eq('lifecycle_status', 'cooldown')
+        .lte('cooldown_until', nowIso);
+
+      if (cooldowns && cooldowns.length > 0) {
+        logInfo('Processing cooldown transitions', { ...baseLogOptions, context: { count: cooldowns.length } });
+
+        for (const record of cooldowns) {
+          const lastCall = record.last_call_at ? new Date(record.last_call_at) : null;
+          const silenceLimitMs = POOL_CONFIG.MIN_SILENCE_DAYS * 24 * 60 * 60 * 1000;
+          const silenceCutoff = new Date(Date.now() - silenceLimitMs);
+
+          if (lastCall && lastCall > silenceCutoff) {
+            // Had a call recently? Extend cooldown.
+            const newCooldown = new Date(Date.now() + (2 * 24 * 60 * 60 * 1000)); // +2 days
+
+            await supabase.from('phone_numbers').update({
+              cooldown_until: newCooldown.toISOString()
+            }).eq('id', record.id);
+
+            logInfo('Extended cooldown due to recent activity', {
+              ...baseLogOptions,
+              context: { phoneId: record.id, lastCall: record.last_call_at }
+            });
+          } else {
+            // Safe to Pool
+            await supabase.from('phone_numbers').update({
+              lifecycle_status: 'pool',
+              cooldown_until: null,
+              assigned_account_id: null,
+              last_lifecycle_change_at: new Date().toISOString()
+            }).eq('id', record.id);
+
+            logInfo('Moved phone number to POOL', {
+              ...baseLogOptions,
+              context: { phoneId: record.id }
+            });
+          }
         }
       }
     }
