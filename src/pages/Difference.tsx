@@ -6,9 +6,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RingSnapCallToCashInteractive } from "@/components/marketing/RingSnapCallToCashInteractive";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Phone, PhoneCall, CheckCircle2, Clock, Star, Settings, FileText, Users, Brain, Briefcase, MessageSquare, ArrowRight, Shield } from "lucide-react";
+import { Phone, PhoneCall, CheckCircle2, Clock, Star, Settings, Users, Briefcase, MessageSquare, ArrowRight, Shield } from "lucide-react";
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({
     default: m.ContractorTestimonials
 })));
@@ -301,9 +299,7 @@ const Difference = () => {
                             <p className="text-sm text-muted-foreground mb-6">
                                 Transparent pricing. No setup fees. Cancel anytime.
                             </p>
-                            <Button variant="gradient" className="rounded-full px-8" onClick={() => document.getElementById('pricing')?.scrollIntoView({
-                                behavior: 'smooth'
-                            })}>
+                            <Button variant="gradient" className="rounded-full px-8" onClick={() => navigate('/pricing')}>
                                 See Pricing <ArrowRight className="ml-2 w-4 h-4" />
                             </Button>
                         </CardContent>
@@ -311,62 +307,7 @@ const Difference = () => {
                 </div>
             </section>
 
-            {/* SECTION 9: FAQ */}
-            <section className="section-spacer bg-background">
-                <div className="container mx-auto px-4 max-w-3xl">
-                    <div className="text-center mb-10">
-                        <h2 className="text-h2 mb-4">Questions contractors ask before they switch</h2>
-                    </div>
 
-                    <Accordion type="single" collapsible className="space-y-3">
-                        <AccordionItem value="natural" className="border rounded-xl px-6">
-                            <AccordionTrigger className="text-left font-semibold py-4">
-                                Will it sound natural to callers?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-muted-foreground pb-4">
-                                RingSnap is designed to speak calmly, clearly, and professionally, like a trained receptionist.
-                            </AccordionContent>
-                        </AccordionItem>
-
-                        <AccordionItem value="process" className="border rounded-xl px-6">
-                            <AccordionTrigger className="text-left font-semibold py-4">
-                                Can it follow our exact process?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-muted-foreground pb-4">
-                                Yes. You set the rules. RingSnap executes them consistently.
-                            </AccordionContent>
-                        </AccordionItem>
-
-                        <AccordionItem value="after-hours" className="border rounded-xl px-6">
-                            <AccordionTrigger className="text-left font-semibold py-4">
-                                What happens after hours?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-muted-foreground pb-4">
-                                RingSnap answers 24/7 and follows your after hours rules for booking, routing, and emergencies.
-                            </AccordionContent>
-                        </AccordionItem>
-
-                        <AccordionItem value="cant-answer" className="border rounded-xl px-6">
-                            <AccordionTrigger className="text-left font-semibold py-4">
-                                What if it can't answer something?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-muted-foreground pb-4">
-                                It collects the right details, sets expectations, and transfers or escalates based on your rules.
-                            </AccordionContent>
-                        </AccordionItem>
-
-                        <AccordionItem value="improving" className="border rounded-xl px-6">
-                            <AccordionTrigger className="text-left font-semibold py-4">
-                                How does it keep improving?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-muted-foreground pb-4">
-                                It turns calls into structured learning: what callers asked, what objections showed up,
-                                what worked, and what happened. That improves talk tracks and routing over time.
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </div>
-            </section>
 
             {/* SECTION 10: Final CTA */}
             <section className="section-spacer bg-gradient-to-br from-cream/30 to-off-white">

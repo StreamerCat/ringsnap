@@ -5,9 +5,9 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { DollarSign, TrendingUp, AlertTriangle, PhoneCall, ArrowRight, Sparkles, ShieldCheck, Clock3, CheckCircle2, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, PhoneCall, ArrowRight, Sparkles, ShieldCheck, Clock3, CheckCircle2, Download } from "lucide-react";
 type CalculatorState = {
   calls: number;
   answerRate: number;
@@ -106,7 +106,7 @@ export const CallValueCalculator = ({
   const [selectedPreset, setSelectedPreset] = useState<keyof typeof tradePresets>(getPresetKey(preselectedTrade));
   const [email, setEmail] = useState("");
   const [formState, setFormState] = useState<"idle" | "submitted">("idle");
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+
   const [inputs, dispatch] = useReducer(calculatorReducer, tradePresets[selectedPreset].defaults, defaults => ({
     ...defaults
   }));
@@ -297,7 +297,7 @@ export const CallValueCalculator = ({
               <Badge variant="secondary" className="border border-primary/10 bg-primary/10 text-primary">
                 60-second ROI snapshot
               </Badge>
-              <span>Pick the preset that mirrors your job mix to preload benchmarks.</span>
+              <span>Select your trade to see typical call patterns.</span>
             </div>
             <ToggleGroup type="single" value={selectedPreset} onValueChange={value => value && handlePresetClick(value as keyof typeof tradePresets)} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {(Object.keys(tradePresets) as (keyof typeof tradePresets)[]).map(presetKey => {
@@ -345,74 +345,57 @@ export const CallValueCalculator = ({
 
 
 
-              <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-                <div className="flex flex-col sm:flex-row gap-3.5 items-start sm:items-center justify-between rounded-2xl border border-dashed border-slate-200 bg-white p-4">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-700">Using {tradePresets[selectedPreset].label} benchmarks</div>
-                    <p className="text-xs text-muted-foreground">Dial in the math—every tweak updates the ROI story immediately.</p>
-                  </div>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="outline" size="sm" className="shrink-0 mt-2 sm:mt-0">
-                      {isAdvancedOpen ? (
-                        <>
-                          <ChevronUp className="h-4 w-4 mr-2" />
-                          Hide Controls
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4 mr-2" />
-                          Show Controls
-                        </>
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
+              {/* Slider Controls - Always Visible */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-6">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-700">Adjust your numbers</p>
+                  <p className="text-xs text-muted-foreground">Every tweak updates the ROI story immediately.</p>
                 </div>
-                <CollapsibleContent forceMount>
-                  <div className="mt-6 grid gap-6">
-                    <div className="grid gap-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                          <PhoneCall className="h-4 w-4 text-primary" />
-                          Monthly inbound calls
-                        </Label>
-                        <span className="text-sm font-semibold text-slate-700">{numberFormatter.format(inputs.calls)} calls</span>
-                      </div>
-                      <Slider value={[inputs.calls]} onValueChange={handleSliderChange("calls")} min={40} max={600} step={10} />
-                      <p className="text-xs text-muted-foreground">
-                        Benchmark: top-quartile crews field 150-280 inbound requests per month across Google and referrals.
-                      </p>
-                    </div>
 
-                    <div className="grid gap-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                          % answered live
-                        </Label>
-                        <span className="text-sm font-semibold text-slate-700">{inputs.answerRate}%</span>
-                      </div>
-                      <Slider value={[inputs.answerRate]} onValueChange={handleSliderChange("answerRate")} min={20} max={100} step={1} />
-                      <p className="text-xs text-muted-foreground">
-                        Every 10% drop in live answer rate leaks {numberFormatter.format(Math.round(inputs.calls * 0.1))} high-intent callers who usually hire whoever picked up first.
-                      </p>
+                <div className="grid gap-6">
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <PhoneCall className="h-4 w-4 text-primary" />
+                        Monthly inbound calls
+                      </Label>
+                      <span className="text-sm font-semibold text-slate-700">{numberFormatter.format(inputs.calls)} calls</span>
                     </div>
-
-                    <div className="grid gap-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                          <DollarSign className="h-4 w-4 text-primary" />
-                          Average ticket value
-                        </Label>
-                        <span className="text-sm font-semibold text-slate-700">${numberFormatter.format(inputs.jobValue)}</span>
-                      </div>
-                      <Slider value={[inputs.jobValue]} onValueChange={handleSliderChange("jobValue")} min={400} max={3500} step={50} />
-                      <p className="text-xs text-muted-foreground">
-                        Each unanswered call walks with roughly ${numberFormatter.format(inputs.jobValue)} in {tradePresets[selectedPreset].label.toLowerCase()} revenue you already paid to generate.
-                      </p>
-                    </div>
+                    <Slider value={[inputs.calls]} onValueChange={handleSliderChange("calls")} min={40} max={600} step={10} />
+                    <p className="text-xs text-muted-foreground">
+                      Top-quartile crews field 150-280 inbound requests per month across Google and referrals.
+                    </p>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
+
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        % answered live
+                      </Label>
+                      <span className="text-sm font-semibold text-slate-700">{inputs.answerRate}%</span>
+                    </div>
+                    <Slider value={[inputs.answerRate]} onValueChange={handleSliderChange("answerRate")} min={20} max={100} step={1} />
+                    <p className="text-xs text-muted-foreground">
+                      Every 10% drop in live answer rate leaks {numberFormatter.format(Math.round(inputs.calls * 0.1))} high-intent callers who usually hire whoever picked up first.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                        Average ticket value
+                      </Label>
+                      <span className="text-sm font-semibold text-slate-700">${numberFormatter.format(inputs.jobValue)}</span>
+                    </div>
+                    <Slider value={[inputs.jobValue]} onValueChange={handleSliderChange("jobValue")} min={400} max={3500} step={50} />
+                    <p className="text-xs text-muted-foreground">
+                      Each unanswered call walks with roughly ${numberFormatter.format(inputs.jobValue)} in {tradePresets[selectedPreset].label.toLowerCase()} revenue you already paid to generate.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="flex flex-col justify-center lg:self-center">
               {renderResultsCard()}
