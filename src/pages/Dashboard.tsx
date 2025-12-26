@@ -126,7 +126,7 @@ export default function Dashboard() {
       return account;
     },
     enabled: !!userId,
-    refetchInterval: (query) => (query.state.data?.provisioning_status === "completed" ? false : 5000), // Poll if not complete
+    refetchInterval: (query) => (query.state.data?.provisioning_status === "completed" || query.state.data?.provisioning_status === "active" ? false : 5000), // Poll if not complete
   });
 
   const salesRepOptions = useMemo(() => {
@@ -239,7 +239,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-12">
       {/* Provisioning Status Banner */}
-      {accountStatus && accountStatus.provisioning_status !== "completed" && (
+      {accountStatus && accountStatus.provisioning_status !== "completed" && accountStatus.provisioning_status !== "active" && (
         <div className={`w-full p-4 text-center text-sm font-medium ${accountStatus.provisioning_status?.startsWith("failed")
           ? "bg-red-100 text-red-800 border-b border-red-200"
           : "bg-blue-50 text-blue-800 border-b border-blue-200"

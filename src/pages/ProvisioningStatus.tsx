@@ -111,7 +111,8 @@ export default function ProvisioningStatus() {
                         setElapsedTime(currentElapsed);
 
                         // PRIMARY: provisioning_status is the source of truth
-                        const statusCompleted = account.provisioning_status === "completed";
+                        // We also accept 'active' as completed (set by standalone provision_number job)
+                        const statusCompleted = account.provisioning_status === "completed" || account.provisioning_status === "active";
 
                         if (statusCompleted) {
                             // If phone number is on account, use it; otherwise fetch from phone_numbers

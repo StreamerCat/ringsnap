@@ -268,7 +268,7 @@ export default function Onboarding() {
         .eq('id', account?.id)
         .single();
 
-      if (updatedAccount?.provisioning_status === 'completed') {
+      if (updatedAccount?.provisioning_status === 'completed' || updatedAccount?.provisioning_status === 'active') {
         clearInterval(pollInterval);
         dlog("Provisioning completed", updatedAccount.id);
         toast.success("Your account is ready!");

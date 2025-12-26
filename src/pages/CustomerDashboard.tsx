@@ -114,7 +114,7 @@ export default function CustomerDashboard() {
       // We poll if not completed or if it looks like we are waiting for something. 
       // Checking 'completed' is the main thing.
       // Also check if vapi_phone_number is missing.
-      const shouldPoll = account.provisioning_status !== 'completed' || !account.vapi_phone_number;
+      const shouldPoll = (account.provisioning_status !== 'completed' && account.provisioning_status !== 'active') || !account.vapi_phone_number;
 
       if (shouldPoll) {
         pollingInterval = setInterval(async () => {
