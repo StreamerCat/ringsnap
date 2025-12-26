@@ -24,8 +24,8 @@ export default function Terms() {
   return (
     <>
       <Helmet>
-        <title>Terms of Service | RingSnap AI</title>
-        <meta name="description" content="Terms of Service for RingSnap AI platform" />
+        <title>Terms of Service | RingSnap</title>
+        <meta name="description" content="Terms of Service for RingSnap platform" />
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -62,7 +62,7 @@ export default function Terms() {
             <section id="intro" className="scroll-mt-20">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Introduction</h2>
               <p className="text-gray-700 leading-relaxed">
-                Welcome to RingSnap AI. These Terms of Service govern your access to and use of the RingSnap website at getringsnap.com and all related services. By using the Service you agree to these Terms and to the Privacy Policy. If you do not agree you must not use the Service.
+                Welcome to RingSnap. These Terms of Service govern your access to and use of the RingSnap website at getringsnap.com and all related services. By using the Service you agree to these Terms and to the Privacy Policy. If you do not agree you must not use the Service.
               </p>
             </section>
 
@@ -122,7 +122,7 @@ export default function Terms() {
             <section id="ip" className="scroll-mt-20">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Intellectual Property</h2>
               <p className="text-gray-700 leading-relaxed">
-                The Service and all related materials are owned by RingSnap AI or its licensors. No ownership rights are transferred to you. You retain ownership of data you submit to the Service. You grant RingSnap a limited license to process that data only as needed to provide and improve the Service.
+                The Service and all related materials are owned by RingSnap or its licensors. No ownership rights are transferred to you. You retain ownership of data you submit to the Service. You grant RingSnap a limited license to process that data only as needed to provide and improve the Service.
               </p>
             </section>
 
@@ -162,7 +162,7 @@ export default function Terms() {
             <section id="indemnity" className="scroll-mt-20">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Indemnification</h2>
               <p className="text-gray-700 leading-relaxed">
-                You will indemnify and hold harmless RingSnap AI and its affiliates from any claims and expenses arising from your use of the Service or your violation of these Terms.
+                You will indemnify and hold harmless RingSnap and its affiliates from any claims and expenses arising from your use of the Service or your violation of these Terms.
               </p>
             </section>
 
@@ -194,7 +194,7 @@ export default function Terms() {
             <section id="contact" className="scroll-mt-20">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">15. Contact</h2>
               <p className="text-gray-700 leading-relaxed">
-                RingSnap AI<br />
+                RingSnap<br />
                 Email: <a href="mailto:support@getringsnap.com" className="text-[#D97757] hover:underline">support@getringsnap.com</a>
               </p>
             </section>
@@ -202,7 +202,7 @@ export default function Terms() {
             {/* Footer */}
             <hr className="my-8 border-gray-200" />
             <p className="text-sm text-gray-600">
-              Legal entity: RingSnap AI, incorporated in Delaware, USA.
+              Legal entity: RingSnap, incorporated in Delaware, USA.
             </p>
           </main>
         </div>

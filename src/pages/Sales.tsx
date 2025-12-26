@@ -59,7 +59,7 @@ export default function Sales() {
     // Footer
     doc.setFontSize(10);
     doc.setTextColor(128, 128, 128);
-    doc.text('RingSnap - AI Receptionist for Contractors', pageWidth / 2, 280, { align: 'center' });
+    doc.text('RingSnap - Virtual Receptionist for Contractors', pageWidth / 2, 280, { align: 'center' });
     doc.text('www.getringsnap.com', pageWidth / 2, 287, { align: 'center' });
 
     // Save
@@ -98,7 +98,7 @@ export default function Sales() {
                 Experience RingSnap Live
               </h1>
               <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                See how our AI receptionist handles calls 24/7, captures every lead, and helps contractors never miss an opportunity.
+                See how our Virtual Receptionist handles calls 24/7, captures every lead, and helps contractors never miss an opportunity.
               </p>
               <div className="pt-4">
                 <Button

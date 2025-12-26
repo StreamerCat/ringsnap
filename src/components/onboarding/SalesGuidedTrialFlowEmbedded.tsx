@@ -176,7 +176,7 @@ export function SalesGuidedTrialFlowEmbedded({
       // Success - move to provisioning
       setAccountId(data.account_id);
       setCurrentStep(4);
-      toast.success("Account activated! Setting up AI receptionist...");
+      toast.success("Account activated! Setting up Agent...");
     } catch (error) {
       console.error("Sales signup error:", error);
       toast.error(error instanceof Error ? error.message : "Signup failed");
@@ -376,7 +376,7 @@ export function SalesGuidedTrialFlowEmbedded({
                 className="w-full"
               >
                 <Phone className="mr-2 h-5 w-5" />
-                Call Their AI Receptionist Now
+                Call Their Agent Now
               </Button>
 
               <Button
@@ -390,7 +390,7 @@ export function SalesGuidedTrialFlowEmbedded({
 
             <div className="mt-6 p-4 bg-green-50 dark:bg-green-950 rounded-lg">
               <p className="text-sm text-green-900 dark:text-green-100 text-center">
-                Next step: Have the customer call the number above to experience their AI receptionist
+                Next step: Have the customer call the number above to experience their Voice Agent
               </p>
             </div>
           </CardContent>

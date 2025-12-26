@@ -162,7 +162,7 @@ export function BusinessBasicsForm({
                 />
               </FormControl>
               <FormDescription>
-                We'll use this to personalize your AI assistant
+                We'll use this to personalize your Agent
               </FormDescription>
               <FormMessage />
             </FormItem>

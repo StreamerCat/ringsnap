@@ -407,7 +407,7 @@ export default function Onboarding() {
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${phoneNumber ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
                     {phoneNumber ? <Check className="h-5 w-5" /> : <Loader2 className="h-4 w-4 animate-spin" />}
                   </div>
-                  <span className="text-sm font-medium">Configuring AI assistant</span>
+                  <span className="text-sm font-medium">Configuring Agent</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${assistant ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
@@ -430,7 +430,7 @@ export default function Onboarding() {
               Welcome to RingSnap! 🎉
             </CardTitle>
             <CardDescription className="text-base sm:text-lg">
-              Your AI phone assistant is {phoneNumber ? 'ready' : 'being set up'}
+              Your Voice Agent is {phoneNumber ? 'ready' : 'being set up'}
             </CardDescription>
             {account?.subscription_status === 'trial' && (
               <div className="inline-block bg-primary/10 text-primary px-4 py-2 rounded-full font-semibold mt-4">
@@ -454,10 +454,10 @@ export default function Onboarding() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Phone className="h-6 w-6 text-green-600" />
-                Test Your AI Assistant
+                Test Your Voice Agent
               </CardTitle>
               <CardDescription className="text-base">
-                Call your RingSnap number to hear your {assistant?.voice_gender || 'AI'} assistant in action
+                Call your RingSnap number to hear your {assistant?.voice_gender || 'Voice'} Agent in action
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -472,7 +472,7 @@ export default function Onboarding() {
                 </a>
               </Button>
               <p className="text-xs text-center text-muted-foreground mt-3">
-                The call will be answered by your AI assistant just like a real customer call
+                The call will be answered by your Voice Agent just like a real customer call
               </p>
             </CardContent>
           </Card>
@@ -527,13 +527,13 @@ export default function Onboarding() {
                 ) : (
                   <UserCircle2 className="h-5 w-5 text-primary" />
                 )}
-                Your AI Assistant
+                Your Voice Agent
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-lg font-semibold">{assistant.name || 'AI Assistant'}</p>
+                  <p className="text-lg font-semibold">{assistant.name || 'RingSnap Agent'}</p>
                   <p className="text-sm text-muted-foreground capitalize">
                     {assistant.voice_gender} Voice
                   </p>
@@ -582,12 +582,12 @@ export default function Onboarding() {
               <TestTube className="h-8 w-8 text-primary mb-2" />
               <CardTitle>2. Test a Call</CardTitle>
               <CardDescription>
-                Call your business line to hear your AI assistant in action
+                Call your business line to hear your Voice Agent in action
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                The AI will answer professionally and capture lead information automatically.
+                The Agent will answer professionally and capture lead information automatically.
               </p>
               {phoneNumber && (
                 <Button variant="outline" size="sm" asChild className="w-full">
@@ -610,7 +610,7 @@ export default function Onboarding() {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Access your dashboard to personalize your AI assistant's behavior.
+                Access your dashboard to personalize your Agent's behavior.
               </p>
               <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/dashboard')}>
                 Go to Dashboard

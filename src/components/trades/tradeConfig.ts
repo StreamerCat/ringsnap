@@ -56,7 +56,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     icon: "🔧",
     hero: {
       headline: "Stop Bleeding $6,800/Month in Missed Plumbing Calls",
-      subheadline: "The AI Receptionist That Captures Every Emergency Call—And Books Them While You're Under the Sink",
+      subheadline: "The Agent That Captures Every Emergency Call—And Books Them While You're Under the Sink",
       transcriptBusiness: "Summit Plumbing",
       transcriptScenario: {
         ai1: "Thanks for calling Summit Plumbing. How can I help?",
@@ -88,7 +88,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "We went from missing 40% of calls to capturing 98%. Emergency AND routine calls—all handled. That's an extra $23,400 in monthly revenue. The AI paid for itself in 3 days.",
+        quote: "We went from missing 40% of calls to capturing 98%. Emergency AND routine calls—all handled. That's an extra $23,400 in monthly revenue. The Agent paid for itself in 3 days.",
         name: "Tommy Chen",
         business: "Tommy's Plumbing",
         location: "Austin, TX",
@@ -97,7 +97,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "TC"
       },
       {
-        quote: "I used to lose sleep worrying about midnight emergency calls. Now the AI handles it—gives them DIY safety tips, books the job, and only wakes me if it's life-threatening. My close rate jumped from 61% to 94%.",
+        quote: "I used to lose sleep worrying about midnight emergency calls. Now RingSnap handles it—gives them DIY safety tips, books the job, and only wakes me if it's life-threatening. My close rate jumped from 61% to 94%.",
         name: "Marcus Williams",
         business: "Rapid Response Plumbing",
         location: "Seattle, WA",
@@ -106,7 +106,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "MW"
       },
       {
-        quote: "The AI books 14 jobs per week while I'm working. It handles quote requests, emergency triage, and appointment scheduling. My revenue is up 38% and I haven't hired a single person.",
+        quote: "RingSnap books 14 jobs per week while I'm working. It handles quote requests, emergency triage, and appointment scheduling. My revenue is up 38% and I haven't hired a single person.",
         name: "Lisa Rodriguez",
         business: "Rodriguez Plumbing & Drain",
         location: "Miami, FL",
@@ -121,9 +121,9 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "61%"
     },
     seo: {
-      title: "AI Answering Service for Plumbers | Never Miss Another Emergency Call",
-      description: "Stop losing $6,800/month to unanswered calls. RingSnap's AI receptionist answers in under 1 second, handles emergencies, and books jobs 24/7. Made for plumbers who never want to miss a call.",
-      keywords: "plumber answering service, plumbing call service, emergency plumber calls, AI for plumbers, plumbing receptionist, 24/7 plumber phone, burst pipe calls, after hours plumbing",
+      title: "Virtual Answering Service for Plumbers | Never Miss Another Emergency Call",
+      description: "Stop losing $6,800/month to unanswered calls. RingSnap's Voice Agent answers in under 1 second, handles emergencies, and books jobs 24/7. Made for plumbers who never want to miss a call.",
+      keywords: "plumber answering service, plumbing call service, emergency plumber calls, virtual receptionist for plumbers, plumbing receptionist, 24/7 plumber phone, burst pipe calls, after hours plumbing",
       canonical: "https://www.getringsnap.com/plumbers"
     }
   },
@@ -135,7 +135,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     icon: "❄️",
     hero: {
       headline: "Your HVAC Business Loses $8,200/Month When the Phone Rings and No One Answers",
-      subheadline: "The AI That Captures Emergency Breakdowns AND Maintenance Calls—While You're in the Attic",
+      subheadline: "The Agent That Captures Emergency Breakdowns AND Maintenance Calls—While You're in the Attic",
       transcriptBusiness: "Arctic Heating & Cooling",
       transcriptScenario: {
         ai1: "Thanks for calling Arctic Heating & Cooling. How can I help?",
@@ -167,7 +167,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "HVAC emergencies AND quote requests come in around the clock. AI captured $31,000 worth of calls in the first month alone—both emergency repairs and scheduled maintenance.",
+        quote: "HVAC emergencies AND quote requests come in around the clock. RingSnap captured $31,000 worth of calls in the first month alone—both emergency repairs and scheduled maintenance.",
         name: "Sarah Martinez",
         business: "Arctic Heating & Cooling",
         location: "Denver, CO",
@@ -176,7 +176,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "SM"
       },
       {
-        quote: "Summer breakdowns are chaos. The AI triages emergency vs routine, books both, and only escalates life-threatening situations. Our emergency revenue jumped 43% while I maintained the same crew size.",
+        quote: "Summer breakdowns are chaos. The Agent triages emergency vs routine, books both, and only escalates life-threatening situations. Our emergency revenue jumped 43% while I maintained the same crew size.",
         name: "David Kim",
         business: "Comfort Zone HVAC",
         location: "Phoenix, AZ",
@@ -185,7 +185,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "DK"
       },
       {
-        quote: "We used to lose maintenance contract opportunities because no one answered during install jobs. Now the AI captures every inquiry. We signed 89 new maintenance contracts in 3 months.",
+        quote: "We used to lose maintenance contract opportunities because no one answered during install jobs. Now RingSnap captures every inquiry. We signed 89 new maintenance contracts in 3 months.",
         name: "Jennifer Walsh",
         business: "Premier Climate Control",
         location: "Dallas, TX",
@@ -200,8 +200,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "58%"
     },
     seo: {
-      title: "AI Answering Service for HVAC Contractors | Capture Every Emergency Call",
-      description: "Stop losing $8,200/month to missed calls. RingSnap's AI handles AC breakdowns, furnace emergencies, and maintenance calls 24/7. Answers in under 1 second. Sounds human.",
+      title: "Virtual Answering Service for HVAC Contractors | Capture Every Emergency Call",
+      description: "Stop losing $8,200/month to missed calls. RingSnap handles AC breakdowns, furnace emergencies, and maintenance calls 24/7. Answers in under 1 second. Sounds human.",
       keywords: "HVAC answering service, AC repair calls, furnace emergency service, HVAC receptionist, 24/7 HVAC calls, air conditioning answering service, heating repair calls",
       canonical: "https://www.getringsnap.com/hvac"
     }
@@ -214,7 +214,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     icon: "⚡",
     hero: {
       headline: "Electricians: You're Losing $7,400/Month Because You Can't Answer While Working Hot",
-      subheadline: "The AI Receptionist That Books Emergency Calls AND Quotes—Even When You're in a Panel Box",
+      subheadline: "The Agent That Books Emergency Calls AND Quotes—Even When You're in a Panel Box",
       transcriptBusiness: "Bolt Electric",
       transcriptScenario: {
         ai1: "Thanks for calling Bolt Electric. How can I help?",
@@ -246,7 +246,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "I'm always on a ladder or in a panel box. AI books 127 calls monthly while I work—emergencies get routed immediately, routine calls get scheduled. My competitors are still missing calls.",
+        quote: "I'm always on a ladder or in a panel box. RingSnap books 127 calls monthly while I work—emergencies get routed immediately, routine calls get scheduled. My competitors are still missing calls.",
         name: "Mike Johnson",
         business: "Bolt Electric",
         location: "Phoenix, AZ",
@@ -255,7 +255,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "MJ"
       },
       {
-        quote: "The AI handles emergency triage perfectly. It knows when to dispatch immediately (sparking panel) vs schedule next-day (outlet replacement). Our emergency close rate went from 54% to 91%.",
+        quote: "The Agent handles emergency triage perfectly. It knows when to dispatch immediately (sparking panel) vs schedule next-day (outlet replacement). Our emergency close rate went from 54% to 91%.",
         name: "Rachel Adams",
         business: "Current Solutions Electric",
         location: "Atlanta, GA",
@@ -264,7 +264,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "RA"
       },
       {
-        quote: "Quote requests used to die in voicemail. Now the AI captures every one—even at 10 PM when someone's planning a kitchen remodel. We book 47% more quote appointments than before.",
+        quote: "Quote requests used to die in voicemail. Now RingSnap captures every one—even at 10 PM when someone's planning a kitchen remodel. We book 47% more quote appointments than before.",
         name: "James Park",
         business: "Park Electrical Services",
         location: "Portland, OR",
@@ -279,8 +279,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "64%"
     },
     seo: {
-      title: "AI Answering Service for Electricians | Never Miss Emergency or Quote Calls",
-      description: "Stop losing $7,400/month to unanswered calls. RingSnap's AI answers in under 1 second, triages electrical emergencies, and books jobs 24/7. Made for electricians who work hot.",
+      title: "Virtual Answering Service for Electricians | Never Miss Emergency or Quote Calls",
+      description: "Stop losing $7,400/month to unanswered calls. RingSnap answers in under 1 second, triages electrical emergencies, and books jobs 24/7. Made for electricians who work hot.",
       keywords: "electrician answering service, electrical emergency calls, panel upgrade quotes, electrician receptionist, 24/7 electrical service, sparking panel calls, electrical fire emergency",
       canonical: "https://www.getringsnap.com/electricians"
     }
@@ -293,7 +293,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     icon: "🏠",
     hero: {
       headline: "Roofing Contractors: Storm Season Brings $12K+ in Calls You're Missing on the Roof",
-      subheadline: "The AI That Captures Emergency Leak Calls AND Inspection Requests—While You're 30 Feet Up",
+      subheadline: "The Agent That Captures Emergency Leak Calls AND Inspection Requests—While You're 30 Feet Up",
       transcriptBusiness: "Summit Roofing & Repair",
       transcriptScenario: {
         ai1: "Thanks for calling Summit Roofing. How can I help?",
@@ -325,7 +325,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "After every storm, my phone explodes. The AI handles emergency leaks, insurance claims, and inspection bookings simultaneously. Last month it captured $47,000 in storm damage work I would've missed.",
+        quote: "After every storm, my phone explodes. The Agent handles emergency leaks, insurance claims, and inspection bookings simultaneously. Last month it captured $47,000 in storm damage work I would've missed.",
         name: "Carlos Mendez",
         business: "Mendez Roofing Solutions",
         location: "Houston, TX",
@@ -334,7 +334,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "CM"
       },
       {
-        quote: "Insurance restoration is timing-sensitive. The AI books inspections instantly while homeowners are motivated. Our inspection booking rate went from 38% to 84%. That's 3x more roofs we're quoting.",
+        quote: "Insurance restoration is timing-sensitive. The Agent books inspections instantly while homeowners are motivated. Our inspection booking rate went from 38% to 84%. That's 3x more roofs we're quoting.",
         name: "Amanda Foster",
         business: "Summit Roofing & Repair",
         location: "Tampa, FL",
@@ -343,7 +343,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
         avatar: "AF"
       },
       {
-        quote: "Seasonal roofing means we're slammed 6 months and slow 6 months. The AI captures every call year-round. We book 214 inspections monthly now vs 89 before. Revenue is up 52%.",
+        quote: "Seasonal roofing means we're slammed 6 months and slow 6 months. RIngSnap captures every call year-round. We book 214 inspections monthly now vs 89 before. Revenue is up 52%.",
         name: "Robert Chen",
         business: "Peak Performance Roofing",
         location: "Nashville, TN",
@@ -358,8 +358,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "45%"
     },
     seo: {
-      title: "AI Answering Service for Roofers | Capture Every Storm Damage & Leak Call",
-      description: "Stop losing $12,000/month in storm season. RingSnap's AI answers in under 1 second, books emergency leak repairs and inspections 24/7. Made for roofing contractors.",
+      title: "Virtual Answering Service for Roofers | Capture Every Storm Damage & Leak Call",
+      description: "Stop losing $12,000/month in storm season. RingSnap answers in under 1 second, books emergency leak repairs and inspections 24/7. Made for roofing contractors.",
       keywords: "roofing answering service, roof leak emergency, storm damage calls, roofing receptionist, 24/7 roofer calls, roof inspection booking, insurance claim calls",
       canonical: "https://www.getringsnap.com/roofing"
     }

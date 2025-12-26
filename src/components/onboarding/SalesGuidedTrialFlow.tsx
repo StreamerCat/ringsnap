@@ -36,7 +36,7 @@ const salesSchema = z.object({
   serviceArea: z.string().min(1, "Service area required"),
   zipCode: z.string().regex(/^\d{5}$/, "ZIP must be 5 digits"),
 
-  // AI config
+  // Agent config
   assistantGender: z.enum(["male", "female"]).default("female"),
 
   // Sales tracking
@@ -181,7 +181,7 @@ export function SalesGuidedTrialFlow({
       // Success - move to provisioning
       setAccountId(data.account_id);
       setCurrentStep(4);
-      toast.success("Account activated! Setting up AI receptionist...");
+      toast.success("Account activated! Setting up RingSnap Agent...");
     } catch (error) {
       console.error("Sales signup error:", error);
       toast.error(error instanceof Error ? error.message : "Signup failed");
@@ -205,204 +205,204 @@ export function SalesGuidedTrialFlow({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="space-y-6">
-      {/* Step 1: Combined Form */}
-      {currentStep === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>New Customer Setup</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Customer Info */}
-                  <div>
-                    <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
-                      Customer Information
-                    </h3>
-                    <UserInfoForm
-                      form={form}
-                      requiredFields={["name", "email", "phone"]}
-                      showLabels={false}
-                      compact={true}
-                    />
+          {/* Step 1: Combined Form */}
+          {currentStep === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>New Customer Setup</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Customer Info */}
+                      <div>
+                        <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
+                          Customer Information
+                        </h3>
+                        <UserInfoForm
+                          form={form}
+                          requiredFields={["name", "email", "phone"]}
+                          showLabels={false}
+                          compact={true}
+                        />
+                      </div>
+
+                      {/* Business Info */}
+                      <div>
+                        <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
+                          Business Information
+                        </h3>
+                        <BusinessBasicsForm
+                          form={form}
+                          requiredFields={["companyName", "trade", "serviceArea", "zipCode"]}
+                          showOptionalBadges={false}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Voice Selection */}
+                      <div>
+                        <VoiceSelector
+                          form={form}
+                          showSamples={false}
+                          layout="vertical"
+                        />
+                      </div>
+
+                      {/* Sales Rep */}
+                      <div>
+                        <FormField
+                          control={form.control}
+                          name="salesRepName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sales Rep *</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Your name" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button onClick={handleNext} size="lg">
+                        Continue to Plan Selection
+                      </Button>
+                    </div>
                   </div>
+                </Form>
+              </CardContent>
+            </Card>
+          )}
 
-                  {/* Business Info */}
-                  <div>
-                    <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
-                      Business Information
-                    </h3>
-                    <BusinessBasicsForm
-                      form={form}
-                      requiredFields={["companyName", "trade", "serviceArea", "zipCode"]}
-                      showOptionalBadges={false}
-                    />
+          {/* Step 2: Plan Selection */}
+          {currentStep === 2 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Select Plan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <PlanSelector
+                    form={form}
+                    variant="compact"
+                    highlight="professional"
+                  />
+                  <div className="flex justify-between gap-2 mt-6">
+                    <Button variant="outline" onClick={handleBack}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button onClick={handleNext}>Continue to Payment</Button>
                   </div>
-                </div>
+                </Form>
+              </CardContent>
+            </Card>
+          )}
 
-                <Separator />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Voice Selection */}
-                  <div>
-                    <VoiceSelector
-                      form={form}
-                      showSamples={false}
-                      layout="vertical"
-                    />
-                  </div>
-
-                  {/* Sales Rep */}
-                  <div>
-                    <FormField
-                      control={form.control}
-                      name="salesRepName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Sales Rep *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Your name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={handleNext} size="lg">
-                    Continue to Plan Selection
+          {/* Step 3: Payment */}
+          {currentStep === 3 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PaymentForm
+                  onCardChange={(complete, error) => {
+                    setCardComplete(complete);
+                    setCardError(error);
+                  }}
+                  showTerms={false} // Rep handles verbally
+                />
+                {cardError && (
+                  <p className="text-sm text-destructive mt-2">{cardError}</p>
+                )}
+                <div className="flex justify-between gap-2 mt-6">
+                  <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleNext}
+                    disabled={!cardComplete || isSubmitting}
+                    size="lg"
+                  >
+                    {isSubmitting ? "Processing..." : "Activate Account"}
                   </Button>
                 </div>
-              </div>
-            </Form>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Step 2: Plan Selection */}
-      {currentStep === 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Plan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <PlanSelector
-                form={form}
-                variant="compact"
-                highlight="professional"
-              />
-              <div className="flex justify-between gap-2 mt-6">
-                <Button variant="outline" onClick={handleBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={handleNext}>Continue to Payment</Button>
-              </div>
-            </Form>
-          </CardContent>
-        </Card>
-      )}
+          {/* Step 4: Provisioning */}
+          {currentStep === 4 && accountId && (
+            <Card>
+              <CardContent className="py-12">
+                <ProvisioningStatus
+                  accountId={accountId}
+                  onComplete={(phone) => {
+                    setPhoneNumber(phone);
+                    setCurrentStep(5);
+                  }}
+                  showProgress={true}
+                  pollingInterval={2000} // Faster polling for sales
+                />
+                <div className="mt-8 text-center">
+                  <div className="inline-block bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                      💡 <strong>Perfect time to:</strong> Explain call forwarding to the customer
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Step 3: Payment */}
-      {currentStep === 3 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PaymentForm
-              onCardChange={(complete, error) => {
-                setCardComplete(complete);
-                setCardError(error);
-              }}
-              showTerms={false} // Rep handles verbally
-            />
-            {cardError && (
-              <p className="text-sm text-destructive mt-2">{cardError}</p>
-            )}
-            <div className="flex justify-between gap-2 mt-6">
-              <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                onClick={handleNext}
-                disabled={!cardComplete || isSubmitting}
-                size="lg"
-              >
-                {isSubmitting ? "Processing..." : "Activate Account"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Step 5: Phone Ready - Demo Time! */}
+          {currentStep === 5 && phoneNumber && (
+            <Card>
+              <CardContent className="py-8">
+                <PhoneReadyPanel
+                  phoneNumber={phoneNumber}
+                  onTestCall={handleTestCall}
+                  showForwardingInstructions={true}
+                  variant="minimal"
+                />
 
-      {/* Step 4: Provisioning */}
-      {currentStep === 4 && accountId && (
-        <Card>
-          <CardContent className="py-12">
-            <ProvisioningStatus
-              accountId={accountId}
-              onComplete={(phone) => {
-                setPhoneNumber(phone);
-                setCurrentStep(5);
-              }}
-              showProgress={true}
-              pollingInterval={2000} // Faster polling for sales
-            />
-            <div className="mt-8 text-center">
-              <div className="inline-block bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  💡 <strong>Perfect time to:</strong> Explain call forwarding to the customer
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <div className="mt-8 space-y-3">
+                  <Button
+                    onClick={handleTestCall}
+                    size="lg"
+                    className="w-full"
+                  >
+                    <Phone className="mr-2 h-5 w-5" />
+                    Call Their Agent Now
+                  </Button>
 
-      {/* Step 5: Phone Ready - Demo Time! */}
-      {currentStep === 5 && phoneNumber && (
-        <Card>
-          <CardContent className="py-8">
-            <PhoneReadyPanel
-              phoneNumber={phoneNumber}
-              onTestCall={handleTestCall}
-              showForwardingInstructions={true}
-              variant="minimal"
-            />
+                  <Button
+                    onClick={handleViewDashboard}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Complete Setup
+                  </Button>
+                </div>
 
-            <div className="mt-8 space-y-3">
-              <Button
-                onClick={handleTestCall}
-                size="lg"
-                className="w-full"
-              >
-                <Phone className="mr-2 h-5 w-5" />
-                Call Their AI Receptionist Now
-              </Button>
-
-              <Button
-                onClick={handleViewDashboard}
-                variant="outline"
-                className="w-full"
-              >
-                Complete Setup
-              </Button>
-            </div>
-
-            <div className="mt-6 p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-              <p className="text-sm text-green-900 dark:text-green-100 text-center">
-                ✅ <strong>Next step:</strong> Have the customer call the number above to experience their AI receptionist
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <div className="mt-6 p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                  <p className="text-sm text-green-900 dark:text-green-100 text-center">
+                    ✅ <strong>Next step:</strong> Have the customer call the number above to experience their Voice Agent
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -22,8 +22,8 @@ export default function Privacy() {
   return (
     <>
       <Helmet>
-        <title>Privacy Policy | RingSnap AI</title>
-        <meta name="description" content="Privacy Policy for RingSnap AI platform" />
+        <title>Privacy Policy | RingSnap</title>
+        <meta name="description" content="Privacy Policy for RingSnap platform" />
         <meta name="robots" content="noindex" />
       </Helmet>
 
@@ -60,7 +60,7 @@ export default function Privacy() {
             <section id="intro" className="scroll-mt-20">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Introduction</h2>
               <p className="text-gray-700 leading-relaxed">
-                RingSnap AI values your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard personal information when you visit getringsnap.com or use our services.
+                RingSnap values your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard personal information when you visit getringsnap.com or use our services.
               </p>
             </section>
 
@@ -187,7 +187,7 @@ export default function Privacy() {
             <section id="contact" className="scroll-mt-20">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">13. Contact</h2>
               <p className="text-gray-700 leading-relaxed">
-                RingSnap AI<br />
+                RingSnap<br />
                 Email: <a href="mailto:support@getringsnap.com" className="text-[#D97757] hover:underline">support@getringsnap.com</a>
               </p>
             </section>
@@ -195,7 +195,7 @@ export default function Privacy() {
             {/* Footer */}
             <hr className="my-8 border-gray-200" />
             <p className="text-sm text-gray-600">
-              Legal entity: RingSnap AI, incorporated in Delaware, USA.
+              Legal entity: RingSnap, incorporated in Delaware, USA.
             </p>
           </main>
         </div>

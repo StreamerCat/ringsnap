@@ -1,5 +1,5 @@
 /**
- * STEP 2: AI Chat Onboarding (Two-Step Signup Flow)
+ * STEP 2: Agent Chat Onboarding (Two-Step Signup Flow)
  *
  * This component handles the full chat-based onboarding flow:
  * - For NEW users (with lead_id from Step 1): Collects all info + payment
@@ -123,7 +123,7 @@ const PLANS = [
     name: "Starter",
     price: 297,
     calls: "~80 calls/mo",
-    features: ["AI phone receptionist", "Call forwarding", "24/7 availability", "Email support"],
+    features: ["Virtual receptionist", "Call forwarding", "24/7 availability", "Email support"],
   },
   {
     value: "professional" as const,
@@ -410,7 +410,7 @@ function OnboardingChatInner() {
         const userName = lead.full_name?.split(" ")[0] || "there";
         addMessage(
           "assistant",
-          `Hi ${userName}! I'm here to get your AI receptionist set up in just a few minutes. Ready to never miss another call?`
+          `Hi ${userName}! I'm here to get your RingSnap Agent set up in just a few minutes. Ready to never miss another call?`
         );
 
         await showTypingDelay(1000);
@@ -444,7 +444,7 @@ function OnboardingChatInner() {
       await showTypingDelay();
       addMessage(
         "assistant",
-        "No problem! I'll walk you through everything step by step. You'll have a dedicated AI phone number that answers calls 24/7, books appointments, and never misses a lead. Ready to get started?"
+        "No problem! I'll walk you through everything step by step. You'll have a dedicated business line that answers calls 24/7, books appointments, and never misses a lead. Ready to get started?"
       );
     }
 
@@ -470,7 +470,7 @@ function OnboardingChatInner() {
     if (value === "faq_human") {
       addMessage("user", "Is it a real person?");
       await showTypingDelay();
-      addMessage("assistant", "It's an advanced AI that sounds just like a human! It can handle multiple calls at once, never sleeps, and follows your instructions perfectly.");
+      addMessage("assistant", "It's an advanced Voice Agent that sounds just like a human! It can handle multiple calls at once, never sleeps, and follows your instructions perfectly.");
       return;
     }
 
@@ -544,7 +544,7 @@ function OnboardingChatInner() {
     await showTypingDelay();
     addMessage(
       "assistant",
-      "Do you have a website? (This helps me personalize your AI - you can skip if you don't have one)"
+      "Do you have a website? (This helps me personalize your Agent - you can skip if you don't have one)"
     );
   };
 
@@ -563,7 +563,7 @@ function OnboardingChatInner() {
     await showTypingDelay();
     addMessage(
       "assistant",
-      "Do you have a website? (This helps me personalize your AI - you can skip if you don't have one)"
+      "Do you have a website? (This helps me personalize your Agent - you can skip if you don't have one)"
     );
   };
 
@@ -649,7 +649,7 @@ function OnboardingChatInner() {
     setStep("voice");
     trackCheckpoint("onboarding_hours_collected", { type: value });
     await showTypingDelay();
-    addMessage("assistant", "What voice would you like your AI receptionist to have?");
+    addMessage("assistant", "What voice would you like your RingSnap Agent to have?");
   };
 
   // Handle custom hours
@@ -665,7 +665,7 @@ function OnboardingChatInner() {
 
     setStep("voice");
     await showTypingDelay();
-    addMessage("assistant", "What voice would you like your AI receptionist to have?");
+    addMessage("assistant", "What voice would you like your RingSnap Agent to have?");
   };
 
   // Handle voice selection
@@ -677,7 +677,7 @@ function OnboardingChatInner() {
     setStep("goal");
     trackCheckpoint("onboarding_voice_collected", { gender });
     await showTypingDelay();
-    addMessage("assistant", "What's the main thing you want your AI receptionist to do?");
+    addMessage("assistant", "What's the main thing you want your RingSnap Agent to do?");
   };
 
   // Handle goal selection
@@ -819,7 +819,7 @@ function OnboardingChatInner() {
             // Optional business info
             website: data.website || undefined,
             businessHours: businessHoursStr,
-            // AI configuration
+            // Agent configuration
             assistantGender: data.assistantGender,
             assistantTone: data.assistantTone, // Ensure assistantTone is passed
             primaryGoal: data.primaryGoal || undefined,
@@ -1260,7 +1260,7 @@ function OnboardingChatInner() {
                 <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <span>Setting up your AI receptionist...</span>
+                    <span>Setting up your RingSnap Agent...</span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
@@ -1277,7 +1277,7 @@ function OnboardingChatInner() {
                       ) : (
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                       )}
-                      <span>Creating AI assistant...</span>
+                      <span>Creating Voice Agent...</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       {provisioningStatus === "completed" ? (
@@ -1296,7 +1296,7 @@ function OnboardingChatInner() {
                   <div className="p-6 border-2 border-green-200 rounded-lg bg-green-50 text-center">
                     <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
                     <h3 className="text-xl font-bold text-green-800 mb-2">You're All Set!</h3>
-                    <p className="text-green-700 mb-4">Your AI phone number:</p>
+                    <p className="text-green-700 mb-4">Your RingSnap Number:</p>
                     <div className="bg-white rounded-lg p-4 flex items-center justify-center gap-3">
                       <span className="text-2xl font-bold">{phoneNumber}</span>
                       <Button variant="ghost" size="icon" onClick={copyPhoneNumber}>
@@ -1326,7 +1326,7 @@ function OnboardingChatInner() {
                       Test Your Assistant
                     </h4>
                     <p className="text-sm text-blue-800 mb-3">
-                      Give your new number a call right now to hear your AI receptionist in action!
+                      Give your new number a call right now to hear your automated receptionist in action!
                     </p>
                     <a href={`tel:${phoneNumber}`} className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-md transition-colors">
                       Call {phoneNumber}

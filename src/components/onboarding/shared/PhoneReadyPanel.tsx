@@ -80,7 +80,7 @@ export function PhoneReadyPanel({
         </div>
         {variant === "full" && (
           <p className="text-sm text-muted-foreground">
-            Your AI receptionist is ready to answer calls 24/7
+            Your RingSnap Agent is ready to answer calls 24/7
           </p>
         )}
       </div>
@@ -165,7 +165,7 @@ export function PhoneReadyPanel({
         {onTestCall && (
           <Button onClick={onTestCall} size="lg" className="w-full sm:w-auto">
             <Phone className="mr-2 h-5 w-5" />
-            Call My AI Receptionist
+            Call My RingSnap Agent
           </Button>
         )}
         {onViewDashboard && (
@@ -191,11 +191,11 @@ export function PhoneReadyPanel({
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span>Test your AI receptionist by calling the number above</span>
+                <span>Test your RingSnap Agent by calling the number above</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span>Forward your business line so customers reach your AI</span>
+                <span>Forward your business line so customers reach your Agent</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary">•</span>
@@ -203,7 +203,7 @@ export function PhoneReadyPanel({
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span>Customize your AI's behavior and voice anytime</span>
+                <span>Customize your Agent's behavior and voice anytime</span>
               </li>
             </ul>
           </CardContent>

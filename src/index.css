@@ -9,37 +9,51 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Terracotta Color System */
-    --terracotta: 13 61% 59%;        /* #D97757 Primary */
-    --terracotta-dark: 13 54% 51%;   /* #C4603E Hover state */
-    --charcoal: 200 11% 21%;         /* #2C3639 Secondary */
-    --cream: 36 33% 91%;             /* #F4E8D8 Accent */
-    --off-white: 60 14% 98%;         /* #FAF9F6 Light background */
-    --sage: 150 16% 57%;             /* #88A096 Success/positive */
-    
+    --terracotta: 13 61% 59%;
+    /* #D97757 Primary */
+    --terracotta-dark: 13 54% 51%;
+    /* #C4603E Hover state */
+    --charcoal: 200 11% 21%;
+    /* #2C3639 Secondary */
+    --cream: 36 33% 91%;
+    /* #F4E8D8 Accent */
+    --off-white: 60 14% 98%;
+    /* #FAF9F6 Light background */
+    --sage: 150 16% 57%;
+    /* #88A096 Success/positive */
+
     /* Neutrals - warm and soft */
-    --background: 60 14% 98%;        /* Off-white */
-    --foreground: 200 11% 21%;       /* Charcoal */
-    --soft-gray: 0 0% 93%;           /* #EDEDED */
-    
+    --background: 60 14% 98%;
+    /* Off-white */
+    --foreground: 200 11% 21%;
+    /* Charcoal */
+    --soft-gray: 0 0% 93%;
+    /* #EDEDED */
+
     /* Primary = Terracotta */
     --primary: 13 61% 59%;
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 200 11% 21%;        /* Charcoal */
+
+    --secondary: 200 11% 21%;
+    /* Charcoal */
     --secondary-foreground: 0 0% 100%;
-    
-    --muted: 36 33% 91%;             /* Cream */
+
+    --muted: 36 33% 91%;
+    /* Cream */
     --muted-foreground: 200 11% 40%;
-    
-    --accent: 36 33% 91%;            /* Cream */
+
+    --accent: 36 33% 91%;
+    /* Cream */
     --accent-foreground: 200 11% 21%;
-    
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 200 11% 21%;           /* Charcoal borders */
+
+    --border: 200 11% 21%;
+    /* Charcoal borders */
     --input: 36 33% 85%;
-    --ring: 13 61% 59%;              /* Terracotta */
+    --ring: 13 61% 59%;
+    /* Terracotta */
 
     --radius: 0.5rem;
 
@@ -106,7 +120,10 @@ All colors MUST be HSL.
 
   /* Respect reduced motion preferences */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
@@ -125,33 +142,39 @@ All colors MUST be HSL.
     line-height: 1.6;
     letter-spacing: 0.01em;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.2;
   }
-  
+
   .text-body-secondary {
     font-family: 'IBM Plex Sans', system-ui, sans-serif;
   }
 }
 
 @layer utilities {
+
   /* Fluid Typography */
   .text-fluid-h1 {
     @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl;
   }
-  
+
   .text-fluid-h2 {
     @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl;
   }
-  
+
   .text-fluid-body {
     @apply text-base sm:text-lg md:text-xl;
   }
-  
+
   /* Expressive Typography Scale */
   .text-display {
     font-size: clamp(2.5rem, 5vw + 1rem, 4.5rem);
@@ -159,52 +182,52 @@ All colors MUST be HSL.
     line-height: 1.1;
     letter-spacing: -0.03em;
   }
-  
+
   .text-headline {
     font-size: clamp(1.75rem, 3.5vw + 0.5rem, 3rem);
     font-weight: 700;
     line-height: 1.15;
     letter-spacing: -0.02em;
   }
-  
+
   .text-subhead {
     font-size: clamp(1.25rem, 2vw + 0.5rem, 1.75rem);
     font-weight: 600;
     line-height: 1.3;
   }
-  
+
   /* Metric Typography */
   .text-metric {
     font-family: 'JetBrains Mono', monospace;
     @apply tabular-nums font-semibold;
   }
-  
+
   /* Core Gradients - Now Solid Terracotta */
   .gradient-core {
     background: hsl(var(--terracotta));
   }
-  
+
   .gradient-secondary {
     background: hsl(var(--charcoal));
   }
-  
+
   .gradient-accent {
-    background: linear-gradient(135deg, 
-      hsl(var(--terracotta)) 0%, 
-      hsl(var(--cream)) 100%);
+    background: linear-gradient(135deg,
+        hsl(var(--terracotta)) 0%,
+        hsl(var(--cream)) 100%);
   }
-  
+
   /* Gradient Text - Now Solid Terracotta */
   .text-gradient-core {
     color: hsl(var(--terracotta));
   }
-  
+
   /* Aura Effects (blurred gradient backgrounds) */
   .aura-purple {
     position: relative;
     overflow: hidden;
   }
-  
+
   .aura-purple::before {
     content: '';
     position: absolute;
@@ -212,111 +235,116 @@ All colors MUST be HSL.
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, 
-      hsl(var(--terracotta) / 0.08) 0%, 
-      transparent 70%);
+    background: radial-gradient(circle,
+        hsl(var(--terracotta) / 0.08) 0%,
+        transparent 70%);
     filter: blur(60px);
     z-index: -1;
     contain: paint;
   }
-  
+
   @media (max-width: 768px) {
     .aura-purple::before {
       filter: blur(30px);
     }
   }
-  
+
   /* Soft Hover Glow - Terracotta */
   .hover-glow {
     transition: box-shadow 0.3s ease, transform 0.3s ease;
     will-change: transform;
   }
-  
+
   .hover-glow:hover {
     box-shadow: 0 20px 40px -15px hsl(var(--terracotta) / 0.25);
     transform: translateY(-2px);
   }
-  
+
   /* Mobile Tap Targets - Minimum 44px */
-  button, a, [role="button"] {
+  button,
+  a,
+  [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Elevation System */
   .elevation-1 {
     @apply shadow-sm hover:shadow-md transition-shadow duration-200;
   }
-  
+
   .elevation-2 {
-    @apply shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.15)] transition-shadow duration-200;
+    @apply shadow-[0_4px_16px_-4px_rgba(0, 0, 0, 0.1)] hover:shadow-[0_8px_24px_-6px_rgba(0, 0, 0, 0.15)] transition-shadow duration-200;
   }
-  
+
   .elevation-3 {
-    @apply shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_40px_-12px_rgba(0,0,0,0.2)] transition-shadow duration-200;
+    @apply shadow-[0_10px_30px_-10px_rgba(0, 0, 0, 0.15)] hover:shadow-[0_15px_40px_-12px_rgba(0, 0, 0, 0.2)] transition-shadow duration-200;
   }
-  
+
   .elevation-4 {
-    @apply shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] hover:shadow-[0_25px_60px_-18px_rgba(0,0,0,0.3)] transition-shadow duration-200;
+    @apply shadow-[0_20px_50px_-15px_rgba(0, 0, 0, 0.25)] hover:shadow-[0_25px_60px_-18px_rgba(0, 0, 0, 0.3)] transition-shadow duration-200;
   }
-  
+
   .card-premium {
     @apply elevation-3 rounded-2xl;
   }
-  
+
   .section-divider {
     @apply h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent;
   }
-  
+
   /* Terracotta button hover state */
   .hover\:bg-terracotta-dark:hover {
     background: hsl(var(--terracotta-dark));
   }
-  
+
   /* Pulse Wave Button Animation */
   .btn-pulse {
     @apply relative overflow-hidden;
   }
-  
+
   .btn-pulse::before {
     content: '';
     @apply absolute inset-0 bg-white opacity-0;
     animation: pulseWave 2s ease-out infinite;
   }
-  
+
   @keyframes pulseWave {
     0% {
       transform: scale(0.8);
       opacity: 0.5;
     }
+
     50% {
       transform: scale(1.2);
       opacity: 0;
     }
+
     100% {
       transform: scale(1.2);
       opacity: 0;
     }
   }
-  
+
   /* Revenue Counter Animation */
   @keyframes countUp {
     from {
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  
+
   .animate-count-up {
     animation: countUp 0.6s ease-out;
   }
-  
+
   /* === 3-TIER CARD HIERARCHY === */
-  
+
   /* TIER 1: PREMIUM CARDS (Testimonials, "Most Popular" Pricing) */
   .card-tier-1 {
     @apply border-2 border-primary rounded-3xl p-8;
@@ -324,12 +352,12 @@ All colors MUST be HSL.
     box-shadow: 0 8px 24px rgba(217, 119, 87, 0.15);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .card-tier-1:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 32px rgba(217, 119, 87, 0.25);
   }
-  
+
   /* TIER 2: STANDARD CARDS (Other pricing tiers, calculator results, features) */
   .card-tier-2 {
     @apply bg-white border rounded-2xl p-6;
@@ -337,12 +365,12 @@ All colors MUST be HSL.
     box-shadow: 0 4px 12px rgba(44, 54, 57, 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   .card-tier-2:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(44, 54, 57, 0.12);
   }
-  
+
   /* TIER 3: LIGHT CARDS (FAQ, objection handling, footer sections) */
   .card-tier-3 {
     @apply rounded-2xl p-5;
@@ -350,43 +378,57 @@ All colors MUST be HSL.
     border: none;
     box-shadow: none;
   }
-  
+
   /* === MICRO-INTERACTIONS === */
-  
+
   /* Button Interactions */
   .btn-press {
     @apply active:scale-95 transition-all duration-200 ease-in-out;
   }
-  
+
   @keyframes pulse-subtle {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.92; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.92;
+    }
   }
-  
+
   .btn-pulse-cta {
     animation: pulse-subtle 2s ease-in-out infinite;
   }
-  
+
   /* Card Interactions */
   .card-interactive {
     @apply transition-all duration-300 ease-out cursor-pointer;
   }
-  
+
   .card-glow-terracotta:hover {
     box-shadow: 0 12px 40px rgba(217, 119, 87, 0.2);
   }
-  
+
   /* Input Interactions */
   .input-focus {
     @apply focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-200;
   }
-  
+
   /* Skeleton Loading */
   @keyframes skeleton-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
   }
-  
+
   .skeleton-loader {
     @apply rounded-2xl bg-gradient-to-r from-cream/30 to-cream/60;
     animation: skeleton-pulse 2s ease-in-out infinite;
@@ -413,7 +455,7 @@ All colors MUST be HSL.
   }
 
   /* === PRICING SECTION ENHANCEMENTS === */
-  
+
   /* Pricing card - Most Popular tier */
   .card-pricing-popular {
     @apply card-tier-1;
@@ -425,9 +467,12 @@ All colors MUST be HSL.
   }
 
   @keyframes pricing-glow {
-    0%, 100% {
+
+    0%,
+    100% {
       box-shadow: 0 20px 60px rgba(217, 119, 87, 0.3);
     }
+
     50% {
       box-shadow: 0 20px 70px rgba(217, 119, 87, 0.45);
     }
@@ -439,16 +484,19 @@ All colors MUST be HSL.
   }
 
   @keyframes pulse-badge {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.85;
     }
   }
 
   /* === TYPOGRAPHY SYSTEM === */
-  
+
   /* Section headline with accent bar */
   .section-headline {
     @apply text-3xl sm:text-4xl lg:text-5xl font-bold text-center mb-4;
@@ -468,15 +516,17 @@ All colors MUST be HSL.
 
   /* Typography hierarchy */
   .text-h1 {
-    @apply text-5xl sm:text-6xl lg:text-7xl font-bold;
+    @apply text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold;
     color: hsl(var(--charcoal));
     letter-spacing: -0.03em;
+    line-height: 1.1;
   }
 
   .text-h2 {
-    @apply text-3xl sm:text-4xl lg:text-5xl font-bold;
+    @apply text-3xl sm:text-4xl md:text-5xl font-bold;
     color: hsl(var(--charcoal));
     letter-spacing: -0.02em;
+    line-height: 1.2;
   }
 
   .text-h3 {
@@ -515,17 +565,17 @@ All colors MUST be HSL.
     text-decoration-thickness: 2px;
     text-underline-offset: 4px;
   }
-  
+
   /* === SECTION SPACING & DIVIDERS === */
-  
+
   .section-spacer {
     @apply py-16 sm:py-20 lg:py-28;
   }
-  
+
   .section-spacer-compact {
     @apply py-10 sm:py-12 lg:py-16;
   }
-  
+
   .section-divider {
     @apply h-px w-20 mx-auto rounded-full;
     background: linear-gradient(to right, transparent, hsl(var(--cream)), transparent);
@@ -537,4 +587,3 @@ All colors MUST be HSL.
     padding-right: env(safe-area-inset-right, 20px);
   }
 }
-

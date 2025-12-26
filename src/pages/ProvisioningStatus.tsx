@@ -242,11 +242,11 @@ export default function ProvisioningStatus() {
                                     <Loader2 className="h-6 w-6 text-primary animate-pulse" />
                                 </div>
                                 <h2 className="text-xl font-semibold text-slate-900">
-                                    Setting up your AI Assistant
+                                    Setting up your Voice Agent
                                 </h2>
                                 <div className="space-y-4 text-slate-600 text-sm">
                                     <p>
-                                        We are training your AI assistant with your business details right now.
+                                        We are configuring your RingSnap Agent with your business details right now.
                                         This usually takes just a few minutes.
                                     </p>
                                     <p>
@@ -279,7 +279,7 @@ export default function ProvisioningStatus() {
                                 </h2>
                                 <div className="space-y-4 text-slate-600 text-sm">
                                     <p>
-                                        Your AI assistant is taking a bit longer to set up than usual.
+                                        Your RingSnap Agent is taking a bit longer to set up than usual.
                                         This is completely normal!
                                     </p>
                                     <p className="font-medium">
@@ -293,7 +293,7 @@ export default function ProvisioningStatus() {
                                     <p className="text-xs text-amber-800 font-semibold mb-2">What's happening?</p>
                                     <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
                                         <li>Creating your dedicated phone number</li>
-                                        <li>Training your AI with your business details</li>
+                                        <li>Configuring your Agent with your business details</li>
                                         <li>Setting up call routing and forwarding</li>
                                     </ul>
                                 </div>
@@ -319,14 +319,14 @@ export default function ProvisioningStatus() {
                                     Your Assistant is Ready! 🎉
                                 </h2>
                                 <p className="text-slate-600">
-                                    Your AI phone assistant has been set up successfully and is ready to take calls.
+                                    Your Voice Agent has been set up successfully and is ready to take calls.
                                 </p>
 
                                 {phoneNumber && (
                                     <div className="space-y-4">
                                         {/* Phone Number Display */}
                                         <div className="bg-green-50 border-2 border-green-200 p-6 rounded-lg">
-                                            <p className="text-xs text-green-700 mb-2 uppercase tracking-wide font-semibold">Your AI Number</p>
+                                            <p className="text-xs text-green-700 mb-2 uppercase tracking-wide font-semibold">Your Business Line</p>
                                             <div className="flex items-center justify-center gap-3">
                                                 <Phone className="h-5 w-5 text-green-700" />
                                                 <p className="text-3xl font-bold text-green-900">{phoneNumber}</p>
@@ -349,14 +349,14 @@ export default function ProvisioningStatus() {
                                             </h3>
 
                                             <div className="space-y-3 text-sm text-slate-700">
-                                                <p className="font-medium">To activate your AI receptionist:</p>
+                                                <p className="font-medium">To activate your RingSnap Agent:</p>
 
                                                 <ol className="space-y-3 list-decimal list-inside">
                                                     <li className="pl-2">
                                                         <span className="font-medium">Set up call forwarding</span> from your existing business number to your new RingSnap number above
                                                     </li>
                                                     <li className="pl-2">
-                                                        <span className="font-medium">Test it out!</span> Call your RingSnap number directly to hear your AI assistant in action
+                                                        <span className="font-medium">Test it out!</span> Call your RingSnap number directly to hear your agent in action
                                                     </li>
                                                     <li className="pl-2">
                                                         <span className="font-medium">Monitor calls</span> in your dashboard to see how your assistant is performing
@@ -367,7 +367,7 @@ export default function ProvisioningStatus() {
                                                     <p className="text-xs text-blue-800 font-semibold mb-1">💡 Pro Tip</p>
                                                     <p className="text-xs text-blue-700">
                                                         You can configure when calls are forwarded to you in the dashboard settings.
-                                                        Your AI can handle calls 24/7 or only during specific hours.
+                                                        Your Agent can handle calls 24/7 or only during specific hours.
                                                     </p>
                                                 </div>
                                             </div>

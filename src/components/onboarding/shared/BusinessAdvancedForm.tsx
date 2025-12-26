@@ -85,7 +85,7 @@ export function BusinessAdvancedForm({
                 </SelectContent>
               </Select>
               <FormDescription>
-                We'll optimize your AI assistant's behavior for this goal
+                We'll optimize your Agent's behavior for this goal
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -113,7 +113,7 @@ export function BusinessAdvancedForm({
                 />
               </FormControl>
               <FormDescription>
-                Your AI will mention these hours to callers
+                Your Agent will mention these hours to callers
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -137,7 +137,7 @@ export function BusinessAdvancedForm({
                 />
               </FormControl>
               <FormDescription>
-                How should your AI handle emergency calls outside business hours?
+                How should your Agent handle emergency calls outside business hours?
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -159,7 +159,7 @@ export function BusinessAdvancedForm({
               </FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Any specific instructions for your AI assistant?"
+                  placeholder="Any specific instructions for your Agent?"
                   rows={4}
                   maxLength={500}
                   disabled={disabled}
@@ -167,7 +167,7 @@ export function BusinessAdvancedForm({
                 />
               </FormControl>
               <FormDescription>
-                Special handling, pricing info, or anything else your AI should know (max 500 characters)
+                Special handling, pricing info, or anything else your Agent should know (max 500 characters)
               </FormDescription>
               <FormMessage />
             </FormItem>
