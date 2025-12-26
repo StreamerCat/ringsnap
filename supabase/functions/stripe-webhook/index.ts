@@ -610,7 +610,7 @@ serve(async (req) => {
           .from('accounts')
           .update({
             subscription_status: 'past_due',
-            // Grace period: 3 days
+            unpaid_since: new Date().toISOString(), // Start tracking delinquency
           })
           .eq('stripe_customer_id', customerId);
 
@@ -625,8 +625,14 @@ serve(async (req) => {
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
-        // Hold phone number for 7 days
-        const holdUntil = new Date();
+        // Hold phone number for 7 days AFTER the period end (or now if missing)
+        // Subscription deleted means access is revoked NOW, but we buffer 7 days.
+        // If it was cancel_at_period_end, this event fires at the end.
+        const periodEnd = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000)
+          : new Date();
+
+        const holdUntil = new Date(periodEnd);
         holdUntil.setDate(holdUntil.getDate() + 7);
 
         await supabase
@@ -635,6 +641,7 @@ serve(async (req) => {
             account_status: 'cancelled',
             subscription_status: 'cancelled',
             phone_number_held_until: holdUntil.toISOString(),
+            unpaid_since: null, // Clear delinquency tracking as it is now cancelled
           })
           .eq('stripe_customer_id', customerId);
 
@@ -675,13 +682,32 @@ serve(async (req) => {
         }
 
         // Sync subscription status and plan
+        // Sync subscription status and plan
+        const statusUpdates: any = {
+          subscription_status: subscription.status,
+          stripe_subscription_id: subscription.id,
+          ...planTypeUpdate
+        };
+
+        if (subscription.status === 'active' || subscription.status === 'trialing') {
+          statusUpdates.unpaid_since = null; // Clear delinquency
+        } else if (['unpaid', 'past_due', 'incomplete_expired'].includes(subscription.status)) {
+          // If transitioning to bad state, ensure we have a start date
+          // We use a specific RPC or just update if null? 
+          // Simplest: only update if currently null is hard in a simple update. 
+          // We can just set it to now if we think it's new. 
+          // Or better: Let the payment_failed event handle the timestamp mainly, 
+          // but here we ensure it is set? 
+          // Let's rely on payment_failed for precision, but here we can safeguard?
+          // Actually, simplest is: we don't overwrite it if it exists.
+          // Supabase update doesn't support "update if null" easily without RPC.
+          // We will skip setting it here to avoid resetting the clock, assuming payment_failed 
+          // or previous state set it.
+        }
+
         await supabase
           .from('accounts')
-          .update({
-            subscription_status: subscription.status,
-            stripe_subscription_id: subscription.id,
-            ...planTypeUpdate
-          })
+          .update(statusUpdates)
           .eq('stripe_customer_id', customerId);
 
         // Check if reactivating within hold period

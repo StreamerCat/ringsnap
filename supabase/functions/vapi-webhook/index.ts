@@ -84,16 +84,83 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Account Mapping
-        const mappingResult = await mapToAccount(supabase, call);
+        // --- IDENTIFICATION & METADATA UPDATE ---
+        const vapiPhoneId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
+        const calleeE164 = call.phoneNumber?.number ?? call.transport?.to ?? null;
+
+        let matchedPhone: { id: any; account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; } | null = null;
+        let matchField: string | null = null;
+
+        // 1. Resolve Phone Record (Identifier-Safe Order)
+        // Primary: Vapi Phone ID
+        if (vapiPhoneId) {
+            const { data } = await supabase
+                .from('phone_numbers')
+                .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                .eq('vapi_phone_id', vapiPhoneId)
+                .maybeSingle();
+            if (data) {
+                matchedPhone = data;
+                matchField = 'vapi_phone_id';
+            }
+        }
+
+        // Secondary: E164
+        if (!matchedPhone && calleeE164) {
+            const { data } = await supabase
+                .from('phone_numbers')
+                .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                .eq('e164_number', calleeE164)
+                .maybeSingle();
+            if (data) {
+                matchedPhone = data;
+                matchField = 'e164_number';
+            }
+        }
+
+        // 2. Always Update last_call_at (Critical for Pool Silence)
+        if (matchedPhone) {
+            await supabase.from('phone_numbers')
+                .update({ last_call_at: new Date().toISOString() })
+                .eq('id', matchedPhone.id);
+
+            console.log(JSON.stringify({
+                event: "debug_mapping_resolution",
+                vapiPhoneId,
+                calleeE164,
+                matchedDbField: matchField,
+                lifecycleStatus: matchedPhone.lifecycle_status,
+                phoneId: matchedPhone.id
+            }));
+        } else {
+            console.log(JSON.stringify({
+                event: "debug_mapping_resolution_failed",
+                vapiPhoneId,
+                calleeE164
+            }));
+        }
+
+        // 3. Account Mapping (Strict Safety)
+        const mappingResult = await resolveMapping(supabase, call, matchedPhone);
 
         if (!mappingResult.accountId) {
+            // Only write to inbox if it's an unexpected failure.
+            // Expected Blocked (Pool/Cooldown) -> SKIP INBOX (Spam reduction)
+            if (mappingResult.method === 'blocked_lifecycle') {
+                console.log(JSON.stringify({
+                    event: "vapi_webhook_blocked_lifecycle",
+                    phoneId: matchedPhone?.id,
+                    reason: "pool_logic"
+                }));
+                return new Response(JSON.stringify({ message: "Skipped: pool/cooldown blocked" }), { status: 200, headers: corsHeaders });
+            }
+
             await writeToInbox(supabase, {
                 provider_call_id: providerCallId,
-                provider_phone_number_id: providerPhoneNumberId,
+                provider_phone_number_id: vapiPhoneId,
                 reason: "unmapped_account",
                 payload: body,
-                error: `Could not map to account. Method tried: ${mappingResult.method}`,
+                error: `Could not map to account. Method: ${mappingResult.method}, PhoneStatus: ${matchedPhone?.lifecycle_status}`,
             });
             return new Response(JSON.stringify({ message: "Skipped: unmapped" }), { status: 200, headers: corsHeaders });
         }
@@ -143,44 +210,56 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Map call to account
+ * Resolve mapping with strict safety
  */
-async function mapToAccount(
+async function resolveMapping(
     supabase: ReturnType<typeof createClient>,
-    call: VapiCall
+    call: VapiCall,
+    matchedPhone: {
+        id: any;
+        account_id: any;
+        assigned_account_id: any;
+        lifecycle_status: any;
+        accounts: { subscription_status: string; account_status: string } | any
+    } | null
 ): Promise<MappingResult> {
-    const providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId;
-    const calleeE164 = call.phoneNumber?.number ?? call.transport?.to;
 
-    // 1. Assistant Metadata
-    if (call.assistant?.metadata?.account_id) {
-        return { accountId: call.assistant.metadata.account_id, phoneNumberId: null, method: "metadata" };
+    if (!matchedPhone) return { accountId: null, phoneNumberId: null, method: "none" };
+
+    // 1. SAFETY FIRST: Block Pool/Cooldown (Overrides Metadata)
+    if (['pool', 'cooldown', 'quarantine'].includes(matchedPhone.lifecycle_status)) {
+        return { accountId: null, phoneNumberId: matchedPhone.id, method: "blocked_lifecycle" };
     }
 
-    // 2. Provider Phone Number ID
-    if (providerPhoneNumberId) {
-        const { data } = await supabase
-            .from('phone_numbers')
-            .select('id, account_id')
-            .eq('provider_phone_number_id', providerPhoneNumberId)
-            .maybeSingle();
-        if (data?.account_id) return { accountId: data.account_id, phoneNumberId: data.id, method: "provider_phone_number_id" };
-
-        // Legacy check
-        const { data: legacy } = await supabase.from('phone_numbers').select('id, account_id').eq('vapi_phone_id', providerPhoneNumberId).maybeSingle();
-        if (legacy?.account_id) return { accountId: legacy.account_id, phoneNumberId: legacy.id, method: "vapi_phone_id" };
+    // 2. Strict Assignment (Canonical Truth)
+    if (matchedPhone.lifecycle_status === 'assigned') {
+        const canonicalId = matchedPhone.assigned_account_id ?? matchedPhone.account_id;
+        return { accountId: canonicalId, phoneNumberId: matchedPhone.id, method: "assigned_native" };
     }
 
-    // 3. E164 Number
-    if (calleeE164) {
-        const { data } = await supabase.from('phone_numbers').select('id, account_id').eq('e164_number', calleeE164).maybeSingle();
-        if (data?.account_id) return { accountId: data.account_id, phoneNumberId: data.id, method: "e164_number" };
+    // 3. (REMOVED) Metadata Override
+    // We strictly rely on DB state. Metadata in 'assistant' might be stale.
+    // Legacy fallback (step 4) handles active legacy accounts.
 
-        const { data: legacy } = await supabase.from('phone_numbers').select('id, account_id').eq('phone_number', calleeE164).maybeSingle();
-        if (legacy?.account_id) return { accountId: legacy.account_id, phoneNumberId: legacy.id, method: "phone_number" };
+    // 4. Legacy Fallback (Active Account Only)
+    if (!matchedPhone.lifecycle_status && matchedPhone.account_id) {
+        const acc = matchedPhone.accounts; // joined data
+        // Check if active
+        const isActive = acc && (
+            ['active', 'trialing', 'past_due'].includes(acc.subscription_status) &&
+            acc.account_status !== 'banned'
+        );
+
+        if (isActive) {
+            return { accountId: matchedPhone.account_id, phoneNumberId: matchedPhone.id, method: "legacy_active_fallback" };
+        } else {
+            console.log("Blocking legacy call to inactive account");
+            // Treat as blocked or unmapped? Blocked prevents spam.
+            return { accountId: null, phoneNumberId: matchedPhone.id, method: "blocked_legacy_inactive" };
+        }
     }
 
-    return { accountId: null, phoneNumberId: null, method: "none" };
+    return { accountId: null, phoneNumberId: matchedPhone.id, method: "no_valid_assignment" };
 }
 
 /**
