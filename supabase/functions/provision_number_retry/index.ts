@@ -142,7 +142,7 @@ serve(async (req) => {
     // Fetch pending phone numbers
     const { data: pendingPhones, error: fetchError } = await supabase
       .from("phone_numbers")
-      .select("id, vapi_id, account_id, provisioning_attempts")
+      .select("id, vapi_phone_id, vapi_id, account_id, provisioning_attempts")
       .eq("status", "pending")
       .lt("provisioning_attempts", 20) // Stop retrying after 20 attempts (~100 min at 5 min intervals)
       .limit(50);
@@ -173,12 +173,13 @@ serve(async (req) => {
 
     for (const phone of pendingPhones) {
       try {
-        // Poll Vapi
-        const vapiPhone = await pollPhoneFromVapi(phone.vapi_id, log);
+        // Poll Vapi (Use canonical ID first)
+        const vapiId = phone.vapi_phone_id || phone.vapi_id;
+        const vapiPhone = await pollPhoneFromVapi(vapiId, log);
 
         if (!vapiPhone) {
           log.warn("Could not poll Vapi phone", {
-            vapiId: phone.vapi_id,
+            vapiId,
             accountId: phone.account_id
           });
 
@@ -220,7 +221,7 @@ serve(async (req) => {
         if (vapiPhone.status === "active") {
           activatedCount++;
           log.info("Phone became active, notifying user", {
-            vapiId: phone.vapi_id,
+            vapiId,
             phoneNumber: vapiPhone.number,
             accountId: phone.account_id
           });
@@ -237,7 +238,7 @@ serve(async (req) => {
             account_id: phone.account_id,
             operation: "poll_success",
             details: {
-              vapiId: phone.vapi_id,
+              vapiId,
               phoneNumber: vapiPhone.number,
               attemptsNeeded: (phone.provisioning_attempts || 0) + 1
             }

@@ -322,6 +322,9 @@ serve(async (req) => {
       provisioning_attempts: 1,
       last_polled_at: new Date().toISOString(),
       activated_at: finalStatus === "active" ? new Date().toISOString() : null,
+      lifecycle_status: "assigned",
+      assigned_account_id: accountId,
+      assigned_at: new Date().toISOString(),
       raw: finalPhone
     };
 

@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
         // Build lookup map by vapi phone id
         const phoneMap = new Map<string, { accountId: string; phoneNumberId: string }>();
         for (const num of ourNumbers) {
-            const vapiId = num.provider_phone_number_id || num.vapi_phone_id;
+            const vapiId = num.vapi_phone_id || num.provider_phone_number_id;
             if (vapiId) {
                 phoneMap.set(vapiId, {
                     accountId: num.account_id,
@@ -205,6 +205,8 @@ Deno.serve(async (req) => {
                 await supabase.from('call_webhook_inbox').insert({
                     provider: 'vapi',
                     provider_call_id: call.id,
+                    provider_phone_number_id: mapping.phoneNumberId, // Actually we need the VAPI ID not our DB ID here? No, schema says provider_phone_number_id. Let's send the vapiPhoneId we found.
+                    // Actually, the previous code sent vapiPhoneId (from the call). let's use that.
                     provider_phone_number_id: vapiPhoneId,
                     reason: 'reconcile_upsert_failed',
                     payload: call,
