@@ -59,7 +59,7 @@ Deno.serve(withSentryEdge(
             if (!providerCallId) {
                 await writeToInbox(supabase, {
                     provider_call_id: null,
-                    provider_phone_number_id: providerPhoneNumberId,
+                    provider_phone_number_id: providerPhoneNumberId, // This is the raw ID from payload
                     reason: "missing_call_id",
                     payload: body,
                     error: "No call.id found in payload",
@@ -319,7 +319,7 @@ Deno.serve(withSentryEdge(
                     provider_call_id: providerCallId,
                     provider_phone_number_id: providerPhoneNumberId,
                     reason: "exception",
-                    payload: body ?? { error: "failed to parse body" },
+                    payload: { ...body as object, error: "failed to parse body" },
                     error: errorMessage,
                 });
             } catch { }
