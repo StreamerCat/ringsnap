@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "../_shared/cors.ts";
 import { extractCallDetails, VapiCall, VapiMessage } from "./call_parser.ts";
+import { withSentryEdge } from "../_shared/sentry.ts";
 
 /**
  * Vapi Webhook Handler
@@ -15,7 +16,7 @@ interface MappingResult {
     method: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentryEdge(async (req) => {
     // Handle CORS
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -118,6 +119,19 @@ Deno.serve(async (req) => {
             }
         }
 
+        // Tertiary: phone_number (fallback for legacy data or null e164 matches)
+        if (!matchedPhone && calleeE164) {
+            const { data } = await supabase
+                .from('phone_numbers')
+                .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                .eq('phone_number', calleeE164)
+                .maybeSingle();
+            if (data) {
+                matchedPhone = data;
+                matchField = 'phone_number';
+            }
+        }
+
         // 2. Always Update last_call_at (Critical for Pool Silence)
         if (matchedPhone) {
             await supabase.from('phone_numbers')
@@ -182,7 +196,7 @@ Deno.serve(async (req) => {
                 error: upsertError.message,
             });
             console.error("Upsert failed:", upsertError);
-            return new Response(JSON.stringify({ error: "upsert_failed" }), { status: 200, headers: corsHeaders });
+            throw upsertError; // Re-throw for Sentry
         }
 
         console.log(JSON.stringify({
@@ -205,9 +219,9 @@ Deno.serve(async (req) => {
             });
         } catch { }
         console.error("Webhook exception:", errorMessage);
-        return new Response(JSON.stringify({ error: errorMessage }), { status: 200, headers: corsHeaders });
+        throw err; // Re-throw for Sentry
     }
-});
+}));
 
 /**
  * Resolve mapping with strict safety
