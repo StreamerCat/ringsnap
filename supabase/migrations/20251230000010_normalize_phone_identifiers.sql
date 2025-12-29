@@ -93,7 +93,7 @@ END $$;
 -- STEP 5: Verification Queries (DO NOT SKIP)
 -- ============================================================================
 -- These counts must be 0 before proceeding to Phase 1
--- Uses filter: lifecycle_status IS NOT NULL AND NOT IN ('released','deleted','quarantine')
+-- Uses filter: lifecycle_status IS NOT NULL AND NOT IN ('released','quarantine')
 DO $$
 DECLARE v_missing_vapi_phone_id INT;
 v_missing_twilio_sid INT;
@@ -105,14 +105,14 @@ BEGIN -- Count 1: Live lifecycle rows missing vapi_phone_id
 SELECT COUNT(*) INTO v_missing_vapi_phone_id
 FROM phone_numbers
 WHERE lifecycle_status IS NOT NULL
-  AND lifecycle_status NOT IN ('released', 'deleted', 'quarantine')
+  AND lifecycle_status NOT IN ('released', 'quarantine')
   AND vapi_phone_id IS NULL;
 -- Count 2: Twilio rows missing twilio_phone_number_sid
 SELECT COUNT(*) INTO v_missing_twilio_sid
 FROM phone_numbers
 WHERE provider = 'twilio'
   AND lifecycle_status IS NOT NULL
-  AND lifecycle_status NOT IN ('released', 'deleted', 'quarantine')
+  AND lifecycle_status NOT IN ('released', 'quarantine')
   AND twilio_phone_number_sid IS NULL;
 -- Count 3: Duplicates on e164_number across live states
 SELECT COUNT(*) INTO v_duplicates_e164
@@ -120,7 +120,7 @@ FROM (
     SELECT e164_number
     FROM phone_numbers
     WHERE lifecycle_status IS NOT NULL
-      AND lifecycle_status NOT IN ('released', 'deleted', 'quarantine')
+      AND lifecycle_status NOT IN ('released', 'quarantine')
       AND e164_number IS NOT NULL
     GROUP BY e164_number
     HAVING COUNT(*) > 1
