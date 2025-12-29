@@ -97,11 +97,15 @@ Deno.serve(withSentryEdge(
             // 1. Resolve Phone Record (Identifier-Safe Order)
             // Primary: Vapi Phone ID
             if (vapiPhoneId) {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('phone_numbers')
                     .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
                     .eq('vapi_phone_id', vapiPhoneId)
                     .maybeSingle();
+
+                if (error) {
+                    console.error("Lookup VapiPhoneId Error:", error);
+                }
                 if (data) {
                     matchedPhone = data;
                     matchField = 'vapi_phone_id';
@@ -110,11 +114,15 @@ Deno.serve(withSentryEdge(
 
             // Secondary: E164
             if (!matchedPhone && calleeE164) {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('phone_numbers')
                     .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
                     .eq('e164_number', calleeE164)
                     .maybeSingle();
+
+                if (error) {
+                    console.error("Lookup E164 Error:", error);
+                }
                 if (data) {
                     matchedPhone = data;
                     matchField = 'e164_number';
@@ -123,11 +131,15 @@ Deno.serve(withSentryEdge(
 
             // Tertiary: phone_number (fallback for legacy data or null e164 matches)
             if (!matchedPhone && calleeE164) {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('phone_numbers')
                     .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
                     .eq('phone_number', calleeE164)
                     .maybeSingle();
+
+                if (error) {
+                    console.error("Lookup PhoneNumber Error:", error);
+                }
                 if (data) {
                     matchedPhone = data;
                     matchField = 'phone_number';
