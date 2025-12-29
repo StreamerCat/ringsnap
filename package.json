@@ -21,7 +21,10 @@
     "audit:perf": "echo 'Run: npx lighthouse <url> --output json --output-path ./audit-report.json' # Placeholder for agent",
     "audit:seo": "echo 'Run: npx lighthouse <url> --only-categories=seo'",
     "audit:a11y": "echo 'Run: npx axe <url>'",
-    "test:lhci": "lhci autorun"
+    "test:lhci": "lhci autorun",
+    "test:smoke": "playwright test --project=smoke",
+    "test:smoke:ci": "playwright test --project=smoke --reporter=github",
+    "test:full": "playwright test --project=full"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
