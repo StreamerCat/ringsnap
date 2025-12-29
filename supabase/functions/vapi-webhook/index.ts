@@ -16,212 +16,214 @@ interface MappingResult {
     method: string;
 }
 
-Deno.serve(withSentryEdge(async (req) => {
-    // Handle CORS
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    let body: unknown;
-    let providerCallId: string | null = null;
-    let providerPhoneNumberId: string | null = null;
-
-    try {
-        body = await req.json();
-
-        // Normalize message vs body structure
-        const message: VapiMessage = (body as any).message ?? body;
-        const type = message.type;
-
-        if (!type) {
-            return new Response("OK", { status: 200, headers: corsHeaders });
+Deno.serve(withSentryEdge(
+    { functionName: "vapi-webhook" },
+    async (req, ctx) => {
+        // Handle CORS
+        if (req.method === 'OPTIONS') {
+            return new Response('ok', { headers: corsHeaders });
         }
 
-        const call: VapiCall = message.call ?? (message as unknown as VapiCall);
-        providerCallId = call.id ?? null;
-        providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
-        console.log(JSON.stringify({
-            event: "vapi_webhook_received",
-            type,
-            providerCallId,
-            providerPhoneNumberId,
-            hasCall: !!call.id,
-        }));
+        let body: unknown;
+        let providerCallId: string | null = null;
+        let providerPhoneNumberId: string | null = null;
 
-        // Validation
-        if (!providerCallId) {
-            await writeToInbox(supabase, {
-                provider_call_id: null,
-                provider_phone_number_id: providerPhoneNumberId,
-                reason: "missing_call_id",
-                payload: body,
-                error: "No call.id found in payload",
-            });
-            console.log(JSON.stringify({ event: "vapi_webhook_skipped", reason: "missing_call_id" }));
-            return new Response("OK", { status: 200, headers: corsHeaders });
-        }
+        try {
+            body = await req.json();
 
-        // Security Check
-        const authMode = Deno.env.get('VAPI_WEBHOOK_AUTH_MODE') || 'secret';
-        const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
-        const incomingSecret = req.headers.get('x-vapi-secret');
+            // Normalize message vs body structure
+            const message: VapiMessage = (body as any).message ?? body;
+            const type = message.type;
 
-        if (authMode === 'secret' && expectedSecret) {
-            if (!incomingSecret || incomingSecret !== expectedSecret) {
-                const errorMsg = incomingSecret ? "Secret mismatch" : "Missing secret header";
+            if (!type) {
+                return new Response("OK", { status: 200, headers: corsHeaders });
+            }
+
+            const call: VapiCall = message.call ?? (message as unknown as VapiCall);
+            providerCallId = call.id ?? null;
+            providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
+
+            console.log(JSON.stringify({
+                event: "vapi_webhook_received",
+                type,
+                providerCallId,
+                providerPhoneNumberId,
+                hasCall: !!call.id,
+            }));
+
+            // Validation
+            if (!providerCallId) {
+                await writeToInbox(supabase, {
+                    provider_call_id: null,
+                    provider_phone_number_id: providerPhoneNumberId,
+                    reason: "missing_call_id",
+                    payload: body,
+                    error: "No call.id found in payload",
+                });
+                console.log(JSON.stringify({ event: "vapi_webhook_skipped", reason: "missing_call_id" }));
+                return new Response("OK", { status: 200, headers: corsHeaders });
+            }
+
+            // Security Check
+            const authMode = Deno.env.get('VAPI_WEBHOOK_AUTH_MODE') || 'secret';
+            const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
+            const incomingSecret = req.headers.get('x-vapi-secret');
+
+            if (authMode === 'secret' && expectedSecret) {
+                if (!incomingSecret || incomingSecret !== expectedSecret) {
+                    const errorMsg = incomingSecret ? "Secret mismatch" : "Missing secret header";
+                    await writeToInbox(supabase, {
+                        provider_call_id: providerCallId,
+                        provider_phone_number_id: providerPhoneNumberId,
+                        reason: "unauthorized",
+                        payload: body,
+                        error: errorMsg,
+                    });
+                    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+                }
+            }
+
+            // --- IDENTIFICATION & METADATA UPDATE ---
+            const vapiPhoneId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
+            const calleeE164 = call.phoneNumber?.number ?? call.transport?.to ?? null;
+
+            let matchedPhone: { id: any; account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; } | null = null;
+            let matchField: string | null = null;
+
+            // 1. Resolve Phone Record (Identifier-Safe Order)
+            // Primary: Vapi Phone ID
+            if (vapiPhoneId) {
+                const { data } = await supabase
+                    .from('phone_numbers')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .eq('vapi_phone_id', vapiPhoneId)
+                    .maybeSingle();
+                if (data) {
+                    matchedPhone = data;
+                    matchField = 'vapi_phone_id';
+                }
+            }
+
+            // Secondary: E164
+            if (!matchedPhone && calleeE164) {
+                const { data } = await supabase
+                    .from('phone_numbers')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .eq('e164_number', calleeE164)
+                    .maybeSingle();
+                if (data) {
+                    matchedPhone = data;
+                    matchField = 'e164_number';
+                }
+            }
+
+            // Tertiary: phone_number (fallback for legacy data or null e164 matches)
+            if (!matchedPhone && calleeE164) {
+                const { data } = await supabase
+                    .from('phone_numbers')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .eq('phone_number', calleeE164)
+                    .maybeSingle();
+                if (data) {
+                    matchedPhone = data;
+                    matchField = 'phone_number';
+                }
+            }
+
+            // 2. Always Update last_call_at (Critical for Pool Silence)
+            if (matchedPhone) {
+                await supabase.from('phone_numbers')
+                    .update({ last_call_at: new Date().toISOString() })
+                    .eq('id', matchedPhone.id);
+
+                console.log(JSON.stringify({
+                    event: "debug_mapping_resolution",
+                    vapiPhoneId,
+                    calleeE164,
+                    matchedDbField: matchField,
+                    lifecycleStatus: matchedPhone.lifecycle_status,
+                    phoneId: matchedPhone.id
+                }));
+            } else {
+                console.log(JSON.stringify({
+                    event: "debug_mapping_resolution_failed",
+                    vapiPhoneId,
+                    calleeE164
+                }));
+            }
+
+            // 3. Account Mapping (Strict Safety)
+            const mappingResult = await resolveMapping(supabase, call, matchedPhone);
+
+            if (!mappingResult.accountId) {
+                // Only write to inbox if it's an unexpected failure.
+                // Expected Blocked (Pool/Cooldown) -> SKIP INBOX (Spam reduction)
+                if (mappingResult.method === 'blocked_lifecycle') {
+                    console.log(JSON.stringify({
+                        event: "vapi_webhook_blocked_lifecycle",
+                        phoneId: matchedPhone?.id,
+                        reason: "pool_logic"
+                    }));
+                    return new Response(JSON.stringify({ message: "Skipped: pool/cooldown blocked" }), { status: 200, headers: corsHeaders });
+                }
+
+                await writeToInbox(supabase, {
+                    provider_call_id: providerCallId,
+                    provider_phone_number_id: vapiPhoneId,
+                    reason: "unmapped_account",
+                    payload: body,
+                    error: `Could not map to account. Method: ${mappingResult.method}, PhoneStatus: ${matchedPhone?.lifecycle_status}`,
+                });
+                return new Response(JSON.stringify({ message: "Skipped: unmapped" }), { status: 200, headers: corsHeaders });
+            }
+
+            // Extraction & Build Record
+            const callRecord = buildCallRecord(call, message, mappingResult, body);
+
+            // Upsert
+            const { error: upsertError } = await supabase
+                .from('call_logs')
+                .upsert(callRecord, { onConflict: 'vapi_call_id' });
+
+            if (upsertError) {
                 await writeToInbox(supabase, {
                     provider_call_id: providerCallId,
                     provider_phone_number_id: providerPhoneNumberId,
-                    reason: "unauthorized",
+                    reason: "upsert_failed",
                     payload: body,
-                    error: errorMsg,
+                    error: upsertError.message,
                 });
-                return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+                console.error("Upsert failed:", upsertError);
+                throw upsertError; // Re-throw for Sentry
             }
-        }
-
-        // --- IDENTIFICATION & METADATA UPDATE ---
-        const vapiPhoneId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
-        const calleeE164 = call.phoneNumber?.number ?? call.transport?.to ?? null;
-
-        let matchedPhone: { id: any; account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; } | null = null;
-        let matchField: string | null = null;
-
-        // 1. Resolve Phone Record (Identifier-Safe Order)
-        // Primary: Vapi Phone ID
-        if (vapiPhoneId) {
-            const { data } = await supabase
-                .from('phone_numbers')
-                .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
-                .eq('vapi_phone_id', vapiPhoneId)
-                .maybeSingle();
-            if (data) {
-                matchedPhone = data;
-                matchField = 'vapi_phone_id';
-            }
-        }
-
-        // Secondary: E164
-        if (!matchedPhone && calleeE164) {
-            const { data } = await supabase
-                .from('phone_numbers')
-                .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
-                .eq('e164_number', calleeE164)
-                .maybeSingle();
-            if (data) {
-                matchedPhone = data;
-                matchField = 'e164_number';
-            }
-        }
-
-        // Tertiary: phone_number (fallback for legacy data or null e164 matches)
-        if (!matchedPhone && calleeE164) {
-            const { data } = await supabase
-                .from('phone_numbers')
-                .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
-                .eq('phone_number', calleeE164)
-                .maybeSingle();
-            if (data) {
-                matchedPhone = data;
-                matchField = 'phone_number';
-            }
-        }
-
-        // 2. Always Update last_call_at (Critical for Pool Silence)
-        if (matchedPhone) {
-            await supabase.from('phone_numbers')
-                .update({ last_call_at: new Date().toISOString() })
-                .eq('id', matchedPhone.id);
 
             console.log(JSON.stringify({
-                event: "debug_mapping_resolution",
-                vapiPhoneId,
-                calleeE164,
-                matchedDbField: matchField,
-                lifecycleStatus: matchedPhone.lifecycle_status,
-                phoneId: matchedPhone.id
+                event: "vapi_webhook_success",
+                type,
+                providerCallId
             }));
-        } else {
-            console.log(JSON.stringify({
-                event: "debug_mapping_resolution_failed",
-                vapiPhoneId,
-                calleeE164
-            }));
+
+            return new Response(JSON.stringify({ success: true, id: providerCallId }), { status: 200, headers: corsHeaders });
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            try {
+                await writeToInbox(supabase, {
+                    provider_call_id: providerCallId,
+                    provider_phone_number_id: providerPhoneNumberId,
+                    reason: "exception",
+                    payload: body ?? { error: "failed to parse body" },
+                    error: errorMessage,
+                });
+            } catch { }
+            console.error("Webhook exception:", errorMessage);
+            throw err; // Re-throw for Sentry
         }
-
-        // 3. Account Mapping (Strict Safety)
-        const mappingResult = await resolveMapping(supabase, call, matchedPhone);
-
-        if (!mappingResult.accountId) {
-            // Only write to inbox if it's an unexpected failure.
-            // Expected Blocked (Pool/Cooldown) -> SKIP INBOX (Spam reduction)
-            if (mappingResult.method === 'blocked_lifecycle') {
-                console.log(JSON.stringify({
-                    event: "vapi_webhook_blocked_lifecycle",
-                    phoneId: matchedPhone?.id,
-                    reason: "pool_logic"
-                }));
-                return new Response(JSON.stringify({ message: "Skipped: pool/cooldown blocked" }), { status: 200, headers: corsHeaders });
-            }
-
-            await writeToInbox(supabase, {
-                provider_call_id: providerCallId,
-                provider_phone_number_id: vapiPhoneId,
-                reason: "unmapped_account",
-                payload: body,
-                error: `Could not map to account. Method: ${mappingResult.method}, PhoneStatus: ${matchedPhone?.lifecycle_status}`,
-            });
-            return new Response(JSON.stringify({ message: "Skipped: unmapped" }), { status: 200, headers: corsHeaders });
-        }
-
-        // Extraction & Build Record
-        const callRecord = buildCallRecord(call, message, mappingResult, body);
-
-        // Upsert
-        const { error: upsertError } = await supabase
-            .from('call_logs')
-            .upsert(callRecord, { onConflict: 'vapi_call_id' });
-
-        if (upsertError) {
-            await writeToInbox(supabase, {
-                provider_call_id: providerCallId,
-                provider_phone_number_id: providerPhoneNumberId,
-                reason: "upsert_failed",
-                payload: body,
-                error: upsertError.message,
-            });
-            console.error("Upsert failed:", upsertError);
-            throw upsertError; // Re-throw for Sentry
-        }
-
-        console.log(JSON.stringify({
-            event: "vapi_webhook_success",
-            type,
-            providerCallId
-        }));
-
-        return new Response(JSON.stringify({ success: true, id: providerCallId }), { status: 200, headers: corsHeaders });
-
-    } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        try {
-            await writeToInbox(supabase, {
-                provider_call_id: providerCallId,
-                provider_phone_number_id: providerPhoneNumberId,
-                reason: "exception",
-                payload: body ?? { error: "failed to parse body" },
-                error: errorMessage,
-            });
-        } catch { }
-        console.error("Webhook exception:", errorMessage);
-        throw err; // Re-throw for Sentry
-    }
-}));
+    }));
 
 /**
  * Resolve mapping with strict safety
