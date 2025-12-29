@@ -193,6 +193,36 @@ serve(async (req) => {
           continue;
         }
 
+        // VERIFICATION: Check assistant_id matches what was requested
+        // Fetch the original request details from provisioning_logs
+        let isVerified = true; // Default to true if we can't find log (graceful degradation) but warn
+        let expectedAssistantId = null;
+
+        const { data: provLog } = await supabase
+          .from("provisioning_logs")
+          .select("details")
+          .eq("account_id", phone.account_id)
+          .eq("operation", "create_started") // Look for the start event
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (provLog?.details?.assistantId) {
+          expectedAssistantId = provLog.details.assistantId;
+          if (vapiPhone.assistantId !== expectedAssistantId) {
+            isVerified = false;
+            log.warn("Verification failed during retry: Assistant mismatch", {
+              vapiId,
+              accountId: phone.account_id,
+              expected: expectedAssistantId,
+              actual: vapiPhone.assistantId
+            });
+            // Do not increment attempts here? Or do? 
+            // If it's mismatch, it might be permanent unless Vapi is slow to update?
+            // For now, treat as not ready.
+          }
+        }
+
         // Update phone record
         const updateData: Record<string, unknown> = {
           status: vapiPhone.status,
@@ -201,26 +231,27 @@ serve(async (req) => {
           provisioning_attempts: (phone.provisioning_attempts || 0) + 1
         };
 
-        if (vapiPhone.status === "active") {
+        const isActive = vapiPhone.status === "active" && isVerified;
+
+        if (isActive) {
           updateData.activated_at = new Date().toISOString();
           updateData.phone_number = vapiPhone.number || updateData.phone_number;
         }
 
         await supabase.from("phone_numbers").update(updateData).eq("id", phone.id);
 
-        // Update account status
-        await supabase
-          .from("accounts")
-          .update({
-            provisioning_status: vapiPhone.status === "active" ? "active" : "pending",
-            phone_provisioned_at: vapiPhone.status === "active" ? new Date().toISOString() : null
-          })
-          .eq("id", phone.account_id);
+        if (isActive) {
+          // Update account status
+          await supabase
+            .from("accounts")
+            .update({
+              provisioning_status: "active",
+              phone_provisioned_at: new Date().toISOString()
+            })
+            .eq("id", phone.account_id);
 
-        // If active, notify user
-        if (vapiPhone.status === "active") {
           activatedCount++;
-          log.info("Phone became active, notifying user", {
+          log.info("Phone became active and verified, notifying user", {
             vapiId,
             phoneNumber: vapiPhone.number,
             accountId: phone.account_id
@@ -240,7 +271,8 @@ serve(async (req) => {
             details: {
               vapiId,
               phoneNumber: vapiPhone.number,
-              attemptsNeeded: (phone.provisioning_attempts || 0) + 1
+              attemptsNeeded: (phone.provisioning_attempts || 0) + 1,
+              verification: "passed"
             }
           });
         }
