@@ -482,27 +482,159 @@ serve(async (req) => {
 
     let phoneNumberId = null;
     if (phoneNumber && vapiPhoneId) {
-      const { data: phoneRecord } = await supabase
+      // Check if this is a pooled number (already has a record from allocator)
+      const { data: existingPooledPhone } = await supabase
         .from("phone_numbers")
-        .insert({
-          account_id: accountId,
-          phone_number: phoneNumber,
-          vapi_phone_id: vapiPhoneId,
-          area_code: phoneNumber.slice(2, 5),
-          is_primary: true,
-          status: "active",
-          label: "Primary",
-        })
-        .select()
-        .single();
+        .select("id")
+        .eq("phone_number", phoneNumber)
+        .maybeSingle();
 
-      phoneNumberId = phoneRecord?.id;
+      if (existingPooledPhone) {
+        // POOLED NUMBER: Update existing record (allocated by allocator RPC)
+        const { error: updateError } = await supabase
+          .from("phone_numbers")
+          .update({
+            account_id: accountId,
+            vapi_phone_id: vapiPhoneId,
+            e164_number: phoneNumber, // Ensure e164 is set for webhook lookup
+            is_primary: true,
+            status: "active",
+            label: "Primary",
+            // Phone Pooling fields - CRITICAL for proper assignment
+            lifecycle_status: "assigned",
+            assigned_account_id: accountId,
+            assigned_at: new Date().toISOString(),
+          })
+          .eq("id", existingPooledPhone.id);
 
-      logInfo("Phone number saved to database", {
-        ...baseLogOptions,
-        accountId,
-        context: { phoneNumberId }
-      });
+        if (updateError) {
+          logError("Failed to update pooled phone record", {
+            ...baseLogOptions,
+            accountId,
+            error: updateError
+          });
+          throw new Error(`Failed to update pooled phone: ${updateError.message}`);
+        }
+
+        phoneNumberId = existingPooledPhone.id;
+
+        logInfo("Updated pooled phone number record", {
+          ...baseLogOptions,
+          accountId,
+          context: { phoneNumberId, phoneNumber }
+        });
+      } else {
+        // NEW NUMBER: Insert new record
+        const { data: phoneRecord, error: insertError } = await supabase
+          .from("phone_numbers")
+          .insert({
+            account_id: accountId,
+            phone_number: phoneNumber,
+            e164_number: phoneNumber, // Ensure e164 is set for webhook lookup
+            vapi_phone_id: vapiPhoneId,
+            area_code: phoneNumber.slice(2, 5),
+            is_primary: true,
+            status: "active",
+            label: "Primary",
+            // Phone Pooling fields - CRITICAL for proper assignment
+            lifecycle_status: "assigned",
+            assigned_account_id: accountId,
+            assigned_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          logError("Failed to insert phone record", {
+            ...baseLogOptions,
+            accountId,
+            error: insertError
+          });
+          throw new Error(`Failed to save phone: ${insertError.message}`);
+        }
+
+        phoneNumberId = phoneRecord?.id;
+
+        logInfo("Inserted new phone number record", {
+          ...baseLogOptions,
+          accountId,
+          context: { phoneNumberId }
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // CRITICAL: Verify Vapi assistant binding
+      // ═══════════════════════════════════════════════════════════════
+      try {
+        const verifyResponse = await fetch(
+          `https://api.vapi.ai/phone-number/${vapiPhoneId}`,
+          {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${VAPI_API_KEY}`,
+            },
+          }
+        );
+
+        if (verifyResponse.ok) {
+          const vapiPhoneData = await verifyResponse.json();
+          const boundAssistantId = vapiPhoneData.assistantId;
+
+          if (boundAssistantId !== account.vapi_assistant_id) {
+            logError("CRITICAL: Vapi assistant binding mismatch!", {
+              ...baseLogOptions,
+              accountId,
+              context: {
+                expectedAssistant: account.vapi_assistant_id,
+                actualAssistant: boundAssistantId,
+                vapiPhoneId
+              }
+            });
+
+            // Attempt to fix by PATCHing again
+            const fixResponse = await fetch(
+              `https://api.vapi.ai/phone-number/${vapiPhoneId}`,
+              {
+                method: "PATCH",
+                headers: {
+                  "Authorization": `Bearer ${VAPI_API_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  assistantId: account.vapi_assistant_id,
+                }),
+              }
+            );
+
+            if (!fixResponse.ok) {
+              const errText = await fixResponse.text();
+              throw new Error(`Failed to fix Vapi binding: ${errText}`);
+            }
+
+            logInfo("Fixed Vapi assistant binding", {
+              ...baseLogOptions,
+              accountId
+            });
+          } else {
+            logInfo("Vapi assistant binding verified", {
+              ...baseLogOptions,
+              accountId,
+              context: { assistantId: boundAssistantId }
+            });
+          }
+        } else {
+          logWarn("Could not verify Vapi binding (non-critical)", {
+            ...baseLogOptions,
+            accountId
+          });
+        }
+      } catch (verifyError) {
+        logWarn("Vapi verification failed (non-critical)", {
+          ...baseLogOptions,
+          accountId,
+          error: verifyError
+        });
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════
