@@ -1,6 +1,6 @@
--- Migration: Harden transition_phone_to_cooldown RPC (Final)
+-- Migration: Harden transition_phone_to_cooldown RPC (Final + Security Fix)
 -- Phase: Compatibility Sweep / Hardening
--- Description: Add ownership check, search_path, and full clear of IDs and assigned_at
+-- Description: Add ownership check, search_path, full clear of IDs, and LOCK DOWN permissions.
 CREATE OR REPLACE FUNCTION public.transition_phone_to_cooldown(
         p_phone_id UUID,
         p_account_id UUID,
@@ -12,6 +12,8 @@ DECLARE v_phone_record RECORD;
 v_user_account_id UUID;
 BEGIN -- 1. Security Check: Validate Ownership (if called by user)
 -- service_role (null uid) bypasses this check
+-- NOTE: We are also revoking execute from public below, so only service_role should theoretically call this.
+-- But if we ever grant it to authenticated, this check is critical.
 IF (auth.uid() IS NOT NULL) THEN v_user_account_id := get_user_account_id(auth.uid());
 IF (p_account_id != v_user_account_id) THEN RAISE EXCEPTION 'Unauthorized: Account ID mismatch';
 END IF;
@@ -49,3 +51,8 @@ WHERE phone_number_id = p_phone_id
 RETURN TRUE;
 END;
 $$;
+-- SECURITY FIX: Revoke from PUBLIC, Grant only to service_role (Option A)
+-- This prevents anon or regular users from calling it directly, addressing the auth.uid() bypass risk.
+REVOKE ALL ON FUNCTION public.transition_phone_to_cooldown(UUID, UUID, TEXT, INTERVAL)
+FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.transition_phone_to_cooldown(UUID, UUID, TEXT, INTERVAL) TO service_role;
