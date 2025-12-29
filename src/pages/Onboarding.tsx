@@ -157,7 +157,7 @@ export default function Onboarding() {
             supabase
               .from("phone_numbers")
               .select("*")
-              .eq("account_id", accountData.id)
+              .or(`assigned_account_id.eq.${accountData.id},account_id.eq.${accountData.id}`)
               .eq("is_primary", true)
               .maybeSingle(),
             supabase

@@ -75,7 +75,7 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
             await supabase
                 .from("phone_numbers")
                 .update({ is_primary: false })
-                .eq("account_id", account.id);
+                .or(`assigned_account_id.eq.${account.id},account_id.eq.${account.id}`);
 
             // Then set the selected number as primary
             const { error } = await supabase

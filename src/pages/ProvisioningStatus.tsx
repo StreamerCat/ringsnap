@@ -121,7 +121,7 @@ export default function ProvisioningStatus() {
                                 const { data: pn } = await supabase
                                     .from("phone_numbers")
                                     .select("phone_number")
-                                    .eq("account_id", profile.account_id)
+                                    .or(`assigned_account_id.eq.${profile.account_id},account_id.eq.${profile.account_id}`)
                                     .eq("is_primary", true)
                                     .single();
                                 phoneNum = pn?.phone_number || null;
@@ -138,7 +138,7 @@ export default function ProvisioningStatus() {
                         const { data: phoneRecord } = await supabase
                             .from("phone_numbers")
                             .select("phone_number, status, is_primary, activated_at")
-                            .eq("account_id", profile.account_id)
+                            .or(`assigned_account_id.eq.${profile.account_id},account_id.eq.${profile.account_id}`)
                             .eq("is_primary", true)
                             .single();
 

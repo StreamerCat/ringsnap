@@ -1,6 +1,6 @@
--- Migration: Hardened RLS for phone_numbers
+-- Migration: Hardened RLS for phone_numbers (Final)
 -- Phase: Compatibility Sweep / Hardening
--- Description: Split policies to enforce strict constraints. No FOR ALL.
+-- Description: Split policies, enforced TO authenticated, strict constraints.
 ALTER TABLE public.phone_numbers ENABLE ROW LEVEL SECURITY;
 -- 1. Drop existing policies
 DROP POLICY IF EXISTS "Users can view their account phone numbers" ON public.phone_numbers;
@@ -8,7 +8,7 @@ DROP POLICY IF EXISTS "Users can manage their account phone numbers" ON public.p
 DROP POLICY IF EXISTS "Users can update their account phone numbers" ON public.phone_numbers;
 -- 2. SELECT Policy
 CREATE POLICY "Users can view their account phone numbers" ON public.phone_numbers FOR
-SELECT USING (
+SELECT TO authenticated USING (
         (
             assigned_account_id = get_user_account_id(auth.uid())
             AND lifecycle_status = 'assigned'
@@ -23,7 +23,7 @@ SELECT USING (
     );
 -- 3. UPDATE Policy (with CHECK constraint)
 CREATE POLICY "Users can update their account phone numbers" ON public.phone_numbers FOR
-UPDATE USING (
+UPDATE TO authenticated USING (
         (
             assigned_account_id = get_user_account_id(auth.uid())
             AND lifecycle_status = 'assigned'
@@ -48,3 +48,4 @@ UPDATE USING (
             )
         )
     );
+-- Note: No INSERT or DELETE policies allowed for customers.

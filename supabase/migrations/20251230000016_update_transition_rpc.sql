@@ -1,6 +1,6 @@
--- Migration: Harden transition_phone_to_cooldown RPC
+-- Migration: Harden transition_phone_to_cooldown RPC (Final)
 -- Phase: Compatibility Sweep / Hardening
--- Description: Add ownership check, search_path, and full clear of IDs
+-- Description: Add ownership check, search_path, and full clear of IDs and assigned_at
 CREATE OR REPLACE FUNCTION public.transition_phone_to_cooldown(
         p_phone_id UUID,
         p_account_id UUID,
@@ -32,6 +32,8 @@ SET lifecycle_status = 'cooldown',
     assigned_account_id = NULL,
     account_id = NULL,
     -- Clear legacy column
+    assigned_at = NULL,
+    -- Clear assignment timestamp
     released_at = now(),
     cooldown_until = now() + p_cooldown_interval,
     last_lifecycle_change_at = now(),
