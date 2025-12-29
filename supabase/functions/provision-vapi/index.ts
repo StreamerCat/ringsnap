@@ -357,7 +357,17 @@ async function provisionVapiPhone(
       assistantId: vapiAssistantId, // Bind immediately
       fallbackDestination: {
         type: "number",
-        number: formatPhoneE164(metadata.fallback_phone || "4155551234"),
+        // Ensure we ALWAYS have a valid E.164 fallback. Double-check the formatted result.
+        number: (() => {
+          const rawFallback = metadata.fallback_phone?.trim() || "";
+          const formatted = formatPhoneE164(rawFallback || "4155551234");
+          // Validate the result is actually E.164
+          if (formatted.startsWith('+') && formatted.length >= 11) {
+            return formatted;
+          }
+          // Hardcoded safe fallback if formatting somehow failed
+          return "+14155551234";
+        })(),
       }
     };
   }
@@ -435,11 +445,16 @@ async function provisionVapiPhone(
     .insert({
       account_id: accountId,
       phone_number: finalNumber,
+      e164_number: finalNumber, // Ensure e164_number is set for webhook lookup
       area_code: requestedAreaCode,
-      vapi_phone_id: vapiPhoneId,  // Fixed: was vapi_id
+      vapi_phone_id: vapiPhoneId,
       purpose: "primary",
       status: "active",
       is_primary: true,
+      // Phone Pooling fields - CRITICAL for proper assignment
+      lifecycle_status: "assigned",
+      assigned_account_id: accountId,
+      assigned_at: new Date().toISOString(),
     })
     .select("id")
     .single();
