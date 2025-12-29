@@ -4,6 +4,7 @@ import { getAreaCodeFromZip } from "../_shared/area-code-lookup.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { parseTraceId, createObservabilityContext } from "../_shared/observability.ts";
 
 const FUNCTION_NAME = "provision-resources";
 
@@ -18,17 +19,22 @@ const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
+  const traceId = parseTraceId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   let currentAccountId: string | null = null;
+  let obs: ReturnType<typeof createObservabilityContext> | null = null;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    // Initialize observability context
+    obs = createObservabilityContext(supabase, traceId, FUNCTION_NAME);
 
     const requestPayload = await req.json();
     const { accountId, email, name, phone, zipCode, areaCode: requestedAreaCode } = requestPayload;
@@ -40,6 +46,15 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Set observability context
+    obs.setAccount(accountId);
+    if (email) obs.setUser('', email);
+
+    // Log system event: provisioning started
+    await obs.info('provisioning_started', {
+      requestOrigin: req.headers.get('origin') || undefined
+    });
 
     logInfo('Starting provisioning workflow', {
       ...baseLogOptions,
@@ -122,8 +137,8 @@ serve(async (req) => {
       if (!phoneResponse.ok) {
         const errorText = await phoneResponse.text();
         const isAreaCodeError = errorText.toLowerCase().includes('not available') ||
-                               errorText.toLowerCase().includes('area code') ||
-                               errorText.toLowerCase().includes('no numbers available');
+          errorText.toLowerCase().includes('area code') ||
+          errorText.toLowerCase().includes('no numbers available');
 
         if (isAreaCodeError) {
           logWarn('Area code not available, retrying without area code constraint', {
@@ -155,6 +170,8 @@ serve(async (req) => {
 
           if (!phoneResponse.ok) {
             const fallbackErrorText = await phoneResponse.text();
+            // Log system event: phone creation failed
+            await obs.error('vapi_phone_create_failed', 'VAPI_PHONE_CREATE_FAILED', fallbackErrorText, { areaCode, fallback: true });
             await supabase
               .from('accounts')
               .update({
@@ -172,6 +189,8 @@ serve(async (req) => {
           });
         } else {
           // Non-area-code error, fail immediately
+          // Log system event: phone creation failed
+          await obs.error('vapi_phone_create_failed', 'VAPI_PHONE_CREATE_FAILED', errorText, { areaCode });
           await supabase
             .from('accounts')
             .update({
@@ -186,6 +205,11 @@ serve(async (req) => {
       const phoneData = await phoneResponse.json();
       vapiPhoneId = phoneData.id;
       phoneNumber = phoneData.number;
+      // Log system event: phone created
+      await obs.info('vapi_phone_created', {
+        vapiPhoneId,
+        actualAreaCode: phoneNumber.slice(2, 5)
+      });
       logInfo('VAPI phone number created successfully', {
         ...baseLogOptions,
         accountId,
@@ -200,10 +224,10 @@ serve(async (req) => {
 
     // 2. Create VAPI Assistant
     let vapiAssistantId = null;
-    
+
     if (VAPI_API_KEY) {
       const voiceId = account.assistant_gender === 'male' ? 'michael' : 'sarah';
-      
+
       const { data: recordingLaw } = await supabase
         .from('state_recording_laws')
         .select('*')
@@ -244,6 +268,8 @@ serve(async (req) => {
 
       if (!assistantResponse.ok) {
         const errorText = await assistantResponse.text();
+        // Log system event: assistant creation failed
+        await obs.error('vapi_assistant_create_failed', 'VAPI_ASSISTANT_CREATE_FAILED', errorText);
         await supabase
           .from('accounts')
           .update({
@@ -256,6 +282,8 @@ serve(async (req) => {
 
       const assistantData = await assistantResponse.json();
       vapiAssistantId = assistantData.id;
+      // Log system event: assistant created
+      await obs.info('vapi_assistant_created', { vapiAssistantId });
       logInfo('Assistant created', {
         ...baseLogOptions,
         accountId,
@@ -318,7 +346,7 @@ serve(async (req) => {
         })
         .select()
         .single();
-      
+
       phoneNumberId = phoneRecord?.id;
     }
 
@@ -364,9 +392,9 @@ serve(async (req) => {
     // 8. Send onboarding SMS if phone is provided (non-blocking)
     if (phone && phoneNumber && vapiPhoneId) {
       supabase.functions.invoke('send-onboarding-sms', {
-        body: { 
+        body: {
           phone: phone,
-          ringSnapNumber: phoneNumber, 
+          ringSnapNumber: phoneNumber,
           name: name || 'there',
           accountId: accountId,
           vapiPhoneId: vapiPhoneId
@@ -547,6 +575,12 @@ serve(async (req) => {
       }
     }
 
+    // Log system event: provisioning completed
+    await obs.info('provisioning_completed', {
+      hasPhone: !!phoneNumber,
+      hasAssistant: !!vapiAssistantId
+    });
+
     logInfo('Provisioning completed', {
       ...baseLogOptions,
       accountId
@@ -569,7 +603,12 @@ serve(async (req) => {
       error
     });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    
+
+    // Log system event: provisioning failed (if obs context available)
+    if (obs) {
+      await obs.error('provisioning_failed', 'PROVISIONING_FAILED', errorMessage);
+    }
+
     if (currentAccountId) {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,

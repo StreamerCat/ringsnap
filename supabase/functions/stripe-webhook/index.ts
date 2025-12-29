@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
+import { parseTraceId, createObservabilityContext } from "../_shared/observability.ts";
 
 type BaseLogContext = {
   functionName: string;
@@ -285,8 +286,10 @@ const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
+  const traceId = parseTraceId(req);
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
   let currentAccountId: string | null = null;
+  let obs: ReturnType<typeof createObservabilityContext> | null = null;
 
   // Initialize Sentry with correlation ID for error tracking
   initSentry(FUNCTION_NAME, { correlationId });
@@ -296,12 +299,16 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    // Initialize observability context
+    obs = createObservabilityContext(supabase, traceId, FUNCTION_NAME);
+
     const signature = req.headers.get('stripe-signature');
     const body = await req.text();
 
     // Verify webhook signature if STRIPE_WEBHOOK_SECRET is configured
     if (STRIPE_WEBHOOK_SECRET) {
       if (!signature) {
+        await obs.error('signature_missing', 'STRIPE_SIGNATURE_FAIL', 'Missing stripe-signature header');
         logError('Missing stripe-signature header', baseLogOptions);
         return new Response(
           JSON.stringify({ error: 'Missing signature' }),
@@ -321,6 +328,7 @@ serve(async (req) => {
       const signaturesV1 = signatureObj.v1;
 
       if (!timestamp || signaturesV1.length === 0) {
+        await obs.error('signature_invalid_format', 'STRIPE_SIGNATURE_FAIL', 'Invalid stripe-signature format');
         logError('Invalid stripe-signature format', baseLogOptions);
         return new Response(
           JSON.stringify({ error: 'Invalid signature format' }),
@@ -375,6 +383,7 @@ serve(async (req) => {
       }
 
       if (!isVerified) {
+        await obs.error('signature_invalid', 'STRIPE_SIGNATURE_FAIL', 'Invalid webhook signature');
         logError('Invalid webhook signature', baseLogOptions);
         return new Response(
           JSON.stringify({ error: 'Invalid signature' }),
@@ -388,6 +397,9 @@ serve(async (req) => {
     }
 
     const event = JSON.parse(body);
+
+    // Log system event: webhook received
+    await obs.info('webhook_received', { eventType: event.type, eventId: event.id });
 
     logInfo('Stripe webhook received', {
       ...baseLogOptions,
@@ -826,6 +838,11 @@ serve(async (req) => {
       p_error: null,
     });
 
+    // Log system event: webhook processed successfully
+    if (obs) {
+      await obs.info('webhook_processed', { eventType: event.type, eventId: event.id });
+    }
+
     return new Response(JSON.stringify({ received: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -837,6 +854,12 @@ serve(async (req) => {
       accountId: currentAccountId,
       error
     });
+
+    // Log system event: webhook failed
+    if (obs) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await obs.error('webhook_failed', 'STRIPE_WEBHOOK_ERROR', errorMessage);
+    }
 
     // Capture error to Sentry
     if (currentAccountId) {
