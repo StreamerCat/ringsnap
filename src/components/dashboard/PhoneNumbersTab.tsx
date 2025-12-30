@@ -1,5 +1,6 @@
 
 import { useMemo, useState } from "react";
+import { formatPhoneNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -31,7 +32,7 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
     }, [phoneNumbers]);
 
     const hasNumbers = phoneNumbers && phoneNumbers.length > 0;
-    const formattedPrimaryNumber = primaryNumber?.phone_number;
+    const formattedPrimaryNumber = formatPhoneNumber(primaryNumber?.phone_number);
 
     const handleEditNumber = (phone: any) => {
         setEditingNumber(phone);
@@ -294,7 +295,7 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                             {formattedPrimaryNumber}
                         </div>
                         <Button asChild size="lg" className="w-full sm:w-auto">
-                            <a href={`tel:${formattedPrimaryNumber}`}>
+                            <a href={`tel:${primaryNumber?.phone_number || formattedPrimaryNumber}`}>
                                 <Phone className="mr-2 h-4 w-4" />
                                 Call Now
                             </a>

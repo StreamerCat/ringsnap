@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Phone, Clock, Calendar, FileText, Target, ArrowRight, MapPin } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatPhoneNumber } from "@/lib/utils";
 import {
     calculateLeadScore,
     getLeadScoreLabel,
@@ -114,7 +114,7 @@ export function CallDetailsDrawer({ open, onOpenChange, call, side = "right" }: 
                                     {call.caller_name || "Unknown Caller"}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                    {call.caller_phone || "No number"}
+                                    {formatPhoneNumber(call.caller_phone)}
                                 </p>
                                 {(call as any).address && (
                                     <p className="flex items-center gap-1.5 text-sm text-foreground/90 mt-1">

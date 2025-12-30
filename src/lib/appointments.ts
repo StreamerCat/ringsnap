@@ -386,10 +386,13 @@ export function deriveAppointmentMetrics(calls: CallLogWithAppointment[]): Appoi
 export function formatPhoneNumber(phone: string | null | undefined): string {
     if (!phone || isSentinelValue(phone)) return 'Unknown';
     const digits = phone.replace(/\D/g, '');
-    if (digits.length === 10) {
-        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    } else if (digits.length === 11 && digits.startsWith('1')) {
-        return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    let coreDigits = digits;
+    if (digits.length === 11 && digits.startsWith('1')) {
+        coreDigits = digits.slice(1);
+    }
+
+    if (coreDigits.length === 10) {
+        return `${coreDigits.slice(0, 3)}-${coreDigits.slice(3, 6)}-${coreDigits.slice(6)}`;
     }
     return phone;
 }

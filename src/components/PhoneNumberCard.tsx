@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Edit2, Star, Loader2 } from "lucide-react";
 
+import { formatPhoneNumber } from "@/lib/utils";
+
 interface PhoneNumberCardProps {
   number: string;
   label?: string;
@@ -22,13 +24,8 @@ export function PhoneNumberCard({
   onEdit,
   onSetPrimary
 }: PhoneNumberCardProps) {
-  const formatPhoneNumber = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-    }
-    return phone;
-  };
+  // formatPhoneNumber is now imported
+
 
   return (
     <Card className="card-tier-2 hover:shadow-lg transition-all">

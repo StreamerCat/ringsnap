@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Clock, MapPin, User, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface AppointmentsTabProps {
     accountId: string;
@@ -76,7 +77,7 @@ export function AppointmentsTab({ accountId }: AppointmentsTabProps) {
                                         <div className="flex items-center gap-2 text-sm">
                                             <User className="w-4 h-4 text-muted-foreground" />
                                             <span className="font-medium">{apt.caller_name}</span>
-                                            <span className="text-muted-foreground">({apt.caller_phone})</span>
+                                            <span className="text-muted-foreground">({formatPhoneNumber(apt.caller_phone)})</span>
                                         </div>
                                         {apt.service_type && (
                                             <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
