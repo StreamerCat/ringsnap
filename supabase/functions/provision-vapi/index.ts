@@ -180,12 +180,39 @@ async function createVapiAssistant(
   const tools = [];
 
   if (APPOINTMENTS_VAPI_TOOL_ENABLED) {
-    logInfo("Enabling Appointment Tool for Assistant", baseLogOptions);
+    logInfo("Enabling Appointment Tools for Assistant", baseLogOptions);
+
+    // 1. check_availability tool - MUST be called before offering times
+    tools.push({
+      type: "function",
+      function: {
+        name: "check_availability",
+        description: "Check available appointment slots for a specific date. ALWAYS call this before offering any times to the caller. Never invent or guess availability.",
+        parameters: {
+          type: "object",
+          properties: {
+            date: { type: "string", description: "Date to check (YYYY-MM-DD format, or 'today', 'tomorrow', 'next monday', etc.)" },
+            timeZone: { type: "string", description: "IANA timezone area/city (e.g. America/Denver)" },
+            durationMinutes: { type: "number", description: "Appointment duration in minutes (default: 60)" },
+            serviceType: { type: "string", description: "Type of service requested (optional, for service-specific availability)" }
+          },
+          required: ["date"]
+        }
+      },
+      server: {
+        url: `${supabaseUrl}/functions/v1/vapi-tools-availability`,
+        headers: {
+          "x-ringsnap-secret": Deno.env.get("VAPI_WEBHOOK_SECRET") || "default-secret"
+        }
+      }
+    });
+
+    // 2. book_appointment tool
     tools.push({
       type: "function",
       function: {
         name: "book_appointment",
-        description: "Book an appointment when the user confirms a specific time and date.",
+        description: "Book an appointment when the user confirms a specific time and date. Only call this AFTER the caller has confirmed a time that was returned by check_availability.",
         parameters: {
           type: "object",
           properties: {
@@ -205,15 +232,28 @@ async function createVapiAssistant(
       server: {
         url: `${supabaseUrl}/functions/v1/vapi-tools-appointments`,
         headers: {
-          // We use the same secret as the webhook for simplicity, or a dedicated one
           "x-ringsnap-secret": Deno.env.get("VAPI_WEBHOOK_SECRET") || "default-secret"
         }
       }
     });
 
-    // Append instructions to prompt
-    prompt += `\n\nTOOL USE: You have a tool called 'book_appointment'. Use this when the caller wants to schedule a service. Collect their name, phone, and desired time. Confirm the details before calling the tool. Tell them they will receive a confirmation text and email.`;
+    // Append instructions to prompt - CRITICAL: enforce availability check before offering times
+    prompt += `
+
+SCHEDULING APPOINTMENTS:
+You have two tools for scheduling: 'check_availability' and 'book_appointment'.
+
+IMPORTANT RULES:
+1. NEVER invent or guess available times. You MUST call 'check_availability' first to see what slots are open.
+2. When a caller wants to schedule service, first ask what day works for them.
+3. Call 'check_availability' with that date to get available slots.
+4. Present ONLY the times returned by the tool. Do not make up times.
+5. Once the caller confirms a time, collect their name and phone number if you don't have them.
+6. Confirm all details with the caller, then call 'book_appointment'.
+7. If a time is not available when booking (rare race condition), apologize and offer alternatives.
+8. Tell them they will receive a confirmation text and email.`;
   }
+
 
   const assistantPayload = {
     name: `${metadata.company_name} Assistant`,

@@ -173,6 +173,62 @@ test.describe('Dashboard Improvements @auth @skip-ci', () => {
         await expect(page.locator('button:has(svg.lucide-chevron-left)')).toBeVisible();
         await expect(page.locator('button:has(svg.lucide-chevron-right)')).toBeVisible();
     });
+
+    test.skip('Appointments tab renders with timeframe dropdown', async ({ page }) => {
+        await page.goto('/dashboard?tab=appointments');
+
+        // Wait for page to load
+        await page.waitForLoadState('networkidle');
+
+        // Check appointments tab heading exists
+        await expect(page.locator('text=Appointments')).toBeVisible({ timeout: 5000 });
+
+        // Check timeframe dropdown exists
+        const dropdown = page.locator('button:has-text("Upcoming")').or(
+            page.locator('button:has-text("Week")').or(
+                page.locator('button:has-text("Month")')
+            )
+        );
+        await expect(dropdown).toBeVisible({ timeout: 3000 });
+    });
+
+    test.skip('Appointments tab shows empty state or appointment cards', async ({ page }) => {
+        await page.goto('/dashboard?tab=appointments');
+
+        // Wait for page to load
+        await page.waitForLoadState('networkidle');
+
+        // Should show either appointments OR empty state
+        const hasEmptyState = await page.locator('text=No appointments found').isVisible({ timeout: 3000 }).catch(() => false);
+        const hasAppointmentCards = await page.locator('button:has(text=Upcoming)').first().isVisible().catch(() => false);
+
+        // One of these should be true
+        expect(hasEmptyState || hasAppointmentCards).toBe(true);
+
+        // Verify no error toast
+        const errorToast = page.locator('text=Error fetching');
+        await expect(errorToast).not.toBeVisible();
+    });
+
+    test.skip('Appointments tab - clicking an appointment opens drawer', async ({ page }) => {
+        await page.goto('/dashboard?tab=appointments');
+
+        // Wait for page to load
+        await page.waitForLoadState('networkidle');
+
+        // Check for appointment cards
+        const appointmentCard = page.locator('button:has([data-testid="appointment-card"]), button:has(svg.lucide-chevron-right)').first();
+        const hasCards = await appointmentCard.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (hasCards) {
+            // Click the appointment card
+            await appointmentCard.click();
+
+            // Expect drawer to be visible
+            const drawer = page.locator('[role="dialog"]');
+            await expect(drawer).toBeVisible({ timeout: 3000 });
+        }
+    });
 });
 
 

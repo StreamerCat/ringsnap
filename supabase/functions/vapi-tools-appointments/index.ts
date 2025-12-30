@@ -1,11 +1,15 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { withSentryEdge } from "../_shared/sentry.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { logInfo, logError } from "../_shared/logging.ts";
+import { logInfo, logError, logWarn } from "../_shared/logging.ts";
 import { sendAppointmentNotifications, Appointment, AccountSettings } from "../_shared/appointment-notifications.ts";
+import { checkSlotConflict } from "../_shared/availability.ts";
 
 const FUNCTION_NAME = "vapi-tools-appointments";
+
+// Feature flag for conflict enforcement (default ON)
+const CONFLICT_ENFORCEMENT_ENABLED =
+    Deno.env.get("APPOINTMENT_CONFLICT_ENFORCEMENT") !== "false";
 
 Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
     // 1. CORS Preflight
@@ -14,6 +18,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
     }
 
     const { correlationId } = ctx;
+    let toolCallId: string | null = null;
 
     try {
         // 2. Authentication (Shared Secret)
@@ -23,7 +28,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
 
         // Allow if no secret configured (dev) or if matches
         if (expectedSecret && authHeader !== expectedSecret) {
-            logError("Unauthorized tool request", { functionName, correlationId, context: { error: "Invalid secret" } });
+            logError("Unauthorized tool request", { functionName: FUNCTION_NAME, correlationId, context: { error: "Invalid secret" } });
             return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
         }
 
@@ -37,6 +42,8 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
             // If it's a direct browser test, structure might differ.
             throw new Error("Invalid payload: missing message or toolCall");
         }
+
+        toolCallId = toolCall.id;
 
         const {
             startDateTime,
@@ -76,7 +83,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
         if (assistantError || !assistant) {
             // Fallback: Try looking up by phone number if assistant logic fails or is shared? 
             // For now, strict requirement: Assistant must be registered.
-            logError("Assistant lookup failed", { functionName, correlationId, context: { vapiAssistantId } });
+            logError("Assistant lookup failed", { functionName: FUNCTION_NAME, correlationId, context: { vapiAssistantId } });
             throw new Error("Assistant not found");
         }
 
@@ -104,8 +111,88 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
             throw new Error("Account not found");
         }
 
-        // 6. Create Appointment (Idempotent)
+        // ═══════════════════════════════════════════════════════════════
+        // 6. PHASE 1: CONFLICT CHECK (Write-Time Protection)
+        // Even if we didn't offer this time (caller requested manually),
+        // we must verify no conflict exists to prevent race conditions.
+        // ═══════════════════════════════════════════════════════════════
+
+        if (CONFLICT_ENFORCEMENT_ENABLED) {
+            logInfo("Checking for slot conflicts", {
+                functionName: FUNCTION_NAME,
+                correlationId,
+                accountId,
+                context: { startDateTime, endDateTime },
+            });
+
+            const conflictResult = await checkSlotConflict(
+                supabase,
+                accountId,
+                startDateTime,
+                endDateTime || null,
+                60, // Default to 60 minute duration if no end time
+                correlationId
+            );
+
+            if (conflictResult.hasConflict) {
+                logWarn("Slot conflict detected at booking time", {
+                    functionName: FUNCTION_NAME,
+                    correlationId,
+                    accountId,
+                    context: {
+                        requestedStart: startDateTime,
+                        conflictId: conflictResult.conflictingAppointment?.id,
+                        alternativesCount: conflictResult.alternativeSlots?.length || 0,
+                    },
+                });
+
+                // Format alternative slots for voice
+                let alternativeMessage = "I'm sorry, but that time slot is no longer available.";
+
+                if (conflictResult.alternativeSlots && conflictResult.alternativeSlots.length > 0) {
+                    const altTimes = conflictResult.alternativeSlots.slice(0, 3).map((slot) => {
+                        const startTime = new Date(slot.start);
+                        const hours = startTime.getHours();
+                        const minutes = startTime.getMinutes();
+                        const period = hours >= 12 ? "PM" : "AM";
+                        const displayHour = hours % 12 || 12;
+                        const displayMinutes = minutes > 0 ? `:${minutes.toString().padStart(2, "0")}` : "";
+                        return `${displayHour}${displayMinutes} ${period}`;
+                    });
+
+                    if (altTimes.length === 1) {
+                        alternativeMessage += ` I do have ${altTimes[0]} available. Would that work for you?`;
+                    } else {
+                        const lastAlt = altTimes.pop();
+                        alternativeMessage += ` I do have ${altTimes.join(", ")} and ${lastAlt} available. Would any of those work for you?`;
+                    }
+                } else {
+                    alternativeMessage += " Would you like me to check availability for a different day?";
+                }
+
+                return new Response(JSON.stringify({
+                    results: [
+                        {
+                            toolCallId: toolCall.id,
+                            result: alternativeMessage,
+                            error: "slot_unavailable",
+                            data: {
+                                conflict: true,
+                                requestedTime: startDateTime,
+                                alternativeSlots: conflictResult.alternativeSlots || [],
+                            },
+                        }
+                    ]
+                }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 7. Create Appointment (Idempotent)
         // We use vapi_call_id + scheduled_start_at unique constraint
+        // ═══════════════════════════════════════════════════════════════
         const vapiCallId = message.call.id;
 
         // Safety: ensure vapiCallId exists.
@@ -139,7 +226,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
 
         if (insertError) {
             if (insertError.code === '23505') { // Unique violation
-                logInfo("Appointment already exists (idempotency)", { functionName, correlationId });
+                logInfo("Appointment already exists (idempotency)", { functionName: FUNCTION_NAME, correlationId });
                 // Fetch existing
                 const { data: existing } = await supabase
                     .from("appointments")
@@ -153,7 +240,19 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
             }
         }
 
-        // 7. Trigger Notifications
+        logInfo("Appointment created/confirmed", {
+            functionName: FUNCTION_NAME,
+            correlationId,
+            accountId,
+            context: {
+                appointmentId: finalAppointment?.id,
+                startDateTime,
+                callerName,
+                enforced: CONFLICT_ENFORCEMENT_ENABLED,
+            },
+        });
+
+        // 8. Trigger Notifications
         // Only if newly created or confirmation not sent yet
         if (finalAppointment && !finalAppointment.confirmation_sent_at) {
             // Run in background (don't await strictly to return Vapi response fast? 
@@ -169,13 +268,21 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
                     correlationId
                 );
             } catch (notifError) {
-                logError("Failed to send notifications", { functionName, correlationId, error: notifError });
+                logError("Failed to send notifications", { functionName: FUNCTION_NAME, correlationId, error: notifError });
                 // Swallow error so booking still succeeds
             }
         }
 
-        // 8. Return Success to Vapi
-        const resultDetails = `Appointment scheduled for ${startDateTime} with ${callerName}. Confirmation sent.`;
+        // 9. Return Success to Vapi
+        const startTime = new Date(startDateTime);
+        const hours = startTime.getHours();
+        const minutes = startTime.getMinutes();
+        const period = hours >= 12 ? "PM" : "AM";
+        const displayHour = hours % 12 || 12;
+        const displayMinutes = minutes > 0 ? `:${minutes.toString().padStart(2, "0")}` : "";
+        const formattedTime = `${displayHour}${displayMinutes} ${period}`;
+
+        const resultDetails = `Perfect! I've booked your appointment for ${formattedTime}. You'll receive a confirmation text and email shortly. Is there anything else I can help you with?`;
 
         return new Response(JSON.stringify({
             results: [
@@ -189,24 +296,22 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
         });
 
     } catch (err: any) {
-        logError("Appointment tool failed", { functionName, correlationId, error: err });
+        logError("Appointment tool failed", { functionName: FUNCTION_NAME, correlationId, error: err });
 
-        // Return a soft error to Vapi so it can say "I had trouble booking that" instead of hanging
-        // or return a standard error if Vapi handles it well. Vapi tools expect 200 with error message usually?
-        // Actually Vapi likes valid JSON.
-        // We'll return 200 with an error description in the result if possible, OR 500 if it's a crash.
-        // User requested: "safe 'could not confirm booking' response"
-
-        // If we have a toolCallId, we can return a result saying we failed.
-        // If we couldn't parse toolCallId, standard error.
-
-        // Try to recover toolCallId from request if possible, but reading body twice might be hard if we didn't clone.
-        // We parsed payload earlier.
-
-        /* 
-           Note: We can't easily return a "result" if we crashed before parsing toolCallId.
-           But if we have it (err implies we might have failed later), we return graceful failure.
-        */
+        // Return a graceful error to Vapi if we have the toolCallId
+        if (toolCallId) {
+            return new Response(JSON.stringify({
+                results: [
+                    {
+                        toolCallId: toolCallId,
+                        result: "I apologize, but I'm having trouble confirming that booking right now. Let me take your information and someone will call you back to confirm the appointment.",
+                        error: "booking_failed"
+                    }
+                ]
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
 
         return new Response(JSON.stringify({
             error: "Internal Server Error", // Fallback
