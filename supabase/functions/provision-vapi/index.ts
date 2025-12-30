@@ -234,6 +234,22 @@ async function createVapiAssistant(
     },
     firstMessage: `Thank you for calling ${metadata.company_name}! How can I help you today?`,
     serverUrl: serverUrl,
+    analysis: {
+      structuredDataSchema: {
+        type: "object",
+        properties: {
+          callerName: { type: "string", description: "The name of the caller." },
+          callerPhone: { type: "string", description: "The phone number of the caller." },
+          reason: { type: "string", description: "The reason for the call." },
+          booked: { type: "boolean", description: "Whether an appointment was successfully booked." },
+          appointmentTime: { type: "string", description: "The ISO 8601 timestamp of the booked appointment, if applicable." },
+          address: { type: "string", description: "The address provided by the caller for the service location." },
+          summary: { type: "string", description: "A brief summary of the call." }
+        },
+        required: ["reason", "booked"]
+      },
+      successEvaluationPrompt: "Did the AI successfully handle the user's request?",
+    }
   };
 
   logInfo("Creating Vapi assistant", {
@@ -484,6 +500,7 @@ async function provisionVapiPhone(
         })
       };
     } else {
+      console.log(`[provisionVapiPhone] Sending payload: ${JSON.stringify(vapiPayload)}`);
       vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
         method: "POST",
         headers: {
@@ -545,6 +562,7 @@ async function provisionVapiPhone(
       lifecycle_status: "assigned",
       assigned_account_id: accountId,
       assigned_at: new Date().toISOString(),
+      activated_at: new Date().toISOString(),
     })
     .select("id")
     .single();

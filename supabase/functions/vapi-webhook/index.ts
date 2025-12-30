@@ -91,6 +91,17 @@ Deno.serve(withSentryEdge(
             const vapiPhoneId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
             const calleeE164 = call.phoneNumber?.number ?? call.transport?.to ?? null;
 
+            // ENHANCED LOGGING: Track extraction
+            console.log(JSON.stringify({
+                event: "webhook_phone_extraction",
+                providerCallId,
+                vapiPhoneId,
+                calleeE164,
+                callPhoneNumber: call.phoneNumber,
+                callPhoneNumberId: call.phoneNumberId,
+                callTransport: call.transport
+            }));
+
             let matchedPhone: { id: any; account_id: any; assigned_account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; accounts: { subscription_status: string; account_status: string } | null } | null = null;
             let matchField: string | null = null;
 
@@ -106,9 +117,21 @@ Deno.serve(withSentryEdge(
             if (vapiPhoneId) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
-                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts!phone_numbers_account_id_fkey(subscription_status, account_status)')
                     .eq('vapi_phone_id', vapiPhoneId)
                     .maybeSingle();
+
+                // ENHANCED LOGGING: Track lookup result
+                console.log(JSON.stringify({
+                    event: "webhook_phone_lookup_vapi_phone_id",
+                    providerCallId,
+                    vapiPhoneId,
+                    found: !!data,
+                    hasError: !!error,
+                    errorCode: error?.code,
+                    errorMessage: error?.message,
+                    dataId: data?.id
+                }));
 
                 if (error) {
                     console.error("Lookup VapiPhoneId Error:", error);
@@ -133,7 +156,7 @@ Deno.serve(withSentryEdge(
             if (!matchedPhone && vapiPhoneId) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
-                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts!phone_numbers_account_id_fkey(subscription_status, account_status)')
                     .eq('vapi_id', vapiPhoneId)
                     .maybeSingle();
 
@@ -160,7 +183,7 @@ Deno.serve(withSentryEdge(
             if (!matchedPhone && vapiPhoneId) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
-                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts!phone_numbers_account_id_fkey(subscription_status, account_status)')
                     .eq('provider_phone_number_id', vapiPhoneId)
                     .maybeSingle();
 
@@ -187,7 +210,7 @@ Deno.serve(withSentryEdge(
             if (!matchedPhone && calleeE164) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
-                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts!phone_numbers_account_id_fkey(subscription_status, account_status)')
                     .eq('e164_number', calleeE164)
                     .maybeSingle();
 
@@ -214,7 +237,7 @@ Deno.serve(withSentryEdge(
             if (!matchedPhone && calleeE164) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
-                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts!phone_numbers_account_id_fkey(subscription_status, account_status)')
                     .eq('phone_number', calleeE164)
                     .maybeSingle();
 
@@ -287,10 +310,26 @@ Deno.serve(withSentryEdge(
             // Extraction & Build Record
             const callRecord = buildCallRecord(call, message, mappingResult, body);
 
-            // Upsert
-            const { error: upsertError } = await supabase
-                .from('call_logs')
-                .upsert(callRecord, { onConflict: 'vapi_call_id' });
+            // Upsert (Robust handling for Schema Evolution)
+            let upsertError: any = null;
+            try {
+                const { error } = await supabase
+                    .from('call_logs')
+                    .upsert(callRecord, { onConflict: 'vapi_call_id' });
+                upsertError = error;
+            } catch (e) {
+                upsertError = e;
+            }
+
+            // Retry without address if column missing
+            if (upsertError && upsertError.message && upsertError.message.includes('address')) {
+                console.warn("Schema mismatch: 'address' column missing in call_logs. Retrying without it.");
+                const { address, ...safeRecord } = callRecord;
+                const { error: retryError } = await supabase
+                    .from('call_logs')
+                    .upsert(safeRecord, { onConflict: 'vapi_call_id' });
+                upsertError = retryError;
+            }
 
             if (upsertError) {
                 await writeToInbox(supabase, {
@@ -302,6 +341,11 @@ Deno.serve(withSentryEdge(
                 });
                 console.error("Upsert failed:", upsertError);
                 throw upsertError; // Re-throw for Sentry
+            }
+
+            // Create appointment if call was booked (only on end-of-call-report)
+            if (type === 'end-of-call-report' && callRecord.booked && mappingResult.accountId) {
+                await createAppointmentFromCall(supabase, callRecord, mappingResult.accountId);
             }
 
             console.log(JSON.stringify({
@@ -430,6 +474,7 @@ function buildCallRecord(
         from_number: callerPhone,
         to_number: call.phoneNumber?.number ?? call.transport?.to ?? null,
         started_at: startedAt ? new Date(startedAt).toISOString() : new Date().toISOString(),
+        address: details.address, // Add address (requires DB migration)
         status,
         updated_at: new Date().toISOString(),
         raw_payload: rawPayload,
@@ -482,5 +527,89 @@ async function writeToInbox(
         });
     } catch (e) {
         console.error("Inbox write failed", e);
+    }
+}
+
+/**
+ * Create an appointment record from a booked call
+ */
+async function createAppointmentFromCall(
+    supabase: ReturnType<typeof createClient>,
+    callRecord: Record<string, unknown>,
+    accountId: string
+): Promise<void> {
+    try {
+        const scheduledStartAt = callRecord.appointment_start as string | null;
+        const appointmentWindow = callRecord.appointment_window as string | null;
+
+        let startTime: string;
+        if (scheduledStartAt) {
+            startTime = scheduledStartAt;
+        } else {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0);
+            startTime = tomorrow.toISOString();
+        }
+
+        const appointmentData = {
+            account_id: accountId,
+            call_log_id: callRecord.id as string | null,
+            caller_name: callRecord.caller_name as string | null,
+            caller_phone: callRecord.from_number as string | null,
+            scheduled_start_at: startTime,
+            window_description: appointmentWindow,
+            status: 'scheduled' as const,
+            notes: callRecord.summary as string | null,
+            address: callRecord.address as string | null, // Map address
+            source: 'vapi_call'
+        };
+
+        // Robust upsert
+        let aptError: any = null;
+        try {
+            const { error } = await supabase.from('appointments').upsert(appointmentData, { onConflict: 'call_log_id' });
+            aptError = error;
+        } catch (e) {
+            aptError = e;
+        }
+
+        // Retry without address if missing
+        if (aptError && aptError.message && aptError.message.includes('address')) {
+            console.warn("Schema mismatch: 'address' column missing in appointments. Retrying without it.");
+            const { address, ...safeAptData } = appointmentData;
+            const { error: retryError } = await supabase.from('appointments').upsert(safeAptData, { onConflict: 'call_log_id' });
+            aptError = retryError;
+        }
+
+        if (aptError) {
+            console.error('Failed to create appointment:', aptError);
+            await writeToInbox(supabase, {
+                provider_call_id: callRecord.vapi_call_id as string,
+                provider_phone_number_id: callRecord.vapi_phone_id as string,
+                reason: "appointment_creation_failed",
+                payload: { error: aptError, appointmentData },
+                error: aptError.message
+            });
+        } else {
+            console.log('Appointment created for call:', callRecord.vapi_call_id);
+            // Log success to inbox for now to verify it ran
+            await writeToInbox(supabase, {
+                provider_call_id: callRecord.vapi_call_id as string,
+                provider_phone_number_id: callRecord.vapi_phone_id as string,
+                reason: "appointment_created",
+                payload: { appointmentData },
+                error: null
+            });
+        }
+    } catch (e) {
+        console.error('Exception creating appointment:', e);
+        await writeToInbox(supabase, {
+            provider_call_id: callRecord.vapi_call_id as string,
+            provider_phone_number_id: callRecord.vapi_phone_id as string,
+            reason: "appointment_creation_exception",
+            payload: { error: String(e) },
+            error: String(e)
+        });
     }
 }
