@@ -545,6 +545,10 @@ async function writeToInbox(
 
 /**
  * Create an appointment record from a booked call
+ * 
+ * This function creates appointments using call_log_id as the primary idempotency key.
+ * If that fails (e.g., column missing or constraint not present), it falls back to
+ * a simple insert which may create duplicates but at least captures the data.
  */
 async function createAppointmentFromCall(
     supabase: ReturnType<typeof createClient>,
@@ -555,72 +559,125 @@ async function createAppointmentFromCall(
     try {
         const scheduledStartAt = callRecord.appointment_start as string | null;
         const appointmentWindow = callRecord.appointment_window as string | null;
+        const callLogId = callRecord.id as string | null;
+        const vapiCallId = callRecord.vapi_call_id as string;
 
+        // Determine best start time
         let startTime: string;
         if (scheduledStartAt) {
             startTime = scheduledStartAt;
         } else {
+            // Default to tomorrow 9am if no specific time parsed
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             tomorrow.setHours(9, 0, 0, 0);
             startTime = tomorrow.toISOString();
         }
 
-        const appointmentData = {
+        // Build appointment data with all possible columns
+        const appointmentData: Record<string, unknown> = {
             account_id: accountId,
-            call_log_id: callRecord.id as string | null,
             caller_name: callRecord.caller_name as string | null,
             caller_phone: callRecord.from_number as string | null,
             scheduled_start_at: startTime,
-            window_description: appointmentWindow,
-            status: 'scheduled' as const,
+            status: 'scheduled',
             notes: callRecord.summary as string | null,
-            address: callRecord.address as string | null, // Map address
             source: 'vapi_call'
         };
 
-        // Robust upsert
+        // Add optional columns if we have the data
+        if (callLogId) appointmentData.call_log_id = callLogId;
+        if (appointmentWindow) appointmentData.window_description = appointmentWindow;
+        if (callRecord.address) appointmentData.address = callRecord.address;
+        if (vapiCallId) appointmentData.vapi_call_id = vapiCallId;
+
+        // Try upsert with call_log_id if available
         let aptError: any = null;
-        try {
-            const { error } = await supabase.from('appointments').upsert(appointmentData, { onConflict: 'call_log_id' });
-            aptError = error;
-        } catch (e) {
-            aptError = e;
+        let success = false;
+
+        // Strategy 1: Upsert with call_log_id (preferred - ensures idempotency)
+        if (callLogId) {
+            try {
+                const { error } = await supabase
+                    .from('appointments')
+                    .upsert(appointmentData, { onConflict: 'call_log_id' });
+                if (!error) {
+                    success = true;
+                    console.log('Appointment upserted via call_log_id:', vapiCallId);
+                } else {
+                    aptError = error;
+                }
+            } catch (e) {
+                aptError = e;
+            }
         }
 
-        // Retry without address if missing
-        if (aptError && aptError.message && aptError.message.includes('address')) {
-            console.warn("Schema mismatch: 'address' column missing in appointments. Retrying without it.");
-            const { address, ...safeAptData } = appointmentData;
-            const { error: retryError } = await supabase.from('appointments').upsert(safeAptData, { onConflict: 'call_log_id' });
-            aptError = retryError;
+        // Strategy 2: If call_log_id upsert failed, try removing problematic columns
+        if (!success && aptError?.message?.includes('call_log_id')) {
+            console.warn("call_log_id conflict failed, trying simple insert");
+            const { call_log_id, ...insertData } = appointmentData;
+            try {
+                const { error } = await supabase.from('appointments').insert(insertData);
+                if (!error) {
+                    success = true;
+                    console.log('Appointment inserted (no call_log_id link):', vapiCallId);
+                } else {
+                    aptError = error;
+                }
+            } catch (e) {
+                aptError = e;
+            }
         }
 
-        if (aptError) {
-            console.error('Failed to create appointment:', aptError);
+        // Strategy 3: Schema fallback - remove columns that might not exist
+        if (!success && aptError?.message) {
+            const problematicColumns = ['address', 'window_description', 'source', 'vapi_call_id', 'call_log_id'];
+            let safeData = { ...appointmentData };
+
+            for (const col of problematicColumns) {
+                if (aptError.message.includes(col)) {
+                    console.warn(`Schema mismatch: '${col}' column issue. Removing and retrying.`);
+                    delete safeData[col];
+                }
+            }
+
+            try {
+                const { error } = await supabase.from('appointments').insert(safeData);
+                if (!error) {
+                    success = true;
+                    console.log('Appointment inserted (safe fallback):', vapiCallId);
+                } else {
+                    aptError = error;
+                }
+            } catch (e) {
+                aptError = e;
+            }
+        }
+
+        // Log result
+        if (success) {
             await writeToInbox(supabase, {
-                provider_call_id: callRecord.vapi_call_id as string,
-                provider_phone_number_id: vapiPhoneId || (callRecord.vapi_phone_id as string) || "unknown",
-                reason: "appointment_creation_failed",
-                payload: { error: aptError, appointmentData },
-                error: aptError.message
+                provider_call_id: vapiCallId,
+                provider_phone_number_id: vapiPhoneId || "unknown",
+                reason: "appointment_created",
+                payload: { appointmentData, callLogId },
+                error: null
             });
         } else {
-            console.log('Appointment created for call:', callRecord.vapi_call_id);
-            // Log success to inbox for now to verify it ran
+            console.error('Failed to create appointment after all strategies:', aptError);
             await writeToInbox(supabase, {
-                provider_call_id: callRecord.vapi_call_id as string,
-                provider_phone_number_id: vapiPhoneId || (callRecord.vapi_phone_id as string) || "unknown",
-                reason: "appointment_created",
-                payload: { appointmentData },
-                error: null
+                provider_call_id: vapiCallId,
+                provider_phone_number_id: vapiPhoneId || "unknown",
+                reason: "appointment_creation_failed",
+                payload: { error: aptError, appointmentData },
+                error: aptError?.message || String(aptError)
             });
         }
     } catch (e) {
         console.error('Exception creating appointment:', e);
         await writeToInbox(supabase, {
             provider_call_id: callRecord.vapi_call_id as string,
-            provider_phone_number_id: callRecord.vapi_phone_id as string,
+            provider_phone_number_id: vapiPhoneId || "unknown",
             reason: "appointment_creation_exception",
             payload: { error: String(e) },
             error: String(e)
