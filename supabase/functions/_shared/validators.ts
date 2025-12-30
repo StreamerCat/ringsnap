@@ -57,48 +57,63 @@ export function isValidPhoneNumber(phone: string): boolean {
 /**
  * Format phone number to E.164 format (+15551234567)
  * Handles various input formats and ensures valid E.164 output
+ * CRITICAL: Vapi requires STRICT E.164 - only '+' followed by digits
  */
 export function formatPhoneE164(phone: string): string {
-  if (!phone) {
+  if (!phone || phone.trim() === '') {
     // Return a valid default US number if empty
     return "+14155551234";
   }
 
-  // If already in E.164 format, return as-is
-  if (phone.startsWith('+')) {
-    return phone;
+  // ALWAYS strip to just digits first, regardless of input format
+  // This handles cases like "+1 (555) 123-4567" or "+1abc123"
+  const digitsOnly = phone.replace(/\D/g, '');
+
+  // If no digits found at all, return default
+  if (digitsOnly.length === 0) {
+    console.warn(`[formatPhoneE164] No digits found in: ${phone}, using default`);
+    return "+14155551234";
   }
 
-  // Remove all non-digit characters
-  const cleaned = phone.replace(/\D/g, '');
-
   // Handle 10-digit US number (e.g., 5551234567)
-  if (cleaned.length === 10) {
-    return `+1${cleaned}`;
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
   }
 
   // Handle 11-digit number starting with 1 (e.g., 15551234567)
-  if (cleaned.length === 11 && cleaned[0] === '1') {
-    return `+${cleaned}`;
+  if (digitsOnly.length === 11 && digitsOnly[0] === '1') {
+    return `+${digitsOnly}`;
+  }
+
+  // Handle 12+ digit international numbers (assume first digits are country code)
+  if (digitsOnly.length >= 11 && digitsOnly.length <= 15) {
+    // If starts with 1 (US/Canada), ensure proper format
+    if (digitsOnly[0] === '1' && digitsOnly.length === 11) {
+      return `+${digitsOnly}`;
+    }
+    // For other international numbers, just prefix with +
+    return `+${digitsOnly}`;
   }
 
   // If we have digits but not the right length, try to salvage it
-  if (cleaned.length > 0) {
-    // If it's longer than 11 digits, take the last 10
-    if (cleaned.length > 11) {
-      const last10 = cleaned.slice(-10);
+  if (digitsOnly.length > 0) {
+    // If it's longer than 15 digits, take the last 10 (US assumption)
+    if (digitsOnly.length > 15) {
+      const last10 = digitsOnly.slice(-10);
+      console.warn(`[formatPhoneE164] Too many digits (${digitsOnly.length}), using last 10: ${last10}`);
       return `+1${last10}`;
     }
 
     // If it's between 7-9 digits, pad with zeros and add +1
-    if (cleaned.length >= 7 && cleaned.length < 10) {
-      const padded = cleaned.padStart(10, '0');
+    if (digitsOnly.length >= 7 && digitsOnly.length < 10) {
+      const padded = digitsOnly.padStart(10, '0');
+      console.warn(`[formatPhoneE164] Short number (${digitsOnly.length} digits), padding: ${padded}`);
       return `+1${padded}`;
     }
   }
 
   // Fallback to a valid default if we can't parse it
-  console.warn(`Unable to format phone number: ${phone}, using default`);
+  console.warn(`[formatPhoneE164] Unable to format phone: ${phone} (digits: ${digitsOnly}), using default`);
   return "+14155551234";
 }
 
