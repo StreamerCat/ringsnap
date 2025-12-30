@@ -752,21 +752,37 @@ async function processJob(job: any, supabase: any): Promise<void> {
     }
 
     // Update account with provisioning results
-    await supabase.from("accounts").update({
+    const { error: accountUpdateError } = await supabase.from("accounts").update({
       vapi_assistant_id: vapiAssistantId,
       vapi_phone_number: phoneE164,
       phone_number_e164: phoneE164,
-      vapi_phone_number_id: vapiPhoneId,
+      vapi_phone_number_id: phoneDbId, // Correct: Use internal UUID for the foreign key
       phone_number_status: "active",
+      provisioning_status: "completed", // Set directly to avoid silent RPC failures
       phone_provisioned_at: new Date().toISOString(),
-      notification_sms_phone: metadata.fallback_phone || null, // Persist profile phone as default notification target
+      // notification_sms_phone: metadata.fallback_phone || null, 
     }).eq("id", job.account_id);
 
+    if (accountUpdateError) {
+      logError("Failed to update account with provisioning results", {
+        ...baseLogOptions,
+        error: accountUpdateError,
+      });
+      throw new Error(`Failed to update account: ${accountUpdateError.message}`);
+    }
+
     // Update provisioning lifecycle to completed
-    await supabase.rpc("update_provisioning_lifecycle", {
+    const { error: lifecycleError } = await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
       p_status: "completed",
     });
+
+    if (lifecycleError) {
+      logWarn("Failed to update provisioning lifecycle (non-critical)", {
+        ...baseLogOptions,
+        error: lifecycleError,
+      });
+    }
 
     // Update user's onboarding status to active (hybrid onboarding flow)
     if (job.user_id) {
