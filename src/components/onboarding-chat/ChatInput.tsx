@@ -34,7 +34,7 @@ export function ChatInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2 animate-in slide-in-from-bottom-2 duration-300">
+    <form onSubmit={handleSubmit} action="javascript:void(0);" className="flex gap-2 animate-in slide-in-from-bottom-2 duration-300">
       <Input
         type={type}
         value={value}

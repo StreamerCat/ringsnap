@@ -285,6 +285,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
+            action="javascript:void(0);"
             className="space-y-4 mt-4"
             aria-live="polite"
           >

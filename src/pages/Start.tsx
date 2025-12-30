@@ -293,7 +293,7 @@ export default function Start() {
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} action="javascript:void(0);" className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="name">Your name</Label>
                   <Input

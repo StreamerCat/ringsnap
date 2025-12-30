@@ -302,7 +302,7 @@ function SalesSignupFormInner() {
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={form.handleSubmit(onSubmit)} action="javascript:void(0);" className="space-y-8">
           {/* Customer Info Section */}
           <CustomerInfoSection form={form} isSubmitting={isSubmitting} />
 
