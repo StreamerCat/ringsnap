@@ -188,3 +188,65 @@ test.describe('Error Handling', () => {
         ).toBe(true);
     });
 });
+
+test.describe('API / Edge Functions', () => {
+    test.skip(!process.env.SUPABASE_URL, 'Skipping API tests - no Supabase URL');
+
+    test('availability endpoint is deployed and reachable', async ({ request }) => {
+        const supabaseUrl = process.env.SUPABASE_URL;
+
+        // Make a request to the availability endpoint
+        // This should return 401 (unauthorized) or 500 (missing data)
+        // but NOT 404 (would mean endpoint not deployed)
+        const response = await request.post(`${supabaseUrl}/functions/v1/vapi-tools-availability`, {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            data: {
+                message: { call: { id: 'test', assistantId: 'test' } },
+                toolCall: {
+                    id: 'test-call',
+                    function: { arguments: { date: '2024-01-15' } }
+                }
+            }
+        });
+
+        // Should not be 404 - endpoint should exist
+        expect(response.status()).not.toBe(404);
+
+        // Should return JSON
+        const contentType = response.headers()['content-type'];
+        expect(contentType).toContain('application/json');
+    });
+
+    test('appointments endpoint is deployed and reachable', async ({ request }) => {
+        const supabaseUrl = process.env.SUPABASE_URL;
+
+        const response = await request.post(`${supabaseUrl}/functions/v1/vapi-tools-appointments`, {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            data: {
+                message: { call: { id: 'test', assistantId: 'test' } },
+                toolCall: {
+                    id: 'test-call',
+                    function: {
+                        arguments: {
+                            startDateTime: '2024-01-15T10:00:00Z',
+                            callerName: 'Test',
+                            callerPhone: '+15551234567',
+                            timeZone: 'America/Denver'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Should not be 404 - endpoint should exist
+        expect(response.status()).not.toBe(404);
+
+        // Should return JSON
+        const contentType = response.headers()['content-type'];
+        expect(contentType).toContain('application/json');
+    });
+});
