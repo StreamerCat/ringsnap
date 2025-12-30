@@ -83,6 +83,7 @@ export interface CallExtractionResult {
     appointmentWindow: string | null;
     outcome: 'booked' | 'lead' | 'other' | null;
     leadCaptured: boolean;
+    address: string | null; // NEW
 }
 
 // ==========================================
@@ -101,8 +102,10 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
     const summary = (message.summary ?? analysis?.summary ?? "").toLowerCase();
 
     // 2. Extract Fields
-    const callerName = extractCallerName(call, transcript, structuredData);
+    const fromNumber = call.customer?.number ?? call.transport?.from ?? null;
+    const callerName = extractCallerName(call, transcript, structuredData, summary, fromNumber);
     const reason = extractReason(call, transcript, structuredData, summary);
+    const address = structuredData.address as string || null; // NEW, extract address directly
 
     const { booked, appointmentStart, appointmentEnd, appointmentWindow } = detectBooking(
         call,
@@ -134,7 +137,8 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
         appointmentEnd,
         appointmentWindow,
         outcome,
-        leadCaptured
+        leadCaptured,
+        address
     };
 }
 
@@ -145,7 +149,9 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
 export function extractCallerName(
     call: VapiCall,
     transcript: string,
-    structuredData: Record<string, any>
+    structuredData: Record<string, any>,
+    summary: string,
+    fromNumber: string | null = null
 ): string | null {
     // 1. Structured Data (Highest Priority)
     if (typeof structuredData.callerName === 'string') return structuredData.callerName;
@@ -176,14 +182,60 @@ export function extractCallerName(
     ];
 
     for (const pattern of namePatterns) {
-        const match = transcript.match(pattern);
+        const match = transcript.toLowerCase().match(pattern);
         if (match && match[1]) {
             const name = match[1].trim();
             // Filter out common false positives
-            if (name.length > 2 && name.length < 30 && !name.includes('to help') && !name.includes('vapi')) {
+            if (
+                name.length > 2 &&
+                name.length < 30 &&
+                !name.startsWith('a ') && // "this is a home"
+                !name.startsWith('the ') && // "this is the manager"
+                !name.includes('to help') &&
+                !name.includes('vapi')
+            ) {
                 return capitalize(name);
             }
         }
+    }
+
+    // 5. Summary Extraction (NEW)
+    // Matches: "booked for [Name]"
+    if (summary) {
+        // Look for "booked for [Name]" or "appointment for [Name]"
+        // But avoid "booked for tomorrow" or "booked for inspection"
+        const summaryPatterns = [
+            /booked for ([a-z\s]+?)(?:at|on|for|with|\.|$)/i,
+            /appointment for ([a-z\s]+?)(?:at|on|for|with|\.|$)/i
+        ];
+
+        for (const pattern of summaryPatterns) {
+            const match = summary.match(pattern);
+            if (match && match[1]) {
+                const name = match[1].trim();
+                const lower = name.toLowerCase();
+                // Heuristic filtering: name should likely be 2+ words, and not common nouns
+                if (
+                    name.length > 3 &&
+                    name.length < 30 &&
+                    !lower.includes('inspection') &&
+                    !lower.includes('repair') &&
+                    !lower.includes('estimate') &&
+                    !lower.includes('tomorrow') &&
+                    !lower.includes('today') &&
+                    !lower.includes('week') &&
+                    // Ensure it looks like a name (no numbers, etc)
+                    /^[a-z\s]+$/i.test(name)
+                ) {
+                    return capitalize(name);
+                }
+            }
+        }
+    }
+
+    // 6. Fallback to phone number if no name found
+    if (fromNumber) {
+        return fromNumber;
     }
 
     return null;
@@ -196,17 +248,18 @@ export function extractReason(
     summary: string
 ): string | null {
     // 1. Structured Data
-    if (typeof structuredData.reason === 'string') return structuredData.reason;
-    if (typeof structuredData.callReason === 'string') return structuredData.callReason;
-    if (typeof structuredData.intent === 'string') return structuredData.intent;
+    if (typeof structuredData.reason === 'string') return cleanReason(structuredData.reason);
+    if (typeof structuredData.callReason === 'string') return cleanReason(structuredData.callReason);
+    if (typeof structuredData.intent === 'string') return cleanReason(structuredData.intent);
 
     // 2. Summary Heuristic
     // Often the summary starts with "The user called to..."
     if (summary) {
+        let cleaned = cleanReason(summary);
         // If summary is short, use it entirely
-        if (summary.length < 150) return summary;
+        if (cleaned.length < 150) return cleaned;
         // Otherwise try to extract the first sentence
-        const firstSentence = summary.split('.')[0];
+        const firstSentence = cleaned.split('.')[0];
         if (firstSentence.length > 10) return firstSentence;
     }
 
@@ -352,4 +405,25 @@ function parseToolResult(resultStr?: string): any {
     } catch {
         return {};
     }
+}
+
+/**
+ * Clean up reason text by removing company names, assistant references, and common prefixes
+ */
+function cleanReason(text: string): string {
+    let cleaned = text.trim();
+
+    // Remove common prefixes (case-insensitive)
+    cleaned = cleaned.replace(/^(the user called|the caller called|caller called|user called)\s+/i, '');
+
+    // Remove company/assistant name patterns like "rs support" or "[company] support"
+    // Match pattern: "[word(s)] support/assistant/service" followed by "to"
+    cleaned = cleaned.replace(/^[a-z\s]+?\s+(support|assistant|service|team)\s+to\s+/i, '');
+
+    // Capitalize first letter
+    if (cleaned.length > 0) {
+        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+
+    return cleaned;
 }

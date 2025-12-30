@@ -504,6 +504,11 @@ function OnboardingChatInner() {
       return;
     }
 
+    if (cleanPhone.startsWith("1")) {
+      toast.error("Please enter your 10-digit number WITHOUT the leading '1'");
+      return;
+    }
+
     addMessage("user", value);
     setData((prev) => ({ ...prev, phone: value }));
     setStep("company");
@@ -872,6 +877,10 @@ function OnboardingChatInner() {
           return;
         }
       }
+
+      // Track completion
+      trackFunnelEvent("signup_completed", { account_id: result.accountId, email: result.email });
+      trackConversion("signup", { value: 0 }); // Trial has 0 upfront value
 
       // Redirect immediately to the new Provisioning Status page
       // This handles the "wait" time gracefully instead of hanging in the chat

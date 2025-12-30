@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Phone, Clock, Calendar, FileText, Target, ArrowRight } from "lucide-react";
+import { Phone, Clock, Calendar, FileText, Target, ArrowRight, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     calculateLeadScore,
@@ -116,6 +116,12 @@ export function CallDetailsDrawer({ open, onOpenChange, call, side = "right" }: 
                                 <p className="text-sm text-muted-foreground">
                                     {call.caller_phone || "No number"}
                                 </p>
+                                {(call as any).address && (
+                                    <p className="flex items-center gap-1.5 text-sm text-foreground/90 mt-1">
+                                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                                        {(call as any).address}
+                                    </p>
+                                )}
                             </div>
                             {getOutcomeBadge()}
                         </div>

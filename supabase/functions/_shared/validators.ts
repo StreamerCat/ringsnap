@@ -66,7 +66,6 @@ export function formatPhoneE164(phone: string): string {
   }
 
   // ALWAYS strip to just digits first, regardless of input format
-  // This handles cases like "+1 (555) 123-4567" or "+1abc123"
   const digitsOnly = phone.replace(/\D/g, '');
 
   // If no digits found at all, return default
@@ -75,23 +74,29 @@ export function formatPhoneE164(phone: string): string {
     return "+14155551234";
   }
 
-  // Handle 10-digit US number (e.g., 5551234567)
+  // Handle 10-digit US number (no country code provided)
+  // e.g., 5551234567 -> +15551234567
   if (digitsOnly.length === 10) {
+    // If it starts with 1, it's ambiguous (could be 1+9 digits or a 10-digit number starting with 1)
+    // US area codes cannot start with 1. If it starts with 1 and is 10 digits, 
+    // it's almost certainly a user error or international.
+    if (digitsOnly[0] === '1') {
+      console.warn(`[formatPhoneE164] 10-digit number starts with 1: ${digitsOnly}. Assuming it needs +.`);
+      return `+${digitsOnly}`; // Try +1-XXX-XXX-X? No, Vapi wants 11 digits for US. 
+      // Actually, if it's 10 digits starting with 1, it's invalid for US E.164 (+1 + 10 digits = 11 digits).
+      // Let's assume they meant a 10-digit US number and just add +1 IF the area code is valid,
+      // but if it starts with 1, it's better to just return as-is with + and let Vapi/Twilio validate.
+    }
     return `+1${digitsOnly}`;
   }
 
-  // Handle 11-digit number starting with 1 (e.g., 15551234567)
+  // Handle 11-digit US number starting with 1 (e.g., 15551234567)
   if (digitsOnly.length === 11 && digitsOnly[0] === '1') {
     return `+${digitsOnly}`;
   }
 
-  // Handle 12+ digit international numbers (assume first digits are country code)
+  // Handle 12+ digit international numbers (already has country code)
   if (digitsOnly.length >= 11 && digitsOnly.length <= 15) {
-    // If starts with 1 (US/Canada), ensure proper format
-    if (digitsOnly[0] === '1' && digitsOnly.length === 11) {
-      return `+${digitsOnly}`;
-    }
-    // For other international numbers, just prefix with +
     return `+${digitsOnly}`;
   }
 

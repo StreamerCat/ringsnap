@@ -96,3 +96,5 @@ verify_jwt = false
 [functions.vapi-webhook]
 verify_jwt = false
 
+[functions.debug-db]
+verify_jwt = false

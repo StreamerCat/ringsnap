@@ -234,6 +234,22 @@ async function createVapiAssistant(
     },
     firstMessage: `Thank you for calling ${metadata.company_name}! How can I help you today?`,
     serverUrl: serverUrl,
+    analysis: {
+      structuredDataSchema: {
+        type: "object",
+        properties: {
+          callerName: { type: "string", description: "The name of the caller." },
+          callerPhone: { type: "string", description: "The phone number of the caller." },
+          reason: { type: "string", description: "The reason for the call." },
+          booked: { type: "boolean", description: "Whether an appointment was successfully booked." },
+          appointmentTime: { type: "string", description: "The ISO 8601 timestamp of the booked appointment, if applicable." },
+          address: { type: "string", description: "The address provided by the caller for the service location." },
+          summary: { type: "string", description: "A brief summary of the call." }
+        },
+        required: ["reason", "booked"]
+      },
+      successEvaluationPrompt: "Did the AI successfully handle the user's request?",
+    }
   };
 
   logInfo("Creating Vapi assistant", {
@@ -426,11 +442,21 @@ async function provisionVapiPhone(
         number: (() => {
           const rawFallback = metadata.fallback_phone?.trim() || "";
           const formatted = formatPhoneE164(rawFallback || "4155551234");
+
+          logInfo("Formatting fallback phone", {
+            ...baseLogOptions,
+            context: { rawFallback, formatted }
+          });
+
           // Validate the result is actually E.164
           if (formatted.startsWith('+') && formatted.length >= 11) {
             return formatted;
           }
           // Hardcoded safe fallback if formatting somehow failed
+          logWarn("Fallback phone formatting failed validation, using hardcoded default", {
+            ...baseLogOptions,
+            context: { rawFallback, formatted }
+          });
           return "+14155551234";
         })(),
       }
@@ -474,6 +500,7 @@ async function provisionVapiPhone(
         })
       };
     } else {
+      console.log(`[provisionVapiPhone] Sending payload: ${JSON.stringify(vapiPayload)}`);
       vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
         method: "POST",
         headers: {
@@ -535,6 +562,7 @@ async function provisionVapiPhone(
       lifecycle_status: "assigned",
       assigned_account_id: accountId,
       assigned_at: new Date().toISOString(),
+      activated_at: new Date().toISOString(),
     })
     .select("id")
     .single();
@@ -742,21 +770,37 @@ async function processJob(job: any, supabase: any): Promise<void> {
     }
 
     // Update account with provisioning results
-    await supabase.from("accounts").update({
+    const { error: accountUpdateError } = await supabase.from("accounts").update({
       vapi_assistant_id: vapiAssistantId,
       vapi_phone_number: phoneE164,
       phone_number_e164: phoneE164,
-      vapi_phone_number_id: vapiPhoneId,
+      vapi_phone_number_id: phoneDbId, // Correct: Use internal UUID for the foreign key
       phone_number_status: "active",
+      provisioning_status: "completed", // Set directly to avoid silent RPC failures
       phone_provisioned_at: new Date().toISOString(),
-      notification_sms_phone: metadata.fallback_phone || null, // Persist profile phone as default notification target
+      // notification_sms_phone: metadata.fallback_phone || null, 
     }).eq("id", job.account_id);
 
+    if (accountUpdateError) {
+      logError("Failed to update account with provisioning results", {
+        ...baseLogOptions,
+        error: accountUpdateError,
+      });
+      throw new Error(`Failed to update account: ${accountUpdateError.message}`);
+    }
+
     // Update provisioning lifecycle to completed
-    await supabase.rpc("update_provisioning_lifecycle", {
+    const { error: lifecycleError } = await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
       p_status: "completed",
     });
+
+    if (lifecycleError) {
+      logWarn("Failed to update provisioning lifecycle (non-critical)", {
+        ...baseLogOptions,
+        error: lifecycleError,
+      });
+    }
 
     // Update user's onboarding status to active (hybrid onboarding flow)
     if (job.user_id) {
