@@ -130,6 +130,13 @@ export default function ProvisioningStatus() {
                             setPhoneNumber(phoneNum);
                             if (timerRef.current) clearInterval(timerRef.current);
                             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+                            // AUTO-REDIRECT IMMEDIATELY
+                            // We use a small timeout to let the UI update briefly to "Ready" so user sees success tick
+                            // before the page transition, avoiding jarring feel.
+                            setTimeout(() => {
+                                handleReadyNavigation();
+                            }, 800);
                             return;
                         }
 
@@ -155,6 +162,11 @@ export default function ProvisioningStatus() {
                             setPhoneNumber(phoneRecord.phone_number);
                             if (timerRef.current) clearInterval(timerRef.current);
                             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+                            // AUTO-REDIRECT IMMEDIATELY (Legacy)
+                            setTimeout(() => {
+                                handleReadyNavigation();
+                            }, 800);
                             return;
                         }
 
@@ -224,8 +236,8 @@ export default function ProvisioningStatus() {
     }, [navigate, status]);
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-2xl space-y-8 text-center">
+        <div className="min-h-[100dvh] h-[100dvh] w-full bg-slate-50 flex flex-col items-center justify-center p-4 overflow-hidden relative">
+            <div className="w-full max-w-2xl space-y-8 text-center z-10">
 
                 {/* Logo or Brand */}
                 <div className="mb-8">
@@ -317,76 +329,14 @@ export default function ProvisioningStatus() {
                                     <CheckCircle2 className="h-8 w-8 text-green-600" />
                                 </div>
                                 <h2 className="text-2xl font-semibold text-green-900">
-                                    Your Assistant is Ready! 🎉
+                                    All Set!
                                 </h2>
                                 <p className="text-slate-600">
-                                    Your Voice Agent has been set up successfully and is ready to take calls.
+                                    Redirecting you to activation...
                                 </p>
-
-                                {phoneNumber && (
-                                    <div className="space-y-4">
-                                        {/* Phone Number Display */}
-                                        <div className="bg-green-50 border-2 border-green-200 p-6 rounded-lg">
-                                            <p className="text-xs text-green-700 mb-2 uppercase tracking-wide font-semibold">Your Business Line</p>
-                                            <div className="flex items-center justify-center gap-3">
-                                                <Phone className="h-5 w-5 text-green-700" />
-                                                <p className="text-3xl font-bold text-green-900">{phoneNumber}</p>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={copyPhoneNumber}
-                                                    className="text-green-700 hover:text-green-900 hover:bg-green-100"
-                                                >
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* Forwarding Instructions */}
-                                        <div className="bg-slate-50 border border-slate-200 p-6 rounded-lg text-left space-y-4">
-                                            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                                                <ArrowRight className="h-5 w-5 text-primary" />
-                                                Next Steps: Forward Your Calls
-                                            </h3>
-
-                                            <div className="space-y-3 text-sm text-slate-700">
-                                                <p className="font-medium">To activate your RingSnap Agent:</p>
-
-                                                <ol className="space-y-3 list-decimal list-inside">
-                                                    <li className="pl-2">
-                                                        <span className="font-medium">Set up call forwarding</span> from your existing business number to your new RingSnap number above
-                                                    </li>
-                                                    <li className="pl-2">
-                                                        <span className="font-medium">Test it out!</span> Call your RingSnap number directly to hear your agent in action
-                                                    </li>
-                                                    <li className="pl-2">
-                                                        <span className="font-medium">Monitor calls</span> in your dashboard to see how your assistant is performing
-                                                    </li>
-                                                </ol>
-
-                                                <div className="bg-blue-50 border border-blue-200 p-3 rounded mt-4">
-                                                    <p className="text-xs text-blue-800 font-semibold mb-1">💡 Pro Tip</p>
-                                                    <p className="text-xs text-blue-700">
-                                                        You can configure when calls are forwarded to you in the dashboard settings.
-                                                        Your Agent can handle calls 24/7 or only during specific hours.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Test Call Option */}
-                                        <div className="pt-2">
-                                            <a
-                                                href={`tel:${phoneNumber}`}
-                                                className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium"
-                                            >
-                                                <Phone className="h-4 w-4" />
-                                                Call now to test your assistant
-                                                <ExternalLink className="h-3 w-3" />
-                                            </a>
-                                        </div>
-                                    </div>
-                                )}
+                                <div className="flex justify-center">
+                                    <Loader2 className="h-6 w-6 text-green-600 animate-spin" />
+                                </div>
                             </div>
                         )}
 
@@ -406,21 +356,7 @@ export default function ProvisioningStatus() {
                         )}
 
                         <div className="pt-4 border-t">
-                            {status === "ready" ? (
-                                <>
-                                    <p className="text-xs text-slate-500 mb-4">
-                                        Ready to see your assistant in action? Head to your dashboard.
-                                    </p>
-                                    <Button
-                                        className="w-full gap-2"
-                                        size="lg"
-                                        onClick={handleReadyNavigation}
-                                    >
-                                        Go to Dashboard
-                                        <ArrowRight className="h-4 w-4" />
-                                    </Button>
-                                </>
-                            ) : (
+                            {status !== "ready" && (
                                 <>
                                     <p className="text-xs text-slate-500 mb-4">
                                         You can explore your dashboard while this runs in the background.
