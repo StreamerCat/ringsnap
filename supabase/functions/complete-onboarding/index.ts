@@ -24,7 +24,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+
     // Get auth user from request
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -35,11 +35,11 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-    
+
     // Get authenticated user
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    
+
     if (userError || !user) {
       logError('Auth error during onboarding completion', {
         ...baseLogOptions,
@@ -59,7 +59,8 @@ serve(async (req) => {
       assistantGender,
       defaultAvailability,
       connectCalendar,
-      referralCode
+      referralCode,
+      timezone
     } = await req.json();
 
     // Validate required fields
@@ -111,7 +112,8 @@ serve(async (req) => {
       assistant_gender: assistantGender,
       phone_number_area_code: areaCode,
       provisioning_status: 'provisioning',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      timezone: timezone || 'America/Denver' // Use passed timezone or fallback
     };
 
     // Add optional fields if provided
@@ -158,9 +160,9 @@ serve(async (req) => {
 
         if (profileData) {
           // Get client IP
-          const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0] || 
-                          req.headers.get('cf-connecting-ip') || 
-                          'unknown';
+          const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0] ||
+            req.headers.get('cf-connecting-ip') ||
+            'unknown';
 
           await supabase.from('referrals').insert({
             referrer_account_id: referralCodeData.account_id,
@@ -206,7 +208,7 @@ serve(async (req) => {
         // Update provisioning status to failed
         await supabase
           .from('accounts')
-          .update({ 
+          .update({
             provisioning_status: 'failed',
             provisioning_error: provisionError.message
           })
@@ -243,7 +245,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         ok: true,
         message: 'Onboarding complete. Resources are being provisioned.'
       }),

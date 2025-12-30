@@ -118,6 +118,11 @@ export type Database = {
           last_usage_warning_sent_at: string | null
           monthly_minutes_limit: number | null
           monthly_minutes_used: number | null
+          notification_email: string | null
+          notification_sms_phone: string | null
+          notify_caller_email: boolean | null
+          notify_caller_sms: boolean | null
+          notify_contractor_email: boolean | null
           onboarding_completed: boolean | null
           overage_cap_percentage: number | null
           overage_minutes_used: number | null
@@ -140,6 +145,7 @@ export type Database = {
           subscription_status:
           | Database["public"]["Enums"]["subscription_status"]
           | null
+          timezone: string | null
           trade: string | null
           trial_end_date: string | null
           trial_start_date: string | null
@@ -176,6 +182,11 @@ export type Database = {
           last_usage_warning_sent_at?: string | null
           monthly_minutes_limit?: number | null
           monthly_minutes_used?: number | null
+          notification_email?: string | null
+          notification_sms_phone?: string | null
+          notify_caller_email?: boolean | null
+          notify_caller_sms?: boolean | null
+          notify_contractor_email?: boolean | null
           onboarding_completed?: boolean | null
           overage_cap_percentage?: number | null
           overage_minutes_used?: number | null
@@ -198,6 +209,7 @@ export type Database = {
           subscription_status?:
           | Database["public"]["Enums"]["subscription_status"]
           | null
+          timezone?: string | null
           trade?: string | null
           trial_end_date?: string | null
           trial_start_date?: string | null
@@ -234,6 +246,11 @@ export type Database = {
           last_usage_warning_sent_at?: string | null
           monthly_minutes_limit?: number | null
           monthly_minutes_used?: number | null
+          notification_email?: string | null
+          notification_sms_phone?: string | null
+          notify_caller_email?: boolean | null
+          notify_caller_sms?: boolean | null
+          notify_contractor_email?: boolean | null
           onboarding_completed?: boolean | null
           overage_cap_percentage?: number | null
           overage_minutes_used?: number | null
@@ -256,6 +273,7 @@ export type Database = {
           subscription_status?:
           | Database["public"]["Enums"]["subscription_status"]
           | null
+          timezone?: string | null
           trade?: string | null
           trial_end_date?: string | null
           trial_start_date?: string | null
@@ -266,6 +284,84 @@ export type Database = {
           zip_code?: string | null
         }
         Relationships: []
+      }
+      appointments: {
+        Row: {
+          account_id: string
+          address: string | null
+          assistant_id: string | null
+          caller_email: string | null
+          caller_name: string
+          caller_phone: string
+          confirmation_sent_at: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          reminder_sent_at: string | null
+          scheduled_end_at: string | null
+          scheduled_start_at: string
+          service_type: string | null
+          status: string
+          time_zone: string
+          updated_at: string | null
+          vapi_call_id: string
+        }
+        Insert: {
+          account_id: string
+          address?: string | null
+          assistant_id?: string | null
+          caller_email?: string | null
+          caller_name: string
+          caller_phone: string
+          confirmation_sent_at?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          reminder_sent_at?: string | null
+          scheduled_end_at?: string | null
+          scheduled_start_at: string
+          service_type?: string | null
+          status?: string
+          time_zone?: string
+          updated_at?: string | null
+          vapi_call_id: string
+        }
+        Update: {
+          account_id?: string
+          address?: string | null
+          assistant_id?: string | null
+          caller_email?: string | null
+          caller_name?: string
+          caller_phone?: string
+          confirmation_sent_at?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          reminder_sent_at?: string | null
+          scheduled_end_at?: string | null
+          scheduled_start_at?: string
+          service_type?: string | null
+          status?: string
+          time_zone?: string
+          updated_at?: string | null
+          vapi_call_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_assistant_id_fkey"
+            columns: ["assistant_id"]
+            isOneToOne: false
+            referencedRelation: "assistants"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       assistants: {
         Row: {
@@ -425,6 +521,47 @@ export type Database = {
             referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      google_calendar_connections: {
+        Row: {
+          account_id: string
+          calendar_id: string | null
+          connected_at: string | null
+          created_at: string | null
+          id: string
+          refresh_token_encrypted: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          calendar_id?: string | null
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          refresh_token_encrypted?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          calendar_id?: string | null
+          connected_at?: string | null
+          created_at?: string | null
+          id?: string
+          refresh_token_encrypted?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_connections_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          }
         ]
       }
       plan_definitions: {

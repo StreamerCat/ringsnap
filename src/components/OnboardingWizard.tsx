@@ -63,6 +63,16 @@ const wizardSchema = step1Schema.merge(step2Schema).merge(step3Schema);
 
 type WizardFormData = z.infer<typeof wizardSchema>;
 
+// Helper to detect browser timezone
+function getBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Denver";
+  } catch (e) {
+    return "America/Denver";
+  }
+}
+
+
 type AccountRow = Database["public"]["Tables"]["accounts"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type ProfileWithAccount = ProfileRow & { accounts?: AccountRow | null };
@@ -352,7 +362,8 @@ export function OnboardingWizard({
           trade: finalTrade,
           assistantGender: values.assistantGender,
           defaultAvailability: values.defaultAvailability?.trim() || null,
-          connectCalendar: values.connectCalendar || false
+          connectCalendar: values.connectCalendar || false,
+          timezone: getBrowserTimezone()
         };
 
         dbg("Submitting wizard payload", payload);
