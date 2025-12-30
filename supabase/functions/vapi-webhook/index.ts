@@ -312,11 +312,16 @@ Deno.serve(withSentryEdge(
 
             // Upsert (Robust handling for Schema Evolution)
             let upsertError: any = null;
+            let savedRecord: any = null;
+
             try {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('call_logs')
-                    .upsert(callRecord, { onConflict: 'vapi_call_id' });
+                    .upsert(callRecord, { onConflict: 'vapi_call_id' })
+                    .select('id')
+                    .single();
                 upsertError = error;
+                savedRecord = data;
             } catch (e) {
                 upsertError = e;
             }
@@ -325,10 +330,18 @@ Deno.serve(withSentryEdge(
             if (upsertError && upsertError.message && upsertError.message.includes('address')) {
                 console.warn("Schema mismatch: 'address' column missing in call_logs. Retrying without it.");
                 const { address, ...safeRecord } = callRecord;
-                const { error: retryError } = await supabase
+                const { data, error: retryError } = await supabase
                     .from('call_logs')
-                    .upsert(safeRecord, { onConflict: 'vapi_call_id' });
+                    .upsert(safeRecord, { onConflict: 'vapi_call_id' })
+                    .select('id')
+                    .single();
                 upsertError = retryError;
+                savedRecord = data;
+            }
+
+            // Update callRecord with ID for subsequent use (e.g. appointment creation)
+            if (!upsertError && savedRecord) {
+                (callRecord as any).id = savedRecord.id;
             }
 
             if (upsertError) {
@@ -345,7 +358,7 @@ Deno.serve(withSentryEdge(
 
             // Create appointment if call was booked (only on end-of-call-report)
             if (type === 'end-of-call-report' && callRecord.booked && mappingResult.accountId) {
-                await createAppointmentFromCall(supabase, callRecord, mappingResult.accountId);
+                await createAppointmentFromCall(supabase, callRecord, mappingResult.accountId, providerPhoneNumberId);
             }
 
             console.log(JSON.stringify({
@@ -536,7 +549,8 @@ async function writeToInbox(
 async function createAppointmentFromCall(
     supabase: ReturnType<typeof createClient>,
     callRecord: Record<string, unknown>,
-    accountId: string
+    accountId: string,
+    vapiPhoneId: string | null
 ): Promise<void> {
     try {
         const scheduledStartAt = callRecord.appointment_start as string | null;
@@ -586,7 +600,7 @@ async function createAppointmentFromCall(
             console.error('Failed to create appointment:', aptError);
             await writeToInbox(supabase, {
                 provider_call_id: callRecord.vapi_call_id as string,
-                provider_phone_number_id: callRecord.vapi_phone_id as string,
+                provider_phone_number_id: vapiPhoneId || (callRecord.vapi_phone_id as string) || "unknown",
                 reason: "appointment_creation_failed",
                 payload: { error: aptError, appointmentData },
                 error: aptError.message
@@ -596,7 +610,7 @@ async function createAppointmentFromCall(
             // Log success to inbox for now to verify it ran
             await writeToInbox(supabase, {
                 provider_call_id: callRecord.vapi_call_id as string,
-                provider_phone_number_id: callRecord.vapi_phone_id as string,
+                provider_phone_number_id: vapiPhoneId || (callRecord.vapi_phone_id as string) || "unknown",
                 reason: "appointment_created",
                 payload: { appointmentData },
                 error: null
