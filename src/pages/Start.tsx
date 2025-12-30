@@ -219,7 +219,7 @@ export default function Start() {
       storeLeadId(leadId);
 
       // Track successful lead capture
-      trackFunnelEvent('signup_completed', { lead_id: leadId });
+      trackFunnelEvent('lead_captured', { lead_id: leadId });
 
       // Show success feedback
       toast.success('Great! Loading your setup...');

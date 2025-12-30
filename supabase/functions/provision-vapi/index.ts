@@ -426,11 +426,21 @@ async function provisionVapiPhone(
         number: (() => {
           const rawFallback = metadata.fallback_phone?.trim() || "";
           const formatted = formatPhoneE164(rawFallback || "4155551234");
+
+          logInfo("Formatting fallback phone", {
+            ...baseLogOptions,
+            context: { rawFallback, formatted }
+          });
+
           // Validate the result is actually E.164
           if (formatted.startsWith('+') && formatted.length >= 11) {
             return formatted;
           }
           // Hardcoded safe fallback if formatting somehow failed
+          logWarn("Fallback phone formatting failed validation, using hardcoded default", {
+            ...baseLogOptions,
+            context: { rawFallback, formatted }
+          });
           return "+14155551234";
         })(),
       }

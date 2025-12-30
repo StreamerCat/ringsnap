@@ -207,14 +207,29 @@ async function trackEvent(
 ): Promise<void> {
   // Allow tracking events without account_id (e.g. signup_started)
   try {
-    await supabase.from("analytics_events").insert({
+    const { error } = await supabase.from("analytics_events").insert({
       account_id: accountId, // Can be null now
       user_id: userId,
       event_type: eventType,
       metadata: metadata,
     });
+
+    if (error) {
+      // Resilience for foreign key violations on user_id
+      if (error.code === '23503' && error.message.includes('user_id')) {
+        console.warn(`[${FUNCTION_NAME}] user_id ${userId} not found, falling back to null for ${eventType}`);
+        await supabase.from("analytics_events").insert({
+          account_id: accountId,
+          user_id: null,
+          event_type: eventType,
+          metadata: { ...metadata, original_user_id: userId },
+        });
+      } else {
+        console.error(`[${FUNCTION_NAME}] Failed to track event ${eventType}:`, error.message);
+      }
+    }
   } catch (err) {
-    console.error(`[${FUNCTION_NAME}] Failed to track event ${eventType}:`, err);
+    console.error(`[${FUNCTION_NAME}] Exception tracking event ${eventType}:`, err);
   }
 }
 
@@ -1645,6 +1660,13 @@ Deno.serve(async (req: Request) => {
         subscriptionId: subscription.id,
         provisioningStatus: "pending",
       },
+    });
+
+    // Track Success in Analytics
+    await trackEvent(supabase, currentAccountId, currentUserId, 'trial_created', {
+      plan_type: data.planType,
+      source: data.source,
+      has_lead: !!data.leadId
     });
 
     // ═══════════════════════════════════════════════════════════════
