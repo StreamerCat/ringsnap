@@ -110,7 +110,7 @@ serve(async (req) => {
             .eq('id', record.id)
             .single();
 
-          const vapiId = phoneDetails?.provider_phone_number_id || phoneDetails?.vapi_phone_id;
+          const vapiId = phoneDetails?.vapi_phone_id || phoneDetails?.provider_phone_number_id;
 
           if (vapiId) {
             const vapiResponse = await fetch(

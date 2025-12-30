@@ -59,7 +59,7 @@ Deno.serve(withSentryEdge(
             if (!providerCallId) {
                 await writeToInbox(supabase, {
                     provider_call_id: null,
-                    provider_phone_number_id: providerPhoneNumberId,
+                    provider_phone_number_id: providerPhoneNumberId, // This is the raw ID from payload
                     reason: "missing_call_id",
                     payload: body,
                     error: "No call.id found in payload",
@@ -91,11 +91,18 @@ Deno.serve(withSentryEdge(
             const vapiPhoneId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
             const calleeE164 = call.phoneNumber?.number ?? call.transport?.to ?? null;
 
-            let matchedPhone: { id: any; account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; } | null = null;
+            let matchedPhone: { id: any; account_id: any; assigned_account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; accounts: { subscription_status: string; account_status: string } | null } | null = null;
             let matchField: string | null = null;
 
             // 1. Resolve Phone Record (Identifier-Safe Order)
-            // Primary: Vapi Phone ID
+            // During Phase 0 normalization, we need to check all legacy columns
+
+            // Helper to detect duplicate mapping errors
+            const isDuplicateError = (error: any) =>
+                error?.message?.toLowerCase().includes('multiple') ||
+                error?.code === 'PGRST116';
+
+            // Primary: vapi_phone_id (CANONICAL)
             if (vapiPhoneId) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
@@ -105,6 +112,16 @@ Deno.serve(withSentryEdge(
 
                 if (error) {
                     console.error("Lookup VapiPhoneId Error:", error);
+                    if (isDuplicateError(error)) {
+                        await writeToInbox(supabase, {
+                            provider_call_id: providerCallId,
+                            provider_phone_number_id: vapiPhoneId,
+                            reason: "duplicate_phone_mapping",
+                            payload: { field: 'vapi_phone_id', vapiPhoneId, calleeE164 },
+                            error: `Multiple rows found for vapi_phone_id: ${vapiPhoneId}`,
+                        });
+                        return new Response(JSON.stringify({ error: "duplicate_phone_mapping", integrity_error: true, field: 'vapi_phone_id', value: vapiPhoneId }), { status: 200, headers: corsHeaders });
+                    }
                 }
                 if (data) {
                     matchedPhone = data;
@@ -112,7 +129,61 @@ Deno.serve(withSentryEdge(
                 }
             }
 
-            // Secondary: E164
+            // Fallback 1: vapi_id (LEGACY - will be removed after normalization)
+            if (!matchedPhone && vapiPhoneId) {
+                const { data, error } = await supabase
+                    .from('phone_numbers')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .eq('vapi_id', vapiPhoneId)
+                    .maybeSingle();
+
+                if (error) {
+                    console.error("Lookup VapiId (legacy) Error:", error);
+                    if (isDuplicateError(error)) {
+                        await writeToInbox(supabase, {
+                            provider_call_id: providerCallId,
+                            provider_phone_number_id: vapiPhoneId,
+                            reason: "duplicate_phone_mapping",
+                            payload: { field: 'vapi_id', vapiPhoneId, calleeE164 },
+                            error: `Multiple rows found for vapi_id: ${vapiPhoneId}`,
+                        });
+                        return new Response(JSON.stringify({ error: "duplicate_phone_mapping", integrity_error: true, field: 'vapi_id', value: vapiPhoneId }), { status: 200, headers: corsHeaders });
+                    }
+                }
+                if (data) {
+                    matchedPhone = data;
+                    matchField = 'vapi_id';
+                }
+            }
+
+            // Fallback 2: provider_phone_number_id (LEGACY - will be removed after normalization)
+            if (!matchedPhone && vapiPhoneId) {
+                const { data, error } = await supabase
+                    .from('phone_numbers')
+                    .select('id, account_id, assigned_account_id, lifecycle_status, vapi_phone_id, e164_number, accounts(subscription_status, account_status)')
+                    .eq('provider_phone_number_id', vapiPhoneId)
+                    .maybeSingle();
+
+                if (error) {
+                    console.error("Lookup ProviderPhoneNumberId (legacy) Error:", error);
+                    if (isDuplicateError(error)) {
+                        await writeToInbox(supabase, {
+                            provider_call_id: providerCallId,
+                            provider_phone_number_id: vapiPhoneId,
+                            reason: "duplicate_phone_mapping",
+                            payload: { field: 'provider_phone_number_id', vapiPhoneId, calleeE164 },
+                            error: `Multiple rows found for provider_phone_number_id: ${vapiPhoneId}`,
+                        });
+                        return new Response(JSON.stringify({ error: "duplicate_phone_mapping", integrity_error: true, field: 'provider_phone_number_id', value: vapiPhoneId }), { status: 200, headers: corsHeaders });
+                    }
+                }
+                if (data) {
+                    matchedPhone = data;
+                    matchField = 'provider_phone_number_id';
+                }
+            }
+
+            // Fallback 3: E164
             if (!matchedPhone && calleeE164) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
@@ -122,6 +193,16 @@ Deno.serve(withSentryEdge(
 
                 if (error) {
                     console.error("Lookup E164 Error:", error);
+                    if (isDuplicateError(error)) {
+                        await writeToInbox(supabase, {
+                            provider_call_id: providerCallId,
+                            provider_phone_number_id: vapiPhoneId,
+                            reason: "duplicate_phone_mapping",
+                            payload: { field: 'e164_number', vapiPhoneId, calleeE164 },
+                            error: `Multiple rows found for e164_number: ${calleeE164}`,
+                        });
+                        return new Response(JSON.stringify({ error: "duplicate_phone_mapping", integrity_error: true, field: 'e164_number', value: calleeE164 }), { status: 200, headers: corsHeaders });
+                    }
                 }
                 if (data) {
                     matchedPhone = data;
@@ -129,7 +210,7 @@ Deno.serve(withSentryEdge(
                 }
             }
 
-            // Tertiary: phone_number (fallback for legacy data or null e164 matches)
+            // Fallback 4: phone_number (legacy data or null e164 matches)
             if (!matchedPhone && calleeE164) {
                 const { data, error } = await supabase
                     .from('phone_numbers')
@@ -139,6 +220,16 @@ Deno.serve(withSentryEdge(
 
                 if (error) {
                     console.error("Lookup PhoneNumber Error:", error);
+                    if (isDuplicateError(error)) {
+                        await writeToInbox(supabase, {
+                            provider_call_id: providerCallId,
+                            provider_phone_number_id: vapiPhoneId,
+                            reason: "duplicate_phone_mapping",
+                            payload: { field: 'phone_number', vapiPhoneId, calleeE164 },
+                            error: `Multiple rows found for phone_number: ${calleeE164}`,
+                        });
+                        return new Response(JSON.stringify({ error: "duplicate_phone_mapping", integrity_error: true, field: 'phone_number', value: calleeE164 }), { status: 200, headers: corsHeaders });
+                    }
                 }
                 if (data) {
                     matchedPhone = data;
@@ -228,7 +319,7 @@ Deno.serve(withSentryEdge(
                     provider_call_id: providerCallId,
                     provider_phone_number_id: providerPhoneNumberId,
                     reason: "exception",
-                    payload: body ?? { error: "failed to parse body" },
+                    payload: { ...body as object, error: "failed to parse body" },
                     error: errorMessage,
                 });
             } catch { }

@@ -183,7 +183,7 @@ export default function CustomerDashboard() {
       // Load parallel data (removed referral_codes fetch to avoid errors)
       // Switch from usage_logs to calls table
       const [phonesRes, assistantsRes, callsRes, creditsRes, referralsRes] = await Promise.all([
-        supabase.from("phone_numbers").select("*").eq("account_id", accountId) as Promise<any>,
+        supabase.from("phone_numbers").select("*").or(`assigned_account_id.eq.${accountId},account_id.eq.${accountId}`) as Promise<any>,
         supabase.from("assistants").select("*").eq("account_id", accountId) as Promise<any>,
         supabase.rpc("get_recent_calls", { p_account_id: accountId, p_limit: 50 }) as Promise<any>,
         supabase.from("account_credits").select("*").eq("account_id", accountId).order("created_at", { ascending: false }) as Promise<any>,

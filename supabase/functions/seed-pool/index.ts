@@ -94,7 +94,6 @@ serve(async (req) => {
                     await supabase.from('phone_numbers').insert({
                         phone_number: e164,
                         e164_number: e164,
-                        provider_phone_number_id: tn.sid,
                         twilio_phone_number_sid: tn.sid,
                         lifecycle_status: 'pool',
                         status: 'released',

@@ -27,7 +27,7 @@ serve(async (req) => {
 
         // Return account-specific data
         const { data: account } = await supabase.from("accounts").select("provisioning_status, vapi_phone_number, vapi_assistant_id").eq("id", accountId).single();
-        const { data: phone } = await supabase.from("phone_numbers").select("*").eq("account_id", accountId);
+        const { data: phone } = await supabase.from("phone_numbers").select("*").or(`assigned_account_id.eq.${accountId},account_id.eq.${accountId}`);
         const { data: assistant } = await supabase.from("vapi_assistants").select("*").eq("account_id", accountId);
         const { data: jobs } = await supabase.from("provisioning_jobs").select("*").eq("account_id", accountId).order('created_at', { ascending: false });
 

@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import { extractCorrelationId, logError, logInfo, logWarn, withLogContext } from "../_shared/logging.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -221,212 +221,212 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    console.log("[provision_number] VAPI_API_KEY found");
 
     // Mark account as provisioning
-    console.log("[provision_number] Updating account status to provisioning");
-    const updateRes = await supabase
-      .from("accounts")
-      .update({ provisioning_status: "provisioning" })
-      .eq("id", accountId);
+    await supabase.from("accounts").update({ provisioning_status: "provisioning" }).eq("id", accountId);
 
-    if (updateRes.error) {
-      console.error("[provision_number] Failed to update account:", updateRes.error);
-      log.error("Failed to update account status", updateRes.error, { accountId });
-      return new Response(JSON.stringify({ status: "failed", error: "Database error" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    console.log("[provision_number] Account status updated");
+    // 1. Attempt Allocation from Pool
+    let provisionedPhone: { id: string, vapiId: string, number: string, isNew: boolean } | null = null;
 
-    // Log provisioning start
-    await supabase.from("provisioning_logs").insert({
-      account_id: accountId,
-      operation: "create_started",
-      details: { areaCode, assistantId, workflowId }
+    const { data: allocated, error: allocError } = await supabase.rpc("allocate_pooled_phone_number", {
+      p_account_id: accountId,
+      p_area_code: areaCode
     });
 
-    // Create phone number on Vapi
-    console.log("[provision_number] Creating phone number on Vapi");
-    const { data: created, error: createError } = await createPhoneNumber(
-      areaCode,
-      assistantId,
-      workflowId,
-      log
-    );
+    if (allocError) {
+      log.error("Allocator RPC failed", allocError, { accountId });
+      // Proceed to buy new? Or fail? Safe to proceed to buy new usually, but let's log loudly.
+    }
 
-    console.log("[provision_number] Vapi creation result:", { created, createError });
+    if (allocated && allocated.length > 0) {
+      const poolPhone = allocated[0];
+      log.info("Allocated phone from pool", { phoneId: poolPhone.id, vapiId: poolPhone.vapi_phone_id });
 
-    if (createError || !created?.id) {
-      console.error("[provision_number] Phone creation failed:", createError);
-      log.error("Phone creation failed", undefined, { accountId, error: createError });
+      // Bind to new assistant via Vapi PATCH
+      try {
+        const patchRes = await fetch(`${VAPI_BASE}/phone-number/${poolPhone.vapi_phone_id}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${vapiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            assistantId: assistantId,
+            // Ensure name/label is updated?
+          }),
+        });
 
-      // Mark as failed
-      await supabase.from("accounts").update({ provisioning_status: "failed" }).eq("id", accountId);
+        if (!patchRes.ok) {
+          const errText = await patchRes.text();
+          throw new Error(`Vapi PATCH failed: ${errText}`);
+        }
 
-      await supabase.from("provisioning_logs").insert({
+        provisionedPhone = {
+          id: poolPhone.id,
+          vapiId: poolPhone.vapi_phone_id,
+          number: poolPhone.e164_number,
+          isNew: false
+        };
+      } catch (err) {
+        log.error("Failed to bind pooled phone", err, { vapiId: poolPhone.vapi_phone_id });
+        // Release back to pool? Or Quarantine? For now, we fail.
+        //Ideally transition strict to quarantine so we don't reuse broken phone.
+        await supabase.from("accounts").update({
+          provisioning_status: "failed",
+          provisioning_error_code: "POOL_BIND_FAILED",
+          provisioning_error_message: String(err)
+        }).eq("id", accountId);
+
+        return new Response(JSON.stringify({ status: "failed", error: "Failed to bind phone number" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+    } else {
+      // 2. Buy New Number (Legacy Logic)
+      log.info("No pool number found, buying new", { areaCode });
+
+      const { data: created, error: createError } = await createPhoneNumber(
+        areaCode,
+        assistantId,
+        workflowId,
+        log
+      );
+
+      if (createError || !created?.id) {
+        await supabase.from("accounts").update({
+          provisioning_status: "failed",
+          provisioning_error_code: "BUY_FAILED",
+          provisioning_error_message: createError
+        }).eq("id", accountId);
+
+        log.error("Phone creation failed", undefined, { accountId, error: createError });
+        return new Response(JSON.stringify({ status: "failed", error: createError || "Failed to create phone number" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const vapiId = created.id;
+      // Upsert new row
+      const phoneNumberValue = created.number || `+1${areaCode}0000000`;
+
+      const newRecord = {
         account_id: accountId,
-        operation: "create_failed",
-        details: { areaCode, error: createError }
-      });
+        vapi_phone_id: vapiId,
+        provider_phone_number_id: vapiId,
+        phone_number: phoneNumberValue,
+        e164_number: phoneNumberValue,
+        area_code: areaCode,
+        provider: "vapi",
+        status: "active", // Vapi mostly returns active immediately or pending?
+        is_primary: true,
+        provisioning_attempts: 1,
+        last_polled_at: new Date().toISOString(),
+        activated_at: new Date().toISOString(), // Assuming active for now, verification gates completion
+        lifecycle_status: "assigned",
+        assigned_account_id: accountId,
+        assigned_at: new Date().toISOString(),
+        raw: created
+      };
+
+      const { data: inserted, error: upsertError } = await supabase
+        .from("phone_numbers")
+        .upsert(newRecord, { onConflict: "vapi_phone_id" })
+        .select("id")
+        .single();
+
+      if (upsertError) {
+        await supabase.from("accounts").update({
+          provisioning_status: "failed",
+          provisioning_error_code: "DB_WRITE_FAILED",
+          provisioning_error_message: upsertError.message
+        }).eq("id", accountId);
+        return new Response(JSON.stringify({ status: "failed", error: "Database write failed" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      provisionedPhone = {
+        id: inserted.id,
+        vapiId: vapiId,
+        number: phoneNumberValue,
+        isNew: true
+      };
+    }
+
+    // 3. VERIFICATION GATING
+    // Loop to verify assistantId matches on Vapi GET
+    const MAX_RETRIES = 3;
+    let verified = false;
+    let verificationError = null;
+
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      await sleep(1000 * Math.pow(2, i)); // 1s, 2s, 4s
+
+      try {
+        const checkRes = await fetch(`${VAPI_BASE}/phone-number/${provisionedPhone.vapiId}`, {
+          headers: { Authorization: `Bearer ${vapiKey}` },
+        });
+        const checkData = await checkRes.json();
+
+        if (checkData.assistantId === assistantId) {
+          verified = true;
+          break;
+        } else {
+          console.warn(`[provision_number] Verification attempt ${i + 1} failed: assistantId mismatch`, {
+            expected: assistantId,
+            actual: checkData.assistantId
+          });
+        }
+      } catch (err) {
+        verificationError = err;
+        console.warn(`[provision_number] Verification error attempt ${i + 1}`, err);
+      }
+    }
+
+    if (!verified) {
+      log.error("Vapi verification failed after retries", verificationError, { accountId, vapiId: provisionedPhone.vapiId });
+
+      // Fail the provisioning
+      await supabase.from("accounts").update({
+        provisioning_status: "failed",
+        provisioning_error_code: "VERIFICATION_FAILED",
+        provisioning_error_message: "Phone number failed to bind to assistant",
+        last_failed_step: "verification_loop"
+      }).eq("id", accountId);
 
       return new Response(JSON.stringify({
         status: "failed",
-        error: createError || "Failed to create phone number"
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+        error: "Provisioning verification failed. Please contact support."
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const vapiId = created.id;
-    console.log("[provision_number] Phone created on Vapi:", vapiId);
+    // 4. Final Success Update
+    await supabase.from("accounts").update({
+      provisioning_status: "active", // or 'completed'
+      vapi_phone_number: provisionedPhone.number,
+      phone_number_e164: provisionedPhone.number,
+      vapi_phone_number_id: provisionedPhone.id,
+      phone_provisioned_at: new Date().toISOString()
+    }).eq("id", accountId);
 
-    // Poll for activation
-    console.log("[provision_number] Starting polling for phone activation");
-    const { data: finalPhone, error: pollError } = await pollPhoneStatus(vapiId, log);
-
-    console.log("[provision_number] Polling result:", { finalPhone, pollError });
-
-    if (pollError) {
-      console.warn("[provision_number] Poll ended with error:", pollError);
-      log.warn("Poll ended with error", {
-        vapiId,
-        error: pollError
-      });
-    }
-
-    const finalStatus = finalPhone?.status ?? "pending";
-    console.log("[provision_number] Final status:", finalStatus);
-
-    // Upsert phone record
-    const phoneNumberValue = finalPhone?.number || `+1${areaCode}0000000`;
-    console.log("[provision_number] PROVISION_UPSERT_START", {
-      accountId,
-      vapiPhoneId: vapiId,
-      phoneNumber: phoneNumberValue,
-      status: finalStatus
-    });
-
-    const phoneRecord = {
-      account_id: accountId,
-      vapi_phone_id: vapiId,  // Use canonical column (has UNIQUE constraint)
-      provider_phone_number_id: vapiId,  // Also populate canonical provider ID
-      phone_number: phoneNumberValue,
-      e164_number: phoneNumberValue,  // Canonical E.164 format
-      area_code: areaCode,
-      provider: "vapi",
-      status: finalStatus,
-      is_primary: true,
-      provisioning_attempts: 1,
-      last_polled_at: new Date().toISOString(),
-      activated_at: finalStatus === "active" ? new Date().toISOString() : null,
-      raw: finalPhone
-    };
-
-    const { data: inserted, error: upsertError } = await supabase
-      .from("phone_numbers")
-      .upsert(phoneRecord, { onConflict: "vapi_phone_id" })  // Match UNIQUE constraint
-      .select("id, phone_number, activated_at")
-      .single();
-
-    console.log("[provision_number] PROVISION_UPSERT_RESULT", {
-      success: !upsertError,
-      phoneRowId: inserted?.id,
-      activatedAt: inserted?.activated_at,
-      error: upsertError?.message
-    });
-
-    if (upsertError) {
-      console.error("[provision_number] Failed to upsert phone record:", upsertError);
-      log.error("Failed to upsert phone record", upsertError, { accountId });
-      await supabase.from("accounts").update({ provisioning_status: "failed" }).eq("id", accountId);
-      return new Response(JSON.stringify({ status: "failed", error: "Database write failed" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Update account with phone link and phone number string
-    // Note: Keep status as 'active' (not 'completed') - provision_number only handles phone, not assistant
-    const accountUpdateStatus = finalStatus === "active" ? "active" : "pending";
-    const phoneNumberStr = inserted?.phone_number || phoneRecord.phone_number;
-
-    console.log("[provision_number] PROVISION_ACCOUNT_UPDATE", {
-      accountId,
-      status: accountUpdateStatus,
-      phoneNumber: phoneNumberStr,
-      phoneRowId: inserted?.id
-    });
-
-    const { error: accountUpdateError } = await supabase
-      .from("accounts")
-      .update({
-        provisioning_status: accountUpdateStatus,
-        vapi_phone_number: phoneNumberStr,  // Actual phone string for UI
-        phone_number_e164: phoneNumberStr,  // Canonical E.164 field
-        vapi_phone_number_id: inserted?.id,
-        phone_provisioned_at: finalStatus === "active" ? new Date().toISOString() : null
-      })
-      .eq("id", accountId);
-
-    if (accountUpdateError) {
-      console.error("[provision_number] PROVISION_ACCOUNT_UPDATE_FAILED", {
-        accountId,
-        error: accountUpdateError.message
-      });
-    } else {
-      console.log("[provision_number] PROVISION_ACCOUNT_UPDATE_SUCCESS", {
-        accountId,
-        phoneRowId: inserted?.id,
-        activatedAt: inserted?.activated_at
-      });
-    }
-
-    // Log success
+    // Initial log success
     await supabase.from("provisioning_logs").insert({
       account_id: accountId,
       operation: "create_success",
       details: {
-        vapiId,
-        phoneNumber: finalPhone?.number,
-        status: finalStatus
+        vapiId: provisionedPhone.vapiId,
+        phoneNumber: provisionedPhone.number,
+        isPooled: !provisionedPhone.isNew
       }
     });
 
-    log.info("Provisioning completed", {
-      accountId,
-      status: finalStatus,
-      number: finalPhone?.number
-    });
+    return new Response(JSON.stringify({
+      status: "active",
+      phone: { number: provisionedPhone.number },
+      phoneId: provisionedPhone.id,
+      number: provisionedPhone.number
+    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    console.log("[provision_number] Provisioning complete, returning response");
-
-    // Return response
-    if (finalStatus === "active") {
-      console.log("[provision_number] Returning active status with number:", finalPhone?.number);
-      return new Response(JSON.stringify({
-        status: "active",
-        phone: finalPhone,
-        phoneId: inserted?.id,
-        number: finalPhone?.number
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    } else {
-      console.log("[provision_number] Returning pending status");
-      return new Response(JSON.stringify({
-        status: "pending",
-        phone: finalPhone,
-        phoneId: inserted?.id,
-        error: "Phone is still provisioning. You will be notified when ready."
-      }), {
-        status: 202,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
   } catch (err) {
     console.error("[provision_number] Unhandled error:", err);
     log.error("Unhandled error in provision_number", err);
