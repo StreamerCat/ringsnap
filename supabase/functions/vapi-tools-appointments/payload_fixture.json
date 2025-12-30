@@ -1,0 +1,27 @@
+{
+    "message": {
+        "type": "tool-calls",
+        "call": {
+            "id": "call_1234567890",
+            "assistantId": "asst_123456"
+        }
+    },
+    "toolCall": {
+        "id": "call_tool_123",
+        "type": "function",
+        "function": {
+            "name": "book_appointment",
+            "arguments": {
+                "startDateTime": "2024-01-15T10:00:00Z",
+                "endDateTime": "2024-01-15T11:00:00Z",
+                "timeZone": "America/Los_Angeles",
+                "callerName": "Jane Tester",
+                "callerPhone": "+14155550201",
+                "callerEmail": "jane@example.com",
+                "serviceType": "HVAC Tune-up",
+                "address": "456 Oak St, San Francisco, CA",
+                "notes": "Gate code 1234"
+            }
+        }
+    }
+}

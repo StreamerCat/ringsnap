@@ -24,6 +24,7 @@
     "test:lhci": "lhci autorun",
     "test:smoke": "playwright test --project=smoke",
     "test:smoke:ci": "playwright test --project=smoke --reporter=github",
+    "test:provisioning:e2e": "node scripts/provisioning-e2e-agent.mjs",
     "test:full": "playwright test --project=full"
   },
   "dependencies": {

@@ -126,7 +126,8 @@ async function createVapiAssistant(
   supabase: any,
   accountId: string,
   metadata: any,
-  correlationId: string
+  correlationId: string,
+  testConfig?: any
 ): Promise<{ vapiAssistantId: string; vapiAssistantDbId: string }> {
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
@@ -174,6 +175,46 @@ async function createVapiAssistant(
     ? `${supabaseUrl.replace(/\/$/, "")}/functions/v1/vapi-webhook`
     : undefined;
 
+  // Feature Flag: Appointment Tool
+  const APPOINTMENTS_VAPI_TOOL_ENABLED = Deno.env.get("APPOINTMENTS_VAPI_TOOL_ENABLED") === "true";
+  const tools = [];
+
+  if (APPOINTMENTS_VAPI_TOOL_ENABLED) {
+    logInfo("Enabling Appointment Tool for Assistant", baseLogOptions);
+    tools.push({
+      type: "function",
+      function: {
+        name: "book_appointment",
+        description: "Book an appointment when the user confirms a specific time and date.",
+        parameters: {
+          type: "object",
+          properties: {
+            startDateTime: { type: "string", description: "ISO 8601 start time (e.g. 2023-10-27T14:30:00)" },
+            endDateTime: { type: "string", description: "ISO 8601 end time (optional)" },
+            timeZone: { type: "string", description: "IANA timezone area/city (e.g. America/Denver)" },
+            callerName: { type: "string", description: "Name of the caller" },
+            callerPhone: { type: "string", description: "Phone number of the caller" },
+            callerEmail: { type: "string", description: "Email of the caller (optional)" },
+            serviceType: { type: "string", description: "Type of service requested (optional)" },
+            address: { type: "string", description: "Service address (optional)" },
+            notes: { type: "string", description: "Any special instructions or notes" }
+          },
+          required: ["startDateTime", "timeZone", "callerName", "callerPhone"]
+        }
+      },
+      server: {
+        url: `${supabaseUrl}/functions/v1/vapi-tools-appointments`,
+        headers: {
+          // We use the same secret as the webhook for simplicity, or a dedicated one
+          "x-ringsnap-secret": Deno.env.get("VAPI_WEBHOOK_SECRET") || "default-secret"
+        }
+      }
+    });
+
+    // Append instructions to prompt
+    prompt += `\n\nTOOL USE: You have a tool called 'book_appointment'. Use this when the caller wants to schedule a service. Collect their name, phone, and desired time. Confirm the details before calling the tool. Tell them they will receive a confirmation text and email.`;
+  }
+
   const assistantPayload = {
     name: `${metadata.company_name} Assistant`,
     model: {
@@ -186,6 +227,7 @@ async function createVapiAssistant(
         },
       ],
     },
+    tools: tools.length > 0 ? tools : undefined,
     voice: {
       provider: "11labs",
       voiceId: voiceId,
@@ -196,17 +238,32 @@ async function createVapiAssistant(
 
   logInfo("Creating Vapi assistant", {
     ...baseLogOptions,
-    context: { companyName: metadata.company_name, voice: voiceId, serverUrl },
+    context: { companyName: metadata.company_name, voice: voiceId, serverUrl, isMock: !!testConfig?.mock_provider },
   });
 
-  const vapiResponse = await fetch(`${VAPI_BASE_URL}/assistant`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${VAPI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(assistantPayload),
-  });
+  let vapiResponse;
+
+  if (testConfig?.mock_provider) {
+    // MOCK PROVIDER RESPONSE
+    vapiResponse = {
+      ok: true,
+      json: async () => ({
+        id: `mock-assistant-${Date.now()}`,
+        name: assistantPayload.name,
+        voice: assistantPayload.voice,
+        model: assistantPayload.model
+      })
+    };
+  } else {
+    vapiResponse = await fetch(`${VAPI_BASE_URL}/assistant`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${VAPI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(assistantPayload),
+    });
+  }
 
   if (!vapiResponse.ok) {
     const errorText = await vapiResponse.text();
@@ -251,7 +308,8 @@ async function provisionVapiPhone(
   accountId: string,
   vapiAssistantId: string,
   metadata: any,
-  correlationId: string
+  correlationId: string,
+  testConfig?: any
 ): Promise<{ phoneE164: string; vapiPhoneId: string; phoneDbId: string }> {
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
@@ -270,7 +328,14 @@ async function provisionVapiPhone(
   // --------------------------------------------------------
   // 1. Provision (Buy) Number from Telephony Provider
   // --------------------------------------------------------
-  if (TELEPHONY_PROVIDER === "twilio") {
+  if (testConfig?.mock_provider) {
+    // MOCK TELEPHONY
+    logInfo("MOCK MODE: Simulating Telephony Provisioning", baseLogOptions);
+    phoneE164 = `+1${requestedAreaCode}555${Math.floor(1000 + Math.random() * 9000)}`;
+    providerProviderId = `mock-sid-${Date.now()}`;
+    providerMetadata = { mocked: true };
+
+  } else if (TELEPHONY_PROVIDER === "twilio") {
     // Validate Creds
     const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID")?.trim();
     // Use TWILIO_API_KEY / TWILIO_API_SECRET preferentially for Twilio Auth
@@ -395,14 +460,29 @@ async function provisionVapiPhone(
     };
   } else {
     // REAL Vapi Call
-    const vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${VAPI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(vapiPayload),
-    });
+    let vapiResponse;
+    if (testConfig?.mock_provider) {
+      logInfo("Test Mode: Mocking Vapi Import (Mock Provider Flag)", baseLogOptions);
+      vapiResponse = {
+        ok: true,
+        json: async () => ({
+          id: `mock-phone-${Date.now()}`,
+          number: phoneE164,
+          phoneNumber: phoneE164,
+          createdAt: new Date().toISOString(),
+          provider: "twilio"
+        })
+      };
+    } else {
+      vapiResponse = await fetch(`${VAPI_BASE_URL}/phone-number`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${VAPI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(vapiPayload),
+      });
+    }
 
     if (!vapiResponse.ok) {
       const errorText = await vapiResponse.text();
@@ -520,6 +600,16 @@ async function processJob(job: any, supabase: any): Promise<void> {
       attempts: job.attempts
     });
 
+    // CHECK FOR SIMULATED FAILURE (E2E TESTING)
+    const testConfig = job.test_config; // Loaded from select *
+    if (testConfig?.simulate_failure_attempts && (job.attempts || 0) < testConfig.simulate_failure_attempts) {
+      logInfo("SIMULATING FAILURE via test_config", {
+        ...baseLogOptions,
+        context: { attempt: job.attempts, target: testConfig.simulate_failure_attempts }
+      });
+      throw new Error("Simulated Transient Failure for Testing");
+    }
+
     // Update account provisioning status
     await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
@@ -541,7 +631,9 @@ async function processJob(job: any, supabase: any): Promise<void> {
     // Check for test mode - use zip_code as fallback since is_test_account column may not exist
     const isJobTestMode = job.test_mode || accountData.zip_code === "99999";
 
-    if (isJobTestMode) {
+    // If mock_provider is true, we want to run the FULL flow but with mocks internally.
+    // So we ONLY skip if it's "Legacy Test Mode" (no mock_provider config).
+    if (isJobTestMode && !testConfig?.mock_provider) {
       // ═══════════════════════════════════════════════════════════════
       // TEST MODE: Skip all Twilio/Vapi calls - use mock data
       // The create-trial function should have already written mock data
@@ -615,7 +707,8 @@ async function processJob(job: any, supabase: any): Promise<void> {
         supabase, // Pass supabase client
         job.account_id,
         metadata,
-        correlationId
+        correlationId,
+        testConfig
       );
       vapiAssistantId = assistantResult.vapiAssistantId;
       vapiAssistantDbId = assistantResult.vapiAssistantDbId;
@@ -640,7 +733,8 @@ async function processJob(job: any, supabase: any): Promise<void> {
         job.account_id,
         vapiAssistantId,
         metadata,
-        correlationId
+        correlationId,
+        testConfig
       );
       phoneE164 = phoneResult.phoneE164;
       vapiPhoneId = phoneResult.vapiPhoneId;
@@ -655,6 +749,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapi_phone_number_id: vapiPhoneId,
       phone_number_status: "active",
       phone_provisioned_at: new Date().toISOString(),
+      notification_sms_phone: metadata.fallback_phone || null, // Persist profile phone as default notification target
     }).eq("id", job.account_id);
 
     // Update provisioning lifecycle to completed

@@ -2,15 +2,16 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
-import { Sparkles, Check, Loader2 } from "lucide-react";
+import { Sparkles, Check, Loader2, Bell } from "lucide-react";
 
 interface SettingsTabProps {
     account: any;
@@ -19,6 +20,16 @@ interface SettingsTabProps {
     onOpenUpgradeModal?: () => void;
 }
 
+const COMMON_TIMEZONES = [
+    { value: "America/New_York", label: "Eastern Time (ET)" },
+    { value: "America/Chicago", label: "Central Time (CT)" },
+    { value: "America/Denver", label: "Mountain Time (MT)" },
+    { value: "America/Phoenix", label: "Arizona (MST)" },
+    { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+    { value: "America/Anchorage", label: "Alaska Time (AKT)" },
+    { value: "Pacific/Honolulu", label: "Hawaii Time (HT)" },
+];
+
 export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUpgradeModal }: SettingsTabProps) {
     const { toast } = useToast();
 
@@ -26,10 +37,23 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
     const [customInstructions, setCustomInstructions] = useState(account.custom_instructions || "");
     const [savingInstructions, setSavingInstructions] = useState(false);
 
-    // SMS Settings State
+    // Notification Settings State
+    const [notifSmsPhone, setNotifSmsPhone] = useState(account.notification_sms_phone || "");
+    const [notifEmail, setNotifEmail] = useState(account.notification_email || "");
+    const [timezone, setTimezone] = useState(account.timezone || "America/Denver");
+
+    // Notification Toggles
+    const [notifyContractorEmail, setNotifyContractorEmail] = useState(account.notify_contractor_email ?? true);
+    const [notifyCallerSms, setNotifyCallerSms] = useState(account.notify_caller_sms ?? true);
+    const [notifyCallerEmail, setNotifyCallerEmail] = useState(account.notify_caller_email ?? true);
+
+    // Existing SMS Toggles (Contractor)
+    const [smsEnabled, setSmsEnabled] = useState(account.sms_enabled ?? true);
     const [smsAppointmentConfirmations, setSmsAppointmentConfirmations] = useState(account.sms_appointment_confirmations || false);
     const [smsReminders, setSmsReminders] = useState(account.sms_reminders || false);
-    const [savingSmsSettings, setSavingSmsSettings] = useState(false);
+
+    const [savingNotifications, setSavingNotifications] = useState(false);
+
 
     // Business Details State
     const [serviceArea, setServiceArea] = useState(account.service_area || "");
@@ -59,29 +83,37 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
         }
     };
 
-    const handleSaveSmsSettings = async () => {
-        setSavingSmsSettings(true);
+    const handleSaveNotifications = async () => {
+        setSavingNotifications(true);
         try {
+            const updates = {
+                notification_sms_phone: notifSmsPhone || null,
+                notification_email: notifEmail || null,
+                timezone: timezone,
+                notify_contractor_email: notifyContractorEmail,
+                notify_caller_sms: notifyCallerSms,
+                notify_caller_email: notifyCallerEmail,
+                sms_enabled: smsEnabled,
+                sms_appointment_confirmations: smsAppointmentConfirmations,
+                sms_reminders: smsReminders
+            };
+
             const { error } = await supabase
                 .from("accounts")
-                .update({
-                    sms_appointment_confirmations: smsAppointmentConfirmations,
-                    sms_reminders: smsReminders
-                })
+                .update(updates)
                 .eq("id", account.id);
 
             if (error) throw error;
 
             onUpdateAccount({
                 ...account,
-                sms_appointment_confirmations: smsAppointmentConfirmations,
-                sms_reminders: smsReminders
+                ...updates
             });
-            toast({ title: "Success", description: "SMS settings updated" });
+            toast({ title: "Success", description: "Notification settings updated" });
         } catch (error: any) {
             toast({ title: "Error", description: error.message, variant: "destructive" });
         } finally {
-            setSavingSmsSettings(false);
+            setSavingNotifications(false);
         }
     };
 
@@ -148,6 +180,109 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                     <Button onClick={handleSaveInstructions} disabled={savingInstructions}>
                         {savingInstructions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                         Save Instructions
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {/* Notifications Settings */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Bell className="h-5 w-5 text-primary" />
+                        Notifications & Appointments
+                    </CardTitle>
+                    <CardDescription>
+                        Configure how you and your callers are notified about appointments.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Contact Info */}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="timezone">Timezone</Label>
+                            <Select value={timezone} onValueChange={setTimezone}>
+                                <SelectTrigger id="timezone">
+                                    <SelectValue placeholder="Select timezone" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {COMMON_TIMEZONES.map((tz) => (
+                                        <SelectItem key={tz.value} value={tz.value}>
+                                            {tz.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="notifPhone">Contractor SMS Phone</Label>
+                            <Input
+                                id="notifPhone"
+                                value={notifSmsPhone}
+                                onChange={(e) => setNotifSmsPhone(e.target.value)}
+                                placeholder="+15550001234"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="notifEmail">Contractor Email</Label>
+                            <Input
+                                id="notifEmail"
+                                value={notifEmail}
+                                onChange={(e) => setNotifEmail(e.target.value)}
+                                placeholder="you@company.com"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4 space-y-4">
+                        <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Contractor Notifications</h3>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label>Enable SMS Notifications</Label>
+                                <p className="text-sm text-muted-foreground">Receive texts for new bookings & reminders</p>
+                            </div>
+                            <Switch checked={smsEnabled} onCheckedChange={setSmsEnabled} />
+                        </div>
+                        {smsEnabled && (
+                            <div className="ml-4 space-y-4 border-l pl-4">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-sm">New Booking Confirmations</Label>
+                                    <Switch checked={smsAppointmentConfirmations} onCheckedChange={setSmsAppointmentConfirmations} />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-sm">Appointment Reminders</Label>
+                                    <Switch checked={smsReminders} onCheckedChange={setSmsReminders} />
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label>Enable Email Notifications</Label>
+                                <p className="text-sm text-muted-foreground">Receive details via email</p>
+                            </div>
+                            <Switch checked={notifyContractorEmail} onCheckedChange={setNotifyContractorEmail} />
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4 space-y-4">
+                        <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Caller Notifications</h3>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label>Notify Caller via SMS</Label>
+                                <p className="text-sm text-muted-foreground">Send confirmation & reminder texts to caller</p>
+                            </div>
+                            <Switch checked={notifyCallerSms} onCheckedChange={setNotifyCallerSms} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label>Notify Caller via Email</Label>
+                                <p className="text-sm text-muted-foreground">Send confirmation emails to caller (if email provided)</p>
+                            </div>
+                            <Switch checked={notifyCallerEmail} onCheckedChange={setNotifyCallerEmail} />
+                        </div>
+                    </div>
+
+                    <Button onClick={handleSaveNotifications} disabled={savingNotifications}>
+                        {savingNotifications ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Notification Settings"}
                     </Button>
                 </CardContent>
             </Card>
@@ -299,26 +434,6 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
 
                     <Button onClick={handleSaveBusinessDetails} disabled={savingBusinessDetails}>
                         {savingBusinessDetails ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Business Details"}
-                    </Button>
-                </CardContent>
-            </Card>
-
-            {/* SMS Settings */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>SMS Settings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <Label>Appointment Confirmations</Label>
-                        <Switch checked={smsAppointmentConfirmations} onCheckedChange={setSmsAppointmentConfirmations} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <Label>Reminder Messages</Label>
-                        <Switch checked={smsReminders} onCheckedChange={setSmsReminders} />
-                    </div>
-                    <Button onClick={handleSaveSmsSettings} disabled={savingSmsSettings}>
-                        {savingSmsSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save SMS Settings"}
                     </Button>
                 </CardContent>
             </Card>
