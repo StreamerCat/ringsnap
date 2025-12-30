@@ -105,7 +105,7 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
     const fromNumber = call.customer?.number ?? call.transport?.from ?? null;
     const callerName = extractCallerName(call, transcript, structuredData, summary, fromNumber);
     const reason = extractReason(call, transcript, structuredData, summary);
-    const address = structuredData.address as string || null; // NEW, extract address directly
+    const address = extractAddress(structuredData, summary);
 
     const { booked, appointmentStart, appointmentEnd, appointmentWindow } = detectBooking(
         call,
@@ -426,4 +426,22 @@ function cleanReason(text: string): string {
     }
 
     return cleaned;
+}
+
+export function extractAddress(structuredData: Record<string, any>, summary: string): string | null {
+    if (typeof structuredData.address === 'string') return structuredData.address;
+
+    // Fallback: Summary
+    // "at 7707 West Main Street"
+    if (summary) {
+        // Look for "at [Address]" pattern
+        // Matches number followed by words ending in common street suffixes
+        const addressPattern = /\bat\s+(\d+\s+[A-Za-z0-9\s,]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Way|Blvd|Boulevard|Court|Ct|Circle|Cir))/i;
+        const match = summary.match(addressPattern);
+        if (match && match[1]) {
+            // Basic cleanup: remove trailing punctuation
+            return match[1].trim().replace(/[\.,]$/, '');
+        }
+    }
+    return null;
 }

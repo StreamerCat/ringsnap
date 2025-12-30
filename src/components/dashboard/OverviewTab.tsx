@@ -143,7 +143,7 @@ export function OverviewTab({
                     <CardContent>
                         <div className="flex items-center gap-2">
                             <div className="text-2xl font-bold">
-                                {(account.vapi_phone_number && account.vapi_phone_number !== "") ? account.vapi_phone_number : "Provisioning..."}
+                                {(account.vapi_phone_number && account.vapi_phone_number !== "") ? formatPhoneNumber(account.vapi_phone_number) : "Provisioning..."}
                             </div>
                             {account.vapi_phone_number && (
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={copyPhoneNumber}>
