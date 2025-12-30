@@ -191,16 +191,41 @@ serve(async (req) => {
         { p_account_id: accountId }
       );
 
+      // Enhanced logging for allocation result
+      if (allocError) {
+        logWarn("Allocator RPC error", {
+          ...baseLogOptions,
+          accountId,
+          context: { error: allocError.message, code: allocError.code }
+        });
+      }
+
       if (allocated) {
         logInfo("Allocated number from pool", {
           ...baseLogOptions,
           accountId,
-          context: { phoneNumber: allocated.phone_number }
+          context: {
+            phoneNumber: allocated.phone_number,
+            phoneNumberId: allocated.id,
+            areaCode: allocated.area_code,
+            assignmentId: allocated.assignment_id
+          }
         });
         phoneNumber = allocated.phone_number;
       } else {
         // B. Buy new from Twilio
-        logInfo("Pool empty or no match, buying from Twilio", { ...baseLogOptions, accountId });
+        // CRITICAL: Log why allocation failed
+        const { data: poolStats } = await supabase.rpc('get_pool_stats').catch(() => ({ data: null }));
+
+        logInfo("Pool allocation returned null, buying from Twilio", {
+          ...baseLogOptions,
+          accountId,
+          context: {
+            allocatorError: allocError?.message || null,
+            poolStats: poolStats || "unavailable",
+            fallbackReason: allocError ? "allocator_error" : "no_pool_available"
+          }
+        });
         try {
           const twilioResult = await provisionPhoneNumber({
             type: 'twilio',
