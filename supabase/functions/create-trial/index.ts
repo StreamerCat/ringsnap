@@ -423,7 +423,6 @@ function mapStripeErrorToUserError(
   requestId?: string
 ): TrialCreationErrorResponse {
   // Extract Stripe error fields - more reliable than message parsing
-  const errorType = stripeError.type || '';
   const errorCode = stripeError.code || '';
   const declineCode = stripeError.raw?.decline_code || stripeError.decline_code || '';
   const message = stripeError.message?.toLowerCase() || '';
@@ -774,7 +773,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    logInfo(\"Creating trial account\", {\n      ...baseLogOptions,\n      context: {\n        email: data.email,\n        source: data.source,\n        salesRep: data.salesRepName,\n        planType: data.planType,\n      },\n    });\n\n    // Persist email to outer scope for catch block logging\n    requestEmail = data.email;
+    logInfo("Creating trial account", {
+      ...baseLogOptions,
+      context: {
+        email: data.email,
+        source: data.source,
+        salesRep: data.salesRepName,
+        planType: data.planType,
+      },
+    });
+
+    // Persist email to outer scope for catch block logging
+    requestEmail = data.email;
 
     // We can't track 'signup_started' in DB yet because we don't have an account_id.
     // We will track it once the account is created.
@@ -1969,7 +1979,7 @@ Deno.serve(async (req: Request) => {
     // Guard with supabase check in case error occurred before client initialization
     if (supabase) {
       await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
-        error: error instanceof Error ? error.message : \"Unknown error\",
+        error: error instanceof Error ? error.message : "Unknown error",
         phase: phase,
         stripeErrorType: (error as any)?.type || 'unknown',
         email: requestEmail, // Now available from outer scope
