@@ -1050,16 +1050,16 @@ Deno.serve(async (req: Request) => {
             });
           } else {
             const existingEmail = (existingCustomer as any).email?.toLowerCase();
-            const requestEmail = data.email.toLowerCase();
+            const requestEmailLower = data.email.toLowerCase();
 
-            if (existingEmail && existingEmail !== requestEmail) {
+            if (existingEmail && existingEmail !== requestEmailLower) {
               // Email mismatch - fail safely
               logError("Payment method customer email mismatch", {
                 ...baseLogOptions,
                 context: {
                   paymentMethodId: data.paymentMethodId,
                   pmCustomerEmail: existingEmail,
-                  requestEmail: requestEmail,
+                  requestEmail: requestEmailLower,
                 },
               });
 
