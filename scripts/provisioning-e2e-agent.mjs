@@ -123,6 +123,19 @@ async function runRetryTest() {
 }
 
 // TEST 3: Pool Allocation
+
+async function invokeProvisionWorker() {
+    log("Invoking provision-vapi worker manually...", "info");
+    const { error } = await supabase.functions.invoke('provision-vapi', {
+        body: {},
+        method: 'POST' // or GET depending on how it's triggered, usually POST for cron
+    });
+    // Note: The worker might return 200 OK even if it processes in background, 
+    // but usually these workers process a batch then return.
+    // We'll trust waitForJobCompletion to catch the result.
+    if (error) log(`Worker invocation warning: ${error.message}`, "warn");
+}
+
 async function runPoolTest() {
     log("Starting Test 3: Pool Allocation...");
 
@@ -154,6 +167,9 @@ async function runPoolTest() {
 
     log(`Created Account ${accountId} and Job ${jobId}`);
 
+    // INVOKE WORKER (RUN 1)
+    await invokeProvisionWorker();
+
     const job = await waitForJobCompletion(jobId);
     log("Job completed!");
 
@@ -170,13 +186,63 @@ async function runPoolTest() {
     }
 }
 
+// TEST 4: Idempotency (Run Twice)
+async function runIdempotencyTest() {
+    log("Starting Test 4: Idempotency (Run Twice)...");
+
+    // Setup
+    const accountId = await createTestAccount('idemp');
+    const jobId = await createProvisioningJob(accountId, { mock_provider: true });
+
+    // Run 1
+    log("Running worker (Attempt 1)...");
+    await invokeProvisionWorker();
+    await waitForJobCompletion(jobId);
+
+    // Verify State 1
+    const { data: phones1 } = await supabase.from('phone_numbers').select('id').eq('account_id', accountId);
+    if (phones1.length !== 1) throw new Error(`Expected 1 phone, found ${phones1.length}`);
+
+    // Run 2 (Simulate duplicate execution)
+    log("Running worker (Attempt 2 - Idempotency Check)...");
+    // We intentionally invoke the worker again. 
+    // Since the job is 'completed', the worker should ignore it. 
+    // To test true idempotency of the *provisioning logic*, we might need to reset the job status?
+    // User requirement: "run the provisioning worker twice... phone_numbers for account has exactly 1... no duplicate".
+    // If the job is marked completed, the worker skips it.
+    // If we want to test that re-running the *provisioning logic* (e.g. if job failed but committed rows, or race condition) is safe,
+    // we should create a NEW job for the same account.
+
+    const jobId2 = await createProvisioningJob(accountId, { mock_provider: true });
+    log(`Created duplicate job ${jobId2} for same account`);
+
+    await invokeProvisionWorker();
+    await waitForJobCompletion(jobId2);
+
+    // Verify State 2
+    const { data: phones2 } = await supabase.from('phone_numbers').select('id').eq('account_id', accountId);
+    if (phones2.length !== 1) {
+        throw new Error(`VIOLATION: Found ${phones2.length} phones after second provisioning run! expected 1.`);
+    }
+
+    log("Idempotency Passed: Still exactly 1 phone number.", "success");
+}
+
+
 async function main() {
     log(`Starting Agent in ${RUN_LIVE ? 'LIVE' : 'MOCK'} mode`);
 
     try {
         await runHappyPathTest();
+        // Trigger worker for happy path too (although waitFor might catch it if cron runs, explicit is safer)
+        await invokeProvisionWorker();
+
         await runRetryTest();
+        // Trigger worker for retry
+        await invokeProvisionWorker();
+
         await runPoolTest();
+        await runIdempotencyTest();
 
         log("All Tests Passed", "success");
     } catch (e) {
