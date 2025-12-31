@@ -980,15 +980,8 @@ Deno.serve(async (req: Request) => {
           },
         });
 
-        // Best-effort: Trigger login link or password reset email
-        try {
-          await supabase.functions.invoke("send-magic-link", {
-            body: { email: data.email, redirect_to: "/dashboard" }
-          });
-          logInfo("Sent magic link to existing user", { ...baseLogOptions, context: { email: data.email } });
-        } catch (linkErr: any) {
-          logWarn("Failed to send magic link (non-critical)", { ...baseLogOptions, error: linkErr });
-        }
+        // Note: Considered sending magic link here but supabase.functions.invoke 
+        // causes Deno runtime compatibility issues. User should use login page.
 
         return new Response(
           JSON.stringify({
