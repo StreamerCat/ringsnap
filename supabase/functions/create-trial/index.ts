@@ -773,7 +773,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    logInfo(\"Creating trial account\", {\n      ...baseLogOptions,\n      context: {\n        email: data.email,\n        source: data.source,\n        salesRep: data.salesRepName,\n        planType: data.planType,\n      },\n    });\n\n    // Persist email to outer scope for catch block logging\n    requestEmail = data.email;
+    logInfo("Creating trial account", {
+      ...baseLogOptions,
+      context: {
+        email: data.email,
+        source: data.source,
+        salesRep: data.salesRepName,
+        planType: data.planType,
+      },
+    });
+
+    // Persist email to outer scope for catch block logging
+    requestEmail = data.email;
 
     // We can't track 'signup_started' in DB yet because we don't have an account_id.
     // We will track it once the account is created.
