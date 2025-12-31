@@ -1,0 +1,6 @@
+# Critical Path Owners
+/supabase/functions/create-trial/ @joshuasturgeon
+/supabase/functions/provision-vapi/ @joshuasturgeon
+/supabase/functions/stripe-webhook/ @joshuasturgeon
+/supabase/migrations/ @joshuasturgeon
+/tests/signup-critical/ @joshuasturgeon
