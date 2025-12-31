@@ -946,56 +946,67 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
     // EARLY EXIT: Check if user already has an account (BEFORE Stripe calls)
     // This prevents orphan Stripe resources when user should log in instead
+    // Wrapped in try-catch to prevent crashes if this check fails
     // ═══════════════════════════════════════════════════════════════
-    phase = "check_existing_account";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+    let existingUser: { id: string; hasAccount: boolean; accountId?: string } | null = null;
+    try {
+      phase = "check_existing_account";
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    const existingUser = await getExistingUserByEmail(supabase, data.email);
+      existingUser = await getExistingUserByEmail(supabase, data.email);
 
-    // Also check account_members in case profiles.account_id is null but user is linked
-    let hasAccountViaMember = false;
-    if (existingUser && !existingUser.accountId) {
-      const { data: memberLink } = await supabase
-        .from("account_members")
-        .select("account_id")
-        .eq("user_id", existingUser.id)
-        .maybeSingle();
-      if (memberLink?.account_id) {
-        hasAccountViaMember = true;
-        existingUser.accountId = memberLink.account_id;
-        existingUser.hasAccount = true;
+      // Also check account_members in case profiles.account_id is null but user is linked
+      let hasAccountViaMember = false;
+      if (existingUser && !existingUser.accountId) {
+        const { data: memberLink } = await supabase
+          .from("account_members")
+          .select("account_id")
+          .eq("user_id", existingUser.id)
+          .maybeSingle();
+        if (memberLink?.account_id) {
+          hasAccountViaMember = true;
+          existingUser.accountId = memberLink.account_id;
+          existingUser.hasAccount = true;
+        }
       }
-    }
 
-    if (existingUser?.hasAccount) {
-      logWarn("User already has an account - returning 409 before Stripe", {
-        ...baseLogOptions,
-        context: {
-          email: data.email,
-          existingAccountId: existingUser.accountId,
-          detectedVia: hasAccountViaMember ? "account_members" : "profiles.account_id"
-        },
-      });
-
-      // Best-effort: Trigger login link or password reset email
-      try {
-        await supabase.functions.invoke("send-magic-link", {
-          body: { email: data.email, redirect_to: "/dashboard" }
+      if (existingUser?.hasAccount) {
+        logWarn("User already has an account - returning 409 before Stripe", {
+          ...baseLogOptions,
+          context: {
+            email: data.email,
+            existingAccountId: existingUser.accountId,
+            detectedVia: hasAccountViaMember ? "account_members" : "profiles.account_id"
+          },
         });
-        logInfo("Sent magic link to existing user", { ...baseLogOptions, context: { email: data.email } });
-      } catch (linkErr: any) {
-        logWarn("Failed to send magic link (non-critical)", { ...baseLogOptions, error: linkErr });
-      }
 
-      return new Response(
-        JSON.stringify({
-          error: "An account with this email already exists. Please log in instead.",
-          code: "ACCOUNT_EXISTS",
-          redirect: "/login",
-          userMessage: "Looks like you already have an account. Please log in to continue.",
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        // Best-effort: Trigger login link or password reset email
+        try {
+          await supabase.functions.invoke("send-magic-link", {
+            body: { email: data.email, redirect_to: "/dashboard" }
+          });
+          logInfo("Sent magic link to existing user", { ...baseLogOptions, context: { email: data.email } });
+        } catch (linkErr: any) {
+          logWarn("Failed to send magic link (non-critical)", { ...baseLogOptions, error: linkErr });
+        }
+
+        return new Response(
+          JSON.stringify({
+            error: "An account with this email already exists. Please log in instead.",
+            code: "ACCOUNT_EXISTS",
+            redirect: "/login",
+            userMessage: "Looks like you already have an account. Please log in to continue.",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } catch (existingUserErr: any) {
+      // Non-critical - if check fails, continue with normal flow
+      logWarn("Existing user check failed (continuing)", {
+        ...baseLogOptions,
+        error: existingUserErr,
+        context: { email: data.email }
+      });
     }
 
     // STRIPE LOGIC
