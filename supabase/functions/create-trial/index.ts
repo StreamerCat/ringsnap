@@ -36,7 +36,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
-import { isValidPhoneNumber } from "../_shared/validators.ts";
+import { isValidPhoneNumber, formatPhoneE164 } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 
@@ -802,6 +802,14 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // Normalize phone to E.164 immediately
+    const normalizedPhone = formatPhoneE164(data.phone);
+    if (normalizedPhone !== data.phone) {
+      console.log(`[create-trial] Normalized phone number: ${data.phone} -> ${normalizedPhone}`);
+      // Update data.phone so it's used consistently downstream (Auth, DB, Logging)
+      data.phone = normalizedPhone;
     }
 
     if (isDisposableEmail(data.email)) {
