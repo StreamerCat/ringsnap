@@ -274,22 +274,8 @@ IMPORTANT RULES:
     },
     firstMessage: `Thank you for calling ${metadata.company_name}! How can I help you today?`,
     serverUrl: serverUrl,
-    analysis: {
-      structuredDataSchema: {
-        type: "object",
-        properties: {
-          callerName: { type: "string", description: "The name of the caller." },
-          callerPhone: { type: "string", description: "The phone number of the caller." },
-          reason: { type: "string", description: "The reason for the call." },
-          booked: { type: "boolean", description: "Whether an appointment was successfully booked." },
-          appointmentTime: { type: "string", description: "The ISO 8601 timestamp of the booked appointment, if applicable." },
-          address: { type: "string", description: "The address provided by the caller for the service location." },
-          summary: { type: "string", description: "A brief summary of the call." }
-        },
-        required: ["reason", "booked"]
-      },
-      successEvaluationPrompt: "Did the AI successfully handle the user's request?",
-    }
+    // Note: 'analysis' property removed - Vapi API no longer accepts it as of 2025-12-31
+    // The structured data schema was moved to a different API endpoint by Vapi
   };
 
   logInfo("Creating Vapi assistant", {
