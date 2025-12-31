@@ -423,7 +423,6 @@ function mapStripeErrorToUserError(
   requestId?: string
 ): TrialCreationErrorResponse {
   // Extract Stripe error fields - more reliable than message parsing
-  const errorType = stripeError.type || '';
   const errorCode = stripeError.code || '';
   const declineCode = stripeError.raw?.decline_code || stripeError.decline_code || '';
   const message = stripeError.message?.toLowerCase() || '';
