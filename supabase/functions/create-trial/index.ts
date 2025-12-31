@@ -1979,7 +1979,7 @@ Deno.serve(async (req: Request) => {
     // Guard with supabase check in case error occurred before client initialization
     if (supabase) {
       await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
-        error: error instanceof Error ? error.message : \"Unknown error\",
+        error: error instanceof Error ? error.message : "Unknown error",
         phase: phase,
         stripeErrorType: (error as any)?.type || 'unknown',
         email: requestEmail, // Now available from outer scope
