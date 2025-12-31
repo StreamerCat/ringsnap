@@ -373,34 +373,38 @@ async function hashRequest(body: any): Promise<string> {
 
 /**
  * Cleanup Stripe resources on failure (compensation logic)
+ * 
+ * IMPORTANT: Only pass resources that were CREATED in this request.
+ * Do NOT pass reused customer IDs - cleanup must not delete customers
+ * that existed before this request.
  */
 async function cleanupStripeResources(
   stripe: Stripe,
-  customerId: string | null,
-  subscriptionId: string | null,
+  createdCustomerId: string | null,  // Only cleanup if WE created it in this request
+  createdSubscriptionId: string | null, // Only cleanup if WE created it in this request
   logOptions: any
 ): Promise<void> {
   try {
-    if (subscriptionId) {
+    if (createdSubscriptionId) {
       logWarn("Canceling Stripe subscription due to account creation failure", {
         ...logOptions,
-        context: { subscriptionId },
+        context: { subscriptionId: createdSubscriptionId },
       });
-      await stripe.subscriptions.cancel(subscriptionId);
+      await stripe.subscriptions.cancel(createdSubscriptionId);
     }
 
-    if (customerId) {
+    if (createdCustomerId) {
       logWarn("Deleting Stripe customer due to account creation failure", {
         ...logOptions,
-        context: { customerId },
+        context: { customerId: createdCustomerId },
       });
-      await stripe.customers.del(customerId);
+      await stripe.customers.del(createdCustomerId);
     }
   } catch (cleanupError: any) {
     logError("Stripe cleanup failed (non-critical)", {
       ...logOptions,
       error: cleanupError,
-      context: { customerId, subscriptionId },
+      context: { customerId: createdCustomerId, subscriptionId: createdSubscriptionId },
     });
   }
 }
@@ -409,6 +413,8 @@ async function cleanupStripeResources(
  * Map Stripe error to user-friendly error response
  * ONLY used when ENABLE_STRUCTURED_TRIAL_ERRORS is true
  * Preserves legacy fields for backward compatibility
+ * 
+ * Prefers Stripe error fields (type, code, decline_code) over message parsing
  */
 function mapStripeErrorToUserError(
   stripeError: any,
@@ -416,126 +422,172 @@ function mapStripeErrorToUserError(
   correlationId: string,
   requestId?: string
 ): TrialCreationErrorResponse {
+  // Extract Stripe error fields - more reliable than message parsing
+  const errorType = stripeError.type || '';
+  const errorCode = stripeError.code || '';
+  const declineCode = stripeError.raw?.decline_code || stripeError.decline_code || '';
   const message = stripeError.message?.toLowerCase() || '';
 
-  // Card not supported
-  if (message.includes('does not support this type of purchase')) {
-    return {
-      success: false,
-      errorCode: 'CARD_NOT_SUPPORTED',
-      userMessage: 'This card was declined by your bank. Please try a different card or contact your bank.',
-      debugMessage: stripeError.message,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Try a different payment method',
-      // Legacy fields
-      error: stripeError.message,
-      message: stripeError.message,
-      request_id: requestId
-    };
-  }
-
-  // Generic card declined
-  if (message.includes('card_declined') || message.includes('card was declined') || message.includes('declined')) {
-    return {
-      success: false,
-      errorCode: 'CARD_DECLINED',
-      userMessage: 'Your card was declined. Please try a different card.',
-      debugMessage: stripeError.message,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Try a different payment method',
-      error: stripeError.message,
-      message: stripeError.message,
-      request_id: requestId
-    };
-  }
-
-  // Insufficient funds
-  if (message.includes('insufficient') || message.includes('funds')) {
-    return {
-      success: false,
-      errorCode: 'INSUFFICIENT_FUNDS',
-      userMessage: 'Your card was declined due to insufficient funds. Please try a different card.',
-      debugMessage: stripeError.message,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Try a different payment method',
-      error: stripeError.message,
-      message: stripeError.message,
-      request_id: requestId
-    };
-  }
-
-  // Expired card
-  if (message.includes('expired')) {
-    return {
-      success: false,
-      errorCode: 'CARD_EXPIRED',
-      userMessage: 'Your card has expired. Please use a valid card.',
-      debugMessage: stripeError.message,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Update your payment method',
-      error: stripeError.message,
-      message: stripeError.message,
-      request_id: requestId
-    };
-  }
-
-  // Incorrect CVC
-  if (message.includes('cvc') || message.includes('security code') || message.includes('incorrect_cvc')) {
-    return {
-      success: false,
-      errorCode: 'INCORRECT_CVC',
-      userMessage: 'The security code (CVC) was incorrect. Please check and try again.',
-      debugMessage: stripeError.message,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Verify your card security code',
-      error: stripeError.message,
-      message: stripeError.message,
-      request_id: requestId
-    };
-  }
-
-  // Authentication required
-  if (message.includes('authentication') || message.includes('3d secure')) {
-    return {
-      success: false,
-      errorCode: 'PAYMENT_AUTH_REQUIRED',
-      userMessage: 'Your card requires additional verification. Please try a different card.',
-      debugMessage: stripeError.message,
-      correlationId,
-      phase,
-      retryable: true,
-      suggestedAction: 'Try a different payment method',
-      error: stripeError.message,
-      message: stripeError.message,
-      request_id: requestId
-    };
-  }
-
-  // Fallback for payment errors
-  return {
+  // Helper to build error response
+  const buildResponse = (
+    code: string,
+    userMessage: string,
+    action: string
+  ): TrialCreationErrorResponse => ({
     success: false,
-    errorCode: 'PAYMENT_PROCESSOR_ERROR',
-    userMessage: 'We could not process your payment. Please try again or use a different card.',
+    errorCode: code,
+    userMessage,
     debugMessage: stripeError.message,
     correlationId,
     phase,
     retryable: true,
-    suggestedAction: 'Try again or contact support',
+    suggestedAction: action,
+    // Legacy fields
     error: stripeError.message,
     message: stripeError.message,
-    request_id: requestId
-  };
-};
+    request_id: requestId,
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // PRIMARY: Check by Stripe error code (most reliable)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Card declined - check decline_code for specifics
+  if (errorCode === 'card_declined') {
+    if (declineCode === 'insufficient_funds') {
+      return buildResponse(
+        'INSUFFICIENT_FUNDS',
+        'Your card was declined due to insufficient funds. Please try a different card.',
+        'Try a different payment method'
+      );
+    }
+    if (declineCode === 'expired_card') {
+      return buildResponse(
+        'CARD_EXPIRED',
+        'Your card has expired. Please use a valid card.',
+        'Update your payment method'
+      );
+    }
+    if (declineCode === 'incorrect_cvc') {
+      return buildResponse(
+        'INCORRECT_CVC',
+        'The security code (CVC) was incorrect. Please check and try again.',
+        'Verify your card security code'
+      );
+    }
+    if (declineCode === 'card_not_supported') {
+      return buildResponse(
+        'CARD_NOT_SUPPORTED',
+        'This card was declined by your bank. Please try a different card or contact your bank.',
+        'Try a different payment method'
+      );
+    }
+    if (declineCode === 'do_not_honor') {
+      return buildResponse(
+        'CARD_DECLINED',
+        'Your card was declined. Please contact your bank or try a different card.',
+        'Try a different payment method'
+      );
+    }
+    // Generic card declined
+    return buildResponse(
+      'CARD_DECLINED',
+      'Your card was declined. Please try a different card.',
+      'Try a different payment method'
+    );
+  }
+
+  if (errorCode === 'incorrect_cvc') {
+    return buildResponse(
+      'INCORRECT_CVC',
+      'The security code (CVC) was incorrect. Please check and try again.',
+      'Verify your card security code'
+    );
+  }
+
+  if (errorCode === 'expired_card') {
+    return buildResponse(
+      'CARD_EXPIRED',
+      'Your card has expired. Please use a valid card.',
+      'Update your payment method'
+    );
+  }
+
+  if (errorCode === 'processing_error') {
+    return buildResponse(
+      'PAYMENT_PROCESSOR_ERROR',
+      'There was an error processing your card. Please try again.',
+      'Try again in a moment'
+    );
+  }
+
+  if (errorCode === 'authentication_required') {
+    return buildResponse(
+      'PAYMENT_AUTH_REQUIRED',
+      'Your card requires additional verification. Please try a different card.',
+      'Try a different payment method'
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // FALLBACK: Message-based detection for edge cases
+  // ═══════════════════════════════════════════════════════════════
+
+  if (message.includes('does not support this type of purchase')) {
+    return buildResponse(
+      'CARD_NOT_SUPPORTED',
+      'This card was declined by your bank. Please try a different card or contact your bank.',
+      'Try a different payment method'
+    );
+  }
+
+  if (message.includes('card was declined') || message.includes('declined')) {
+    return buildResponse(
+      'CARD_DECLINED',
+      'Your card was declined. Please try a different card.',
+      'Try a different payment method'
+    );
+  }
+
+  if (message.includes('insufficient') || message.includes('funds')) {
+    return buildResponse(
+      'INSUFFICIENT_FUNDS',
+      'Your card was declined due to insufficient funds. Please try a different card.',
+      'Try a different payment method'
+    );
+  }
+
+  if (message.includes('expired')) {
+    return buildResponse(
+      'CARD_EXPIRED',
+      'Your card has expired. Please use a valid card.',
+      'Update your payment method'
+    );
+  }
+
+  if (message.includes('cvc') || message.includes('security code')) {
+    return buildResponse(
+      'INCORRECT_CVC',
+      'The security code (CVC) was incorrect. Please check and try again.',
+      'Verify your card security code'
+    );
+  }
+
+  if (message.includes('authentication') || message.includes('3d secure')) {
+    return buildResponse(
+      'PAYMENT_AUTH_REQUIRED',
+      'Your card requires additional verification. Please try a different card.',
+      'Try a different payment method'
+    );
+  }
+
+  // Fallback for any other payment errors
+  return buildResponse(
+    'PAYMENT_PROCESSOR_ERROR',
+    'We could not process your payment. Please try again or use a different card.',
+    'Try again or contact support'
+  );
+}
 
 
 /**
@@ -606,7 +658,7 @@ Deno.serve(async (req: Request) => {
   }
 
   let currentAccountId: string | null = null;
-  let currentUserId: string | null = null; // Restore missing var
+  let currentUserId: string | null = null;
   // Initialize customer/subscription as basic objects to satisfy TS before assignment
   let customer: any = null;
   let subscription: any = null;
@@ -614,9 +666,19 @@ Deno.serve(async (req: Request) => {
   let stripeSubscriptionId: string | null = null;
   let phase = "start";
 
+  // Hoisted to outer scope so catch block can access them
+  let supabase: any = null;
+  let stripe: Stripe | null = null;
+  let requestEmail: string | null = null; // For logging in catch block
+
+  // Track resources created in this request for safe cleanup
+  let createdStripeCustomerId: string | null = null;
+  let createdStripeSubscriptionId: string | null = null;
+
   try {
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
-    // ... Initialization ...
+
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -624,11 +686,11 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing Supabase environment variables");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    // Initialize Stripe client
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
-    // Only init stripe if key exists to avoid crash, though assertEnv checks it later
-    const stripe = stripeKey ? new Stripe(stripeKey, {
+    stripe = stripeKey ? new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
       httpClient: Stripe.createFetchHttpClient(),
     }) : null;
@@ -712,15 +774,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    logInfo("Creating trial account", {
-      ...baseLogOptions,
-      context: {
-        email: data.email,
-        source: data.source,
-        salesRep: data.salesRepName,
-        planType: data.planType,
-      },
-    });
+    logInfo(\"Creating trial account\", {\n      ...baseLogOptions,\n      context: {\n        email: data.email,\n        source: data.source,\n        salesRep: data.salesRepName,\n        planType: data.planType,\n      },\n    });\n\n    // Persist email to outer scope for catch block logging\n    requestEmail = data.email;
 
     // We can't track 'signup_started' in DB yet because we don't have an account_id.
     // We will track it once the account is created.
@@ -879,6 +933,61 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // EARLY EXIT: Check if user already has an account (BEFORE Stripe calls)
+    // This prevents orphan Stripe resources when user should log in instead
+    // ═══════════════════════════════════════════════════════════════
+    phase = "check_existing_account";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+    const existingUser = await getExistingUserByEmail(supabase, data.email);
+
+    // Also check account_members in case profiles.account_id is null but user is linked
+    let hasAccountViaMember = false;
+    if (existingUser && !existingUser.accountId) {
+      const { data: memberLink } = await supabase
+        .from("account_members")
+        .select("account_id")
+        .eq("user_id", existingUser.id)
+        .maybeSingle();
+      if (memberLink?.account_id) {
+        hasAccountViaMember = true;
+        existingUser.accountId = memberLink.account_id;
+        existingUser.hasAccount = true;
+      }
+    }
+
+    if (existingUser?.hasAccount) {
+      logWarn("User already has an account - returning 409 before Stripe", {
+        ...baseLogOptions,
+        context: {
+          email: data.email,
+          existingAccountId: existingUser.accountId,
+          detectedVia: hasAccountViaMember ? "account_members" : "profiles.account_id"
+        },
+      });
+
+      // Best-effort: Trigger login link or password reset email
+      try {
+        await supabase.functions.invoke("send-magic-link", {
+          body: { email: data.email, redirect_to: "/dashboard" }
+        });
+        logInfo("Sent magic link to existing user", { ...baseLogOptions, context: { email: data.email } });
+      } catch (linkErr: any) {
+        logWarn("Failed to send magic link (non-critical)", { ...baseLogOptions, error: linkErr });
+      }
+
+      return new Response(
+        JSON.stringify({
+          error: "An account with this email already exists. Please log in instead.",
+          code: "ACCOUNT_EXISTS",
+          redirect: "/login",
+          userMessage: "Looks like you already have an account. Please log in to continue.",
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // STRIPE LOGIC
     console.log(`[${FUNCTION_NAME}] Payment Logic Check`, {
       receivedPmId: pmId,
@@ -898,42 +1007,146 @@ Deno.serve(async (req: Request) => {
 
       const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
-      // Customer
-      phase = "stripe_customer";
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 1: Retrieve payment method to check if already attached
+      // ═══════════════════════════════════════════════════════════════
+      phase = "stripe_payment_method_check";
+      let paymentMethodCustomerId: string | null = null;
+      let reusedExistingCustomer = false;
+
       try {
-        customer = await stripe.customers.create({
-          email: data.email,
-          name: data.name,
-          phone: data.phone,
-          metadata: {
-            company_name: data.companyName,
-            trade: data.trade,
-            source: data.source
+        const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
+        paymentMethodCustomerId = typeof paymentMethod.customer === 'string'
+          ? paymentMethod.customer
+          : (paymentMethod.customer as any)?.id ?? null;
+
+        if (paymentMethodCustomerId) {
+          logInfo("Payment method already attached to a customer", {
+            ...baseLogOptions,
+            context: {
+              paymentMethodId: data.paymentMethodId,
+              existingCustomerId: paymentMethodCustomerId
+            },
+          });
+
+          // Validate the existing customer's email matches the request email
+          const existingCustomer = await stripe.customers.retrieve(paymentMethodCustomerId);
+          if (existingCustomer.deleted) {
+            // Customer was deleted, treat as if PM is not attached
+            paymentMethodCustomerId = null;
+            logInfo("Existing customer was deleted, will create new customer", {
+              ...baseLogOptions,
+              context: { paymentMethodId: data.paymentMethodId },
+            });
+          } else {
+            const existingEmail = (existingCustomer as any).email?.toLowerCase();
+            const requestEmail = data.email.toLowerCase();
+
+            if (existingEmail && existingEmail !== requestEmail) {
+              // Email mismatch - fail safely
+              logError("Payment method customer email mismatch", {
+                ...baseLogOptions,
+                context: {
+                  paymentMethodId: data.paymentMethodId,
+                  pmCustomerEmail: existingEmail,
+                  requestEmail: requestEmail,
+                },
+              });
+
+              if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+                return new Response(JSON.stringify({
+                  success: false,
+                  errorCode: 'PAYMENT_METHOD_MISMATCH',
+                  userMessage: 'This card is associated with a different email. Please use a different card or check your email address.',
+                  correlationId,
+                  phase,
+                  retryable: true,
+                  suggestedAction: 'Try a different payment method',
+                  error: 'Payment method email mismatch',
+                  message: 'Payment method email mismatch',
+                  request_id,
+                }), {
+                  status: 400,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+              } else {
+                throw new Error("Payment method is associated with a different email address");
+              }
+            }
+
+            // Email matches or existing customer has no email - reuse this customer
+            reusedExistingCustomer = true;
+            customer = existingCustomer;
+            stripeCustomerId = paymentMethodCustomerId;
+            logInfo("Reusing existing customer for payment method", {
+              ...baseLogOptions,
+              context: {
+                customerId: paymentMethodCustomerId,
+                email: data.email,
+              },
+            });
           }
-        }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
-        stripeCustomerId = customer.id;
-        logInfo("Stripe customer created", {
-          ...baseLogOptions,
-          context: {
-            customerId: customer.id,
-            source: data.source,
-            email: data.email,
-          },
-        });
+        }
       } catch (e: any) {
-        throw new Error(`Stripe Customer Create Failed: ${e.message}`);
+        // If PM retrieve fails, log and continue to create new customer
+        logWarn("Failed to retrieve payment method (will create new customer)", {
+          ...baseLogOptions,
+          error: e,
+          context: { paymentMethodId: data.paymentMethodId },
+        });
       }
 
-      // Payment Method
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 2: Create customer if not reusing existing
+      // ═══════════════════════════════════════════════════════════════
+      if (!reusedExistingCustomer) {
+        phase = "stripe_customer";
+        try {
+          customer = await stripe.customers.create({
+            email: data.email,
+            name: data.name,
+            phone: data.phone,
+            metadata: {
+              company_name: data.companyName,
+              trade: data.trade,
+              source: data.source
+            }
+          }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
+          stripeCustomerId = customer.id;
+          createdStripeCustomerId = customer.id; // Track for safe cleanup
+          logInfo("Stripe customer created", {
+            ...baseLogOptions,
+            context: {
+              customerId: customer.id,
+              source: data.source,
+              email: data.email,
+            },
+          });
+        } catch (e: any) {
+          throw new Error(`Stripe Customer Create Failed: ${e.message}`);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 3: Attach payment method if not already attached
+      // ═══════════════════════════════════════════════════════════════
       phase = "stripe_payment_method";
       try {
-        await stripe.paymentMethods.attach(data.paymentMethodId, { customer: customer.id });
-        await stripe.customers.update(customer.id, {
+        if (!paymentMethodCustomerId) {
+          // PM not attached - attach it now
+          await stripe.paymentMethods.attach(data.paymentMethodId, { customer: stripeCustomerId! });
+        }
+        // Always set as default payment method
+        await stripe.customers.update(stripeCustomerId!, {
           invoice_settings: { default_payment_method: data.paymentMethodId }
         });
-        logInfo("Payment method attached", {
+        logInfo("Payment method configured", {
           ...baseLogOptions,
-          context: { customerId: customer.id },
+          context: {
+            customerId: stripeCustomerId,
+            reusedExisting: reusedExistingCustomer,
+            wasAlreadyAttached: !!paymentMethodCustomerId,
+          },
         });
       } catch (e: any) {
         // ALWAYS log full technical details (unchanged)
@@ -943,7 +1156,7 @@ Deno.serve(async (req: Request) => {
           error: e,
           context: {
             phase,
-            customerId: customer.id,
+            customerId: stripeCustomerId,
             paymentMethodId: data.paymentMethodId
           }
         });
@@ -961,18 +1174,21 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Subscription
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 4: Create subscription
+      // ═══════════════════════════════════════════════════════════════
       phase = "stripe_subscription";
       try {
         const priceId = getStripePriceId(data.planType);
         subscription = await stripe.subscriptions.create({
-          customer: customer.id,
+          customer: stripeCustomerId!,
           items: [{ price: priceId }],
           trial_period_days: 3,
           payment_behavior: "default_incomplete",
           metadata: { source: data.source, plan_type: data.planType }
         }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
         stripeSubscriptionId = subscription.id;
+        createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
         logInfo("Stripe subscription created", {
           ...baseLogOptions,
           context: {
@@ -988,7 +1204,7 @@ Deno.serve(async (req: Request) => {
           ...baseLogOptions,
           accountId: currentAccountId,
           error: e,
-          context: { phase, customerId: customer.id }
+          context: { phase, customerId: stripeCustomerId }
         });
 
         // Return structured error if flag enabled, otherwise preserve legacy behavior
@@ -1067,34 +1283,16 @@ Deno.serve(async (req: Request) => {
     // MANUAL TRANSACTION: Create User -> Account -> Profile
     // ═══════════════════════════════════════════════════════════════
 
-    // 1. Check if user already exists
-    const existingUser = await getExistingUserByEmail(supabase, data.email);
-
-    if (existingUser) {
-      if (existingUser.hasAccount) {
-        // User already has an account - they should log in instead
-        logWarn("User already has an account", {
-          ...baseLogOptions,
-          context: { email: data.email, existingAccountId: existingUser.accountId },
-        });
-
-        return new Response(
-          JSON.stringify({
-            error: "An account with this email already exists. Please log in instead.",
-            code: "ACCOUNT_EXISTS",
-            redirect: "/login",
-          }),
-          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+    // Note: existingUser with hasAccount was already checked before Stripe calls
+    // If we're here, either existingUser doesn't have an account, or they're new
+    if (existingUser && !existingUser.hasAccount) {
       // User exists but has no account - we'll create an account for them
       logInfo("Existing user found without account, creating account", {
         ...baseLogOptions,
         context: { email: data.email, userId: existingUser.id },
       });
       currentUserId = existingUser.id;
-    } else {
+    } else if (!existingUser) {
       // 1b. Create new Auth User
       const { data: userData, error: userError } = await supabase.auth.admin.createUser({
         email: data.email,
@@ -1768,19 +1966,15 @@ Deno.serve(async (req: Request) => {
     await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
 
     // Track failure in Analytics (Critical for Dashboard visibility)
-    // We try to access 'data' if it was parsed, otherwise we lose the email.
-    // Since 'data' is scoped to the try block, we can't access it here directly if not lifted.
-    // However, most failures happen after parsing. 
-    // TODO: Ideally we retrieve email from a wider scope variable. 
-    // For now, we will track what we have.
-    await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
-      error: error instanceof Error ? error.message : "Unknown error",
-      phase: phase,
-      stripeErrorType: (error as any)?.type || 'unknown',
-      // In a real refactor we would lift 'email' to outer scope. 
-      // For this specific 'catch', we might be limited.
-      // But wait, we can log the event without email if needed.
-    });
+    // Guard with supabase check in case error occurred before client initialization
+    if (supabase) {
+      await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
+        error: error instanceof Error ? error.message : \"Unknown error\",
+        phase: phase,
+        stripeErrorType: (error as any)?.type || 'unknown',
+        email: requestEmail, // Now available from outer scope
+      });
+    }
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
