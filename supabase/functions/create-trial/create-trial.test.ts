@@ -36,6 +36,14 @@ const mockSupabase = {
   },
 };
 
+// Mock global fetch
+const mockFetch = vi.fn().mockResolvedValue({
+  ok: true,
+  json: () => Promise.resolve({}),
+  text: () => Promise.resolve(""),
+});
+vi.stubGlobal("fetch", mockFetch);
+
 // Mock Stripe
 const mockStripe = {
   customers: {
