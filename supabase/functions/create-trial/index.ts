@@ -620,7 +620,7 @@ async function withRetry<T>(
 }
 
 Deno.serve(async (req: Request) => {
-  console.log("FUNCTION VERSION: 2025-12-10-LOGGING-FIX-V3");
+  console.log("FUNCTION VERSION: 2025-12-31-PM-RETRY-FIX-V1");
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
@@ -1025,6 +1025,7 @@ Deno.serve(async (req: Request) => {
       // STEP 1: Retrieve payment method to check if already attached
       // ═══════════════════════════════════════════════════════════════
       phase = "stripe_payment_method_check";
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase} pmId=${data.paymentMethodId}`);
       let paymentMethodCustomerId: string | null = null;
       let reusedExistingCustomer = false;
 
