@@ -16,6 +16,7 @@ import {
   type CallLogWithAppointment
 } from "@/lib/appointments";
 import { type CallLog } from "@/lib/leadScore";
+import { sanitizeCallReason } from "@/lib/call-sanitation";
 
 interface OperatorStats {
   calls_today: number;
@@ -354,11 +355,7 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
                     const getSummarizedReason = () => {
                       const text = call.reason || call.summary || '';
                       if (!text) return '-';
-                      const firstSentence = text.split(/[.!?]/)[0];
-                      if (firstSentence.length > 50) {
-                        return firstSentence.substring(0, 47) + '...';
-                      }
-                      return firstSentence || text.substring(0, 50);
+                      return sanitizeCallReason(text);
                     };
 
                     return (

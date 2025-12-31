@@ -27,16 +27,16 @@ export function AssistantsTab({ account, assistants }: AssistantsTabProps) {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Your AI Assistants</h2>
+                <h2 className="text-2xl font-bold">Your RingSnap Agents</h2>
                 <Button disabled={account.plan_type !== 'premium'}>
-                    {account.plan_type === 'premium' ? 'Add Assistant' : 'Premium Feature'}
+                    {account.plan_type === 'premium' ? 'Add Agent' : 'Premium Feature'}
                 </Button>
             </div>
 
             {assistants.length === 0 ? (
                 <Card>
                     <CardContent className="py-12 text-center text-muted-foreground">
-                        No assistants yet. Your assistant will appear here after setup.
+                        No agents yet. Your agent will appear here after setup.
                     </CardContent>
                 </Card>
             ) : (

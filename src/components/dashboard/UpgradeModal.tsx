@@ -169,7 +169,7 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Check className="h-4 w-4 text-green-600" />
-                                            <span>{plan.aiReceptionists} AI receptionist{plan.aiReceptionists > 1 ? "s" : ""}</span>
+                                            <span>{plan.aiReceptionists} RingSnap agent{plan.aiReceptionists > 1 ? "s" : ""}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-muted-foreground">
                                             <span className="ml-6">${plan.overageRate}/min overage</span>
