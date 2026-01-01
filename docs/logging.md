@@ -685,6 +685,84 @@ function TrialSignupForm() {
 - [ ] **Correlation Dashboard**: Visualize trace propagation across services
 - [ ] **Automated Log Analysis**: LLM-powered anomaly detection on step patterns
 
+## Edge Function JWT Configuration
+
+### JWT Verification Control
+
+Edge Functions require JWT verification by default. For public endpoints (webhooks, OAuth callbacks, pre-auth flows), disable JWT verification in `supabase/config.toml`:
+
+```toml
+[functions.create-trial]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.vapi-tools-appointments]
+verify_jwt = false
+```
+
+### Supabase CLI Usage
+
+**✅ Correct Usage:**
+
+```bash
+# Local development - JWT verification controlled by config.toml
+supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector
+
+# Deploy functions - JWT verification controlled by config.toml
+supabase functions deploy create-trial --project-ref <project-ref>
+
+# Test functions locally with JWT disabled (optional override)
+supabase functions serve --no-verify-jwt
+```
+
+**❌ WRONG - This flag is NOT supported:**
+
+```bash
+# ❌ --no-verify-jwt does NOT work with 'supabase start'
+supabase start --no-verify-jwt  # This will fail!
+```
+
+### Public Endpoints in Config
+
+The following functions are configured with `verify_jwt = false`:
+
+**Webhooks:**
+- `stripe-webhook` - Stripe payment webhooks
+- `vapi-webhook` - Vapi call webhooks
+- `vapi-tools-appointments` - Vapi appointment booking tool
+- `vapi-tools-availability` - Vapi availability check tool
+- `resend-webhook` - Resend email webhooks
+
+**Pre-Auth Flows:**
+- `create-trial` - Trial signup (called before user has JWT)
+- `capture-signup-lead` - Lead capture (pre-auth)
+- `send-verification-code` - SMS verification (pre-auth)
+- `verify-code` - Code verification (pre-auth)
+
+**OAuth Callbacks:**
+- `jobber-oauth-callback` - Jobber OAuth callback
+
+**Other Public Endpoints:**
+- `booking-schedule` - Called by external systems
+- `debug-db` - Debug endpoint
+
+### Why Per-Function Configuration?
+
+1. **Security**: Only disable JWT for endpoints that truly need public access
+2. **Single Source of Truth**: All JWT settings in one place (`config.toml`)
+3. **Version Control**: JWT configuration tracked in git
+4. **Deployment Consistency**: Same settings in local dev, staging, and production
+
+### Alternative Auth for Public Endpoints
+
+Public endpoints should still validate requests using:
+- **Webhooks**: Validate signatures (Stripe, Vapi, etc.)
+- **Shared Secrets**: Use `x-ringsnap-secret` header (Vapi tools)
+- **OAuth**: Validate state and tokens (OAuth callbacks)
+- **Business Logic**: Validate account_id, check rate limits, etc.
+
 ## Support
 
 For questions about logging:

@@ -9,7 +9,8 @@ If you need to immediately disable conflict checking without redeploying:
 supabase secrets set APPOINTMENT_CONFLICT_ENFORCEMENT=false
 
 # Force restart edge functions to pick up new secret
-supabase functions deploy vapi-tools-appointments --no-verify-jwt
+# Note: JWT verification is controlled by supabase/config.toml
+supabase functions deploy vapi-tools-appointments
 ```
 
 This will:
