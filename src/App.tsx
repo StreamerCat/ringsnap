@@ -4,10 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import * as Sentry from "@sentry/react";
 
 import { withAuthGuard } from "@/lib/auth/useUser";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { VapiWidgetProvider } from "@/lib/VapiWidgetContext";
 import { VapiChatWidget } from "@/components/VapiChatWidget";
@@ -55,26 +56,7 @@ const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
 // and unauthenticated users with lead_id (two-step signup flow)
 
 const App = () => (
-  <Sentry.ErrorBoundary
-    fallback={({ error, resetError }) => (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
-        <AlertTriangle className="h-12 w-12 text-destructive" />
-        <h1 className="text-2xl font-bold text-foreground">Something went wrong</h1>
-        <p className="max-w-md text-muted-foreground">
-          We're sorry, but an unexpected error occurred. Our team has been notified.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 rounded-lg bg-primary px-6 py-2 text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Refresh Page
-        </button>
-      </div>
-    )}
-    onError={(error, componentStack) => {
-      console.error("React Error Boundary caught:", error, componentStack);
-    }}
-  >
+  <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <VapiWidgetProvider>
@@ -141,7 +123,7 @@ const App = () => (
         </VapiWidgetProvider>
       </TooltipProvider>
     </QueryClientProvider >
-  </Sentry.ErrorBoundary >
+  </ErrorBoundary>
 );
 
 export default App;

@@ -557,7 +557,82 @@ When pasting logs to Claude for debugging:
 **Example prompt to Claude:**
 > "Debug this trial creation failure. Trace ID: 550e8400-e29b-41d4-a716-446655440000. The user tried to create a trial but got a payment error. Here are the logs: [paste JSON logs]"
 
-## Phase 2 Enhancements (TODO)
+## Phase 2: Frontend Debug Bundle (✅ COMPLETED)
+
+### Debug Bundle UI
+
+The ErrorBoundary component now automatically captures and presents debug information when errors occur:
+
+**Features:**
+- **Automatic debug bundle creation** on React errors
+- **One-click copy to clipboard** for easy sharing
+- **Download as JSON file** for offline analysis
+- **Automatic PII sanitization** (emails, phones masked)
+- **Trace ID display** for backend log correlation
+- **Step log collection** from session storage (last 30 steps)
+
+**Components:**
+- `src/lib/debugBundle.ts` - Debug bundle utilities
+- `src/components/ErrorBoundary.tsx` - Enhanced error boundary with debug UI
+- `src/hooks/useStepLogger.ts` - React hook for frontend step logging
+
+**Usage Example:**
+```tsx
+import { useStepLogger } from '@/hooks/useStepLogger';
+
+function TrialSignupForm() {
+  const { logStepStart, logStepEnd, logStepError } = useStepLogger();
+
+  const handleSubmit = async (data) => {
+    logStepStart('submit_trial_form', { plan: data.planType });
+
+    try {
+      const response = await createTrial(data);
+      logStepEnd('submit_trial_form', { account_id: response.accountId });
+    } catch (error) {
+      logStepError('submit_trial_form', error);
+      throw error; // ErrorBoundary will catch and show debug bundle
+    }
+  };
+
+  return <form onSubmit={handleSubmit}>...</form>;
+}
+```
+
+**Debug Bundle Format:**
+```json
+{
+  "trace_id": "uuid",
+  "timestamp": "ISO 8601",
+  "route": "/trial/signup",
+  "error": {
+    "message": "Payment failed",
+    "reason_code": "STRIPE_PAYMENT_FAILED",
+    "stack": "..."
+  },
+  "user_agent": "...",
+  "viewport": { "width": 1920, "height": 1080 },
+  "network_status": "online",
+  "recent_steps": [
+    {
+      "timestamp": "...",
+      "step": "validate_input",
+      "event_type": "step_end",
+      "duration_ms": 45,
+      "result": "success"
+    },
+    {
+      "timestamp": "...",
+      "step": "submit_trial_form",
+      "event_type": "error",
+      "error": "Payment method declined",
+      "result": "failure"
+    }
+  ]
+}
+```
+
+## Phase 3 Enhancements (Future)
 
 - [ ] **Central Log Storage**: Stream logs to Datadog/Axiom for long-term retention
 - [ ] **Sentry Tag Enrichment**: Automatically tag Sentry events with trace_id
@@ -576,4 +651,4 @@ For questions about logging:
 ---
 
 **Last Updated**: 2026-01-01
-**Version**: 1.0 (Phase 1)
+**Version**: 2.0 (Phase 2: Frontend Debug Bundle Complete)
