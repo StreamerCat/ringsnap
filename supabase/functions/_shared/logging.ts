@@ -58,11 +58,11 @@ function sanitizeValue(value: unknown, keyPath: string[]): unknown {
     }
 
     if (isLikelyEmail(value)) {
-      return maskEmail(value);
+      return maskEmailForLogs(value);
     }
 
     if (key.includes('phone') || isLikelyPhoneNumber(value)) {
-      return maskPhone(value);
+      return maskPhoneForLogs(value);
     }
 
     return value;
@@ -98,7 +98,7 @@ function maskString(value: string): string {
   return `${value.slice(0, 3)}***${value.slice(-3)}`;
 }
 
-function maskEmail(value: string): string {
+function maskEmailForLogs(value: string): string {
   const [localPart, domain] = value.split('@');
   if (!domain) {
     return maskString(value);
@@ -107,13 +107,13 @@ function maskEmail(value: string): string {
   return `${maskedLocal}@${domain}`;
 }
 
-function maskPhone(value: string): string {
+function maskPhoneForLogs(value: string): string {
   const digits = value.replace(/[^0-9]/g, '');
   if (digits.length < 4) {
     return '***';
   }
-  const maskedDigits = `${digits.slice(0, 2)}***${digits.slice(-2)}`;
-  return value.replace(/[^0-9]/g, '').length === value.length ? maskedDigits : value.replace(digits, maskedDigits);
+  // Show ONLY last 4 digits (no leading digits revealed)
+  return `***${digits.slice(-4)}`;
 }
 
 function isLikelyEmail(value: string): boolean {
@@ -331,24 +331,42 @@ export function stepError(
 }
 
 // ============================================================================
-// EXPORTED MASKING UTILITIES
+// EXPORTED MASKING UTILITIES (FOR LOGS ONLY - DO NOT USE IN OPERATIONAL CODE)
 // ============================================================================
 
 /**
  * Mask an email address for safe logging.
- * Example: "user@example.com" => "us***@example.com"
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in:
+ * - Database writes
+ * - API payloads to external services (Stripe, Twilio, Vapi)
+ * - Operational/business logic
+ *
+ * Example: "user@example.com" => "u***r@example.com"
  */
-export { maskEmail };
+export { maskEmailForLogs };
 
 /**
  * Mask a phone number for safe logging.
- * Example: "+14155551234" => "***1234"
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in:
+ * - Database writes
+ * - API payloads to external services (Stripe, Twilio, Vapi)
+ * - Operational/business logic
+ *
+ * Reveals ONLY last 4 digits.
+ * Examples:
+ * - "+14155551234" => "***1234"
+ * - "415-555-1234" => "***1234"
+ * - "123" => "***"
  */
-export { maskPhone };
+export { maskPhoneForLogs };
 
 /**
  * Manually redact/sanitize an object for safe logging.
  * Automatically masks emails, phones, and sensitive keys.
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in operational code.
  */
 export function redact(obj: Record<string, unknown>): Record<string, unknown> {
   return sanitizeValue(obj, []) as Record<string, unknown>;

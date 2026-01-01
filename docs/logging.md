@@ -137,23 +137,28 @@ const REDACTED_KEYS = [
 { stripe_secret_key: "[REDACTED]" }
 ```
 
-### Email Masking
+### Email Masking (`maskEmailForLogs`)
+
+⚠️ **FOR LOGS ONLY** - Do NOT use in database writes, API payloads, or operational code.
 
 Emails are masked to show first 2 characters and domain:
 
 ```typescript
-maskEmail("user@example.com")  // => "us***@example.com"
-maskEmail("a@test.co")          // => "a***@test.co"
+maskEmailForLogs("user@example.com")  // => "us***@example.com"
+maskEmailForLogs("a@test.co")          // => "a***@test.co"
 ```
 
-### Phone Masking
+### Phone Masking (`maskPhoneForLogs`)
 
-Phone numbers are masked to show last 4 digits:
+⚠️ **FOR LOGS ONLY** - Do NOT use in database writes, API payloads, or operational code.
+
+Phone numbers are masked to show **ONLY last 4 digits**:
 
 ```typescript
-maskPhone("+14155551234")       // => "***1234"
-maskPhone("415-555-1234")       // => "***1234"
-maskPhone(null)                 // => null
+maskPhoneForLogs("+14155551234")       // => "***1234"
+maskPhoneForLogs("415-555-1234")       // => "***1234"
+maskPhoneForLogs("123")                // => "***"
+maskPhoneForLogs(null)                 // => null
 ```
 
 ### Manual Redaction
@@ -169,6 +174,45 @@ const safeData = redact({
   internal_note: "sensitive info"
 });
 // Automatically masks email/phone, redacts blacklisted keys
+```
+
+### ⚠️ CRITICAL: When to Use Masked vs Raw Values
+
+**Use MASKED values (`maskEmailForLogs`, `maskPhoneForLogs`):**
+- ✅ In `stepStart()`, `stepEnd()`, `stepError()` context objects
+- ✅ In frontend `logFrontendStep()` context
+- ✅ In debug bundles and error reports
+- ✅ Anywhere the value will appear in logs
+
+**Use RAW (unmasked) values:**
+- ✅ Database writes (`.insert()`, `.update()`)
+- ✅ Stripe API calls (`stripe.customers.create()`, payment methods)
+- ✅ Twilio SMS payloads (`To`, `From`, `Body`)
+- ✅ Vapi API calls (phone number provisioning, assistant creation)
+- ✅ Any external service integration
+- ✅ Return values sent to the client/frontend
+
+**Example - Correct Usage:**
+```typescript
+// ✅ CORRECT: Raw value to Stripe, masked value in logs
+const customer = await stripe.customers.create({
+  email: data.email,  // Raw email for Stripe
+  phone: data.phone   // Raw phone for Stripe
+});
+
+stepEnd('create_stripe_customer', base, {
+  email: maskEmailForLogs(data.email),  // Masked for logs
+  customer_id: customer.id
+}, startTime);
+```
+
+**Example - WRONG Usage:**
+```typescript
+// ❌ WRONG: Masked value to database
+await supabase.from('accounts').insert({
+  email: maskEmailForLogs(data.email),  // This breaks the account!
+  phone: maskPhoneForLogs(data.phone)   // This breaks SMS/calling!
+});
 ```
 
 ## Trace ID Propagation
@@ -207,7 +251,7 @@ import { stepStart, stepEnd } from '../_shared/logging.ts';
 
 const base = { functionName: 'create-trial', traceId, accountId };
 
-stepStart('validate_input', base, { email: maskEmail(email) });
+stepStart('validate_input', base, { email: maskEmailForLogs(email) });
 // ... validation logic ...
 stepEnd('validate_input', base, { valid: true }, startTime);
 ```
@@ -380,13 +424,13 @@ export default async function handler(req: Request) {
 
   // Step 1: Validate
   const validateStart = Date.now();
-  stepStart('validate_input', base, { email: maskEmail(email) });
+  stepStart('validate_input', base, { email: maskEmailForLogs(email) });
 
   try {
     const validated = schema.parse(body);
     stepEnd('validate_input', base, { valid: true }, validateStart);
   } catch (err) {
-    stepError('validate_input', base, err, { email: maskEmail(email) });
+    stepError('validate_input', base, err, { email: maskEmailForLogs(email) });
     return new Response(JSON.stringify({
       error: true,
       message: "Validation failed",
@@ -397,7 +441,7 @@ export default async function handler(req: Request) {
 
   // Step 2: Create Stripe customer
   const stripeStart = Date.now();
-  stepStart('create_stripe_customer', base, { email: maskEmail(email) });
+  stepStart('create_stripe_customer', base, { email: maskEmailForLogs(email) });
 
   try {
     const customer = await stripe.customers.create({
@@ -418,7 +462,7 @@ export default async function handler(req: Request) {
     }));
   } catch (err) {
     stepError('create_stripe_customer', base, err, {
-      email: maskEmail(email),
+      email: maskEmailForLogs(email),
       reason_code: "STRIPE_CUSTOMER_FAILED"
     });
 

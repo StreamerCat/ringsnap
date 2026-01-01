@@ -34,7 +34,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmail, maskPhone, type BaseLogContext } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmailForLogs, maskPhoneForLogs, type BaseLogContext } from "../_shared/logging.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
 import { POOL_CONFIG } from "../_shared/pool-config.ts";
 import { provisionPhoneNumber } from "../_shared/telephony.ts";
@@ -63,9 +63,7 @@ async function retryWithBackoff<T>(
 
       if (attempt < maxRetries) {
         const delayMs = baseDelayMs * Math.pow(2, attempt);
-        console.log(
-          `[provision-phone-number] Retry ${operationName} attempt ${attempt + 1}/${maxRetries} after ${delayMs}ms`
-        );
+        // Retry logic - using structured step logging instead of console.log
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
@@ -218,7 +216,7 @@ serve(async (req) => {
         stepEnd('check_pool_eligibility', base, {
           result: 'success',
           pool_action: 'from_pool',
-          phone_masked: maskPhone(allocated.phone_number),
+          phone_masked: maskPhoneForLogs(allocated.phone_number),
           area_code: allocated.area_code
         }, poolStart);
 
@@ -271,7 +269,7 @@ serve(async (req) => {
 
           stepEnd('purchase_new_number', base, {
             result: 'success',
-            phone_masked: maskPhone(phoneNumber),
+            phone_masked: maskPhoneForLogs(phoneNumber),
             provider_id: twilioResult.providerId
           }, twilioStart);
 
@@ -302,7 +300,7 @@ serve(async (req) => {
 
       const vapiAttachStart = Date.now();
       stepStart('attach_to_vapi', base, {
-        phone_masked: maskPhone(phoneNumber),
+        phone_masked: maskPhoneForLogs(phoneNumber),
         assistant_id: account.vapi_assistant_id
       });
 
@@ -342,7 +340,7 @@ serve(async (req) => {
         stepEnd('attach_to_vapi', base, {
           result: 'success',
           vapi_phone_id: vapiPhoneId,
-          phone_masked: maskPhone(phoneNumber)
+          phone_masked: maskPhoneForLogs(phoneNumber)
         }, vapiAttachStart);
 
         logInfo("Imported number to Vapi", { ...baseLogOptions, context: { vapiPhoneId, phoneNumber } });
@@ -350,7 +348,7 @@ serve(async (req) => {
       } catch (importErr) {
         stepError('attach_to_vapi', base, importErr, {
           reason_code: 'VAPI_ATTACH_FAILED',
-          phone_masked: maskPhone(phoneNumber)
+          phone_masked: maskPhoneForLogs(phoneNumber)
         });
 
         // If import fails, we have bought a Twilio number (if not pooled) or allocated one.

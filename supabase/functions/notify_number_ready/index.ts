@@ -49,7 +49,7 @@ async function sendSmsTwilio(
 
     if (response.ok) {
       log.info("SMS sent successfully", {
-        recipient: maskPhone(to)
+        recipient: maskPhoneForLogs(to)
       });
       return true;
     } else {
@@ -95,7 +95,7 @@ async function sendEmailSendGrid(
 
     if (response.ok) {
       log.info("Email sent via SendGrid", {
-        recipient: maskEmail(to)
+        recipient: maskEmailForLogs(to)
       });
       return true;
     } else {
@@ -140,7 +140,7 @@ async function sendEmailResend(
 
     if (response.ok) {
       log.info("Email sent via Resend", {
-        recipient: maskEmail(to)
+        recipient: maskEmailForLogs(to)
       });
       return true;
     } else {
@@ -155,13 +155,13 @@ async function sendEmailResend(
   }
 }
 
-function maskEmail(email: string): string {
+function maskEmailForLogs(email: string): string {
   const [local, domain] = email.split("@");
   if (!domain) return "***@***";
   return `${local.slice(0, 2)}***@${domain}`;
 }
 
-function maskPhone(phone: string): string {
+function maskPhoneForLogs(phone: string): string {
   return `***${phone.slice(-4)}`;
 }
 

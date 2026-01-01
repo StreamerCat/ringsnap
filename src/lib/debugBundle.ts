@@ -52,8 +52,10 @@ export interface DebugBundle {
 
 /**
  * Mask email address for safe logging
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in operational code.
  */
-function maskEmail(email: string): string {
+function maskEmailForLogs(email: string): string {
   if (!email || !email.includes('@')) return email;
 
   const [local, domain] = email.split('@');
@@ -65,8 +67,10 @@ function maskEmail(email: string): string {
 
 /**
  * Mask phone number to show only last 4 digits
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in operational code.
  */
-function maskPhone(phone: string | null | undefined): string | null {
+function maskPhoneForLogs(phone: string | null | undefined): string | null {
   if (!phone) return null;
 
   const digitsOnly = phone.replace(/\D/g, '');
@@ -86,12 +90,12 @@ function sanitizeValue(value: unknown): unknown {
   if (typeof value === 'string') {
     // Mask email patterns
     if (value.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      return maskEmail(value);
+      return maskEmailForLogs(value);
     }
 
     // Mask phone patterns (basic detection)
     if (/^[\d\s\-\+\(\)]{10,}$/.test(value)) {
-      return maskPhone(value);
+      return maskPhoneForLogs(value);
     }
 
     return value;
@@ -115,9 +119,9 @@ function sanitizeValue(value: unknown): unknown {
       ) {
         sanitized[key] = '[REDACTED]';
       } else if (lowerKey.includes('email')) {
-        sanitized[key] = typeof val === 'string' ? maskEmail(val) : sanitizeValue(val);
+        sanitized[key] = typeof val === 'string' ? maskEmailForLogs(val) : sanitizeValue(val);
       } else if (lowerKey.includes('phone')) {
-        sanitized[key] = typeof val === 'string' ? maskPhone(val) : sanitizeValue(val);
+        sanitized[key] = typeof val === 'string' ? maskPhoneForLogs(val) : sanitizeValue(val);
       } else {
         sanitized[key] = sanitizeValue(val);
       }

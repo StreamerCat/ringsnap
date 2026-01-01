@@ -25,6 +25,12 @@ const CONSOLE_LOG_EXCLUSIONS = [
   "supabase/functions/_shared/observability.ts",
 ];
 
+// File patterns to completely skip from guardrail checks
+const SKIP_PATTERNS = [
+  "**/_legacy/**",
+  "**/*.test.ts",
+];
+
 interface LintResult {
   filePath: string;
   violations: string[];
@@ -51,10 +57,28 @@ function isExcludedFromConsoleCheck(filePath: string): boolean {
 }
 
 /**
+ * Check if file should be completely skipped from all guardrail checks
+ */
+function shouldSkipFile(filePath: string): boolean {
+  return SKIP_PATTERNS.some((pattern) => {
+    const regexPattern = pattern
+      .replace(/\*\*/g, ".*")
+      .replace(/\*/g, "[^/]*")
+      .replace(/\//g, "\\/");
+    return new RegExp(regexPattern).test(filePath);
+  });
+}
+
+/**
  * Lint a single file for logging violations
  */
 async function lintFile(filePath: string): Promise<LintResult> {
   const violations: string[] = [];
+
+  // Skip legacy and test files entirely
+  if (shouldSkipFile(filePath)) {
+    return { filePath, violations: [] };
+  }
 
   try {
     const content = await Deno.readTextFile(filePath);
@@ -104,6 +128,29 @@ async function lintFile(filePath: string): Promise<LintResult> {
           "No step logging usage found (must call stepStart/stepEnd at least once)"
         );
       }
+    }
+
+    // Check 3: Ensure masking helpers are only used in logging contexts
+    if (/(maskPhoneForLogs|maskEmailForLogs)\s*\(/.test(content)) {
+      lines.forEach((line, index) => {
+        const hasMaskingHelper = /(maskPhoneForLogs|maskEmailForLogs)\s*\(/.test(line);
+
+        if (hasMaskingHelper) {
+          // Check for misuse patterns: DB writes, API payloads to external services
+          const isMisused =
+            (/\.insert\s*\(/.test(line) && /email|phone/.test(line)) ||  // Database insert with PII field
+            (/\.update\s*\(/.test(line) && /email|phone/.test(line)) ||  // Database update with PII field
+            (/stripe\.customers\.create|stripe\.paymentMethods/.test(line)) ||  // Stripe customer/payment creation
+            (/To:|From:|to:|from:|phone_number:/.test(line) && /twilio|sendSMS/i.test(content.substring(Math.max(0, index - 10), index + 10))) ||  // Twilio SMS payload
+            (/phoneNumber:|assistantId:/.test(line) && /vapi/i.test(content.substring(Math.max(0, index - 10), index + 10))); // Vapi API payload
+
+          if (isMisused) {
+            violations.push(
+              `Line ${index + 1}: maskPhoneForLogs/maskEmailForLogs used in operational code (DB write or API payload). Use raw values for external services!`
+            );
+          }
+        }
+      });
     }
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {

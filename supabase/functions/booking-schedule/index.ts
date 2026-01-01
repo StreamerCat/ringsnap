@@ -37,7 +37,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { logError, logInfo, logWarn, extractTraceId, stepStart, stepEnd, stepError, maskEmail, maskPhone, type BaseLogContext } from "../_shared/logging.ts";
+import { logError, logInfo, logWarn, extractTraceId, stepStart, stepEnd, stepError, maskEmailForLogs, maskPhoneForLogs, type BaseLogContext } from "../_shared/logging.ts";
 import { sendSMS } from "../_shared/sms.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 
@@ -216,7 +216,7 @@ serve(async (req: Request) => {
     const appointmentStart = Date.now();
     stepStart('create_appointment_record', base, {
       customer_name: data.customer_name,
-      phone_masked: maskPhone(data.customer_phone)
+      phone_masked: maskPhoneForLogs(data.customer_phone)
     });
 
     const { data: appointment, error: appointmentError } = await supabase
@@ -289,7 +289,7 @@ serve(async (req: Request) => {
         const smsStart = Date.now();
         stepStart('send_sms_notification', base, {
           notification_method: 'sms',
-          to_masked: maskPhone(destinationPhone)
+          to_masked: maskPhoneForLogs(destinationPhone)
         });
 
         try {
