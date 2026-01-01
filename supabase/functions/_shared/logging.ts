@@ -1,4 +1,6 @@
 export type LogLevel = 'info' | 'warn' | 'error';
+export type EventType = 'step_start' | 'step_end' | 'info' | 'error';
+export type StepResult = 'success' | 'failure' | 'partial';
 
 export interface LogOptions {
   functionName: string;
@@ -6,6 +8,13 @@ export interface LogOptions {
   accountId?: string | null;
   context?: Record<string, unknown> | undefined;
   error?: unknown;
+}
+
+export interface BaseLogContext {
+  functionName: string;
+  traceId: string;
+  accountId?: string | null;
+  userId?: string | null;
 }
 
 const SENSITIVE_KEYWORDS = [
@@ -196,6 +205,35 @@ export function extractCorrelationId(req: Request): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Extract trace ID from request headers, preferring x-rs-trace-id.
+ * Falls back to generating a new UUID if not present.
+ */
+export function extractTraceId(req: Request): string {
+  // Prefer RingSnap-specific trace ID header
+  const rsTraceId = req.headers.get('x-rs-trace-id');
+  if (rsTraceId) {
+    return rsTraceId;
+  }
+
+  // Fall back to other correlation headers
+  const headerCandidates = [
+    'x-correlation-id',
+    'x-request-id',
+    'requestid',
+    'traceparent'
+  ];
+
+  for (const header of headerCandidates) {
+    const value = req.headers.get(header);
+    if (value) {
+      return value;
+    }
+  }
+
+  return crypto.randomUUID();
+}
+
 export function withLogContext(base: Omit<LogOptions, 'context'>) {
   return {
     info: (message: string, context?: Record<string, unknown>) =>
@@ -205,4 +243,113 @@ export function withLogContext(base: Omit<LogOptions, 'context'>) {
     error: (message: string, error?: unknown, context?: Record<string, unknown>) =>
       logError(message, { ...base, context, error })
   };
+}
+
+// ============================================================================
+// LLM-NATIVE STEP LOGGING
+// ============================================================================
+
+/**
+ * Log the start of a step in a critical flow.
+ * Emits a single-line JSON log event optimized for LLM consumption.
+ */
+export function stepStart(
+  step: string,
+  base: BaseLogContext,
+  context?: Record<string, unknown>
+): void {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'info' as LogLevel,
+    event_type: 'step_start' as EventType,
+    trace_id: base.traceId,
+    function_name: base.functionName,
+    step,
+    message: `Step started: ${step}`,
+    account_id: base.accountId ?? null,
+    user_id: base.userId ?? null,
+    context: sanitizeContext(context)
+  };
+
+  console.log(JSON.stringify(payload));
+}
+
+/**
+ * Log the end of a step in a critical flow.
+ * Automatically calculates duration_ms from startTime.
+ */
+export function stepEnd(
+  step: string,
+  base: BaseLogContext,
+  context: Record<string, unknown> & { result?: StepResult } = {},
+  startTime?: number
+): void {
+  const durationMs = startTime ? Date.now() - startTime : undefined;
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'info' as LogLevel,
+    event_type: 'step_end' as EventType,
+    trace_id: base.traceId,
+    function_name: base.functionName,
+    step,
+    message: `Step completed: ${step}`,
+    account_id: base.accountId ?? null,
+    user_id: base.userId ?? null,
+    duration_ms: durationMs,
+    result: context.result ?? 'success',
+    context: sanitizeContext(context)
+  };
+
+  console.log(JSON.stringify(payload));
+}
+
+/**
+ * Log a step error in a critical flow.
+ */
+export function stepError(
+  step: string,
+  base: BaseLogContext,
+  error: unknown,
+  context?: Record<string, unknown>
+): void {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'error' as LogLevel,
+    event_type: 'error' as EventType,
+    trace_id: base.traceId,
+    function_name: base.functionName,
+    step,
+    message: `Step failed: ${step}`,
+    account_id: base.accountId ?? null,
+    user_id: base.userId ?? null,
+    error: serializeError(error),
+    context: sanitizeContext(context)
+  };
+
+  console.error(JSON.stringify(payload));
+}
+
+// ============================================================================
+// EXPORTED MASKING UTILITIES
+// ============================================================================
+
+/**
+ * Mask an email address for safe logging.
+ * Example: "user@example.com" => "us***@example.com"
+ */
+export { maskEmail };
+
+/**
+ * Mask a phone number for safe logging.
+ * Example: "+14155551234" => "***1234"
+ */
+export { maskPhone };
+
+/**
+ * Manually redact/sanitize an object for safe logging.
+ * Automatically masks emails, phones, and sensitive keys.
+ */
+export function redact(obj: Record<string, unknown>): Record<string, unknown> {
+  return sanitizeValue(obj, []) as Record<string, unknown>;
 }

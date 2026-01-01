@@ -34,7 +34,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmail, type BaseLogContext } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber, formatPhoneE164 } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
@@ -72,6 +72,7 @@ interface TrialCreationErrorResponse {
   error?: string;
   message?: string;
   request_id?: string;
+  trace_id?: string; // LLM-native trace ID for debugging
 }
 
 type ErrorCode =
@@ -620,17 +621,27 @@ async function withRetry<T>(
 }
 
 Deno.serve(async (req: Request) => {
-  console.log("FUNCTION VERSION: 2025-12-31-PM-RETRY-FIX-V1");
+  console.log("FUNCTION VERSION: 2026-01-01-LLM-LOGGING-V1");
   const request_id = crypto.randomUUID();
-  const correlationId = extractCorrelationId(req);
+  const correlationId = extractCorrelationId(req); // Legacy compatibility
+  const traceId = extractTraceId(req); // Primary trace ID for LLM-native logging
+
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
     request_id,
   };
 
+  // Base context for step logging
+  let base: BaseLogContext = {
+    functionName: FUNCTION_NAME,
+    traceId,
+    accountId: null,
+    userId: null,
+  };
+
   // Initialize Sentry for error tracking
-  initSentry(FUNCTION_NAME, { correlationId });
+  initSentry(FUNCTION_NAME, { correlationId: traceId });
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -741,12 +752,16 @@ Deno.serve(async (req: Request) => {
 
     // ... Input Validation ...
     phase = "validate_input";
+    const validateStart = Date.now();
+    stepStart('validate_input', base);
+
     let rawData: any;
     try {
       rawData = await req.json();
     } catch (err: any) {
       console.error(JSON.stringify({ request_id, phase, message: err.message }));
-      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: corsHeaders });
+      stepError('validate_input', base, err, { reason_code: 'INVALID_JSON' });
+      return new Response(JSON.stringify({ error: "Invalid JSON", trace_id: traceId }), { status: 400, headers: corsHeaders });
     }
 
     // ... Schema Parse ...
@@ -755,7 +770,13 @@ Deno.serve(async (req: Request) => {
 
     try {
       data = createTrialSchema.parse(normalizedData);
+      stepEnd('validate_input', base, { result: 'success', email: maskEmail(data.email) }, validateStart);
     } catch (zodError: any) {
+      stepError('validate_input', base, zodError, {
+        reason_code: 'VALIDATION_FAILED',
+        errors: zodError.errors
+      });
+
       logWarn("Validation error in create-trial", {
         ...baseLogOptions,
         context: { errors: zodError.errors, rawLeadId: rawData.leadId },
@@ -765,6 +786,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           error: "Invalid input data",
           details: zodError.errors,
+          trace_id: traceId,
         }),
         {
           status: 400,
@@ -1124,6 +1146,9 @@ Deno.serve(async (req: Request) => {
       // ═══════════════════════════════════════════════════════════════
       if (!reusedExistingCustomer) {
         phase = "stripe_customer";
+        const stripeCustomerStart = Date.now();
+        stepStart('create_stripe_customer', base, { email: maskEmail(data.email), source: data.source });
+
         try {
           customer = await stripe.customers.create({
             email: data.email,
@@ -1137,6 +1162,12 @@ Deno.serve(async (req: Request) => {
           }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
           stripeCustomerId = customer.id;
           createdStripeCustomerId = customer.id; // Track for safe cleanup
+
+          stepEnd('create_stripe_customer', base, {
+            result: 'success',
+            stripe_customer_id: customer.id
+          }, stripeCustomerStart);
+
           logInfo("Stripe customer created", {
             ...baseLogOptions,
             context: {
@@ -1146,6 +1177,10 @@ Deno.serve(async (req: Request) => {
             },
           });
         } catch (e: any) {
+          stepError('create_stripe_customer', base, e, {
+            reason_code: 'STRIPE_CUSTOMER_FAILED',
+            email: maskEmail(data.email)
+          });
           throw new Error(`Stripe Customer Create Failed: ${e.message}`);
         }
       }
@@ -1154,6 +1189,12 @@ Deno.serve(async (req: Request) => {
       // STEP 3: Attach payment method if not already attached
       // ═══════════════════════════════════════════════════════════════
       phase = "stripe_payment_method";
+      const pmStart = Date.now();
+      stepStart('attach_payment_method', base, {
+        payment_method_id: data.paymentMethodId,
+        already_attached: !!paymentMethodCustomerId
+      });
+
       try {
         if (!paymentMethodCustomerId) {
           // PM not attached - attach it now
@@ -1163,6 +1204,12 @@ Deno.serve(async (req: Request) => {
         await stripe.customers.update(stripeCustomerId!, {
           invoice_settings: { default_payment_method: data.paymentMethodId }
         });
+
+        stepEnd('attach_payment_method', base, {
+          result: 'success',
+          was_already_attached: !!paymentMethodCustomerId
+        }, pmStart);
+
         logInfo("Payment method configured", {
           ...baseLogOptions,
           context: {
@@ -1172,6 +1219,11 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
+        stepError('attach_payment_method', base, e, {
+          reason_code: 'STRIPE_PAYMENT_FAILED',
+          payment_method_id: data.paymentMethodId
+        });
+
         // ALWAYS log full technical details (unchanged)
         logError("Stripe payment method attach failed", {
           ...baseLogOptions,
@@ -1187,6 +1239,7 @@ Deno.serve(async (req: Request) => {
         // Return structured error if flag enabled, otherwise preserve legacy behavior
         if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
           const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          errorResponse.trace_id = traceId; // Add trace ID to response
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1201,6 +1254,9 @@ Deno.serve(async (req: Request) => {
       // STEP 4: Create subscription
       // ═══════════════════════════════════════════════════════════════
       phase = "stripe_subscription";
+      const subStart = Date.now();
+      stepStart('create_subscription', base, { plan_type: data.planType });
+
       try {
         const priceId = getStripePriceId(data.planType);
         subscription = await stripe.subscriptions.create({
@@ -1212,6 +1268,14 @@ Deno.serve(async (req: Request) => {
         }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
         stripeSubscriptionId = subscription.id;
         createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
+
+        stepEnd('create_subscription', base, {
+          result: 'success',
+          subscription_id: subscription.id,
+          plan_type: data.planType,
+          status: subscription.status
+        }, subStart);
+
         logInfo("Stripe subscription created", {
           ...baseLogOptions,
           context: {
@@ -1222,6 +1286,11 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
+        stepError('create_subscription', base, e, {
+          reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
+          plan_type: data.planType
+        });
+
         // ALWAYS log full technical details (unchanged)
         logError("Stripe subscription creation failed", {
           ...baseLogOptions,
@@ -1233,6 +1302,7 @@ Deno.serve(async (req: Request) => {
         // Return structured error if flag enabled, otherwise preserve legacy behavior
         if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
           const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          errorResponse.trace_id = traceId; // Add trace ID to response
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1246,6 +1316,8 @@ Deno.serve(async (req: Request) => {
 
     // DATABASE INSERT
     phase = "account_insert";
+    const accountStart = Date.now();
+    stepStart('create_account_atomic', base, { email: maskEmail(data.email) });
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     const tempPassword = generateSecurePassword();
@@ -1470,6 +1542,19 @@ Deno.serve(async (req: Request) => {
 
     currentAccountId = accountTxResult.account_id;
     currentUserId = accountTxResult.user_id;
+
+    // Update base context with account and user IDs
+    base = {
+      ...base,
+      accountId: currentAccountId,
+      userId: currentUserId,
+    };
+
+    stepEnd('create_account_atomic', base, {
+      result: 'success',
+      account_id: currentAccountId,
+      user_id: currentUserId
+    }, accountStart);
 
     logInfo("Account created atomically", {
       ...baseLogOptions,
@@ -1762,6 +1847,9 @@ Deno.serve(async (req: Request) => {
       // ═══════════════════════════════════════════════════════════════
       // LIVE MODE: Real provisioning via job queue
       // ═══════════════════════════════════════════════════════════════
+      const enqueueStart = Date.now();
+      stepStart('enqueue_provisioning', base, { account_id: currentAccountId });
+
       // ... metadata build ...
       const jobMetadata = {
         company_name: data.companyName,
@@ -1819,6 +1907,10 @@ Deno.serve(async (req: Request) => {
         });
 
         if (jobError) {
+          stepError('enqueue_provisioning', base, jobError, {
+            reason_code: 'PROVISIONING_ENQUEUE_FAILED'
+          });
+
           logError("Failed to enqueue provisioning job (non-critical)", {
             ...baseLogOptions,
             accountId: currentAccountId,
@@ -1833,6 +1925,8 @@ Deno.serve(async (req: Request) => {
             request_id,
           }, currentAccountId);
         } else {
+          stepEnd('enqueue_provisioning', base, { result: 'success' }, enqueueStart);
+
           logInfo("Provisioning job enqueued", {
             ...baseLogOptions,
             accountId: currentAccountId,
@@ -1905,12 +1999,14 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
     // BUILD SUCCESS RESPONSE
     // ═══════════════════════════════════════════════════════════════
+    stepStart('prepare_response', base);
 
     const successResponse = {
       success: true,
       accountId: currentAccountId,
       stripeCustomerId: customer.id,
       stripeSubscriptionId: subscription.id,
+      trace_id: traceId, // Add trace ID for debugging
       // Backward compatibility fields
       ok: true,
       user_id: currentUserId,
@@ -1927,6 +2023,8 @@ Deno.serve(async (req: Request) => {
       phone_number: null,
       message: "Trial started! Your AI receptionist is being set up...",
     };
+
+    stepEnd('prepare_response', base, { result: 'success' });
 
     // ═══════════════════════════════════════════════════════════════
     // CACHE RESPONSE FOR IDEMPOTENCY
@@ -2027,7 +2125,8 @@ Deno.serve(async (req: Request) => {
         // Legacy fields
         error: error?.message ?? errorMessage,
         message: String(error?.message ?? errorMessage),
-        request_id
+        request_id,
+        trace_id: traceId // Add trace ID for LLM debugging
       };
 
       return new Response(JSON.stringify(errorResponse), {
@@ -2042,6 +2141,7 @@ Deno.serve(async (req: Request) => {
           request_id,
           phase,
           message: String(error?.message ?? errorMessage),
+          trace_id: traceId // Add trace ID even in legacy mode
         }),
         {
           status: 500,
