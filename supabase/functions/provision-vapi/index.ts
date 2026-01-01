@@ -32,7 +32,7 @@
 // Imports
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
 import { formatPhoneE164 } from "../_shared/validators.ts";

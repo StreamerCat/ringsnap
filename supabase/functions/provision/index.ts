@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 
 type Json = Record<string, unknown>;
 

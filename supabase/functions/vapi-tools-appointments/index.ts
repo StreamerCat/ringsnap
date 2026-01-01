@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { withSentryEdge } from "../_shared/sentry.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { logInfo, logError, logWarn } from "../_shared/logging.ts";
+import { logInfo, logError, logWarn, extractTraceId, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 import { sendAppointmentNotifications, Appointment, AccountSettings } from "../_shared/appointment-notifications.ts";
 import { checkSlotConflict } from "../_shared/availability.ts";
 
