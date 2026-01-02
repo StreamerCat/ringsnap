@@ -49,9 +49,8 @@ ON public.phone_number_notifications FOR SELECT
 USING (
   EXISTS (
     SELECT 1 FROM public.phone_numbers pn
-    JOIN public.accounts a ON a.id = pn.account_id
     WHERE pn.id = phone_number_notifications.phone_number_id
-    AND a.user_id = auth.uid()
+    AND pn.account_id = public.get_user_account_id(auth.uid())
   )
 );
 
@@ -60,11 +59,7 @@ DROP POLICY IF EXISTS "users_can_read_own_provisioning_logs" ON public.provision
 CREATE POLICY "users_can_read_own_provisioning_logs"
 ON public.provisioning_logs FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1 FROM public.accounts a
-    WHERE a.id = provisioning_logs.account_id
-    AND a.user_id = auth.uid()
-  )
+  provisioning_logs.account_id = public.get_user_account_id(auth.uid())
 );
 
 -- Update indexes for performance
