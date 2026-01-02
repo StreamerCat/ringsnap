@@ -1,6 +1,6 @@
 #!/bin/bash
 # Migration Linter - Prevents common Postgres migration errors
-# Usage: .github/scripts/lint-migrations.sh
+# Usage: bash .github/scripts/lint-migrations.sh
 
 set -e
 
@@ -37,14 +37,33 @@ else
 fi
 echo ""
 
-# Rule 3: Check for GRANT USAGE ON SEQUENCE for UUID tables
-echo "Checking for invalid GRANT USAGE ON SEQUENCE for UUID primary keys..."
-if grep -rn "GRANT USAGE ON SEQUENCE.*_id_seq" "$MIGRATIONS_DIR"/*.sql 2>/dev/null; then
-  echo "⚠️  WARNING: Found GRANT USAGE ON SEQUENCE for *_id_seq"
-  echo "   UUID primary keys (gen_random_uuid) do not create sequences."
-  echo "   Verify the table uses SERIAL/IDENTITY before granting sequence usage."
-  echo ""
-  # This is a warning, not an error, since some tables legitimately use SERIAL
+# Rule 3: Check for UUID tables with sequence grants in same file
+echo "Checking for UUID tables with invalid sequence grants..."
+UUID_SEQUENCE_ERRORS=0
+for migration in "$MIGRATIONS_DIR"/*.sql; do
+  # Skip if file doesn't exist
+  [ -f "$migration" ] || continue
+
+  # Check if this migration has UUID primary key with gen_random_uuid()
+  if grep -q "DEFAULT gen_random_uuid()" "$migration" 2>/dev/null; then
+    # Check if same file grants usage on _id_seq
+    if grep -q "GRANT USAGE ON SEQUENCE.*_id_seq" "$migration" 2>/dev/null; then
+      # Ignore commented-out grants
+      if ! grep "GRANT USAGE ON SEQUENCE.*_id_seq" "$migration" | grep -q "^--" 2>/dev/null; then
+        echo "❌ ERROR: $migration"
+        echo "   File defines UUID primary key (gen_random_uuid) AND grants SEQUENCE usage"
+        echo "   UUID PKs do not create sequences - remove the GRANT USAGE ON SEQUENCE line"
+        grep -n "GRANT USAGE ON SEQUENCE.*_id_seq" "$migration" 2>/dev/null || true
+        echo ""
+        UUID_SEQUENCE_ERRORS=1
+        ERRORS_FOUND=1
+      fi
+    fi
+  fi
+done
+
+if [ $UUID_SEQUENCE_ERRORS -eq 0 ]; then
+  echo "✅ No UUID tables with invalid sequence grants found"
 fi
 echo ""
 

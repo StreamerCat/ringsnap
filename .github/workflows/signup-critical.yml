@@ -35,7 +35,7 @@ jobs:
           version: latest
 
       - name: Lint Migrations
-        run: .github/scripts/lint-migrations.sh
+        run: bash .github/scripts/lint-migrations.sh
 
       - name: Configure Local Env
         run: |
