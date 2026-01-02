@@ -245,7 +245,7 @@ CREATE POLICY "Admins can view all auth events"
   USING (
     EXISTS (
       SELECT 1 FROM public.staff_roles
-      WHERE user_id = auth.uid() AND role IN ('admin', 'support')
+      WHERE user_id = auth.uid() AND role::text IN ('admin', 'support', 'platform_admin', 'platform_owner')
     )
   );
 

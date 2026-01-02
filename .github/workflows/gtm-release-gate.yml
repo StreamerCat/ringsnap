@@ -7,11 +7,17 @@ on:
     branches: [ main, develop, gtm-staging-gate ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  deployments: read
+  statuses: read
+  pull-requests: read
+
 jobs:
   gtm-gate:
     timeout-minutes: 20
     runs-on: ubuntu-latest
-    
+
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -29,15 +35,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set Base URL for PR
-        if: github.event_name == 'pull_request'
-        run: echo "PLAYWRIGHT_BASE_URL=https://staging.getringsnap.com" >> $GITHUB_ENV
-
-      - name: Set Base URL for Main/Dispatch
+      - name: Set Production Base URL
         if: github.event_name != 'pull_request'
         run: echo "PLAYWRIGHT_BASE_URL=https://getringsnap.com" >> $GITHUB_ENV
 
-      - name: Wait for Vercel Deployment
+      - name: Wait for Vercel Preview Deployment
+        if: github.event_name == 'pull_request'
         id: wait-for-deployment
         uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
         with:
@@ -45,8 +48,8 @@ jobs:
           max_timeout: 300
           check_interval: 5
 
-      - name: Override with Vercel Deployment URL
-        if: ${{ steps.wait-for-deployment.outputs.url != '' }}
+      - name: Set Preview Base URL
+        if: github.event_name == 'pull_request' && steps.wait-for-deployment.outputs.url != ''
         run: echo "PLAYWRIGHT_BASE_URL=${{ steps.wait-for-deployment.outputs.url }}" >> $GITHUB_ENV
 
       - name: "Tier 1: API Smoke Tests (Fast Fail)"
