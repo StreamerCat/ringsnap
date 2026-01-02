@@ -68,8 +68,7 @@ CREATE INDEX idx_idempotency_results_account
 -- ==============================================================================
 
 COMMENT ON TABLE public.idempotency_results IS
-  'Stores idempotency keys and cached responses for create-trial API requests. ' ||
-  'Results expire after 24 hours and are automatically cleaned up.';
+  'Stores idempotency keys and cached responses for create-trial API requests. Results expire after 24 hours and are automatically cleaned up.';
 
 COMMENT ON COLUMN public.idempotency_results.idempotency_key IS
   'Unique client-provided key from Idempotency-Key header';
