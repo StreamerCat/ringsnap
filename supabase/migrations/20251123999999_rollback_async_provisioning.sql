@@ -22,6 +22,10 @@ DROP TABLE IF EXISTS public.stripe_events CASCADE;
 -- Rollback Part 2: provisioning timestamps
 -- ==============================================================================
 
+-- Drop views that depend on provisioning_error column
+DROP VIEW IF EXISTS public.admin_provisioning_failures CASCADE;
+DROP VIEW IF EXISTS public.admin_provisioning_status_counts CASCADE;
+
 -- Drop helper function
 DROP FUNCTION IF EXISTS public.update_provisioning_lifecycle(UUID, TEXT, TEXT);
 
