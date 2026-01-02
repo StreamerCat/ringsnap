@@ -56,10 +56,14 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
     const callbackPhone = (callWithAppointment as any).callback_phone;
     const hasCallback = callbackPhone && callbackPhone !== callerPhone;
 
-    // Topic derivation
+    // Get summary with fallback (RPC returns summary, direct queries return transcript_summary)
+    const summaryText = call.transcript_summary || call.summary;
+
+    // Topic derivation (with company name for sanitization)
     const topics = deriveTopicLabels({
         reason: call.reason,
-        summary: call.transcript_summary,
+        summary: summaryText,
+        companyName,
     });
 
     // Outcome and next step
@@ -82,9 +86,10 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
     const address = getDisplayAddress(callWithAppointment);
     const hasAddress = address !== 'Address not provided';
 
-    // Sanitized text
+    // Sanitized text (fallback to call.summary since RPC may return summary instead of transcript_summary)
+    const summaryText = call.transcript_summary || call.summary;
     const sanitizedReason = sanitizeCallText(call.reason, { companyName });
-    const sanitizedSummary = sanitizeCallText(call.transcript_summary, { companyName });
+    const sanitizedSummary = sanitizeCallText(summaryText, { companyName });
 
     // Format duration as mm:ss
     const formatDuration = (seconds: number | undefined) => {
@@ -203,9 +208,30 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
 
                     <Separator />
 
+                    {/* Reason for Call */}
+                    {sanitizedReason && (
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-muted-foreground">Reason for Call</h4>
+                            <p className="text-sm bg-muted p-3 rounded-lg">
+                                {sanitizedReason}
+                            </p>
+                        </div>
+                    )}
+
                     {/* Job Details Block */}
                     <div className="space-y-3">
                         <h4 className="text-sm font-medium text-muted-foreground">Job Details</h4>
+
+                        {/* Services Requested */}
+                        {topics.length > 0 && (
+                            <div className="flex items-start gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                                <div>
+                                    <p className="text-sm font-medium">Services Requested</p>
+                                    <p className="text-xs text-muted-foreground">{topics.join(', ')}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Address */}
                         {hasAddress && (

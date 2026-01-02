@@ -94,6 +94,14 @@ function extractNameFromSummary(summary: string | null | undefined): string | nu
     const nameLabel = s.match(/(?:name|caller): ([A-Z][a-z]+(?: [A-Z][a-z]+)+)/i);
     if (nameLabel && nameLabel[1]) return nameLabel[1].trim();
 
+    // Pattern 5: "[Name] called" at start of summary (e.g., "Mark called Apple Plumb")
+    const calledMatch = s.match(/^([A-Z][a-z]+)\s+called\s+/i);
+    if (calledMatch && calledMatch[1]) return calledMatch[1].trim();
+
+    // Pattern 6: "A caller named [Name]"
+    const namedMatch = s.match(/(?:a )?caller named ([A-Z][a-z]+(?: [A-Z][a-z]+)?)/i);
+    if (namedMatch && namedMatch[1]) return namedMatch[1].trim();
+
     return null;
 }
 
@@ -110,9 +118,10 @@ export function getDisplayName(call: CallLogWithAppointment | null | undefined):
 
     if (name) return name;
 
-    // Fallback: Try to extract from summary
+    // Fallback: Try to extract from summary or transcript_summary
     // (This handles cases where RPC doesn't return caller_name but summary has it)
-    const extracted = extractNameFromSummary(call.summary);
+    const extracted = extractNameFromSummary(call.summary)
+        || extractNameFromSummary(call.transcript_summary);
     if (extracted) return extracted;
 
     // Fall back to formatted phone number

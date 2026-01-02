@@ -22,6 +22,7 @@ export interface TopicDerivationInput {
     summary?: string | null;
     transcript?: string | null;
     trade?: string | null;
+    companyName?: string | null;
 }
 
 export interface OutcomeInput {
@@ -215,12 +216,26 @@ export function sanitizeCallText(text: string | null | undefined, options: Sanit
 /**
  * Derive topic labels from call data using trade keyword mapping.
  * Returns 0..N labels, never sentence fragments.
+ * Removes company name from text before matching to prevent false positives.
  */
 export function deriveTopicLabels(input: TopicDerivationInput): string[] {
-    const { reason, summary, transcript, trade } = input;
+    const { reason, summary, transcript, trade, companyName } = input;
 
     // Combine all text sources for keyword matching
-    const combinedText = [reason, summary, transcript].filter(Boolean).join(' ').toLowerCase();
+    let combinedText = [reason, summary, transcript].filter(Boolean).join(' ').toLowerCase();
+
+    // Remove company name from text before matching to prevent false positives
+    // e.g., "apple plumb" shouldn't match "plumb" keyword
+    if (companyName) {
+        const companyLower = companyName.toLowerCase();
+        const companyTokens = companyLower.split(/\s+/).filter(t => t.length > 2);
+        for (const token of companyTokens) {
+            // Remove token only if not a generic word
+            if (!['the', 'and', 'for', 'inc', 'llc', 'co'].includes(token)) {
+                combinedText = combinedText.replace(new RegExp(token, 'gi'), '');
+            }
+        }
+    }
 
     if (!combinedText.trim()) {
         return trade ? [trade] : [];

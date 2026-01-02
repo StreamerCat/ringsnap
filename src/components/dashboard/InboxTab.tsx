@@ -55,10 +55,13 @@ export function InboxTab({ calls, companyName }: InboxTabProps) {
         // Categorize calls by outcome
         const categorized = calls.map(call => {
             const appointmentDisplay = getAppointmentDisplay(call);
+            // Only treat as structured appointment if not inferred from text
+            // This ensures text-based "tomorrow at 10" stays as Follow-up, not Booked
+            const hasStructuredTime = appointmentDisplay.hasDateTime && !appointmentDisplay.inferred;
             const outcomeInput: OutcomeInput = {
                 call,
-                hasAppointment: appointmentDisplay.hasDateTime,
-                appointmentStart: appointmentDisplay.start?.toISOString()
+                hasAppointment: hasStructuredTime,
+                appointmentStart: hasStructuredTime ? appointmentDisplay.start?.toISOString() : undefined
             };
             return {
                 call,
@@ -220,7 +223,7 @@ function FollowUpRow({ call, outcome, outcomeInput, companyName, onClick }: Foll
     const hasCallback = callbackPhone && callbackPhone !== callerPhone;
     const preferredPhone = hasCallback ? callbackPhone : callerPhone;
 
-    const topics = deriveTopicLabels({ reason: call.reason, summary: call.summary });
+    const topics = deriveTopicLabels({ reason: call.reason, summary: call.summary, companyName });
     const nextStep = deriveNextStep(outcomeInput);
     const whyItMatters = deriveWhyItMatters(outcomeInput);
     const score = calculateLeadScore(call);
@@ -297,7 +300,7 @@ interface CallRowProps {
 function CallRow({ call, outcome, outcomeInput, companyName, onClick }: CallRowProps) {
     const displayName = getDisplayName(call);
     const callerPhone = call.from_number || call.caller_phone || '';
-    const topics = deriveTopicLabels({ reason: call.reason, summary: call.summary });
+    const topics = deriveTopicLabels({ reason: call.reason, summary: call.summary, companyName });
     const score = calculateLeadScore(call);
     const scoreClasses = getLeadScoreClasses(score);
 
