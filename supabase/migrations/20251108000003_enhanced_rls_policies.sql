@@ -329,7 +329,7 @@ DO $$ BEGIN
       EXISTS (
         SELECT 1 FROM public.staff_roles
         WHERE user_id = auth.uid()
-        AND role IN ('admin', 'support', 'billing')
+        AND role::text IN ('admin', 'support', 'billing', 'platform_admin', 'platform_owner')
       )
     );
   END IF;
