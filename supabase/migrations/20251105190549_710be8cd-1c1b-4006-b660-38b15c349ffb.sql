@@ -62,7 +62,7 @@ ALTER TABLE accounts
 -- 3. SIGNUP LEADS TABLE (lead capture before full account creation)
 -- Note: accounts table already has assistant_gender and zip_code (added above)
 -- These columns on signup_leads capture preferences during lead collection
-CREATE TABLE IF NOT EXISTS signup_leads (
+CREATE TABLE IF NOT EXISTS public.signup_leads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -82,8 +82,8 @@ CREATE TABLE IF NOT EXISTS signup_leads (
   referral_code TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_signup_leads_email ON signup_leads(email);
-CREATE INDEX IF NOT EXISTS idx_signup_leads_created_at ON signup_leads(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_signup_leads_email ON public.signup_leads(email);
+CREATE INDEX IF NOT EXISTS idx_signup_leads_created_at ON public.signup_leads(created_at DESC);
 
 -- 4. PHONE NUMBERS TABLE (Multi-phone support)
 CREATE TABLE phone_numbers (
