@@ -212,8 +212,18 @@ COMMENT ON COLUMN public.provisioning_state_transitions.metadata IS 'Additional 
 COMMENT ON COLUMN public.accounts.provisioning_stage IS 'Current stage in the signup/provisioning flow';
 
 -- Step 12: Grant appropriate permissions
+-- Table grants for service_role (UUID PK has no sequence)
 GRANT SELECT, INSERT ON public.provisioning_state_transitions TO service_role;
-GRANT USAGE ON SEQUENCE public.provisioning_state_transitions_id_seq TO service_role;
 
+-- Harden SECURITY DEFINER functions - revoke PUBLIC access
+REVOKE ALL ON FUNCTION public.log_state_transition FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_account_provisioning_history FROM PUBLIC;
+
+-- Grant EXECUTE only to service_role
+GRANT EXECUTE ON FUNCTION public.log_state_transition TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_account_provisioning_history TO service_role;
+
+-- Views are admin-only (contain provisioning metadata)
+-- Staff can view provisioning timeline and stuck accounts
 GRANT SELECT ON public.account_provisioning_timeline TO authenticated;
 GRANT SELECT ON public.stuck_provisioning_accounts TO authenticated;
