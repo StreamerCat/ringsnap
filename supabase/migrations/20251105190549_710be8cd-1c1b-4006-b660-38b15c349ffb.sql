@@ -59,13 +59,31 @@ ALTER TABLE accounts
   ADD COLUMN phone_verified BOOLEAN DEFAULT false,
   ADD COLUMN email_verified BOOLEAN DEFAULT false;
 
--- 3. EXTEND SIGNUP LEADS TABLE (lead capture before full account creation)
+-- 3. SIGNUP LEADS TABLE (lead capture before full account creation)
 -- Note: accounts table already has assistant_gender and zip_code (added above)
 -- These columns on signup_leads capture preferences during lead collection
-ALTER TABLE signup_leads
-  ADD COLUMN IF NOT EXISTS assistant_gender TEXT CHECK (assistant_gender IN ('male', 'female')),
-  ADD COLUMN IF NOT EXISTS zip_code TEXT,
-  ADD COLUMN IF NOT EXISTS referral_code TEXT;
+CREATE TABLE IF NOT EXISTS signup_leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  email TEXT NOT NULL,
+  full_name TEXT,
+  phone TEXT,
+  source TEXT,
+  signup_flow TEXT,
+  auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  account_id UUID REFERENCES public.accounts(id) ON DELETE SET NULL,
+  profile_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  completed_at TIMESTAMPTZ,
+  ip_address INET,
+  user_agent TEXT,
+  assistant_gender TEXT CHECK (assistant_gender IN ('male', 'female')),
+  zip_code TEXT,
+  referral_code TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_signup_leads_email ON signup_leads(email);
+CREATE INDEX IF NOT EXISTS idx_signup_leads_created_at ON signup_leads(created_at DESC);
 
 -- 4. PHONE NUMBERS TABLE (Multi-phone support)
 CREATE TABLE phone_numbers (

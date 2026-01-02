@@ -51,7 +51,7 @@ jobs:
 
       - name: Tier 1: API Smoke Tests (Fast Fail)
         run: npm run test:smoke:api
-        
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
         
