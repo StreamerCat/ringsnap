@@ -7,10 +7,20 @@
 -- PART 1: Drop the existing create_account_transaction function
 -- ==============================================================================
 
-DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, signup_channel_type, UUID, JSONB, TEXT) CASCADE;
+-- Conditionally drop old function signatures (signup_channel_type may not exist)
+DO $$
+BEGIN
+  -- Try to drop the old signature with signup_channel_type
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'signup_channel_type') THEN
+    EXECUTE 'DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, signup_channel_type, UUID, JSONB, TEXT) CASCADE';
+  END IF;
+
+  -- Also drop if it was created with TEXT
+  DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, UUID, JSONB, TEXT) CASCADE;
+END $$;
 
 -- ==============================================================================
--- PART 2: Recreate without provisioning_stage
+-- PART 2: Recreate without provisioning_stage, using TEXT for signup_channel
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION public.create_account_transaction(
@@ -18,7 +28,7 @@ CREATE OR REPLACE FUNCTION public.create_account_transaction(
   p_password TEXT,
   p_stripe_customer_id TEXT,
   p_stripe_subscription_id TEXT,
-  p_signup_channel signup_channel_type,
+  p_signup_channel TEXT,
   p_sales_rep_id UUID,
   p_account_data JSONB,
   p_correlation_id TEXT
@@ -29,7 +39,11 @@ DECLARE
   v_profile_id UUID;
   v_result JSONB;
   v_trial_end_date TIMESTAMPTZ;
+  v_signup_channel TEXT;
 BEGIN
+  -- Normalize signup_channel (default to 'unknown' if null/empty)
+  v_signup_channel := COALESCE(NULLIF(p_signup_channel, ''), 'unknown');
+
   -- Calculate trial end date (3 days from now)
   v_trial_end_date := now() + INTERVAL '3 days';
 
@@ -44,7 +58,7 @@ BEGIN
         'name', p_account_data->>'name',
         'phone', p_account_data->>'phone',
         'company_name', p_account_data->>'company_name',
-        'signup_channel', p_signup_channel::text,
+        'signup_channel', v_signup_channel,
         'correlation_id', p_correlation_id
       )
     );
@@ -88,7 +102,7 @@ BEGIN
       p_account_data->>'trade',
       p_stripe_customer_id,
       p_stripe_subscription_id,
-      p_signup_channel,
+      v_signup_channel,
       p_sales_rep_id,
       'trial'::text,
       now(),
@@ -133,7 +147,7 @@ BEGIN
       p_account_data->>'name',
       p_account_data->>'phone',
       true,
-      p_signup_channel,
+      v_signup_channel,
       now(),
       now()
     )
@@ -202,4 +216,5 @@ COMMENT ON FUNCTION public.create_account_transaction IS 'Atomically creates aut
 -- PART 3: Grant appropriate permissions
 -- ==============================================================================
 
-GRANT EXECUTE ON FUNCTION public.create_account_transaction TO service_role;
+GRANT EXECUTE ON FUNCTION public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, UUID, JSONB, TEXT) TO service_role;
+

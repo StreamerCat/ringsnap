@@ -67,6 +67,39 @@ if [ $UUID_SEQUENCE_ERRORS -eq 0 ]; then
 fi
 echo ""
 
+# Rule 4: Check for signup_channel_type usage (type was created then rolled back)
+echo "Checking for signup_channel_type usage..."
+SIGNUP_CHANNEL_ERRORS=0
+for migration in "$MIGRATIONS_DIR"/*.sql; do
+  # Skip if file doesn't exist
+  [ -f "$migration" ] || continue
+
+  # Skip the migrations that intentionally create/rollback the type
+  if [[ "$migration" == *"20251120000001_unified_signup_schema.sql" ]] || \
+     [[ "$migration" == *"20251120000004_profiles_signup_channel.sql" ]] || \
+     [[ "$migration" == *"20251120000006_create_account_transaction.sql" ]] || \
+     [[ "$migration" == *"20251120999999_rollback_phase1.sql" ]] || \
+     [[ "$migration" == *"20251123999998_fix_create_account_no_provisioning_stage.sql" ]]; then
+    continue
+  fi
+
+  # Check for any direct usage of signup_channel_type (not in comments)
+  if grep -v "^--" "$migration" 2>/dev/null | grep -q "signup_channel_type" 2>/dev/null; then
+    echo "❌ ERROR: $migration"
+    echo "   File references signup_channel_type which was created then rolled back"
+    echo "   Use TEXT instead and wrap function drops in DO blocks that check type existence"
+    grep -n "signup_channel_type" "$migration" 2>/dev/null | head -5 || true
+    echo ""
+    SIGNUP_CHANNEL_ERRORS=1
+    ERRORS_FOUND=1
+  fi
+done
+
+if [ $SIGNUP_CHANNEL_ERRORS -eq 0 ]; then
+  echo "✅ No invalid signup_channel_type usage found"
+fi
+echo ""
+
 # Exit with error if any issues found
 if [ $ERRORS_FOUND -eq 1 ]; then
   echo "❌ Migration linting failed. Please fix the errors above."
