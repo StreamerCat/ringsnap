@@ -121,10 +121,10 @@ RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role = p_role
+    WHERE user_id = p_user_id AND role::text = p_role
   ) OR EXISTS (
     SELECT 1 FROM public.account_members
-    WHERE user_id = p_user_id AND role = p_role
+    WHERE user_id = p_user_id AND role::text = p_role
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
@@ -135,10 +135,10 @@ RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role = ANY(p_roles)
+    WHERE user_id = p_user_id AND role::text = ANY(p_roles)
   ) OR EXISTS (
     SELECT 1 FROM public.account_members
-    WHERE user_id = p_user_id AND role = ANY(p_roles)
+    WHERE user_id = p_user_id AND role::text = ANY(p_roles)
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;

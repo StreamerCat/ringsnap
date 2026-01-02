@@ -5,11 +5,11 @@ FOR SELECT
 TO authenticated
 USING (
   EXISTS (
-    SELECT 1 
+    SELECT 1
     FROM staff_roles sr
     JOIN profiles p ON p.id = sr.user_id
     WHERE sr.user_id = auth.uid()
-    AND sr.role = 'sales'
+    AND sr.role::text = 'sales'
     AND accounts.sales_rep_name = p.name
   )
 );
@@ -25,7 +25,7 @@ USING (
     FROM accounts a
     JOIN staff_roles sr ON sr.user_id = auth.uid()
     JOIN profiles p ON p.id = sr.user_id
-    WHERE sr.role = 'sales'
+    WHERE sr.role::text = 'sales'
     AND a.sales_rep_name = p.name
   )
 );
@@ -41,7 +41,7 @@ USING (
     FROM accounts a
     JOIN staff_roles sr ON sr.user_id = auth.uid()
     JOIN profiles p ON p.id = sr.user_id
-    WHERE sr.role = 'sales'
+    WHERE sr.role::text = 'sales'
     AND a.sales_rep_name = p.name
   )
 );

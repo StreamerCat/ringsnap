@@ -58,7 +58,7 @@ USING (
     SELECT 1 FROM public.staff_roles sr
     JOIN public.profiles p ON p.id = sr.user_id
     WHERE sr.user_id = auth.uid()
-    AND sr.role = 'sales'
+    AND sr.role::text = 'sales'
     AND accounts.sales_rep_name = p.name
   )
 );

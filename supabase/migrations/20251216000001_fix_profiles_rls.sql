@@ -29,7 +29,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('platform_owner', 'platform_admin', 'support', 'sales')
+    AND role::text IN ('platform_owner', 'platform_admin', 'support', 'sales')
   )
 );
 
