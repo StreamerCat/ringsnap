@@ -246,6 +246,7 @@ serve(async (req) => {
 
   let job: Json | null = null;
   let accountId: string | null = null;
+  const traceId = extractTraceId(req);
 
   try {
     const payload = await req.json();
@@ -257,6 +258,10 @@ serve(async (req) => {
     const areaCode = payload.areaCode?.trim() || undefined;
 
     const baseLog = { functionName: FUNCTION_NAME, correlationId, accountId: accountId! };
+    const base = { functionName: FUNCTION_NAME, traceId, accountId: accountId! };
+    const provisionStart = Date.now();
+
+    stepStart('provision_account', base, { userId, companyName, areaCode });
 
     logInfo("Starting provisioning job", {
       ...baseLog,
@@ -340,6 +345,8 @@ serve(async (req) => {
       context: { assistantId, numberId, phoneE164 },
     });
 
+    stepEnd('provision_account', base, { result: 'success', assistantId, numberId }, provisionStart);
+
     return json(200, {
       ok: true,
       assistantId,
@@ -349,6 +356,10 @@ serve(async (req) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const base = { functionName: FUNCTION_NAME, traceId, accountId: accountId ?? undefined };
+
+    stepError('provision_account', base, error, { reason_code: message });
+
     logError("Provisioning failed", {
       functionName: FUNCTION_NAME,
       correlationId,

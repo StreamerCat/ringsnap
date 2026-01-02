@@ -29,6 +29,7 @@ const CONSOLE_LOG_EXCLUSIONS = [
 const SKIP_PATTERNS = [
   "**/_legacy/**",
   "**/*.test.ts",
+  "**/test_logic.ts",
 ];
 
 interface LintResult {

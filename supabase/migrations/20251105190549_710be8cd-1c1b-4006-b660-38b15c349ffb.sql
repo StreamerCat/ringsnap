@@ -59,11 +59,13 @@ ALTER TABLE accounts
   ADD COLUMN phone_verified BOOLEAN DEFAULT false,
   ADD COLUMN email_verified BOOLEAN DEFAULT false;
 
--- 3. EXTEND TRIAL SIGNUPS TABLE
-ALTER TABLE trial_signups
-  ADD COLUMN assistant_gender TEXT DEFAULT 'female' CHECK (assistant_gender IN ('male', 'female')),
-  ADD COLUMN zip_code TEXT,
-  ADD COLUMN referral_code TEXT;
+-- 3. EXTEND SIGNUP LEADS TABLE (lead capture before full account creation)
+-- Note: accounts table already has assistant_gender and zip_code (added above)
+-- These columns on signup_leads capture preferences during lead collection
+ALTER TABLE signup_leads
+  ADD COLUMN IF NOT EXISTS assistant_gender TEXT CHECK (assistant_gender IN ('male', 'female')),
+  ADD COLUMN IF NOT EXISTS zip_code TEXT,
+  ADD COLUMN IF NOT EXISTS referral_code TEXT;
 
 -- 4. PHONE NUMBERS TABLE (Multi-phone support)
 CREATE TABLE phone_numbers (

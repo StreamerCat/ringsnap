@@ -17,7 +17,8 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       RESEND_PROD_KEY: ${{ secrets.RESEND_PROD_KEY }}
-      PLAYWRIGHT_BASE_URL: ${{ steps.wait-for-deployment.outputs.url || (github.event_name == 'pull_request' && 'https://staging.getringsnap.com' || 'https://getringsnap.com') }}
+      # Default base URL - will be overridden by Vercel deployment URL if available
+      PLAYWRIGHT_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://staging.getringsnap.com' || 'https://getringsnap.com' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +38,11 @@ jobs:
           token: ${{ secrets.VERCEL_TOKEN }}
           project_id: ${{ secrets.VERCEL_PROJECT_ID }}
           max_timeout: 300
-        
+
+      - name: Set Deployment URL
+        if: steps.wait-for-deployment.outputs.url != ''
+        run: echo "PLAYWRIGHT_BASE_URL=${{ steps.wait-for-deployment.outputs.url }}" >> $GITHUB_ENV
+
       - name: Tier 1: API Smoke Tests (Fast Fail)
         run: npm run test:smoke:api
         
