@@ -30,6 +30,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { isBookedCall, getDisplayName, isSentinelValue, formatPhoneNumber } from "@/lib/appointments";
+import { sanitizeCallReason } from "@/lib/call-sanitation";
 
 interface OverviewTabProps {
     account: any;
@@ -152,7 +153,7 @@ export function OverviewTab({
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                            Call this number to test your assistant.
+                            Call this number to test your RingSnap agent.
                         </p>
                     </CardContent>
                 </Card>
@@ -269,11 +270,7 @@ export function OverviewTab({
                                     const getSummarizedReason = () => {
                                         const text = log.reason || log.summary || '';
                                         if (!text) return '-';
-                                        const firstSentence = text.split(/[.!?]/)[0];
-                                        if (firstSentence.length > 50) {
-                                            return firstSentence.substring(0, 47) + '...';
-                                        }
-                                        return firstSentence || text.substring(0, 50);
+                                        return sanitizeCallReason(text);
                                     };
 
                                     const getAppointmentText = () => {
@@ -334,7 +331,7 @@ export function OverviewTab({
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell max-w-[200px]">
                                                 <div className="truncate text-sm" title={log.reason || log.summary}>
-                                                    {log.reason || (log.summary ? log.summary.substring(0, 50) + "..." : "-")}
+                                                    {getSummarizedReason()}
                                                 </div>
                                             </TableCell>
                                             <TableCell>

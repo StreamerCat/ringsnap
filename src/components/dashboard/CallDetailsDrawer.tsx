@@ -10,6 +10,7 @@ import {
     getLeadScoreClasses,
     type CallLog
 } from "@/lib/leadScore";
+import { sanitizeCallReason, sanitizeCallSummary } from "@/lib/call-sanitation";
 import {
     Tooltip,
     TooltipContent,
@@ -166,7 +167,7 @@ export function CallDetailsDrawer({ open, onOpenChange, call, side = "right" }: 
                                     Reason for Call
                                 </h4>
                                 <p className="text-sm bg-muted p-3 rounded-lg">
-                                    {call.reason}
+                                    {sanitizeCallReason(call.reason)}
                                 </p>
                             </div>
                         </>
@@ -179,10 +180,10 @@ export function CallDetailsDrawer({ open, onOpenChange, call, side = "right" }: 
                             <div className="space-y-2">
                                 <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                                     <FileText className="h-4 w-4" />
-                                    Summary
+                                    Call Summary
                                 </h4>
                                 <p className="text-sm bg-muted p-3 rounded-lg">
-                                    {call.transcript_summary}
+                                    {sanitizeCallSummary(call.transcript_summary)}
                                 </p>
                             </div>
                         </>

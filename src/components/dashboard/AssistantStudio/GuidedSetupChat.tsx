@@ -26,7 +26,7 @@ export function GuidedSetupChat({ currentConfig, onConfigUpdate, onCancel }: Gui
     const [messages, setMessages] = useState<Message[]>([
         {
             role: "assistant",
-            content: "Hi! I'm your AI Setup Assistant. I can help you customize your receptionist. Tell me about your business.\n\nFor example: \"We are a plumbing company in Denver, and I want a friendly tone.\""
+            content: "Hi! I'm your RingSnap setup helper. I can help you customize your voice agent. Tell me about your business.\n\nFor example: \"We are a plumbing company in Denver, and I want a friendly tone.\""
         }
     ]);
     const [input, setInput] = useState("");
@@ -78,7 +78,7 @@ export function GuidedSetupChat({ currentConfig, onConfigUpdate, onCancel }: Gui
             console.error("Chat error:", error);
             toast({
                 title: "Error",
-                description: "Failed to get response from AI assistant. Please try again.",
+                description: "Failed to get response from the RingSnap agent. Please try again.",
                 variant: "destructive"
             });
             setMessages(prev => [...prev, { role: "assistant", content: "I'm sorry, I had trouble processing that. Could you try saying it differently?" }]);
@@ -103,7 +103,7 @@ export function GuidedSetupChat({ currentConfig, onConfigUpdate, onCancel }: Gui
             <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold">AI Setup Assistant</h3>
+                    <h3 className="font-semibold">Setup Helper</h3>
                 </div>
                 <Button variant="ghost" size="sm" onClick={onCancel}>Close</Button>
             </div>
@@ -125,8 +125,8 @@ export function GuidedSetupChat({ currentConfig, onConfigUpdate, onCancel }: Gui
                             <div className="space-y-2 max-w-[80%]">
                                 <div
                                     className={`p-3 rounded-lg text-sm whitespace-pre-wrap ${msg.role === "user"
-                                            ? "bg-primary text-primary-foreground"
-                                            : "bg-muted"
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-muted"
                                         }`}
                                 >
                                     {msg.content}
@@ -138,7 +138,7 @@ export function GuidedSetupChat({ currentConfig, onConfigUpdate, onCancel }: Gui
                                             Proposed Changes
                                         </div>
                                         <p className="text-xs text-muted-foreground mb-3">
-                                            Based on our chat, I've prepared a new configuration properly formatted for your assistant.
+                                            Based on our chat, I've prepared a new configuration properly formatted for your agent.
                                         </p>
                                         <Button
                                             size="sm"

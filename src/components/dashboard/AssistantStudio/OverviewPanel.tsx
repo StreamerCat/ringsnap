@@ -19,10 +19,10 @@ export function OverviewPanel({ config, onStartGuidedSetup }: OverviewPanelProps
                     <div>
                         <h3 className="text-xl font-bold flex items-center gap-2">
                             <Sparkles className="h-5 w-5 text-primary" />
-                            Tune your Assistant
+                            Tune your RingSnap Agent
                         </h3>
                         <p className="text-muted-foreground">
-                            Use our AI guided setup to perfectly match your business voice and rules.
+                            Use our RingSnap guided setup to perfectly match your business voice and rules.
                         </p>
                     </div>
                     <Button onClick={onStartGuidedSetup} size="lg" className="shrink-0">

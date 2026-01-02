@@ -104,17 +104,17 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
 
     return (
         <div className="space-y-6">
-            {/* Helper Card: Get your RingSnap assistant answering calls */}
+            {/* Helper Card: Get your RingSnap agent answering calls */}
             <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div className="space-y-2">
                         <h3 className="text-lg font-bold flex items-center gap-2">
                             <ShieldCheck className="h-5 w-5 text-primary" />
-                            Get your RingSnap assistant answering calls
+                            Get your RingSnap agent answering calls
                         </h3>
                         <div className="text-sm text-muted-foreground space-y-1">
                             <p>Step 1: Forward your main business phone to your RingSnap number.</p>
-                            <p>Step 2: Call your RingSnap number to test your assistant.</p>
+                            <p>Step 2: Call your RingSnap number to test your agent.</p>
                         </div>
                         {formattedPrimaryNumber && (
                             <div className="mt-2 text-sm">
@@ -137,7 +137,7 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                             disabled={!hasNumbers}
                         >
                             <Phone className="mr-2 h-4 w-4" />
-                            Test My Assistant
+                            Test My Agent
                         </Button>
                     </div>
                 </CardContent>
@@ -163,7 +163,7 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                         <div className="space-y-2">
                             <h3 className="font-semibold text-amber-900">Provisioning your RingSnap number...</h3>
                             <p className="text-sm text-amber-700 max-w-sm mx-auto">
-                                We are currently securing your phone number and setting up your AI assistant.
+                                We are currently securing your phone number and setting up your RingSnap agent.
                                 This usually takes less than a minute.
                             </p>
                         </div>
@@ -204,7 +204,7 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                         <DialogDescription className="space-y-4 pt-2">
                             <p>
                                 Forward your main business phone to your RingSnap number so
-                                your assistant can answer calls. You can turn forwarding off at any time.
+                                your agent can answer calls. You can turn forwarding off at any time.
                             </p>
                             {formattedPrimaryNumber ? (
                                 <div className="bg-muted p-3 rounded-md text-center">
@@ -270,9 +270,9 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                         </Tabs>
 
                         <div className="mt-6 pt-4 border-t text-xs text-muted-foreground">
-                            <p className="font-semibold mb-1">How to stop using the assistant:</p>
+                            <p className="font-semibold mb-1">How to stop using the agent:</p>
                             <p>
-                                To temporarily turn off your RingSnap assistant, simply turn off call forwarding using the
+                                To temporarily turn off your RingSnap agent, simply turn off call forwarding using the
                                 "Turn forwarding off" steps above. Callers will reach your normal business line again.
                             </p>
                         </div>
@@ -284,9 +284,9 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
             <Dialog open={showTestInfo} onOpenChange={setShowTestInfo}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Test Your Assistant</DialogTitle>
+                        <DialogTitle>Test Your Agent</DialogTitle>
                         <DialogDescription>
-                            Call your RingSnap number to hear your assistant in action.
+                            Call your RingSnap number to hear your agent in action.
                         </DialogDescription>
                     </DialogHeader>
 
