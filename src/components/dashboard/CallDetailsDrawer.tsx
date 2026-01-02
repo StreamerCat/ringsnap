@@ -86,8 +86,7 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
     const address = getDisplayAddress(callWithAppointment);
     const hasAddress = address !== 'Address not provided';
 
-    // Sanitized text (fallback to call.summary since RPC may return summary instead of transcript_summary)
-    const summaryText = call.transcript_summary || call.summary;
+    // Sanitized text (uses summaryText defined above)
     const sanitizedReason = sanitizeCallText(call.reason, { companyName });
     const sanitizedSummary = sanitizeCallText(summaryText, { companyName });
 
