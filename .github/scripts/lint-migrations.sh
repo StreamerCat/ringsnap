@@ -10,7 +10,51 @@ ERRORS_FOUND=0
 echo "🔍 Linting migrations in $MIGRATIONS_DIR..."
 echo ""
 
-# Rule 1: Check for COMMENT ON with string concatenation (||)
+# Rule 0: Check filename format (14 digits followed by underscore and name)
+echo "Checking migration filename format..."
+INVALID_FILENAMES=0
+for migration in "$MIGRATIONS_DIR"/*.sql; do
+  [ -f "$migration" ] || continue
+  filename=$(basename "$migration")
+  
+  # Skip debug/test migrations (99999...)
+  if [[ "$filename" =~ ^99999 ]]; then
+    continue
+  fi
+  
+  if ! [[ "$filename" =~ ^[0-9]{14}_.+\.sql$ ]]; then
+    echo "❌ ERROR: Invalid filename format: $filename"
+    echo "   Expected: YYYYMMDDHHMMSS_description.sql (14 digits + underscore + name)"
+    INVALID_FILENAMES=1
+    ERRORS_FOUND=1
+  fi
+done
+
+if [ $INVALID_FILENAMES -eq 0 ]; then
+  echo "✅ All migration filenames are valid"
+fi
+echo ""
+
+# Rule 1: Check for duplicate version prefixes
+echo "Checking for duplicate migration version prefixes..."
+cd "$MIGRATIONS_DIR"
+DUPLICATES=$(ls -1 *.sql 2>/dev/null | grep -v "^99999" | cut -c1-14 | sort | uniq -d || true)
+cd - > /dev/null
+if [ -n "$DUPLICATES" ]; then
+  echo "❌ ERROR: Found duplicate migration version prefixes:"
+  echo "$DUPLICATES" | while read dup; do
+    echo "   Duplicate: $dup"
+    ls -1 "$MIGRATIONS_DIR"/${dup}*.sql 2>/dev/null | sed 's/^/     - /'
+  done
+  echo "   Fix: Rename one file in each duplicate pair to a unique timestamp"
+  echo ""
+  ERRORS_FOUND=1
+else
+  echo "✅ No duplicate version prefixes found"
+fi
+echo ""
+
+# Rule 2: Check for COMMENT ON with string concatenation (||)
 echo "Checking for COMMENT ON with string concatenation..."
 if grep -rn "COMMENT ON.*||" "$MIGRATIONS_DIR"/*.sql 2>/dev/null; then
   echo "❌ ERROR: Found COMMENT ON statements using string concatenation (||)"
@@ -23,7 +67,7 @@ else
 fi
 echo ""
 
-# Rule 2: Check for CREATE INDEX with STABLE functions in WHERE clause
+# Rule 3: Check for CREATE INDEX with STABLE functions in WHERE clause
 echo "Checking for CREATE INDEX with STABLE functions in WHERE predicate..."
 if grep -rn "CREATE INDEX" "$MIGRATIONS_DIR"/*.sql | grep -i "WHERE" | grep -iE "now\(\)|current_timestamp|current_date|current_time|clock_timestamp|timeofday" 2>/dev/null; then
   echo "❌ ERROR: Found CREATE INDEX with STABLE function in WHERE clause"
@@ -37,18 +81,14 @@ else
 fi
 echo ""
 
-# Rule 3: Check for UUID tables with sequence grants in same file
+# Rule 4: Check for UUID tables with sequence grants in same file
 echo "Checking for UUID tables with invalid sequence grants..."
 UUID_SEQUENCE_ERRORS=0
 for migration in "$MIGRATIONS_DIR"/*.sql; do
-  # Skip if file doesn't exist
   [ -f "$migration" ] || continue
-
-  # Check if this migration has UUID primary key with gen_random_uuid()
+  
   if grep -q "DEFAULT gen_random_uuid()" "$migration" 2>/dev/null; then
-    # Check if same file grants usage on _id_seq
     if grep -q "GRANT USAGE ON SEQUENCE.*_id_seq" "$migration" 2>/dev/null; then
-      # Ignore commented-out grants
       if ! grep "GRANT USAGE ON SEQUENCE.*_id_seq" "$migration" | grep -q "^--" 2>/dev/null; then
         echo "❌ ERROR: $migration"
         echo "   File defines UUID primary key (gen_random_uuid) AND grants SEQUENCE usage"
@@ -67,14 +107,13 @@ if [ $UUID_SEQUENCE_ERRORS -eq 0 ]; then
 fi
 echo ""
 
-# Rule 4: Check for signup_channel_type usage (type was created then rolled back)
+# Rule 5: Check for signup_channel_type usage (type was created then rolled back)
 echo "Checking for signup_channel_type usage..."
 SIGNUP_CHANNEL_ERRORS=0
 for migration in "$MIGRATIONS_DIR"/*.sql; do
-  # Skip if file doesn't exist
   [ -f "$migration" ] || continue
-
-  # Skip the migrations that intentionally create/rollback the type
+  
+  # Skip migrations that intentionally create/rollback the type
   if [[ "$migration" == *"20251120000001_unified_signup_schema.sql" ]] || \
      [[ "$migration" == *"20251120000004_profiles_signup_channel.sql" ]] || \
      [[ "$migration" == *"20251120000006_create_account_transaction.sql" ]] || \
@@ -82,8 +121,7 @@ for migration in "$MIGRATIONS_DIR"/*.sql; do
      [[ "$migration" == *"20251123999998_fix_create_account_no_provisioning_stage.sql" ]]; then
     continue
   fi
-
-  # Check for any direct usage of signup_channel_type (not in comments)
+  
   if grep -v "^--" "$migration" 2>/dev/null | grep -q "signup_channel_type" 2>/dev/null; then
     echo "❌ ERROR: $migration"
     echo "   File references signup_channel_type which was created then rolled back"
