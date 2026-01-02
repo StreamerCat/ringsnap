@@ -94,6 +94,14 @@ function extractNameFromSummary(summary: string | null | undefined): string | nu
     const nameLabel = s.match(/(?:name|caller): ([A-Z][a-z]+(?: [A-Z][a-z]+)+)/i);
     if (nameLabel && nameLabel[1]) return nameLabel[1].trim();
 
+    // Pattern 5: "[Name] called" at start of summary (e.g., "Mark called Apple Plumb")
+    const calledMatch = s.match(/^([A-Z][a-z]+)\s+called\s+/i);
+    if (calledMatch && calledMatch[1]) return calledMatch[1].trim();
+
+    // Pattern 6: "A caller named [Name]"
+    const namedMatch = s.match(/(?:a )?caller named ([A-Z][a-z]+(?: [A-Z][a-z]+)?)/i);
+    if (namedMatch && namedMatch[1]) return namedMatch[1].trim();
+
     return null;
 }
 
@@ -110,9 +118,10 @@ export function getDisplayName(call: CallLogWithAppointment | null | undefined):
 
     if (name) return name;
 
-    // Fallback: Try to extract from summary
+    // Fallback: Try to extract from summary or transcript_summary
     // (This handles cases where RPC doesn't return caller_name but summary has it)
-    const extracted = extractNameFromSummary(call.summary);
+    const extracted = extractNameFromSummary(call.summary)
+        || extractNameFromSummary(call.transcript_summary);
     if (extracted) return extracted;
 
     // Fall back to formatted phone number
@@ -149,10 +158,21 @@ export function getJobType(call: CallLogWithAppointment | null | undefined): str
 }
 
 /**
- * Check if a call resulted in a booked appointment.
- * Matches the existing badge logic used in OperatorOverview and OverviewTab.
+ * Check if a call has a STRUCTURED appointment (for Booked status).
+ * Only returns true if there's a deterministic datetime field.
+ * Use this for Schedule display and Booked badge.
  */
-export function isBookedCall(call: CallLogWithAppointment | null | undefined): boolean {
+export function hasStructuredAppointment(call: CallLogWithAppointment | null | undefined): boolean {
+    if (!call) return false;
+    return !!call.appointment_start;
+}
+
+/**
+ * Check if a call has booking INTENT (may be TBD or confirmed).
+ * Returns true for structured appointments OR text-based windows.
+ * Use this for determining if a call should appear in Schedule at all.
+ */
+export function hasBookingIntent(call: CallLogWithAppointment | null | undefined): boolean {
     if (!call) return false;
     return (
         call.outcome === 'booked' ||
@@ -160,6 +180,15 @@ export function isBookedCall(call: CallLogWithAppointment | null | undefined): b
         !!call.appointment_window ||
         !!call.appointment_start
     );
+}
+
+/**
+ * @deprecated Use hasStructuredAppointment or hasBookingIntent instead.
+ * Check if a call resulted in a booked appointment.
+ * Matches the existing badge logic used in OperatorOverview and OverviewTab.
+ */
+export function isBookedCall(call: CallLogWithAppointment | null | undefined): boolean {
+    return hasBookingIntent(call);
 }
 
 // Weekday names for parsing
