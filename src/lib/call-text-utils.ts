@@ -34,24 +34,43 @@ export interface OutcomeInput {
 export type CallOutcome = 'Booked' | 'Follow-up' | 'Info-only' | 'Missed';
 
 // ============================================================================
-// TRADE KEYWORD MAPPING
+// SERVICE AND INTENT PHRASE MAPPING (word-boundary safe)
 // ============================================================================
 
-const TRADE_KEYWORDS: Record<string, string[]> = {
+/**
+ * Service phrases - what the caller asked about.
+ * Each phrase is matched with word boundaries to prevent substring issues.
+ * E.g., "ac" must match as a full word, not inside "callback".
+ */
+const SERVICE_PHRASES: Record<string, string[]> = {
+    'EV charger installation': ['ev charger', 'ev charging', 'electric vehicle charger', 'car charger', 'tesla charger'],
     'Water heater': ['water heater', 'hot water', 'tankless', 'water tank'],
-    'Drain cleaning': ['drain', 'clog', 'clogged', 'backed up', 'backup', 'slow drain'],
-    'Plumbing repair': ['leak', 'leaking', 'pipe', 'faucet', 'toilet', 'plumb'],
-    'AC repair': ['ac', 'air conditioning', 'air conditioner', 'cooling', 'hvac', 'a/c'],
-    'Heating repair': ['furnace', 'heater', 'heating', 'heat pump', 'boiler'],
-    'Electrical': ['electric', 'outlet', 'wire', 'wiring', 'breaker', 'panel'],
-    'Lighting install': ['lighting', 'light fixture', 'chandelier', 'recessed light', 'light install', 'lighting install'],
-    'Roofing': ['roof', 'shingle', 'gutter', 'leak roof'],
-    'Estimate request': ['estimate', 'quote', 'pricing', 'how much', 'cost'],
-    'Consultation': ['consultation', 'consult', 'advice', 'discuss', 'assessment'],
-    'Emergency': ['emergency', 'urgent', 'asap', 'right away', 'immediately'],
+    'Drain cleaning': ['drain cleaning', 'clogged drain', 'backed up drain', 'slow drain'],
+    'Plumbing repair': ['plumbing repair', 'leaky pipe', 'leaky faucet', 'leaking pipe', 'leaking faucet', 'toilet repair'],
+    'AC repair': ['air conditioning', 'air conditioner', 'hvac repair', 'cooling system'],  // Note: "ac" handled separately
+    'Heating repair': ['furnace repair', 'heater repair', 'heating system', 'heat pump', 'boiler repair'],
+    'Electrical': ['electrical work', 'electrical repair', 'outlet repair', 'panel upgrade', 'breaker'],
+    'Lighting install': ['lighting installation', 'light fixture', 'chandelier', 'recessed light', 'recessed lighting'],
+    'Roofing': ['roof repair', 'roofing', 'shingle', 'gutter'],
+    'Generator': ['generator', 'standby power', 'backup power'],
+};
+
+/**
+ * Intent phrases - what the caller wants to do.
+ */
+const INTENT_PHRASES: Record<string, string[]> = {
+    'Callback requested': ['call back', 'callback', 'call me back', 'return my call', 'please call'],
+    'Estimate requested': ['estimate', 'quote', 'pricing', 'how much', 'cost'],
     'Scheduling': ['schedule', 'appointment', 'book', 'available', 'availability'],
+    'Emergency': ['emergency', 'urgent', 'asap', 'right away', 'immediately'],
+    'Consultation': ['consultation', 'consult', 'advice', 'assessment'],
     'General inquiry': ['question', 'information', 'wondering', 'inquiry'],
 };
+
+/**
+ * Phrases that indicate we should ignore the clause (service list, not caller request).
+ */
+const IGNORE_AFTER_PHRASES = ['which include', 'including', 'we offer', 'our services', 'services include'];
 
 // Common business name suffixes to strip
 const BUSINESS_SUFFIXES = ['inc', 'llc', 'co', 'company', 'corp', 'corporation', 'services', 'service', 'plumbing', 'hvac', 'electric', 'electrical', 'roofing'];
@@ -177,12 +196,26 @@ export function sanitizeCallText(text: string | null | undefined, options: Sanit
     cleaned = cleaned.replace(/called\s+[\w\s]+?\s+(to|about)\s+/gi, '');
 
     // -------------------------------------------------------------------------
-    // Layer 3: AI replacement and cleanup
+    // Layer 3: AI replacement, phrasing cleanup, and final polish
     // -------------------------------------------------------------------------
 
     // Replace AI mentions (handle A.I. separately due to punctuation)
     cleaned = cleaned.replace(/A\.I\./g, 'RingSnap agent');
     cleaned = cleaned.replace(/\b(AI|Artificial Intelligence)\b/gi, 'RingSnap agent');
+
+    // Replace awkward phrasing
+    cleaned = cleaned.replace(/\binquire(?:d)? about\b/gi, 'asked about');
+    cleaned = cleaned.replace(/\binquir(?:e|ing) about\b/gi, 'asking about');
+    cleaned = cleaned.replace(/\bto inquire\b/gi, 'asking');
+
+    // Remove residual "{company} to" patterns that might have survived
+    if (companyName) {
+        const companyTokens = tokenize(companyName).filter(t => t.length > 2);
+        for (const token of companyTokens) {
+            // Pattern: "token to inquire/ask/call" or "token to get"
+            cleaned = cleaned.replace(new RegExp(`\\b${token}\\s+to\\s+`, 'gi'), '');
+        }
+    }
 
     // Clean up leading/trailing punctuation and whitespace
     cleaned = cleaned.replace(/^[\s,.:;-]+/, '').replace(/[\s,.:;-]+$/, '');
@@ -210,65 +243,198 @@ export function sanitizeCallText(text: string | null | undefined, options: Sanit
 }
 
 // ============================================================================
-// TOPIC DERIVATION
+// TOPIC DERIVATION (Word-Boundary Safe)
 // ============================================================================
 
 /**
- * Derive topic labels from call data using trade keyword mapping.
- * Returns 0..N labels, never sentence fragments.
- * Removes company name from text before matching to prevent false positives.
+ * Check if a phrase exists in text using word boundaries.
+ * Prevents "callback" from matching "ac".
  */
-export function deriveTopicLabels(input: TopicDerivationInput): string[] {
-    const { reason, summary, transcript, trade, companyName } = input;
+function matchPhrase(text: string, phrase: string): boolean {
+    // Escape special regex chars in phrase
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Special handling for "ac" and "a/c" - must be word boundary
+    if (phrase === 'ac' || phrase === 'a/c') {
+        const pattern = new RegExp(`\\b${escaped}\\b`, 'i');
+        return pattern.test(text);
+    }
+    // For multi-word phrases, use word boundary at start/end
+    const pattern = new RegExp(`\\b${escaped}\\b`, 'i');
+    return pattern.test(text);
+}
 
-    // Combine all text sources for keyword matching
-    let combinedText = [reason, summary, transcript].filter(Boolean).join(' ').toLowerCase();
+/**
+ * Extract caller-intent sentences from text.
+ * Filters out service list sentences (after "which include", "we offer", etc.)
+ */
+function extractCallerIntentText(text: string): string {
+    const sentences = text.split(/[.!?]+/).filter(Boolean);
+    const callerIntentPatterns = [
+        /\b(need|want|looking for|interested in)\b/i,
+        /\b(request|asked|inquire|enquire)\b/i,
+        /\b(call back|callback|call me)\b/i,
+        /\b(estimate|quote|price)\b/i,
+        /\b(schedule|book|appointment)\b/i,
+    ];
 
-    // Remove company name from text before matching to prevent false positives
-    // e.g., "apple plumb" shouldn't match "plumb" keyword
-    if (companyName) {
-        const companyLower = companyName.toLowerCase();
-        const companyTokens = companyLower.split(/\s+/).filter(t => t.length > 2);
-        for (const token of companyTokens) {
-            // Remove token only if not a generic word
-            if (!['the', 'and', 'for', 'inc', 'llc', 'co'].includes(token)) {
-                combinedText = combinedText.replace(new RegExp(token, 'gi'), '');
+    const relevantSentences: string[] = [];
+
+    for (const sentence of sentences) {
+        const trimmed = sentence.trim().toLowerCase();
+
+        // Skip sentences that list services (assistant's services, not caller's request)
+        let skipSentence = false;
+        for (const ignorePhrase of IGNORE_AFTER_PHRASES) {
+            if (trimmed.includes(ignorePhrase)) {
+                skipSentence = true;
+                break;
+            }
+        }
+        if (skipSentence) continue;
+
+        // Include sentences that match caller intent patterns
+        for (const pattern of callerIntentPatterns) {
+            if (pattern.test(trimmed)) {
+                relevantSentences.push(trimmed);
+                break;
             }
         }
     }
 
-    if (!combinedText.trim()) {
-        return trade ? [trade] : [];
+    // If no intent sentences found, return first part of text (before service lists)
+    if (relevantSentences.length === 0) {
+        const firstPart = text.split(/which include|including|we offer/i)[0];
+        return firstPart?.toLowerCase() || text.toLowerCase();
     }
 
-    const matchedTopics: string[] = [];
+    return relevantSentences.join(' ');
+}
 
-    // Check each topic's keywords
-    for (const [topic, keywords] of Object.entries(TRADE_KEYWORDS)) {
-        for (const keyword of keywords) {
-            if (combinedText.includes(keyword)) {
-                if (!matchedTopics.includes(topic)) {
-                    matchedTopics.push(topic);
+/**
+ * Derive service tags from call text.
+ * Returns tags for services the CALLER asked about (not assistant's service list).
+ */
+export function deriveServiceTags(input: TopicDerivationInput): string[] {
+    const { reason, summary, transcript, companyName } = input;
+
+    // Combine and clean text
+    let combinedText = [reason, summary, transcript].filter(Boolean).join(' ');
+
+    // Remove company name fragments
+    if (companyName) {
+        const companyTokens = companyName.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+        for (const token of companyTokens) {
+            if (!['the', 'and', 'for', 'inc', 'llc', 'co'].includes(token)) {
+                combinedText = combinedText.replace(new RegExp(`\\b${token}\\b`, 'gi'), '');
+            }
+        }
+    }
+
+    // Extract caller-intent focused text
+    const intentText = extractCallerIntentText(combinedText);
+
+    const matchedServices: string[] = [];
+
+    // Match service phrases with word boundaries
+    for (const [service, phrases] of Object.entries(SERVICE_PHRASES)) {
+        for (const phrase of phrases) {
+            if (matchPhrase(intentText, phrase)) {
+                if (!matchedServices.includes(service)) {
+                    matchedServices.push(service);
                 }
                 break;
             }
         }
     }
 
-    // If no keyword matches found
-    if (matchedTopics.length === 0) {
-        // Trade fallback takes priority over General inquiry
-        if (trade) {
-            return [trade];
-        }
-        // If we have meaningful content but no matches, return General inquiry
-        if (combinedText.length > 10) {
-            return ['General inquiry'];
-        }
-        return [];
+    // Special: "ac" standalone check (must be word boundary)
+    if (matchPhrase(intentText, 'ac') && !matchedServices.includes('AC repair')) {
+        matchedServices.push('AC repair');
     }
 
-    return matchedTopics;
+    return matchedServices;
+}
+
+/**
+ * Derive intent tags from call text.
+ * Returns tags for what the caller wants to do (callback, estimate, schedule).
+ */
+export function deriveIntentTags(input: TopicDerivationInput): string[] {
+    const { reason, summary, transcript, companyName } = input;
+
+    let combinedText = [reason, summary, transcript].filter(Boolean).join(' ').toLowerCase();
+
+    // Remove company name
+    if (companyName) {
+        const companyTokens = companyName.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+        for (const token of companyTokens) {
+            if (!['the', 'and', 'for', 'inc', 'llc', 'co'].includes(token)) {
+                combinedText = combinedText.replace(new RegExp(`\\b${token}\\b`, 'gi'), '');
+            }
+        }
+    }
+
+    const matchedIntents: string[] = [];
+
+    for (const [intent, phrases] of Object.entries(INTENT_PHRASES)) {
+        for (const phrase of phrases) {
+            if (matchPhrase(combinedText, phrase)) {
+                if (!matchedIntents.includes(intent)) {
+                    matchedIntents.push(intent);
+                }
+                break;
+            }
+        }
+    }
+
+    return matchedIntents;
+}
+
+/**
+ * Derive topic labels (combined service + intent for backward compatibility).
+ */
+export function deriveTopicLabels(input: TopicDerivationInput): string[] {
+    const services = deriveServiceTags(input);
+    const intents = deriveIntentTags(input);
+
+    // Return services first, then relevant intents
+    const combined = [...services];
+
+    // Only add certain intents as visible tags
+    const displayableIntents = ['Callback requested', 'Estimate requested', 'Emergency'];
+    for (const intent of intents) {
+        if (displayableIntents.includes(intent) && !combined.includes(intent)) {
+            combined.push(intent);
+        }
+    }
+
+    if (combined.length === 0) {
+        return ['General inquiry'];
+    }
+
+    return combined;
+}
+
+/**
+ * Derive reason label for display (short, derived not raw prose).
+ */
+export function deriveReasonLabel(serviceTags: string[], intentTags: string[]): string {
+    if (serviceTags.length > 0) {
+        return serviceTags[0];
+    }
+    if (intentTags.length > 0) {
+        // Map intent to reason label
+        const intentMap: Record<string, string> = {
+            'Callback requested': 'Requested callback',
+            'Estimate requested': 'Requested estimate',
+            'Scheduling': 'Scheduling inquiry',
+            'Emergency': 'Emergency service',
+            'Consultation': 'Consultation request',
+            'General inquiry': 'General inquiry',
+        };
+        return intentMap[intentTags[0]] || intentTags[0];
+    }
+    return 'General inquiry';
 }
 
 /**
