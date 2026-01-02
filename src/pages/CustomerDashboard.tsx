@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UsageWarningAlert } from "@/components/UsageWarningAlert";
 import {
   Phone, Users, Settings, CreditCard, Gift, TrendingUp,
-  Calendar, Loader2, Bot, UsersRound, CalendarCheck, CalendarRange
+  Calendar, Loader2, Bot, UsersRound, CalendarCheck, CalendarRange, Inbox
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
@@ -30,6 +30,8 @@ import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
 import { CalendarTab } from "@/components/dashboard/CalendarTab";
 import { AppointmentsTab } from "@/components/dashboard/AppointmentsTab";
 import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
+import { InboxTab } from "@/components/dashboard/InboxTab";
+import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
 
 
 export default function CustomerDashboard() {
@@ -39,7 +41,7 @@ export default function CustomerDashboard() {
   const { setWidgetContext } = useVapiWidget();
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "today");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "inbox");
   const [account, setAccount] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([]);
@@ -464,32 +466,19 @@ export default function CustomerDashboard() {
         {/* Main Tabs - horizontal scroll on mobile */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-8">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-8 gap-1">
-              <TabsTrigger value="today" className="flex-shrink-0 px-3">
-                <Calendar className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Today</span>
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-6 gap-1">
+              <TabsTrigger value="inbox" className="flex-shrink-0 px-3">
+                <Inbox className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline text-xs">Inbox</span>
               </TabsTrigger>
-              <TabsTrigger value="overview" className="flex-shrink-0 px-3">
-                <TrendingUp className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Overview</span>
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex-shrink-0 px-3">
+              <TabsTrigger value="schedule" className="flex-shrink-0 px-3">
                 <CalendarCheck className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Calendar</span>
-              </TabsTrigger>
-              <TabsTrigger value="appointments" className="flex-shrink-0 px-3">
-                <CalendarRange className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Appointments</span>
+                <span className="hidden sm:inline text-xs">Schedule</span>
               </TabsTrigger>
               <TabsTrigger value="phone-numbers" className="flex-shrink-0 px-3">
                 <Phone className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Phones</span>
               </TabsTrigger>
-              {/* Commented out - will add later */}
-              {/* <TabsTrigger value="assistants" className="flex-shrink-0 px-3">
-                <Bot className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Assistant</span>
-              </TabsTrigger> */}
               <TabsTrigger value="team" className="flex-shrink-0 px-3">
                 <UsersRound className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Team</span>
@@ -502,37 +491,36 @@ export default function CustomerDashboard() {
                 <CreditCard className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline text-xs">Billing</span>
               </TabsTrigger>
-              {/* Commented out - will add later */}
-              {/* <TabsTrigger value="referrals" className="flex-shrink-0 px-3">
-                <Gift className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Earn</span>
-              </TabsTrigger> */}
             </TabsList>
           </div>
 
+
+          {/* New Primary Tabs */}
+          <TabsContent value="inbox">
+            <InboxTab calls={usageLogs} companyName={account.company_name} />
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <ScheduleTab calls={usageLogs} companyName={account.company_name} />
+          </TabsContent>
+
+          {/* Legacy Tabs (for redirect compatibility) */}
           <TabsContent value="today">
-            <TodayTab accountId={account.id} />
+            <InboxTab calls={usageLogs} companyName={account.company_name} />
           </TabsContent>
 
           <TabsContent value="overview">
-            <OverviewTab
-              account={account}
-              usageLogs={usageLogs}
-              usagePercent={usagePercent}
-              remainingMinutes={remainingMinutes}
-              trialDaysRemaining={trialDaysRemaining}
-              creditsBalance={creditsBalance}
-              onOpenUpgradeModal={() => setUpgradeModalOpen(true)}
-            />
+            <InboxTab calls={usageLogs} companyName={account.company_name} />
           </TabsContent>
 
           <TabsContent value="calendar">
-            <CalendarTab calls={usageLogs} />
+            <ScheduleTab calls={usageLogs} companyName={account.company_name} />
           </TabsContent>
 
           <TabsContent value="appointments">
-            <AppointmentsTab accountId={account.id} />
+            <ScheduleTab calls={usageLogs} companyName={account.company_name} />
           </TabsContent>
+
 
           <TabsContent value="phone-numbers">
             <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />

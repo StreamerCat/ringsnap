@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import * as Sentry from "@sentry/react";
@@ -122,6 +122,11 @@ const App = () => (
                 <Route path="/trial-confirmation" element={<TrialConfirmation />} />
                 <Route path="/admin/monitoring" element={<AdminMonitoring />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
+                {/* Dashboard tab redirects */}
+                <Route path="/today" element={<Navigate to="/dashboard?tab=inbox" replace />} />
+                <Route path="/overview" element={<Navigate to="/dashboard?tab=inbox" replace />} />
+                <Route path="/calendar" element={<Navigate to="/dashboard?tab=schedule" replace />} />
+                <Route path="/appointments" element={<Navigate to="/dashboard?tab=schedule" replace />} />
                 {/* Legal pages */}
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />

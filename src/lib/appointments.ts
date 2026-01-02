@@ -149,10 +149,21 @@ export function getJobType(call: CallLogWithAppointment | null | undefined): str
 }
 
 /**
- * Check if a call resulted in a booked appointment.
- * Matches the existing badge logic used in OperatorOverview and OverviewTab.
+ * Check if a call has a STRUCTURED appointment (for Booked status).
+ * Only returns true if there's a deterministic datetime field.
+ * Use this for Schedule display and Booked badge.
  */
-export function isBookedCall(call: CallLogWithAppointment | null | undefined): boolean {
+export function hasStructuredAppointment(call: CallLogWithAppointment | null | undefined): boolean {
+    if (!call) return false;
+    return !!call.appointment_start;
+}
+
+/**
+ * Check if a call has booking INTENT (may be TBD or confirmed).
+ * Returns true for structured appointments OR text-based windows.
+ * Use this for determining if a call should appear in Schedule at all.
+ */
+export function hasBookingIntent(call: CallLogWithAppointment | null | undefined): boolean {
     if (!call) return false;
     return (
         call.outcome === 'booked' ||
@@ -160,6 +171,15 @@ export function isBookedCall(call: CallLogWithAppointment | null | undefined): b
         !!call.appointment_window ||
         !!call.appointment_start
     );
+}
+
+/**
+ * @deprecated Use hasStructuredAppointment or hasBookingIntent instead.
+ * Check if a call resulted in a booked appointment.
+ * Matches the existing badge logic used in OperatorOverview and OverviewTab.
+ */
+export function isBookedCall(call: CallLogWithAppointment | null | undefined): boolean {
+    return hasBookingIntent(call);
 }
 
 // Weekday names for parsing
