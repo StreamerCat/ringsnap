@@ -50,7 +50,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Function to get user's account_id
-CREATE OR REPLACE FUNCTION public.get_user_account_id(p_user_id uuid)
+CREATE OR REPLACE FUNCTION public.get_user_account_id(_user_id uuid)
 RETURNS uuid AS $$
 DECLARE
   v_account_id uuid;
@@ -58,7 +58,7 @@ BEGIN
   -- Get from profiles table first
   SELECT account_id INTO v_account_id
   FROM public.profiles
-  WHERE id = p_user_id;
+  WHERE id = _user_id;
 
   IF v_account_id IS NOT NULL THEN
     RETURN v_account_id;
@@ -67,7 +67,7 @@ BEGIN
   -- Fallback to account_members
   SELECT account_id INTO v_account_id
   FROM public.account_members
-  WHERE user_id = p_user_id
+  WHERE user_id = _user_id
   LIMIT 1;
 
   RETURN v_account_id;
