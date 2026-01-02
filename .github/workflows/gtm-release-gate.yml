@@ -17,19 +17,25 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       RESEND_PROD_KEY: ${{ secrets.RESEND_PROD_KEY }}
-      # Default base URL - will be overridden by Vercel deployment URL if available
-      PLAYWRIGHT_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://staging.getringsnap.com' || 'https://getringsnap.com' }}
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: 'npm'
-          
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Set Base URL for PR
+        if: github.event_name == 'pull_request'
+        run: echo "PLAYWRIGHT_BASE_URL=https://staging.getringsnap.com" >> $GITHUB_ENV
+
+      - name: Set Base URL for Main/Dispatch
+        if: github.event_name != 'pull_request'
+        run: echo "PLAYWRIGHT_BASE_URL=https://getringsnap.com" >> $GITHUB_ENV
 
       - name: Wait for Vercel Deployment
         id: wait-for-deployment
@@ -39,7 +45,7 @@ jobs:
           project_id: ${{ secrets.VERCEL_PROJECT_ID }}
           max_timeout: 300
 
-      - name: Set Deployment URL
+      - name: Override with Vercel Deployment URL
         if: steps.wait-for-deployment.outputs.url != ''
         run: echo "PLAYWRIGHT_BASE_URL=${{ steps.wait-for-deployment.outputs.url }}" >> $GITHUB_ENV
 
