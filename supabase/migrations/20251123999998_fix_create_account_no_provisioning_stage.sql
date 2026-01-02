@@ -8,15 +8,23 @@
 -- ==============================================================================
 
 -- Conditionally drop old function signatures (signup_channel_type may not exist)
+-- IMPORTANT: Must avoid parse-time references to signup_channel_type type
 DO $$
+DECLARE
+  v_type_exists BOOLEAN;
 BEGIN
-  -- Try to drop the old signature with signup_channel_type
-  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'signup_channel_type') THEN
-    EXECUTE 'DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, signup_channel_type, UUID, JSONB, TEXT) CASCADE';
+  -- Check if signup_channel_type exists
+  SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'signup_channel_type') INTO v_type_exists;
+
+  -- If type exists, drop function signature that uses it
+  IF v_type_exists THEN
+    -- Build the DROP statement dynamically to avoid parse-time type resolution
+    EXECUTE 'DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, ' ||
+            quote_ident('signup_channel_type') || ', UUID, JSONB, TEXT) CASCADE';
   END IF;
 
-  -- Also drop if it was created with TEXT
-  DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, UUID, JSONB, TEXT) CASCADE;
+  -- Always drop the TEXT signature (idempotent)
+  EXECUTE 'DROP FUNCTION IF EXISTS public.create_account_transaction(TEXT, TEXT, TEXT, TEXT, TEXT, UUID, JSONB, TEXT) CASCADE';
 END $$;
 
 -- ==============================================================================
