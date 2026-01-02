@@ -13,6 +13,9 @@ import {
 import {
     sanitizeCallText,
     deriveTopicLabels,
+    deriveServiceTags,
+    deriveIntentTags,
+    deriveReasonLabel,
     formatTopicDisplay,
     deriveOutcome,
     deriveNextStep,
@@ -58,13 +61,15 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
 
     // Get summary with fallback (RPC returns summary, direct queries return transcript_summary)
     const summaryText = call.transcript_summary || call.summary;
+    const topicInput = { reason: call.reason, summary: summaryText, companyName };
 
-    // Topic derivation (with company name for sanitization)
-    const topics = deriveTopicLabels({
-        reason: call.reason,
-        summary: summaryText,
-        companyName,
-    });
+    // Separate service and intent tags for better display
+    const serviceTags = deriveServiceTags(topicInput);
+    const intentTags = deriveIntentTags(topicInput);
+    const topics = deriveTopicLabels(topicInput); // Combined for backward compatibility
+
+    // Derived reason label (short, not raw prose)
+    const reasonLabel = deriveReasonLabel(serviceTags, intentTags);
 
     // Outcome and next step
     const appointmentDisplay = getAppointmentDisplay(callWithAppointment);
@@ -207,15 +212,13 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
 
                     <Separator />
 
-                    {/* Reason for Call */}
-                    {sanitizedReason && (
-                        <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-muted-foreground">Reason for Call</h4>
-                            <p className="text-sm bg-muted p-3 rounded-lg">
-                                {sanitizedReason}
-                            </p>
-                        </div>
-                    )}
+                    {/* Reason for Call - derived label, not raw prose */}
+                    <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-muted-foreground">Reason for Call</h4>
+                        <p className="text-sm bg-muted p-3 rounded-lg font-medium">
+                            {reasonLabel}
+                        </p>
+                    </div>
 
                     {/* Job Details Block */}
                     <div className="space-y-3">

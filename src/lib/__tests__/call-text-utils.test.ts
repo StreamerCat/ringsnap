@@ -108,9 +108,11 @@ describe('call-text-utils', () => {
             expect(labels.length).toBeGreaterThanOrEqual(2);
         });
 
-        it('uses trade fallback when no keywords match', () => {
+        it('returns General inquiry when no keywords match (trade not used)', () => {
+            // Per requirements: "Remove any default tags based on account.trade"
             const labels = deriveTopicLabels({ reason: 'Had a chat about the property', trade: 'Plumbing' });
-            expect(labels).toContain('Plumbing');
+            expect(labels).toContain('General inquiry');
+            expect(labels).not.toContain('Plumbing');
         });
 
         it('returns General inquiry for content without matches', () => {
@@ -120,7 +122,7 @@ describe('call-text-utils', () => {
 
         it('returns empty array for empty input', () => {
             const labels = deriveTopicLabels({});
-            expect(labels).toEqual([]);
+            expect(labels).toEqual(['General inquiry']);
         });
 
         it('never returns sentence fragments', () => {
@@ -131,6 +133,53 @@ describe('call-text-utils', () => {
                 expect(label).not.toContain('...');
                 expect(label.length).toBeLessThan(50);
             });
+        });
+
+        // Critical: Word boundary tests
+        it('does NOT produce AC tag for callback text', () => {
+            const labels = deriveTopicLabels({ summary: 'Customer requested a callback about electrical work' });
+            expect(labels).not.toContain('AC repair');
+        });
+
+        it('matches AC repair only with word boundary', () => {
+            const labels = deriveTopicLabels({ summary: 'Customer needs AC repair for their home' });
+            expect(labels).toContain('AC repair');
+        });
+
+        it('extracts EV charger installation from Mark sample', () => {
+            const labels = deriveTopicLabels({
+                summary: 'Mark called apple plumb to inquire about new EV charger installation for his home',
+                companyName: 'Apple Plum Electrical'
+            });
+            expect(labels).toContain('EV charger installation');
+        });
+
+        it('extracts callback intent from Mark sample', () => {
+            const labels = deriveTopicLabels({
+                summary: 'Customer requested a callback to discuss EV charger installation',
+            });
+            expect(labels).toContain('Callback requested');
+        });
+
+        it('preserves customer name Mark when removing company name', () => {
+            // Company removal should only remove company tokens, not customer names
+            const input = 'Mark called apple plumb to ask about services';
+            const result = sanitizeCallText(input, { companyName: 'Apple Plum Electrical' });
+            // Result should not contain company fragments but the customer name reference is fine
+            expect(result.toLowerCase()).not.toContain('apple');
+            expect(result.toLowerCase()).not.toContain('plumb');
+        });
+
+        it('should NOT include services from assistant list', () => {
+            const labels = deriveTopicLabels({
+                summary: 'Customer asked about EV charger installation. Our services which include outlet repair, panel upgrades, and lighting install are available.',
+                companyName: 'Apple Plum Electrical'
+            });
+            // Should only include what customer asked about
+            expect(labels).toContain('EV charger installation');
+            // Should NOT include items from the "services which include" clause
+            expect(labels).not.toContain('Electrical');
+            expect(labels).not.toContain('Lighting install');
         });
     });
 

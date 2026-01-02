@@ -291,10 +291,11 @@ export interface AppointmentDisplayResult {
 
 /**
  * Extract appointment display information from a call.
- * Handles explicit datetimes, weekday inference, and free-text windows.
+ * ONLY uses structured appointment_start - does NOT infer from prose/text.
+ * Per requirements: "Do NOT parse 'tomorrow at 10am' from summary text"
  */
 export function getAppointmentDisplay(call: CallLogWithAppointment): AppointmentDisplayResult {
-    // Try to parse explicit appointment_start first
+    // ONLY use structured appointment_start - never infer from text
     const parsedStart = tryParseDateTime(call.appointment_start);
 
     if (parsedStart) {
@@ -307,34 +308,13 @@ export function getAppointmentDisplay(call: CallLogWithAppointment): Appointment
         };
     }
 
-    // Try to infer from appointment_window (e.g., "thursday at 1pm")
-    if (call.appointment_window) {
-        const referenceDate = call.started_at ? new Date(call.started_at) : new Date();
-        const inferred = inferWeekdayAppointment(call.appointment_window, referenceDate);
-
-        if (inferred) {
-            return {
-                hasDateTime: true,
-                inferred: true,
-                start: inferred.date,
-                displayWhen: inferred.date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-                displayDay: inferred.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }),
-            };
-        }
-
-        // Not parseable, show as-is
-        return {
-            hasDateTime: false,
-            inferred: false,
-            displayWhen: call.appointment_window,
-        };
-    }
-
-    // No appointment time info available
+    // No structured appointment time - show as TBD
+    // Note: We intentionally do NOT try to parse appointment_window text
+    // because "tomorrow at 10am" in prose should not be treated as confirmed
     return {
         hasDateTime: false,
         inferred: false,
-        displayWhen: 'Time TBD',
+        displayWhen: call.appointment_window || 'Time TBD',
     };
 }
 
