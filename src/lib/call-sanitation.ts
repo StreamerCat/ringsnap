@@ -47,7 +47,7 @@ export function sanitizeCallReason(text: string | null | undefined): string {
 
 /**
  * Sanitizes the "Call Summary" field.
- * - Removes introductory sentences about who called whom.
+ * - Strips introductory phrases like "The user called..." from sentences.
  * - Replaces "AI" with "RingSnap agent".
  * - Limits to max 2 sentences.
  * - Focuses on outcome and next steps.
@@ -60,26 +60,38 @@ export function sanitizeCallSummary(text: string | null | undefined): string {
     // 1. Replace "AI", "A.I.", "Artificial Intelligence" with "RingSnap agent"
     cleaned = cleaned.replace(/\b(AI|A\.I\.|Artificial Intelligence)\b/gi, "RingSnap agent");
 
-    // 2. Split into sentences
-    const sentences = cleaned.split(/(?<=[.!?])\s+/);
+    // 2. Strip intro phrases from the beginning of the text (preserves the rest)
+    // e.g., "The user called to book a cleaning and the agent scheduled Tuesday."
+    // becomes "Book a cleaning and the agent scheduled Tuesday."
+    const introPatterns = [
+        /^the (user|caller) called\s+to\s+/i,                    // "The user called to ..."
+        /^the (user|caller) called [^.]*?\s+to\s+/i,             // "The user called RingSnap to ..."
+        /^the (user|caller) called [^.]*?\.\s*/i,                // "The user called RingSnap."
+        /^the ringsnap agent answered the call\.\s*/i,           // "The RingSnap agent answered the call."
+        /^(user|caller) called\s+to\s+/i,                        // "Caller called to ..."
+    ];
+    for (const pattern of introPatterns) {
+        cleaned = cleaned.replace(pattern, "");
+    }
 
-    // 3. Filter out introductory sentences like "The user called [Business]."
-    // or "The RingSnap agent answered the call."
-    const filteredSentences = sentences.filter(s => {
-        const lowerS = s.toLowerCase();
-        const isIntro =
-            lowerS.includes("user called") ||
-            lowerS.includes("caller called") ||
-            (lowerS.includes("ringsnap agent answered") && lowerS.length < 50);
-        return !isIntro;
-    });
+    // 3. Split into sentences using a lookbehind-free approach for browser compatibility
+    // Match sentence-ending punctuation followed by whitespace, then split
+    const sentences = cleaned.split(/([.!?])\s+/).reduce((acc: string[], part, i, arr) => {
+        // Reconstruct sentences: odd indices are punctuation, combine with previous
+        if (i % 2 === 0) {
+            const punct = arr[i + 1] || "";
+            const sentence = (part + punct).trim();
+            if (sentence) acc.push(sentence);
+        }
+        return acc;
+    }, []);
 
     // 4. Take first 2 meaningful sentences
-    let result = filteredSentences.slice(0, 2).join(" ");
+    let result = sentences.slice(0, 2).join(" ");
 
-    // 5. Ensure it's not too long but informative
-    if (result.length > 250) {
-        // If still very long, we might need more aggressive truncation, but 2 sentences is usually okay.
+    // 5. Capitalize first letter if needed
+    if (result.length > 0) {
+        result = result.charAt(0).toUpperCase() + result.slice(1);
     }
 
     return result;

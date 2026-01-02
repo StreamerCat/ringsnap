@@ -39,7 +39,12 @@ describe("call-sanitation", () => {
     });
 
     describe("sanitizeCallSummary", () => {
-        it("removes introductory sentences", () => {
+        it("strips intro phrases but preserves meaningful content", () => {
+            const input = "The user called to book a cleaning and the agent scheduled Tuesday.";
+            expect(sanitizeCallSummary(input)).toBe("Book a cleaning and the agent scheduled Tuesday.");
+        });
+
+        it("removes standalone intro sentence and keeps the rest", () => {
             const input = "The user called RingSnap. They wanted to book a drain cleaning. The RingSnap agent helped them find a time.";
             expect(sanitizeCallSummary(input)).toBe("They wanted to book a drain cleaning. The RingSnap agent helped them find a time.");
         });
@@ -52,8 +57,9 @@ describe("call-sanitation", () => {
         it("limits to max 2 sentences", () => {
             const input = "First sentence. Second sentence. Third sentence. Fourth sentence.";
             const output = sanitizeCallSummary(input);
-            const sentences = output.split(/(?<=[.!?])\s+/);
-            expect(sentences.length).toBe(2);
+            // Count periods to verify sentence count
+            const periodCount = (output.match(/\./g) || []).length;
+            expect(periodCount).toBe(2);
         });
 
         it("handles empty or null input", () => {
