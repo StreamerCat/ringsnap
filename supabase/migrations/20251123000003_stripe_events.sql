@@ -73,8 +73,7 @@ CREATE INDEX idx_stripe_events_account
 -- ==============================================================================
 
 COMMENT ON TABLE public.stripe_events IS
-  'Stores all Stripe webhook events for idempotent processing and audit trail. ' ||
-  'Duplicate events are detected via stripe_event_id uniqueness constraint.';
+  'Stores all Stripe webhook events for idempotent processing and audit trail. Duplicate events are detected via stripe_event_id uniqueness constraint.';
 
 COMMENT ON COLUMN public.stripe_events.stripe_event_id IS
   'Unique Stripe event ID (e.g., evt_xxxxx) for duplicate detection';
