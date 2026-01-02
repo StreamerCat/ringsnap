@@ -150,7 +150,7 @@ BEGIN
   -- Check if user is staff (staff can access multiple accounts)
   IF EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role IN ('admin', 'support', 'sales')
+    WHERE user_id = p_user_id AND role::text IN ('admin', 'support', 'sales', 'platform_admin', 'platform_owner')
   ) THEN
     RETURN true;
   END IF;

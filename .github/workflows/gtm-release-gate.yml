@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  deployments: read
-  statuses: read
   pull-requests: read
 
 jobs:
@@ -23,6 +21,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       RESEND_PROD_KEY: ${{ secrets.RESEND_PROD_KEY }}
+      PLAYWRIGHT_BASE_URL: https://getringsnap.com
 
     steps:
       - uses: actions/checkout@v4
@@ -35,30 +34,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Set Production Base URL
-        if: github.event_name != 'pull_request'
-        run: echo "PLAYWRIGHT_BASE_URL=https://getringsnap.com" >> $GITHUB_ENV
-
-      - name: Wait for Vercel Preview Deployment
-        if: github.event_name == 'pull_request'
-        id: wait-for-deployment
-        uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 300
-          check_interval: 5
-
-      - name: Set Preview Base URL
-        if: github.event_name == 'pull_request' && steps.wait-for-deployment.outputs.url != ''
-        run: echo "PLAYWRIGHT_BASE_URL=${{ steps.wait-for-deployment.outputs.url }}" >> $GITHUB_ENV
-
       - name: "Tier 1: API Smoke Tests (Fast Fail)"
         run: npm run test:smoke:api
 
       - name: Install Playwright Browsers
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: npx playwright install --with-deps
 
       - name: "Tier 2: Playwright Smoke Tests"
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: npx playwright test --project=smoke
 
       - name: "Tier 3: Playwright Full Suite (Main/Nightly/Staging)"
@@ -66,11 +50,13 @@ jobs:
         run: npx playwright test --project=full
 
       - name: "Tier 4: Lighthouse CI"
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: npm run test:lhci
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
       - name: "Tier 5: SEO & Indexing Check"
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: |
           curl -s -f ${{ env.PLAYWRIGHT_BASE_URL }}/robots.txt || (echo "robots.txt missing" && exit 1)
           curl -s -f ${{ env.PLAYWRIGHT_BASE_URL }}/sitemap.xml || (echo "sitemap.xml missing" && exit 1)
