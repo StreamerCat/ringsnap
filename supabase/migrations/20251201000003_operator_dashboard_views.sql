@@ -1,5 +1,36 @@
 -- Migration: Create operator dashboard views
 -- Provides efficient queries for contractor daily dashboard
+--
+-- IMPORTANT: Depends on public.call_logs existing
+-- This should run AFTER 20251201000002_create_call_logs.sql
+
+-- ==============================================================================
+-- PART 0: Verify required tables exist
+-- ==============================================================================
+
+DO $$
+BEGIN
+  -- Check that call_logs table exists
+  IF to_regclass('public.call_logs') IS NULL THEN
+    RAISE EXCEPTION 'Cannot create operator dashboard views: public.call_logs table does not exist. Ensure 20251201000002_create_call_logs.sql ran first.';
+  END IF;
+
+  -- Check that customer_leads table exists
+  IF to_regclass('public.customer_leads') IS NULL THEN
+    RAISE EXCEPTION 'Cannot create operator dashboard views: public.customer_leads table does not exist.';
+  END IF;
+
+  -- Check that appointments table exists
+  IF to_regclass('public.appointments') IS NULL THEN
+    RAISE EXCEPTION 'Cannot create operator dashboard views: public.appointments table does not exist.';
+  END IF;
+
+  RAISE NOTICE 'All required tables exist. Creating operator dashboard views...';
+END $$;
+
+-- ==============================================================================
+-- PART 1: Create operator dashboard views
+-- ==============================================================================
 
 -- View: Calls today by account
 CREATE OR REPLACE VIEW public.operator_calls_today AS
