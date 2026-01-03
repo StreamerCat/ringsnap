@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { withSentryEdge } from "../_shared/sentry.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { logInfo, logError, logWarn } from "../_shared/logging.ts";
+import { logInfo, logError, logWarn, extractTraceId, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 import { sendAppointmentNotifications, Appointment, AccountSettings } from "../_shared/appointment-notifications.ts";
 import { checkSlotConflict } from "../_shared/availability.ts";
 
@@ -19,6 +19,8 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
 
     const { correlationId } = ctx;
     let toolCallId: string | null = null;
+    const traceId = extractTraceId(req);
+    let accountId: string | undefined;
 
     try {
         // 2. Authentication (Shared Secret)
@@ -87,7 +89,11 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
             throw new Error("Assistant not found");
         }
 
-        const accountId = assistant.account_id;
+        accountId = assistant.account_id;
+        const base = { functionName: FUNCTION_NAME, traceId, accountId };
+        const bookingStart = Date.now();
+
+        stepStart('book_appointment', base, { callerName, vapiAssistantId });
 
         // 5. Get Account Settings for Notification
         const { data: account, error: accountError } = await supabase
@@ -284,6 +290,8 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
 
         const resultDetails = `Perfect! I've booked your appointment for ${formattedTime}. You'll receive a confirmation text and email shortly. Is there anything else I can help you with?`;
 
+        stepEnd('book_appointment', base, { result: 'success', appointmentId: finalAppointment?.id }, bookingStart);
+
         return new Response(JSON.stringify({
             results: [
                 {
@@ -296,6 +304,9 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
         });
 
     } catch (err: any) {
+        const base = { functionName: FUNCTION_NAME, traceId, accountId };
+        stepError('book_appointment', base, err, { reason_code: err.message });
+
         logError("Appointment tool failed", { functionName: FUNCTION_NAME, correlationId, error: err });
 
         // Return a graceful error to Vapi if we have the toolCallId

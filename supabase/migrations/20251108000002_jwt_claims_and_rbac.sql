@@ -50,7 +50,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- Function to get user's account_id
-CREATE OR REPLACE FUNCTION public.get_user_account_id(p_user_id uuid)
+CREATE OR REPLACE FUNCTION public.get_user_account_id(_user_id uuid)
 RETURNS uuid AS $$
 DECLARE
   v_account_id uuid;
@@ -58,7 +58,7 @@ BEGIN
   -- Get from profiles table first
   SELECT account_id INTO v_account_id
   FROM public.profiles
-  WHERE id = p_user_id;
+  WHERE id = _user_id;
 
   IF v_account_id IS NOT NULL THEN
     RETURN v_account_id;
@@ -67,7 +67,7 @@ BEGIN
   -- Fallback to account_members
   SELECT account_id INTO v_account_id
   FROM public.account_members
-  WHERE user_id = p_user_id
+  WHERE user_id = _user_id
   LIMIT 1;
 
   RETURN v_account_id;
@@ -121,10 +121,10 @@ RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role = p_role
+    WHERE user_id = p_user_id AND role::text = p_role
   ) OR EXISTS (
     SELECT 1 FROM public.account_members
-    WHERE user_id = p_user_id AND role = p_role
+    WHERE user_id = p_user_id AND role::text = p_role
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
@@ -135,10 +135,10 @@ RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role = ANY(p_roles)
+    WHERE user_id = p_user_id AND role::text = ANY(p_roles)
   ) OR EXISTS (
     SELECT 1 FROM public.account_members
-    WHERE user_id = p_user_id AND role = ANY(p_roles)
+    WHERE user_id = p_user_id AND role::text = ANY(p_roles)
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
@@ -150,7 +150,7 @@ BEGIN
   -- Check if user is staff (staff can access multiple accounts)
   IF EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = p_user_id AND role IN ('admin', 'support', 'sales')
+    WHERE user_id = p_user_id AND role::text IN ('admin', 'support', 'sales', 'platform_admin', 'platform_owner')
   ) THEN
     RETURN true;
   END IF;

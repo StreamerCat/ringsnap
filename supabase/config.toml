@@ -98,3 +98,18 @@ verify_jwt = false
 
 [functions.debug-db]
 verify_jwt = false
+
+[functions.vapi-tools-appointments]
+verify_jwt = false
+
+[functions.vapi-tools-availability]
+verify_jwt = false
+
+[functions.booking-schedule]
+verify_jwt = false
+
+[functions.resend-webhook]
+verify_jwt = false
+
+[functions.jobber-oauth-callback]
+verify_jwt = false

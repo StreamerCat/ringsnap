@@ -18,7 +18,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('admin', 'support', 'sales')
+    AND role::text IN ('admin', 'support', 'sales', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -50,7 +50,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('admin', 'support', 'billing')
+    AND role::text IN ('admin', 'support', 'billing', 'platform_admin', 'platform_owner')
   )
   OR
   -- Sales reps can view their assigned accounts
@@ -58,7 +58,7 @@ USING (
     SELECT 1 FROM public.staff_roles sr
     JOIN public.profiles p ON p.id = sr.user_id
     WHERE sr.user_id = auth.uid()
-    AND sr.role = 'sales'
+    AND sr.role::text = 'sales'
     AND accounts.sales_rep_name = p.name
   )
 );
@@ -81,7 +81,7 @@ USING (
   -- Staff admins
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 )
 WITH CHECK (
@@ -97,7 +97,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -122,7 +122,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('admin', 'support', 'sales')
+    AND role::text IN ('admin', 'support', 'sales', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -144,7 +144,7 @@ USING (
   -- Staff admin
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 )
 WITH CHECK (
@@ -159,7 +159,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -182,7 +182,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('admin', 'support')
+    AND role::text IN ('admin', 'support', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -201,7 +201,7 @@ USING (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 )
 WITH CHECK (
@@ -216,7 +216,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -239,7 +239,7 @@ USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('admin', 'support')
+    AND role::text IN ('admin', 'support', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -258,7 +258,7 @@ USING (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 )
 WITH CHECK (
@@ -273,7 +273,7 @@ WITH CHECK (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -289,7 +289,7 @@ USING (
   OR
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -299,13 +299,13 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM public.staff_roles
-    WHERE user_id = auth.uid() AND role = 'admin'
+    WHERE user_id = auth.uid() AND role::text IN ('admin', 'platform_admin', 'platform_owner')
   )
 );
 
@@ -329,7 +329,7 @@ DO $$ BEGIN
       EXISTS (
         SELECT 1 FROM public.staff_roles
         WHERE user_id = auth.uid()
-        AND role IN ('admin', 'support', 'billing')
+        AND role::text IN ('admin', 'support', 'billing', 'platform_admin', 'platform_owner')
       )
     );
   END IF;

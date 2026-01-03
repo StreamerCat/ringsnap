@@ -2,10 +2,40 @@ import { test, expect } from '@playwright/test';
 
 /**
  * GTM Smoke Tests
- * 
+ *
  * Minimal suite for maximum confidence on critical user flows.
  * These tests should pass on every PR before merge.
  */
+
+/**
+ * Normalize Supabase URL to use correct domain (.supabase.co)
+ * Handles common cases:
+ * - .supabase.com → .supabase.co (legacy/incorrect domain)
+ * - localhost variants → unchanged (127.0.0.1:54321, etc)
+ * - Missing URL → throws clear error
+ */
+function getNormalizedSupabaseUrl(): string {
+  const url = process.env.SUPABASE_URL;
+
+  if (!url) {
+    throw new Error(
+      'SUPABASE_URL environment variable is required for API tests. ' +
+      'Please set SUPABASE_URL in your .env file or CI environment.'
+    );
+  }
+
+  // Preserve localhost URLs unchanged
+  if (url.includes('localhost') || url.includes('127.0.0.1')) {
+    return url;
+  }
+
+  // Normalize .supabase.com → .supabase.co
+  if (url.endsWith('.supabase.com') || url.includes('.supabase.com/')) {
+    return url.replace('.supabase.com', '.supabase.co');
+  }
+
+  return url;
+}
 
 test.describe('Marketing Pages', () => {
     test('homepage loads and has navigation', async ({ page }) => {
@@ -193,7 +223,7 @@ test.describe('API / Edge Functions', () => {
     test.skip(!process.env.SUPABASE_URL, 'Skipping API tests - no Supabase URL');
 
     test('availability endpoint is deployed and reachable', async ({ request }) => {
-        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseUrl = getNormalizedSupabaseUrl();
 
         // Make a request to the availability endpoint
         // This should return 401 (unauthorized) or 500 (missing data)
@@ -220,7 +250,7 @@ test.describe('API / Edge Functions', () => {
     });
 
     test('appointments endpoint is deployed and reachable', async ({ request }) => {
-        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseUrl = getNormalizedSupabaseUrl();
 
         const response = await request.post(`${supabaseUrl}/functions/v1/vapi-tools-appointments`, {
             headers: {

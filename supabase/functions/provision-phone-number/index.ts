@@ -34,7 +34,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmailForLogs, maskPhoneForLogs, type BaseLogContext } from "../_shared/logging.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
 import { POOL_CONFIG } from "../_shared/pool-config.ts";
 import { provisionPhoneNumber } from "../_shared/telephony.ts";
@@ -63,9 +63,7 @@ async function retryWithBackoff<T>(
 
       if (attempt < maxRetries) {
         const delayMs = baseDelayMs * Math.pow(2, attempt);
-        console.log(
-          `[provision-phone-number] Retry ${operationName} attempt ${attempt + 1}/${maxRetries} after ${delayMs}ms`
-        );
+        // Retry logic - using structured step logging instead of console.log
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
@@ -84,9 +82,17 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  const correlationId = extractCorrelationId(req);
+  const correlationId = extractCorrelationId(req); // Legacy compatibility
+  const traceId = extractTraceId(req); // Primary trace ID for LLM-native logging
   const baseLogOptions = { functionName: FUNCTION_NAME, correlationId };
+
   let currentAccountId: string | null = null;
+  let base: BaseLogContext = {
+    functionName: FUNCTION_NAME,
+    traceId,
+    accountId: null,
+    userId: null,
+  };
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -99,6 +105,9 @@ serve(async (req) => {
 
     const { accountId, email, name, phone, areaCode, companyName } = await req.json();
     currentAccountId = accountId;
+
+    // Update base context with account ID
+    base = { ...base, accountId };
 
     if (!accountId) {
       return new Response(
@@ -185,6 +194,9 @@ serve(async (req) => {
       // -----------------------------------------------------------
       logInfo("Using Number Pool Strategy", { ...baseLogOptions, accountId });
 
+      const poolStart = Date.now();
+      stepStart('check_pool_eligibility', base, { area_code: areaCode });
+
       // A. Try to allocate from pool
       const { data: allocated, error: allocError } = await supabase.rpc(
         'allocate_phone_number_from_pool',
@@ -201,6 +213,13 @@ serve(async (req) => {
       }
 
       if (allocated) {
+        stepEnd('check_pool_eligibility', base, {
+          result: 'success',
+          pool_action: 'from_pool',
+          phone_masked: maskPhoneForLogs(allocated.phone_number),
+          area_code: allocated.area_code
+        }, poolStart);
+
         logInfo("Allocated number from pool", {
           ...baseLogOptions,
           accountId,
@@ -213,6 +232,12 @@ serve(async (req) => {
         });
         phoneNumber = allocated.phone_number;
       } else {
+        stepEnd('check_pool_eligibility', base, {
+          result: 'failure',
+          pool_action: 'pool_unavailable',
+          reason_code: allocError ? 'POOL_ERROR' : 'POOL_EXHAUSTED'
+        }, poolStart);
+
         // B. Buy new from Twilio
         // CRITICAL: Log why allocation failed
         const { data: poolStats } = await supabase.rpc('get_pool_stats').catch(() => ({ data: null }));
@@ -226,6 +251,10 @@ serve(async (req) => {
             fallbackReason: allocError ? "allocator_error" : "no_pool_available"
           }
         });
+
+        const twilioStart = Date.now();
+        stepStart('purchase_new_number', base, { area_code: areaCode, provider: 'twilio' });
+
         try {
           const twilioResult = await provisionPhoneNumber({
             type: 'twilio',
@@ -238,6 +267,12 @@ serve(async (req) => {
 
           phoneNumber = twilioResult.phoneNumber;
 
+          stepEnd('purchase_new_number', base, {
+            result: 'success',
+            phone_masked: maskPhoneForLogs(phoneNumber),
+            provider_id: twilioResult.providerId
+          }, twilioStart);
+
           // We should probably save the provider_phone_number_id (SID) somewhere?
           // The final upsert Step 3 handles saving.
           logInfo("Purchased Twilio number", {
@@ -246,6 +281,10 @@ serve(async (req) => {
           });
 
         } catch (twilioErr) {
+          stepError('purchase_new_number', base, twilioErr, {
+            reason_code: 'TWILIO_PURCHASE_FAILED',
+            area_code: areaCode
+          });
           throw new Error(`Failed to buy Twilio number: ${twilioErr instanceof Error ? twilioErr.message : String(twilioErr)}`);
         }
       }
@@ -258,6 +297,12 @@ serve(async (req) => {
       if (!twilioAccountSid || !twilioAuthToken) {
         throw new Error("Missing Twilio credentials for Vapi Import");
       }
+
+      const vapiAttachStart = Date.now();
+      stepStart('attach_to_vapi', base, {
+        phone_masked: maskPhoneForLogs(phoneNumber),
+        assistant_id: account.vapi_assistant_id
+      });
 
       try {
         const phoneData = await retryWithBackoff(
@@ -291,9 +336,21 @@ serve(async (req) => {
         );
 
         vapiPhoneId = phoneData.id;
+
+        stepEnd('attach_to_vapi', base, {
+          result: 'success',
+          vapi_phone_id: vapiPhoneId,
+          phone_masked: maskPhoneForLogs(phoneNumber)
+        }, vapiAttachStart);
+
         logInfo("Imported number to Vapi", { ...baseLogOptions, context: { vapiPhoneId, phoneNumber } });
 
       } catch (importErr) {
+        stepError('attach_to_vapi', base, importErr, {
+          reason_code: 'VAPI_ATTACH_FAILED',
+          phone_masked: maskPhoneForLogs(phoneNumber)
+        });
+
         // If import fails, we have bought a Twilio number (if not pooled) or allocated one.
         // If bought, we might leak it?
         // If allocated, we should ideally rollback allocation (or it stays assigned but broken).

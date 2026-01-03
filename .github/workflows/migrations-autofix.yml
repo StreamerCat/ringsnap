@@ -1,0 +1,53 @@
+name: Migration Autofix
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/scripts/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autofix:
+    # Only run on PRs from the same repository (not forks)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run migration autofix
+        run: bash .github/scripts/autofix-migrations.sh
+      
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code || echo "changes=true" >> $GITHUB_OUTPUT
+      
+      - name: Commit and push fixes
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: autofix migrations"
+          git push
+      
+      - name: Comment on PR
+        if: steps.git-check.outputs.changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🔧 Migration autofix has been applied to this PR. Please review the changes.'
+            })

@@ -30,11 +30,10 @@ ALTER TABLE public.provisioning_jobs
   DROP COLUMN IF EXISTS metadata,
   DROP COLUMN IF EXISTS correlation_id;
 
--- Remove columns from accounts
+-- Remove timestamp columns from accounts (keep provisioning_error)
 ALTER TABLE public.accounts
   DROP COLUMN IF EXISTS provisioning_started_at,
-  DROP COLUMN IF EXISTS provisioning_completed_at,
-  DROP COLUMN IF EXISTS provisioning_error;
+  DROP COLUMN IF EXISTS provisioning_completed_at;
 
 -- ==============================================================================
 -- Rollback Part 1: idempotency_results table

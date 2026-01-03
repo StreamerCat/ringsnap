@@ -19,8 +19,13 @@
  * ```
  */
 
+// Primary header for RingSnap trace propagation (LLM-native logging)
+const TRACE_ID_HEADER = 'x-rs-trace-id';
+
+// Legacy correlation ID header (kept for backward compatibility)
 const CORRELATION_ID_HEADER = 'x-correlation-id';
-const SESSION_STORAGE_KEY = 'ringsnap_correlation_id';
+
+const SESSION_STORAGE_KEY = 'ringsnap_trace_id';
 
 /**
  * Generate a new UUID v4 correlation ID
@@ -103,6 +108,7 @@ export function getCorrelationId(persist: boolean = false): string {
 
 /**
  * Add correlation ID header to existing headers object
+ * Uses x-rs-trace-id as primary header for LLM-native logging.
  * @param headers - Existing headers object (optional)
  * @param correlationId - Correlation ID to use (optional, will generate if not provided)
  * @returns Headers object with correlation ID added
@@ -115,18 +121,18 @@ export function withCorrelationId(
 
   // Handle different header types
   if (headers instanceof Headers) {
-    headers.set(CORRELATION_ID_HEADER, id);
+    headers.set(TRACE_ID_HEADER, id);
     return headers;
   }
 
   if (Array.isArray(headers)) {
-    return [...headers, [CORRELATION_ID_HEADER, id]];
+    return [...headers, [TRACE_ID_HEADER, id]];
   }
 
   // Plain object
   return {
     ...headers,
-    [CORRELATION_ID_HEADER]: id,
+    [TRACE_ID_HEADER]: id,
   };
 }
 
@@ -163,13 +169,14 @@ export function createCorrelatedFetch(
 
 /**
  * Extract correlation ID from response headers
+ * Checks both x-rs-trace-id and legacy x-correlation-id headers.
  * @param response - Fetch Response object
  * @returns Correlation ID from response or null
  */
 export function extractCorrelationIdFromResponse(
   response: Response
 ): string | null {
-  return response.headers.get(CORRELATION_ID_HEADER);
+  return response.headers.get(TRACE_ID_HEADER) || response.headers.get(CORRELATION_ID_HEADER);
 }
 
 /**
@@ -302,5 +309,5 @@ export function endSignupFlow(): void {
   clearCorrelationId();
 }
 
-// Export header name for external use
-export { CORRELATION_ID_HEADER };
+// Export header names for external use
+export { TRACE_ID_HEADER, CORRELATION_ID_HEADER };
