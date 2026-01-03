@@ -17,6 +17,8 @@ interface PhoneNumbersTabProps {
     phoneNumbers: any[];
 }
 
+import { OnboardingRecoveryPanel } from "@/components/dashboard/OnboardingRecoveryPanel";
+
 export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps) {
     const [showForwardingInfo, setShowForwardingInfo] = useState(false);
     const [showTestInfo, setShowTestInfo] = useState(false);
@@ -104,6 +106,8 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
 
     return (
         <div className="space-y-6">
+            <OnboardingRecoveryPanel accountId={account.id} />
+
             {/* Helper Card: Get your RingSnap agent answering calls */}
             <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

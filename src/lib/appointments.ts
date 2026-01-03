@@ -136,6 +136,45 @@ export function getDisplayName(call: CallLogWithAppointment | null | undefined):
 }
 
 /**
+ * Extract a callback phone number from text (summary or transcript).
+ * Looks for patterns like "call back at X", "number is X".
+ * Returns E.164 format if possible, otherwise null.
+ */
+export function extractCallbackPhone(text: string | null | undefined): string | null {
+    if (!text) return null;
+
+    // Normalize text for easier matching
+    const normalized = text.toLowerCase().replace(/[-.]/g, '');
+
+    // Pattern 1: "call back at" or "callback at" or "callback number is" followed by digits
+    // Matches: "call back at 555 123 4567", "number is 5551234567", "call back at (555)..."
+    // Also handling potential leading space
+    const patterns = [
+        /(?:call|dial) ?back (?:at|on|to) ?([\d(][\d\s()]{9,})/,
+        /callback (?:number|num) (?:is|is) ?([\d(][\d\s()]{9,})/,
+        /reach (?:me|him|her|us) (?:at|on) ?([\d(][\d\s()]{9,})/,
+        /number (?:is|is) ?([\d(][\d\s()]{9,})/
+    ];
+
+    for (const pattern of patterns) {
+        const match = normalized.match(pattern);
+        if (match && match[1]) {
+            // Found a candidate number string
+            const rawNumber = match[1].replace(/\D/g, ''); // strip non-digits
+
+            // Validate length (US numbers usually 10 or 11 digits)
+            if (rawNumber.length === 10) {
+                return `+1${rawNumber}`;
+            } else if (rawNumber.length === 11 && rawNumber.startsWith('1')) {
+                return `+${rawNumber}`;
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
  * Get display address from a call with priority order and sentinel handling.
  * Priority: address → customer_address → service_address → "Address not provided"
  */

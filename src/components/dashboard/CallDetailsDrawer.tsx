@@ -27,6 +27,7 @@ import {
     getDisplayAddress,
     getAppointmentDisplay,
     formatPhoneNumber,
+    extractCallbackPhone,
     type CallLogWithAppointment
 } from "@/lib/appointments";
 import {
@@ -56,11 +57,17 @@ export function CallDetailsDrawer({ open, onOpenChange, call, companyName, side 
     // Derive display values using new utilities
     const displayName = getDisplayName(callWithAppointment);
     const callerPhone = callWithAppointment.caller_phone || callWithAppointment.from_number || '';
-    const callbackPhone = (callWithAppointment as any).callback_phone;
+
+    // Get summary text for extraction
+    const summaryText = call.transcript_summary || call.summary;
+
+    // Extract callback phone from text if not provided in metadata
+    const extractedCallback = extractCallbackPhone(summaryText);
+    const callbackPhone = (callWithAppointment as any).callback_phone || extractedCallback;
     const hasCallback = callbackPhone && callbackPhone !== callerPhone;
 
     // Get summary with fallback (RPC returns summary, direct queries return transcript_summary)
-    const summaryText = call.transcript_summary || call.summary;
+    // const summaryText = call.transcript_summary || call.summary; (already defined above)
     const topicInput = { reason: call.reason, summary: summaryText, companyName };
 
     // Separate service and intent tags for better display

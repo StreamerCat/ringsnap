@@ -34,6 +34,9 @@ import { InboxTab } from "@/components/dashboard/InboxTab";
 import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
 
 
+import { OnboardingUiGuardrail } from "@/components/dashboard/OnboardingUiGuardrail";
+
+
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -449,6 +452,9 @@ export default function CustomerDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Onboarding Guardrail - New System */}
+        {account?.id && <OnboardingUiGuardrail accountId={account.id} />}
 
         {/* Provisioning Banner - shows when provisioning incomplete */}
         <ProvisioningBanner account={account} />
