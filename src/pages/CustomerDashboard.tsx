@@ -581,6 +581,5 @@ export default function CustomerDashboard() {
         />
       )}
     </div>
-    </div >
   );
 }
