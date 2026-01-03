@@ -34,6 +34,9 @@ import { InboxTab } from "@/components/dashboard/InboxTab";
 import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
 
 
+import { OnboardingUiGuardrail } from "@/components/dashboard/OnboardingUiGuardrail";
+
+
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -450,129 +453,134 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        {/* Provisioning Banner - shows when provisioning incomplete */}
-        <ProvisioningBanner account={account} />
+      </div>
 
-        {/* Usage Warning */}
-        {usagePercent >= 80 && (
-          <div className="mb-6">
-            <UsageWarningAlert
-              usagePercent={usagePercent}
-              remainingMinutes={remainingMinutes}
-            />
-          </div>
-        )}
+      {/* Onboarding Guardrail - New System */}
+      {account?.id && <OnboardingUiGuardrail accountId={account.id} />}
 
-        {/* Main Tabs - horizontal scroll on mobile */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-8">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-6 gap-1">
-              <TabsTrigger value="inbox" className="flex-shrink-0 px-3">
-                <Inbox className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Inbox</span>
-              </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-shrink-0 px-3">
-                <CalendarCheck className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Schedule</span>
-              </TabsTrigger>
-              <TabsTrigger value="phone-numbers" className="flex-shrink-0 px-3">
-                <Phone className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Phones</span>
-              </TabsTrigger>
-              <TabsTrigger value="team" className="flex-shrink-0 px-3">
-                <UsersRound className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Team</span>
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex-shrink-0 px-3">
-                <Settings className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Settings</span>
-              </TabsTrigger>
-              <TabsTrigger value="billing" className="flex-shrink-0 px-3">
-                <CreditCard className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline text-xs">Billing</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+      {/* Provisioning Banner - shows when provisioning incomplete */}
+      <ProvisioningBanner account={account} />
 
+      {/* Usage Warning */}
+      {usagePercent >= 80 && (
+        <div className="mb-6">
+          <UsageWarningAlert
+            usagePercent={usagePercent}
+            remainingMinutes={remainingMinutes}
+          />
+        </div>
+      )}
 
-          {/* New Primary Tabs */}
-          <TabsContent value="inbox">
-            <InboxTab calls={usageLogs} companyName={account.company_name} />
-          </TabsContent>
-
-          <TabsContent value="schedule">
-            <ScheduleTab calls={usageLogs} companyName={account.company_name} />
-          </TabsContent>
-
-          {/* Legacy Tabs (for redirect compatibility) */}
-          <TabsContent value="today">
-            <InboxTab calls={usageLogs} companyName={account.company_name} />
-          </TabsContent>
-
-          <TabsContent value="overview">
-            <InboxTab calls={usageLogs} companyName={account.company_name} />
-          </TabsContent>
-
-          <TabsContent value="calendar">
-            <ScheduleTab calls={usageLogs} companyName={account.company_name} />
-          </TabsContent>
-
-          <TabsContent value="appointments">
-            <ScheduleTab calls={usageLogs} companyName={account.company_name} />
-          </TabsContent>
+      {/* Main Tabs - horizontal scroll on mobile */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-8">
+          <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-6 gap-1">
+            <TabsTrigger value="inbox" className="flex-shrink-0 px-3">
+              <Inbox className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Inbox</span>
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex-shrink-0 px-3">
+              <CalendarCheck className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="phone-numbers" className="flex-shrink-0 px-3">
+              <Phone className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Phones</span>
+            </TabsTrigger>
+            <TabsTrigger value="team" className="flex-shrink-0 px-3">
+              <UsersRound className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Team</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex-shrink-0 px-3">
+              <Settings className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Settings</span>
+            </TabsTrigger>
+            <TabsTrigger value="billing" className="flex-shrink-0 px-3">
+              <CreditCard className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Billing</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
 
-          <TabsContent value="phone-numbers">
-            <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
-          </TabsContent>
+        {/* New Primary Tabs */}
+        <TabsContent value="inbox">
+          <InboxTab calls={usageLogs} companyName={account.company_name} />
+        </TabsContent>
 
-          {/* Commented out - will add later */}
-          {/* <TabsContent value="assistants">
+        <TabsContent value="schedule">
+          <ScheduleTab calls={usageLogs} companyName={account.company_name} />
+        </TabsContent>
+
+        {/* Legacy Tabs (for redirect compatibility) */}
+        <TabsContent value="today">
+          <InboxTab calls={usageLogs} companyName={account.company_name} />
+        </TabsContent>
+
+        <TabsContent value="overview">
+          <InboxTab calls={usageLogs} companyName={account.company_name} />
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <ScheduleTab calls={usageLogs} companyName={account.company_name} />
+        </TabsContent>
+
+        <TabsContent value="appointments">
+          <ScheduleTab calls={usageLogs} companyName={account.company_name} />
+        </TabsContent>
+
+
+        <TabsContent value="phone-numbers">
+          <PhoneNumbersTab account={account} phoneNumbers={phoneNumbers} />
+        </TabsContent>
+
+        {/* Commented out - will add later */}
+        {/* <TabsContent value="assistants">
             <AssistantsTab account={account} assistants={assistants} />
           </TabsContent> */}
 
-          <TabsContent value="team">
-            <TeamTab accountId={account.id} />
-          </TabsContent>
+        <TabsContent value="team">
+          <TeamTab accountId={account.id} />
+        </TabsContent>
 
-          <TabsContent value="settings">
-            <SettingsTab
-              account={account}
-              onUpdateAccount={setAccount}
-              recordingState={recordingState}
-              onOpenUpgradeModal={() => setUpgradeModalOpen(true)}
-            />
-          </TabsContent>
+        <TabsContent value="settings">
+          <SettingsTab
+            account={account}
+            onUpdateAccount={setAccount}
+            recordingState={recordingState}
+            onOpenUpgradeModal={() => setUpgradeModalOpen(true)}
+          />
+        </TabsContent>
 
-          <TabsContent value="billing">
-            <BillingTab
-              account={account}
-              trialDaysRemaining={trialDaysRemaining}
-              creditsBalance={creditsBalance}
-              onRefresh={() => {
-                if (profile?.id) loadDashboardData(profile.id);
-              }}
-            />
-          </TabsContent>
+        <TabsContent value="billing">
+          <BillingTab
+            account={account}
+            trialDaysRemaining={trialDaysRemaining}
+            creditsBalance={creditsBalance}
+            onRefresh={() => {
+              if (profile?.id) loadDashboardData(profile.id);
+            }}
+          />
+        </TabsContent>
 
-          {/* Commented out - will add later */}
-          {/* <TabsContent value="referrals">
+        {/* Commented out - will add later */}
+        {/* <TabsContent value="referrals">
             <ReferralsTab
               referralStats={referralStats}
             />
           </TabsContent> */}
-        </Tabs>
+      </Tabs>
 
-        {/* Upgrade Modal - controlled by feature flag */}
-        {featureFlags.upgradeModalEnabled && (
-          <UpgradeModal
-            open={upgradeModalOpen}
-            onOpenChange={setUpgradeModalOpen}
-            currentPlanKey={account.plan_type}
-            accountId={account.id}
-          />
-        )}
-      </div>
+      {/* Upgrade Modal - controlled by feature flag */}
+      {featureFlags.upgradeModalEnabled && (
+        <UpgradeModal
+          open={upgradeModalOpen}
+          onOpenChange={setUpgradeModalOpen}
+          currentPlanKey={account.plan_type}
+          accountId={account.id}
+        />
+      )}
     </div>
+    </div >
   );
 }
