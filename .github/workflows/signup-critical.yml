@@ -45,7 +45,7 @@ jobs:
           sed -i 's/your-vapi-api-key/dummy_vapi_key/g' .env
 
       - name: Start Supabase
-        run: supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector --no-verify-jwt
+        run: supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector
 
       - name: Health Check (Verify Local Execution)
         run: |
