@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,6 +12,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
 import { Sparkles, Check, Loader2, Bell } from "lucide-react";
+import { featureFlags } from "@/lib/featureFlags";
+import { trackOnboardingEvent } from "@/lib/sentry-tracking";
+import { cn } from "@/lib/utils";
+
+// ToggleRow component for consistent layout
+interface ToggleRowProps {
+    label: string;
+    description?: string;
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+    disabled?: boolean;
+    loading?: boolean;
+    size?: 'default' | 'sm';
+}
+
+function ToggleRow({ label, description, checked, onCheckedChange, disabled, loading, size = 'default' }: ToggleRowProps) {
+    return (
+        <div className={cn(
+            "flex items-center justify-between gap-4",
+            size === 'sm' && "py-1"
+        )}>
+            <div className="flex-1 min-w-0">
+                <Label className={cn(size === 'sm' && "text-sm font-normal")}>{label}</Label>
+                {description && (
+                    <p className="text-sm text-muted-foreground">{description}</p>
+                )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+                {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                <Switch
+                    checked={checked}
+                    onCheckedChange={onCheckedChange}
+                    disabled={disabled || loading}
+                />
+            </div>
+        </div>
+    );
+}
 
 interface SettingsTabProps {
     account: any;
@@ -65,6 +103,62 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
 
     // Call Recording State
     const [showRecordingConsent, setShowRecordingConsent] = useState(false);
+    const [updatingRecording, setUpdatingRecording] = useState(false);
+
+    // Handle call recording toggle with immediate assistant update
+    const handleRecordingToggle = useCallback(async (checked: boolean) => {
+        if (checked && !account.call_recording_consent_accepted) {
+            setShowRecordingConsent(true);
+            return;
+        }
+
+        setUpdatingRecording(true);
+        try {
+            // Update database
+            const { error } = await supabase
+                .from("accounts")
+                .update({ call_recording_enabled: checked })
+                .eq("id", account.id);
+
+            if (error) throw error;
+
+            // Track event
+            trackOnboardingEvent('settings.call_recording_toggled', {
+                enabled: checked,
+                accountId: account.id
+            });
+
+            // Trigger assistant rebuild if feature flag enabled
+            if (featureFlags.callRecordingImmediateApply) {
+                try {
+                    const { error: rebuildError } = await supabase.functions.invoke('rebuild-assistant', {
+                        body: { accountId: account.id, updateRecording: true }
+                    });
+
+                    if (rebuildError) {
+                        console.warn('Assistant rebuild failed:', rebuildError);
+                        // Don't fail the toggle - recording preference is saved
+                    } else {
+                        trackOnboardingEvent('settings.assistant_updated', {
+                            reason: 'call_recording_toggle'
+                        });
+                    }
+                } catch (rebuildErr) {
+                    console.warn('Assistant rebuild error:', rebuildErr);
+                }
+            }
+
+            onUpdateAccount({ ...account, call_recording_enabled: checked });
+            toast({
+                title: "Updated",
+                description: `Call recording ${checked ? 'enabled' : 'disabled'}${featureFlags.callRecordingImmediateApply ? ' - takes effect immediately' : ''}`
+            });
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
+        } finally {
+            setUpdatingRecording(false);
+        }
+    }, [account, onUpdateAccount, toast]);
 
     const handleSaveInstructions = async () => {
         setSavingInstructions(true);
@@ -303,35 +397,13 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                         </div>
                     ) : (
                         <>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <Label>Enable Call Recording</Label>
-                                    <p className="text-sm text-muted-foreground">Record all calls for quality</p>
-                                </div>
-                                <Switch
-                                    checked={account.call_recording_enabled}
-                                    onCheckedChange={async (checked) => {
-                                        if (checked && !account.call_recording_consent_accepted) {
-                                            setShowRecordingConsent(true);
-                                            return;
-                                        }
-
-                                        // Toggle logic
-                                        try {
-                                            const { error } = await supabase
-                                                .from("accounts")
-                                                .update({ call_recording_enabled: checked })
-                                                .eq("id", account.id);
-
-                                            if (error) throw error;
-                                            onUpdateAccount({ ...account, call_recording_enabled: checked });
-                                            toast({ title: "Updated", description: `Call recording ${checked ? 'enabled' : 'disabled'}` });
-                                        } catch (error: any) {
-                                            toast({ title: "Error", description: error.message, variant: "destructive" });
-                                        }
-                                    }}
-                                />
-                            </div>
+                            <ToggleRow
+                                label="Enable Call Recording"
+                                description="Record all calls for quality and training"
+                                checked={account.call_recording_enabled || false}
+                                onCheckedChange={handleRecordingToggle}
+                                loading={updatingRecording}
+                            />
                             <CallRecordingConsentDialog
                                 open={showRecordingConsent}
                                 onOpenChange={setShowRecordingConsent}

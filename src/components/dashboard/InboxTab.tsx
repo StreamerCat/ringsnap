@@ -26,6 +26,13 @@ import {
 } from '@/lib/appointments';
 import { calculateLeadScore, getLeadScoreLabel, getLeadScoreClasses } from '@/lib/leadScore';
 import { CallDetailsDrawer } from './CallDetailsDrawer';
+import { featureFlags } from '@/lib/featureFlags';
+
+// Type for call with source metadata
+type CallWithTagSource = CallLogWithAppointment & {
+    tag_source?: 'structured' | 'transcript' | 'none' | null;
+    reason_source?: 'structured' | 'transcript' | 'none' | null;
+};
 
 interface InboxTabProps {
     calls: CallLogWithAppointment[];
@@ -223,15 +230,28 @@ function FollowUpRow({ call, outcome, outcomeInput, companyName, onClick }: Foll
     const hasCallback = callbackPhone && callbackPhone !== callerPhone;
     const preferredPhone = hasCallback ? callbackPhone : callerPhone;
 
-    const topics = deriveTopicLabels({ reason: call.reason, summary: call.summary, companyName });
+    // Tag source for confidence indicator
+    const callWithSource = call as CallWithTagSource;
+    const tagSource = callWithSource.tag_source || null;
+    const showConfidenceIndicator = featureFlags.taggingConfidenceUi && tagSource === 'none';
+
+    // Only derive topics if we have a valid source
+    const topics = tagSource !== 'none'
+        ? deriveTopicLabels({ reason: call.reason, summary: call.summary, companyName })
+        : [];
+
     const nextStep = deriveNextStep(outcomeInput);
     const whyItMatters = deriveWhyItMatters(outcomeInput);
     const score = calculateLeadScore(call);
     const scoreClasses = getLeadScoreClasses(score);
 
+    // Short call indicator
+    const isShortCall = (call.duration_seconds ?? 0) < 10 && (call.duration_seconds ?? 0) > 0;
+
     return (
         <div className="p-4 hover:bg-muted/50 cursor-pointer" onClick={onClick}>
-            <div className="flex items-start justify-between gap-4">
+            {/* Mobile-first: stack vertically, then row on sm+ */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="flex-1 min-w-0 space-y-1">
                     {/* Name + Phone */}
                     <div>
@@ -242,38 +262,50 @@ function FollowUpRow({ call, outcome, outcomeInput, companyName, onClick }: Foll
                         )}
                     </div>
 
-                    {/* Topics + Score */}
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    {/* Topics + Score + Short call badge */}
+                    <div className="flex flex-wrap items-center gap-1.5 max-w-full">
                         {topics.slice(0, 2).map((topic, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
+                            <Badge
+                                key={i}
+                                variant="secondary"
+                                className={cn(
+                                    "text-xs",
+                                    showConfidenceIndicator && "border-dashed opacity-60"
+                                )}
+                            >
                                 {topic}
                             </Badge>
                         ))}
                         <Badge className={cn("text-xs border", outcome === 'Missed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800')}>
                             {outcome}
                         </Badge>
+                        {isShortCall && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                                Short call
+                            </Badge>
+                        )}
                         <span className={cn("text-xs px-1.5 py-0.5 rounded-full", scoreClasses)}>
                             {score}
                         </span>
                     </div>
 
                     {/* Why + Next Step */}
-                    <p className="text-sm text-muted-foreground">{whyItMatters}</p>
+                    <p className="text-sm text-muted-foreground break-words">{whyItMatters}</p>
                     <p className="text-sm text-primary flex items-center gap-1">
-                        <ArrowRight className="h-3 w-3" />
-                        {nextStep}
+                        <ArrowRight className="h-3 w-3 shrink-0" />
+                        <span className="break-words">{nextStep}</span>
                     </p>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="flex flex-col gap-1 shrink-0">
-                    <Button size="sm" variant="default" className="h-8" asChild onClick={e => e.stopPropagation()}>
+                {/* Quick Actions - full width on mobile, column on sm+ */}
+                <div className="flex gap-2 sm:flex-col sm:gap-1 shrink-0">
+                    <Button size="sm" variant="default" className="flex-1 sm:flex-none h-8" asChild onClick={e => e.stopPropagation()}>
                         <a href={`tel:${preferredPhone}`}>
                             <PhoneCall className="h-3.5 w-3.5 mr-1" />
                             Call
                         </a>
                     </Button>
-                    <Button size="sm" variant="outline" className="h-8" asChild onClick={e => e.stopPropagation()}>
+                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none h-8" asChild onClick={e => e.stopPropagation()}>
                         <a href={`sms:${preferredPhone}`}>
                             <MessageSquare className="h-3.5 w-3.5 mr-1" />
                             Text
@@ -300,9 +332,21 @@ interface CallRowProps {
 function CallRow({ call, outcome, outcomeInput, companyName, onClick }: CallRowProps) {
     const displayName = getDisplayName(call);
     const callerPhone = call.from_number || call.caller_phone || '';
-    const topics = deriveTopicLabels({ reason: call.reason, summary: call.summary, companyName });
+
+    // Tag source for confidence
+    const callWithSource = call as CallWithTagSource;
+    const tagSource = callWithSource.tag_source || null;
+
+    // Only derive topics if we have a valid source
+    const topics = tagSource !== 'none'
+        ? deriveTopicLabels({ reason: call.reason, summary: call.summary, companyName })
+        : [];
+
     const score = calculateLeadScore(call);
     const scoreClasses = getLeadScoreClasses(score);
+
+    // Short call indicator
+    const isShortCall = (call.duration_seconds ?? 0) < 10 && (call.duration_seconds ?? 0) > 0;
 
     const getOutcomeColor = () => {
         switch (outcome) {
@@ -325,11 +369,16 @@ function CallRow({ call, outcome, outcomeInput, companyName, onClick }: CallRowP
     }, [call.started_at]);
 
     return (
-        <div className="p-4 hover:bg-muted/50 cursor-pointer flex items-center gap-4" onClick={onClick}>
+        <div className="p-4 hover:bg-muted/50 cursor-pointer flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4" onClick={onClick}>
             <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium truncate">{displayName}</p>
-                    <span className="text-xs text-muted-foreground">{timeAgo}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{timeAgo}</span>
+                    {isShortCall && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                            Short
+                        </Badge>
+                    )}
                 </div>
                 <p className="text-xs text-muted-foreground">{formatPhoneNumber(callerPhone)}</p>
                 {topics.length > 0 && (
@@ -341,7 +390,7 @@ function CallRow({ call, outcome, outcomeInput, companyName, onClick }: CallRowP
             <div className="flex items-center gap-2 shrink-0">
                 <Badge className={cn("text-xs", getOutcomeColor())}>{outcome}</Badge>
                 <span className={cn("text-xs px-1.5 py-0.5 rounded-full border", scoreClasses)}>{score}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground hidden sm:block" />
             </div>
         </div>
     );

@@ -35,7 +35,7 @@ export interface FeatureFlags {
   /**
    * Enable the Upgrade modal for plan upgrades in the dashboard.
    * When disabled, upgrade buttons redirect to Stripe billing portal instead.
-   * 
+   *
    * This is a "kill switch" - deploy UI fixes with flag off, then enable
    * upgrades when ready.
    *
@@ -59,6 +59,45 @@ export interface FeatureFlags {
    * Set via: VITE_FEATURE_REPORTING_WOW=true
    */
   reportingWowEnabled: boolean;
+
+  // ============================================================================
+  // Sprint 2026-01-04: Dashboard & Onboarding Fixes
+  // ============================================================================
+
+  /**
+   * Enable activation troubleshooting UI.
+   * Shows guidance panel after timeout if test call not detected.
+   * Set via: VITE_FEATURE_ACTIVATION_TROUBLESHOOTING=true
+   */
+  activationTroubleshooting: boolean;
+
+  /**
+   * Enable tag confidence indicators in call logs.
+   * Shows dashed border for inferred tags, solid for structured/transcript.
+   * Set via: VITE_FEATURE_TAGGING_CONFIDENCE_UI=true
+   */
+  taggingConfidenceUi: boolean;
+
+  /**
+   * Enable Add Phone Number flow for eligible plans.
+   * Shows modal wizard for Professional/Premium users.
+   * Set via: VITE_FEATURE_ADD_PHONE_NUMBER_FLOW=true
+   */
+  addPhoneNumberFlow: boolean;
+
+  /**
+   * Enable safe offset positioning for Vapi widget on mobile.
+   * Prevents widget from overlapping CTAs.
+   * Set via: VITE_FEATURE_WIDGET_SAFE_OFFSET=true
+   */
+  widgetSafeOffset: boolean;
+
+  /**
+   * Enable immediate call recording toggle effect.
+   * Triggers Vapi assistant rebuild when recording toggled.
+   * Set via: VITE_FEATURE_CALL_RECORDING_IMMEDIATE_APPLY=true
+   */
+  callRecordingImmediateApply: boolean;
 }
 
 /**
@@ -115,6 +154,40 @@ export const featureFlags: FeatureFlags = {
   // Reporting wow: ENABLED in all environments
   reportingWowEnabled: parseBoolEnv(
     import.meta.env.VITE_FEATURE_REPORTING_WOW,
+    true
+  ),
+
+  // ============================================================================
+  // Sprint 2026-01-04: Dashboard & Onboarding Fixes
+  // ============================================================================
+
+  // Activation troubleshooting: ENABLED by default
+  activationTroubleshooting: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_ACTIVATION_TROUBLESHOOTING,
+    true
+  ),
+
+  // Tagging confidence UI: ENABLED by default
+  taggingConfidenceUi: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_TAGGING_CONFIDENCE_UI,
+    true
+  ),
+
+  // Add phone number flow: ENABLED by default
+  addPhoneNumberFlow: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_ADD_PHONE_NUMBER_FLOW,
+    true
+  ),
+
+  // Widget safe offset: ENABLED by default
+  widgetSafeOffset: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_WIDGET_SAFE_OFFSET,
+    true
+  ),
+
+  // Call recording immediate apply: ENABLED by default
+  callRecordingImmediateApply: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_CALL_RECORDING_IMMEDIATE_APPLY,
     true
   ),
 };

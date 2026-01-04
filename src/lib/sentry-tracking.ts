@@ -320,3 +320,80 @@ export function setUserContext(context: {
 export function clearUserContext(): void {
     Sentry.setUser(null);
 }
+
+
+// ============================================================================
+// 4. ONBOARDING & ACTIVATION EVENTS
+// ============================================================================
+
+type OnboardingEventName =
+    | 'activation.test_call_initiated'
+    | 'activation.test_call_detected'
+    | 'activation.troubleshooting_shown'
+    | 'activation.completed'
+    | 'activation.forwarding_confirmed'
+    | 'activation.verification_started'
+    | 'phone_number.add_clicked'
+    | 'phone_number.add_success'
+    | 'phone_number.add_failed'
+    | 'settings.call_recording_toggled'
+    | 'settings.assistant_updated';
+
+/**
+ * Track onboarding and activation events with Sentry breadcrumbs
+ *
+ * @example
+ * trackOnboardingEvent('activation.test_call_initiated', { phoneNumberId: 'xxx' });
+ */
+export function trackOnboardingEvent(
+    eventName: OnboardingEventName,
+    data?: Record<string, string | number | boolean | null>
+): void {
+    Sentry.addBreadcrumb({
+        category: 'onboarding',
+        message: eventName,
+        level: 'info',
+        data: { event: eventName, ...data, timestamp: Date.now() },
+    });
+
+    // For critical events, also capture as custom event
+    const criticalEvents: OnboardingEventName[] = [
+        'activation.completed',
+        'phone_number.add_success',
+        'phone_number.add_failed',
+    ];
+
+    if (criticalEvents.includes(eventName)) {
+        Sentry.captureMessage(`Onboarding: ${eventName}`, {
+            level: 'info',
+            tags: { onboarding_event: eventName },
+            extra: data,
+        });
+    }
+}
+
+/**
+ * Track onboarding error with full context
+ *
+ * @example
+ * trackOnboardingError('phone_number.add_failed', new Error('Twilio error'), { step: 'provision' });
+ */
+export function trackOnboardingError(
+    eventName: OnboardingEventName,
+    error: Error | unknown,
+    data?: Record<string, string | number | boolean | null>
+): void {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    Sentry.addBreadcrumb({
+        category: 'onboarding',
+        message: `${eventName}: ${errorMessage}`,
+        level: 'error',
+        data: { event: eventName, error: errorMessage, ...data, timestamp: Date.now() },
+    });
+
+    Sentry.captureException(error, {
+        tags: { onboarding_event: eventName },
+        extra: { ...data, eventName },
+    });
+}

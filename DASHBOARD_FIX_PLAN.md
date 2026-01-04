@@ -765,3 +765,79 @@ This plan addresses all 7 issues with a phased approach prioritizing user-facing
 2. **Feature flags** where behavior changes significantly
 3. **Graceful degradation** - New features degrade to current behavior if flags off
 4. **No breaking changes** to signup, provisioning, call logging, or billing
+
+---
+
+## Implementation Status (Sprint 2026-01-04)
+
+### Completed Changes
+
+| Phase | Component | Change | Status |
+|-------|-----------|--------|--------|
+| 0 | featureFlags.ts | Added 5 new feature flags | DONE |
+| 0 | sentry-tracking.ts | Added onboarding event tracking | DONE |
+| 1 | ActivationStepper.tsx | Test call attempt tracking, troubleshooting UI | DONE |
+| 1 | vapi-webhook/index.ts | Activation call tracking in webhook | DONE |
+| 2 | Migration | reason_source, tag_source columns | DONE |
+| 3 | call_parser.ts | extractReasonWithSource(), tag source logic | DONE |
+| 3 | vapi-webhook/index.ts | Save reason_source, tag_source | DONE |
+| 4 | InboxTab.tsx | Mobile layout, tag confidence, short call badge | DONE |
+| 5 | PhoneNumbersTab.tsx | Add number modal, plan gating, provisioning flow | DONE |
+| 6 | SettingsTab.tsx | ToggleRow component, call recording immediate apply | DONE |
+| 7 | VapiChatWidget.tsx | Safe offset positioning with feature flag | DONE |
+| 8 | Tests | Playwright e2e tests for activation and phone flow | DONE |
+
+### Feature Flags Added
+
+```
+VITE_FEATURE_ACTIVATION_TROUBLESHOOTING=true
+VITE_FEATURE_TAGGING_CONFIDENCE_UI=true
+VITE_FEATURE_ADD_PHONE_NUMBER_FLOW=true
+VITE_FEATURE_WIDGET_SAFE_OFFSET=true
+VITE_FEATURE_CALL_RECORDING_IMMEDIATE_APPLY=true
+```
+
+---
+
+## Manual QA Checklist
+
+### Activation Flow
+- [ ] Navigate to /activation after provisioning completes
+- [ ] Click "Call Now" and verify onboarding.test_call_initiated event created in system_events
+- [ ] Complete a 10+ second call and verify step advances
+- [ ] If no call after 25s, troubleshooting panel appears
+- [ ] Can click "Skip test call" to proceed to forwarding
+
+### Call Logs
+- [ ] Make a short call (<10 seconds) - verify "Short" badge appears
+- [ ] Make a call with transcript - verify tags display normally
+- [ ] Make a call without transcript - verify tags don't display (if taggingConfidenceUi enabled)
+- [ ] Check call_webhook_inbox for any failed calls
+
+### Add Phone Number
+- [ ] As Starter plan: clicking "Add Phone Number" redirects to billing or shows upgrade toast
+- [ ] As Professional/Premium: clicking opens modal wizard
+- [ ] Modal shows label and area code inputs
+- [ ] Provisioning calls provision-phone-number edge function
+- [ ] New number appears in list after success
+
+### Settings Toggles
+- [ ] Toggle SMS notifications - verify per-toggle loading state
+- [ ] Toggle call recording - verify immediate effect (if callRecordingImmediateApply enabled)
+- [ ] Nested toggles appear/disappear when parent toggled
+
+### Widget Overlay (Mobile)
+- [ ] On /pricing at 375px width, upgrade CTA is clickable (not covered by widget)
+- [ ] On /dashboard at 375px width, tab navigation is accessible
+- [ ] Widget does NOT appear on /activation page
+
+### UI Layout (Mobile)
+- [ ] FollowUpRow: buttons stack on mobile, no overlap
+- [ ] CallRow: badges wrap, no horizontal overflow
+- [ ] PhoneNumbersTab: buttons stack on mobile
+
+### Regressions to Verify
+- [ ] Signup flow completes successfully
+- [ ] Trial creation works
+- [ ] Calls are logged in call_logs table
+- [ ] Billing tab loads without errors
