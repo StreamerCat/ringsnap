@@ -35,7 +35,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
-import { generateReferralCode } from "../_shared/validators.ts";
+import { generateReferralCode, formatPhoneE164 } from "../_shared/validators.ts";
 import { POOL_CONFIG } from "../_shared/pool-config.ts";
 import { provisionPhoneNumber } from "../_shared/telephony.ts";
 
@@ -289,6 +289,18 @@ serve(async (req) => {
         try {
           phoneData = await retryWithBackoff(
             async () => {
+              // Log payload for observability (redact sensitive parts)
+              const fallbackE164 = formatPhoneE164(phone || "4155551234");
+              logInfo("Vapi phone payload (legacy path)", {
+                ...baseLogOptions,
+                accountId,
+                context: {
+                  fallbackE164,
+                  rawPhone: phone ? phone.substring(0, 6) + "***" : "empty",
+                  areaCode,
+                },
+              });
+
               const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
                 method: "POST",
                 headers: {
@@ -300,7 +312,8 @@ serve(async (req) => {
                   name: `${companyName} - Primary`,
                   fallbackDestination: {
                     type: "number",
-                    number: phone || "+14155551234",
+                    // CRITICAL: Normalize to E.164 - Vapi requires strict format
+                    number: formatPhoneE164(phone || "4155551234"),
                   },
                   numberDesiredAreaCode: areaCode,
                 }),
@@ -347,7 +360,8 @@ serve(async (req) => {
                     name: `${companyName} - Primary`,
                     fallbackDestination: {
                       type: "number",
-                      number: phone || "+14155551234",
+                      // CRITICAL: Normalize to E.164 - Vapi requires strict format
+                      number: formatPhoneE164(phone || "4155551234"),
                     },
                     // No numberDesiredAreaCode - accept any available number
                   }),
