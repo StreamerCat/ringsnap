@@ -813,9 +813,13 @@ Deno.serve(async (req: Request) => {
 
     // Normalize phone to E.164 immediately
     const normalizedPhone = formatPhoneE164(data.phone);
-    if (normalizedPhone !== data.phone) {
+    if (normalizedPhone && normalizedPhone !== data.phone) {
+      console.log(`[create-trial] Normalized phone number: ${data.phone} -> ${normalizedPhone}`);
       // Update data.phone so it's used consistently downstream (Auth, DB, Logging)
       data.phone = normalizedPhone;
+    } else if (!normalizedPhone) {
+      // Phone couldn't be normalized - log but continue with original value
+      console.warn(`[create-trial] Phone could not be normalized to E.164: ${data.phone?.substring(0, 6)}***`);
     }
 
     if (isDisposableEmail(data.email)) {
@@ -1009,566 +1013,566 @@ Deno.serve(async (req: Request) => {
     }
 
     // STRIPE LOGIC
-      receivedPmId: pmId,
+    receivedPmId: pmId,
       hasExplicitFlag: data.bypassStripe,
-      isBypassMode
-    });
+        isBypassMode
+  });
 
-    if (isBypassMode) {
-      logInfo("BYPASS MODE: Skipping Stripe API calls", baseLogOptions);
-      customer = { id: `cus_bypass_${Date.now()}` };
-      subscription = { id: `sub_bypass_${Date.now()}`, status: 'active' };
-      stripeCustomerId = customer.id;
-      stripeSubscriptionId = subscription.id;
-    } else {
-      // Real Stripe Flow
-      if (!stripe) throw new Error("Stripe not initialized");
+if (isBypassMode) {
+  logInfo("BYPASS MODE: Skipping Stripe API calls", baseLogOptions);
+  customer = { id: `cus_bypass_${Date.now()}` };
+  subscription = { id: `sub_bypass_${Date.now()}`, status: 'active' };
+  stripeCustomerId = customer.id;
+  stripeSubscriptionId = subscription.id;
+} else {
+  // Real Stripe Flow
+  if (!stripe) throw new Error("Stripe not initialized");
 
-      const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
+  const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 1: Retrieve payment method to check if already attached
-      // ═══════════════════════════════════════════════════════════════
-      phase = "stripe_payment_method_check";
-      let paymentMethodCustomerId: string | null = null;
-      let reusedExistingCustomer = false;
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 1: Retrieve payment method to check if already attached
+  // ═══════════════════════════════════════════════════════════════
+  phase = "stripe_payment_method_check";
+  let paymentMethodCustomerId: string | null = null;
+  let reusedExistingCustomer = false;
 
-      try {
-        const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
-        paymentMethodCustomerId = typeof paymentMethod.customer === 'string'
-          ? paymentMethod.customer
-          : (paymentMethod.customer as any)?.id ?? null;
+  try {
+    const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
+    paymentMethodCustomerId = typeof paymentMethod.customer === 'string'
+      ? paymentMethod.customer
+      : (paymentMethod.customer as any)?.id ?? null;
 
-        if (paymentMethodCustomerId) {
-          logInfo("Payment method already attached to a customer", {
-            ...baseLogOptions,
-            context: {
-              paymentMethodId: data.paymentMethodId,
-              existingCustomerId: paymentMethodCustomerId
-            },
-          });
-
-          // Validate the existing customer's email matches the request email
-          const existingCustomer = await stripe.customers.retrieve(paymentMethodCustomerId);
-          if (existingCustomer.deleted) {
-            // Customer was deleted, treat as if PM is not attached
-            paymentMethodCustomerId = null;
-            logInfo("Existing customer was deleted, will create new customer", {
-              ...baseLogOptions,
-              context: { paymentMethodId: data.paymentMethodId },
-            });
-          } else {
-            const existingEmail = (existingCustomer as any).email?.toLowerCase();
-            const requestEmailLower = data.email.toLowerCase();
-
-            if (existingEmail && existingEmail !== requestEmailLower) {
-              // Email mismatch - fail safely
-              logError("Payment method customer email mismatch", {
-                ...baseLogOptions,
-                context: {
-                  paymentMethodId: data.paymentMethodId,
-                  pmCustomerEmail: existingEmail,
-                  requestEmail: requestEmailLower,
-                },
-              });
-
-              if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-                return new Response(JSON.stringify({
-                  success: false,
-                  errorCode: 'PAYMENT_METHOD_MISMATCH',
-                  userMessage: 'This card is associated with a different email. Please use a different card or check your email address.',
-                  correlationId,
-                  phase,
-                  retryable: true,
-                  suggestedAction: 'Try a different payment method',
-                  error: 'Payment method email mismatch',
-                  message: 'Payment method email mismatch',
-                  request_id,
-                }), {
-                  status: 400,
-                  headers: { ...corsHeaders, "Content-Type": "application/json" }
-                });
-              } else {
-                throw new Error("Payment method is associated with a different email address");
-              }
-            }
-
-            // Email matches or existing customer has no email - reuse this customer
-            reusedExistingCustomer = true;
-            customer = existingCustomer;
-            stripeCustomerId = paymentMethodCustomerId;
-            logInfo("Reusing existing customer for payment method", {
-              ...baseLogOptions,
-              context: {
-                customerId: paymentMethodCustomerId,
-                email: data.email,
-              },
-            });
-          }
-        }
-      } catch (e: any) {
-        // If PM retrieve fails, log and continue to create new customer
-        logWarn("Failed to retrieve payment method (will create new customer)", {
-          ...baseLogOptions,
-          error: e,
-          context: { paymentMethodId: data.paymentMethodId },
-        });
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 2: Create customer if not reusing existing
-      // ═══════════════════════════════════════════════════════════════
-      if (!reusedExistingCustomer) {
-        phase = "stripe_customer";
-        const stripeCustomerStart = Date.now();
-        stepStart('create_stripe_customer', base, { email: maskEmailForLogs(data.email), source: data.source });
-
-        try {
-          customer = await stripe.customers.create({
-            email: data.email,
-            name: data.name,
-            phone: data.phone,
-            metadata: {
-              company_name: data.companyName,
-              trade: data.trade,
-              source: data.source
-            }
-          }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
-          stripeCustomerId = customer.id;
-          createdStripeCustomerId = customer.id; // Track for safe cleanup
-
-          stepEnd('create_stripe_customer', base, {
-            result: 'success',
-            stripe_customer_id: customer.id
-          }, stripeCustomerStart);
-
-          logInfo("Stripe customer created", {
-            ...baseLogOptions,
-            context: {
-              customerId: customer.id,
-              source: data.source,
-              email: data.email,
-            },
-          });
-        } catch (e: any) {
-          stepError('create_stripe_customer', base, e, {
-            reason_code: 'STRIPE_CUSTOMER_FAILED',
-            email: maskEmailForLogs(data.email)
-          });
-          throw new Error(`Stripe Customer Create Failed: ${e.message}`);
-        }
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 3: Attach payment method if not already attached
-      // ═══════════════════════════════════════════════════════════════
-      phase = "stripe_payment_method";
-      const pmStart = Date.now();
-      stepStart('attach_payment_method', base, {
-        payment_method_id: data.paymentMethodId,
-        already_attached: !!paymentMethodCustomerId
-      });
-
-      try {
-        if (!paymentMethodCustomerId) {
-          // PM not attached - attach it now
-          await stripe.paymentMethods.attach(data.paymentMethodId, { customer: stripeCustomerId! });
-        }
-        // Always set as default payment method
-        await stripe.customers.update(stripeCustomerId!, {
-          invoice_settings: { default_payment_method: data.paymentMethodId }
-        });
-
-        stepEnd('attach_payment_method', base, {
-          result: 'success',
-          was_already_attached: !!paymentMethodCustomerId
-        }, pmStart);
-
-        logInfo("Payment method configured", {
-          ...baseLogOptions,
-          context: {
-            customerId: stripeCustomerId,
-            reusedExisting: reusedExistingCustomer,
-            wasAlreadyAttached: !!paymentMethodCustomerId,
-          },
-        });
-      } catch (e: any) {
-        stepError('attach_payment_method', base, e, {
-          reason_code: 'STRIPE_PAYMENT_FAILED',
-          payment_method_id: data.paymentMethodId
-        });
-
-        // ALWAYS log full technical details (unchanged)
-        logError("Stripe payment method attach failed", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: e,
-          context: {
-            phase,
-            customerId: stripeCustomerId,
-            paymentMethodId: data.paymentMethodId
-          }
-        });
-
-        // Return structured error if flag enabled, otherwise preserve legacy behavior
-        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-          errorResponse.trace_id = traceId; // Add trace ID to response
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        } else {
-          // Legacy behavior - throw error as before
-          throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
-        }
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 4: Create subscription
-      // ═══════════════════════════════════════════════════════════════
-      phase = "stripe_subscription";
-      const subStart = Date.now();
-      stepStart('create_subscription', base, { plan_type: data.planType });
-
-      try {
-        const priceId = getStripePriceId(data.planType);
-        subscription = await stripe.subscriptions.create({
-          customer: stripeCustomerId!,
-          items: [{ price: priceId }],
-          trial_period_days: 3,
-          payment_behavior: "default_incomplete",
-          metadata: { source: data.source, plan_type: data.planType }
-        }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
-        stripeSubscriptionId = subscription.id;
-        createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
-
-        stepEnd('create_subscription', base, {
-          result: 'success',
-          subscription_id: subscription.id,
-          plan_type: data.planType,
-          status: subscription.status
-        }, subStart);
-
-        logInfo("Stripe subscription created", {
-          ...baseLogOptions,
-          context: {
-            subscriptionId: subscription.id,
-            planType: data.planType,
-            source: data.source,
-            status: subscription.status,
-          },
-        });
-      } catch (e: any) {
-        stepError('create_subscription', base, e, {
-          reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
-          plan_type: data.planType
-        });
-
-        // ALWAYS log full technical details (unchanged)
-        logError("Stripe subscription creation failed", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: e,
-          context: { phase, customerId: stripeCustomerId }
-        });
-
-        // Return structured error if flag enabled, otherwise preserve legacy behavior
-        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-          errorResponse.trace_id = traceId; // Add trace ID to response
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        } else {
-          // Legacy behavior - throw error as before
-          throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
-        }
-      }
-    }
-
-    // DATABASE INSERT
-    phase = "account_insert";
-    const accountStart = Date.now();
-    stepStart('create_account_atomic', base, { email: maskEmailForLogs(data.email) });
-
-    const tempPassword = generateSecurePassword();
-    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    const billingState = data.zipCode ? getStateFromZip(data.zipCode) : "CA";
-
-    let businessHoursValue = null;
-    if (data.businessHours) {
-      try {
-        businessHoursValue = JSON.parse(data.businessHours);
-      } catch {
-        businessHoursValue = { text: data.businessHours };
-      }
-    }
-
-    const accountData = {
-      company_name: data.companyName,
-      trade: data.trade,
-      plan_type: data.planType,
-      phone_number_area_code: data.zipCode?.slice(0, 3) || null,
-      zip_code: data.zipCode || null,
-      business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
-      assistant_gender: data.assistantGender,
-      wants_advanced_voice: data.wantsAdvancedVoice,
-      company_website: data.website || null,
-      service_area: data.serviceArea || null,
-      emergency_policy: data.emergencyPolicy || null,
-      billing_state: billingState,
-    };
-
-    // Normalize plan_type to match SQL constraint (starter|professional|premium)
-    const rawPlan = (accountData.plan_type || "starter")
-      .toString()
-      .trim()
-      .toLowerCase();
-
-    accountData.plan_type =
-      rawPlan === "pro" ? "professional" :
-        rawPlan === "professional" ? "professional" :
-          rawPlan === "premium" ? "premium" :
-            "starter";
-
-    // Normalize assistant_gender to match SQL constraint (male|female)
-    const rawGender = (accountData.assistant_gender || "female")
-      .toString()
-      .trim()
-      .toLowerCase();
-
-    accountData.assistant_gender =
-      rawGender === "male" ? "male" : "female";
-
-    // Log normalized values before RPC
-
-    // ═══════════════════════════════════════════════════════════════
-    // MANUAL TRANSACTION: Create User -> Account -> Profile
-    // ═══════════════════════════════════════════════════════════════
-
-    // Note: existingUser with hasAccount was already checked before Stripe calls
-    // If we're here, either existingUser doesn't have an account, or they're new
-    if (existingUser && !existingUser.hasAccount) {
-      // User exists but has no account - we'll create an account for them
-      logInfo("Existing user found without account, creating account", {
+    if (paymentMethodCustomerId) {
+      logInfo("Payment method already attached to a customer", {
         ...baseLogOptions,
-        context: { email: data.email, userId: existingUser.id },
-      });
-      currentUserId = existingUser.id;
-    } else if (!existingUser) {
-      // 1b. Create new Auth User
-      const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-        email: data.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: data.name,
-          company_name: data.companyName,
-        }
-      });
-
-      if (userError) {
-        // Check if this is specifically "user already exists" error
-        if (userError.message?.includes("already been registered") ||
-          userError.message?.includes("already exists")) {
-          // Try to look them up in profiles as a fallback
-          const { data: fallbackProfile } = await supabase
-            .from("profiles")
-            .select("id, account_id")
-            .eq("email", data.email)
-            .maybeSingle();
-
-          if (fallbackProfile?.account_id) {
-            // They have an account - redirect to login
-            return new Response(
-              JSON.stringify({
-                error: "An account with this email already exists. Please log in instead.",
-                code: "ACCOUNT_EXISTS",
-                redirect: "/login",
-              }),
-              { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-
-          if (fallbackProfile?.id) {
-            // They exist but no account - use their ID
-            currentUserId = fallbackProfile.id;
-            logInfo("Recovered existing user ID from profile", {
-              ...baseLogOptions,
-              context: { email: data.email, userId: currentUserId },
-            });
-          } else {
-            // Can't recover - create admin alert and return error
-            await createAdminAlert(supabase, "user_creation_failed", {
-              email: data.email,
-              error: userError.message,
-              phase: "user_creation",
-              request_id,
-            });
-            throw new Error(`Auth User Creation Failed: ${userError.message}`);
-          }
-        } else {
-          // Different error - throw it
-          await createAdminAlert(supabase, "user_creation_failed", {
-            email: data.email,
-            error: userError.message,
-            phase: "user_creation",
-            request_id,
-          });
-          throw new Error(`Auth User Creation Failed: ${userError.message}`);
-        }
-      } else {
-        currentUserId = userData.user.id;
-      }
-    }
-
-    // 2. Create Account
-    // NOTE: is_test_account field removed from initial insert to prevent errors if column doesn't exist
-    // Will be updated after insert if test mode is active
-    const { data: accountResult, error: accountError } = await supabase
-      .from("accounts")
-      .insert({
-        subscription_status: 'trial',
-        stripe_customer_id: stripeCustomerId,
-        stripe_subscription_id: stripeSubscriptionId,
-        ...accountData
-      })
-      .select("id")
-      .single();
-
-    if (accountError) {
-      // Rollback user if possible, or just throw (manual rollback complex here)
-      throw new Error(`Account Insertion Failed: ${accountError.message}`);
-    }
-    currentAccountId = accountResult.id;
-
-    // 3. Create/Link Profile
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .upsert({
-        id: currentUserId,
-        account_id: currentAccountId,
-        email: data.email,
-        name: data.name,
-        phone: data.phone,
-        is_primary: true,
-        role: 'customer',
-        // onboarding_status removed to fix schema mismatch (column missing in prod)
-      });
-
-    if (profileError) {
-      throw new Error(`Profile Upsert Failed: ${profileError.message}`);
-    }
-
-    // 4. Assign owner role in account_members table (Corrected from user_roles)
-    const { error: memberError } = await supabase
-      .from("account_members")
-      .insert({
-        user_id: currentUserId,
-        account_id: currentAccountId,
-        role: "owner"
-      });
-
-    if (memberError) {
-      // Log but don't fail - link is critical but we have profile backup
-      logWarn("Failed to create account_member link", {
-        ...baseLogOptions,
-        error: memberError,
-        accountId: currentAccountId
-      });
-    }
-
-    // 5. Link Account to User Metadata (Updating existing block)
-    await supabase.auth.admin.updateUserById(currentUserId, {
-      user_metadata: {
-        account_id: currentAccountId,
-        account_created_at: new Date().toISOString()
-      }
-    });
-
-    // Unified result object for downstream logging
-    const accountTxResult = {
-      account_id: currentAccountId,
-      user_id: currentUserId
-    };
-
-    // accountTxError is already handled above (throws Error)
-    const accountTxError = null;
-
-    // DETAILED LOGGING: After account creation
-      step: "create_account_transaction",
-      operation: "AFTER_CALL",
-      hasError: false,
-      hasData: true,
-      error: null,
-      result: accountTxResult,
-    });
-
-    // (Removed old error handling block as it is now redundant)
-
-    currentAccountId = accountTxResult.account_id;
-    currentUserId = accountTxResult.user_id;
-
-    // Update base context with account and user IDs
-    base = {
-      ...base,
-      accountId: currentAccountId,
-      userId: currentUserId,
-    };
-
-    stepEnd('create_account_atomic', base, {
-      result: 'success',
-      account_id: currentAccountId,
-      user_id: currentUserId
-    }, accountStart);
-
-    logInfo("Account created atomically", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: {
-        source: data.source
-      },
-    });
-
-    // ═══════════════════════════════════════════════════════════════
-    // LINK LEAD (if provided)
-    // ═══════════════════════════════════════════════════════════════
-
-    phase = "lead_link";
-
-    if (data.leadId) {
-
-      // DETAILED LOGGING: Before lead update
-        step: "link_lead",
-        operation: "BEFORE_UPDATE",
-        table: "signup_leads",
-        payload: {
-          auth_user_id: currentUserId,
-          account_id: currentAccountId,
-          profile_id: currentUserId,
-          completed_at: new Date().toISOString(),
-          leadId: data.leadId,
+        context: {
+          paymentMethodId: data.paymentMethodId,
+          existingCustomerId: paymentMethodCustomerId
         },
       });
 
-      try {
-        const { error: leadLinkError } = await supabase
-          .from("signup_leads")
-          .update({
-            auth_user_id: currentUserId,
-            account_id: currentAccountId,
-            profile_id: currentUserId,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", data.leadId);
+      // Validate the existing customer's email matches the request email
+      const existingCustomer = await stripe.customers.retrieve(paymentMethodCustomerId);
+      if (existingCustomer.deleted) {
+        // Customer was deleted, treat as if PM is not attached
+        paymentMethodCustomerId = null;
+        logInfo("Existing customer was deleted, will create new customer", {
+          ...baseLogOptions,
+          context: { paymentMethodId: data.paymentMethodId },
+        });
+      } else {
+        const existingEmail = (existingCustomer as any).email?.toLowerCase();
+        const requestEmailLower = data.email.toLowerCase();
 
-        // DETAILED LOGGING: After lead update
-          step: "link_lead",
-          operation: "AFTER_UPDATE",
-          table: "signup_leads",
-          hasError: !!leadLinkError,
+        if (existingEmail && existingEmail !== requestEmailLower) {
+          // Email mismatch - fail safely
+          logError("Payment method customer email mismatch", {
+            ...baseLogOptions,
+            context: {
+              paymentMethodId: data.paymentMethodId,
+              pmCustomerEmail: existingEmail,
+              requestEmail: requestEmailLower,
+            },
+          });
+
+          if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+            return new Response(JSON.stringify({
+              success: false,
+              errorCode: 'PAYMENT_METHOD_MISMATCH',
+              userMessage: 'This card is associated with a different email. Please use a different card or check your email address.',
+              correlationId,
+              phase,
+              retryable: true,
+              suggestedAction: 'Try a different payment method',
+              error: 'Payment method email mismatch',
+              message: 'Payment method email mismatch',
+              request_id,
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          } else {
+            throw new Error("Payment method is associated with a different email address");
+          }
+        }
+
+        // Email matches or existing customer has no email - reuse this customer
+        reusedExistingCustomer = true;
+        customer = existingCustomer;
+        stripeCustomerId = paymentMethodCustomerId;
+        logInfo("Reusing existing customer for payment method", {
+          ...baseLogOptions,
+          context: {
+            customerId: paymentMethodCustomerId,
+            email: data.email,
+          },
+        });
+      }
+    }
+  } catch (e: any) {
+    // If PM retrieve fails, log and continue to create new customer
+    logWarn("Failed to retrieve payment method (will create new customer)", {
+      ...baseLogOptions,
+      error: e,
+      context: { paymentMethodId: data.paymentMethodId },
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 2: Create customer if not reusing existing
+  // ═══════════════════════════════════════════════════════════════
+  if (!reusedExistingCustomer) {
+    phase = "stripe_customer";
+    const stripeCustomerStart = Date.now();
+    stepStart('create_stripe_customer', base, { email: maskEmailForLogs(data.email), source: data.source });
+
+    try {
+      customer = await stripe.customers.create({
+        email: data.email,
+        name: data.name,
+        phone: data.phone,
+        metadata: {
+          company_name: data.companyName,
+          trade: data.trade,
+          source: data.source
+        }
+      }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
+      stripeCustomerId = customer.id;
+      createdStripeCustomerId = customer.id; // Track for safe cleanup
+
+      stepEnd('create_stripe_customer', base, {
+        result: 'success',
+        stripe_customer_id: customer.id
+      }, stripeCustomerStart);
+
+      logInfo("Stripe customer created", {
+        ...baseLogOptions,
+        context: {
+          customerId: customer.id,
+          source: data.source,
+          email: data.email,
+        },
+      });
+    } catch (e: any) {
+      stepError('create_stripe_customer', base, e, {
+        reason_code: 'STRIPE_CUSTOMER_FAILED',
+        email: maskEmailForLogs(data.email)
+      });
+      throw new Error(`Stripe Customer Create Failed: ${e.message}`);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 3: Attach payment method if not already attached
+  // ═══════════════════════════════════════════════════════════════
+  phase = "stripe_payment_method";
+  const pmStart = Date.now();
+  stepStart('attach_payment_method', base, {
+    payment_method_id: data.paymentMethodId,
+    already_attached: !!paymentMethodCustomerId
+  });
+
+  try {
+    if (!paymentMethodCustomerId) {
+      // PM not attached - attach it now
+      await stripe.paymentMethods.attach(data.paymentMethodId, { customer: stripeCustomerId! });
+    }
+    // Always set as default payment method
+    await stripe.customers.update(stripeCustomerId!, {
+      invoice_settings: { default_payment_method: data.paymentMethodId }
+    });
+
+    stepEnd('attach_payment_method', base, {
+      result: 'success',
+      was_already_attached: !!paymentMethodCustomerId
+    }, pmStart);
+
+    logInfo("Payment method configured", {
+      ...baseLogOptions,
+      context: {
+        customerId: stripeCustomerId,
+        reusedExisting: reusedExistingCustomer,
+        wasAlreadyAttached: !!paymentMethodCustomerId,
+      },
+    });
+  } catch (e: any) {
+    stepError('attach_payment_method', base, e, {
+      reason_code: 'STRIPE_PAYMENT_FAILED',
+      payment_method_id: data.paymentMethodId
+    });
+
+    // ALWAYS log full technical details (unchanged)
+    logError("Stripe payment method attach failed", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error: e,
+      context: {
+        phase,
+        customerId: stripeCustomerId,
+        paymentMethodId: data.paymentMethodId
+      }
+    });
+
+    // Return structured error if flag enabled, otherwise preserve legacy behavior
+    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+      const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+      errorResponse.trace_id = traceId; // Add trace ID to response
+      return new Response(JSON.stringify(errorResponse), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } else {
+      // Legacy behavior - throw error as before
+      throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // STEP 4: Create subscription
+  // ═══════════════════════════════════════════════════════════════
+  phase = "stripe_subscription";
+  const subStart = Date.now();
+  stepStart('create_subscription', base, { plan_type: data.planType });
+
+  try {
+    const priceId = getStripePriceId(data.planType);
+    subscription = await stripe.subscriptions.create({
+      customer: stripeCustomerId!,
+      items: [{ price: priceId }],
+      trial_period_days: 3,
+      payment_behavior: "default_incomplete",
+      metadata: { source: data.source, plan_type: data.planType }
+    }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
+    stripeSubscriptionId = subscription.id;
+    createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
+
+    stepEnd('create_subscription', base, {
+      result: 'success',
+      subscription_id: subscription.id,
+      plan_type: data.planType,
+      status: subscription.status
+    }, subStart);
+
+    logInfo("Stripe subscription created", {
+      ...baseLogOptions,
+      context: {
+        subscriptionId: subscription.id,
+        planType: data.planType,
+        source: data.source,
+        status: subscription.status,
+      },
+    });
+  } catch (e: any) {
+    stepError('create_subscription', base, e, {
+      reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
+      plan_type: data.planType
+    });
+
+    // ALWAYS log full technical details (unchanged)
+    logError("Stripe subscription creation failed", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error: e,
+      context: { phase, customerId: stripeCustomerId }
+    });
+
+    // Return structured error if flag enabled, otherwise preserve legacy behavior
+    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+      const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+      errorResponse.trace_id = traceId; // Add trace ID to response
+      return new Response(JSON.stringify(errorResponse), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } else {
+      // Legacy behavior - throw error as before
+      throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
+    }
+  }
+}
+
+// DATABASE INSERT
+phase = "account_insert";
+const accountStart = Date.now();
+stepStart('create_account_atomic', base, { email: maskEmailForLogs(data.email) });
+
+const tempPassword = generateSecurePassword();
+const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+const billingState = data.zipCode ? getStateFromZip(data.zipCode) : "CA";
+
+let businessHoursValue = null;
+if (data.businessHours) {
+  try {
+    businessHoursValue = JSON.parse(data.businessHours);
+  } catch {
+    businessHoursValue = { text: data.businessHours };
+  }
+}
+
+const accountData = {
+  company_name: data.companyName,
+  trade: data.trade,
+  plan_type: data.planType,
+  phone_number_area_code: data.zipCode?.slice(0, 3) || null,
+  zip_code: data.zipCode || null,
+  business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
+  assistant_gender: data.assistantGender,
+  wants_advanced_voice: data.wantsAdvancedVoice,
+  company_website: data.website || null,
+  service_area: data.serviceArea || null,
+  emergency_policy: data.emergencyPolicy || null,
+  billing_state: billingState,
+};
+
+// Normalize plan_type to match SQL constraint (starter|professional|premium)
+const rawPlan = (accountData.plan_type || "starter")
+  .toString()
+  .trim()
+  .toLowerCase();
+
+accountData.plan_type =
+  rawPlan === "pro" ? "professional" :
+    rawPlan === "professional" ? "professional" :
+      rawPlan === "premium" ? "premium" :
+        "starter";
+
+// Normalize assistant_gender to match SQL constraint (male|female)
+const rawGender = (accountData.assistant_gender || "female")
+  .toString()
+  .trim()
+  .toLowerCase();
+
+accountData.assistant_gender =
+  rawGender === "male" ? "male" : "female";
+
+// Log normalized values before RPC
+
+// ═══════════════════════════════════════════════════════════════
+// MANUAL TRANSACTION: Create User -> Account -> Profile
+// ═══════════════════════════════════════════════════════════════
+
+// Note: existingUser with hasAccount was already checked before Stripe calls
+// If we're here, either existingUser doesn't have an account, or they're new
+if (existingUser && !existingUser.hasAccount) {
+  // User exists but has no account - we'll create an account for them
+  logInfo("Existing user found without account, creating account", {
+    ...baseLogOptions,
+    context: { email: data.email, userId: existingUser.id },
+  });
+  currentUserId = existingUser.id;
+} else if (!existingUser) {
+  // 1b. Create new Auth User
+  const { data: userData, error: userError } = await supabase.auth.admin.createUser({
+    email: data.email,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: {
+      full_name: data.name,
+      company_name: data.companyName,
+    }
+  });
+
+  if (userError) {
+    // Check if this is specifically "user already exists" error
+    if (userError.message?.includes("already been registered") ||
+      userError.message?.includes("already exists")) {
+      // Try to look them up in profiles as a fallback
+      const { data: fallbackProfile } = await supabase
+        .from("profiles")
+        .select("id, account_id")
+        .eq("email", data.email)
+        .maybeSingle();
+
+      if (fallbackProfile?.account_id) {
+        // They have an account - redirect to login
+        return new Response(
+          JSON.stringify({
+            error: "An account with this email already exists. Please log in instead.",
+            code: "ACCOUNT_EXISTS",
+            redirect: "/login",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (fallbackProfile?.id) {
+        // They exist but no account - use their ID
+        currentUserId = fallbackProfile.id;
+        logInfo("Recovered existing user ID from profile", {
+          ...baseLogOptions,
+          context: { email: data.email, userId: currentUserId },
+        });
+      } else {
+        // Can't recover - create admin alert and return error
+        await createAdminAlert(supabase, "user_creation_failed", {
+          email: data.email,
+          error: userError.message,
+          phase: "user_creation",
+          request_id,
+        });
+        throw new Error(`Auth User Creation Failed: ${userError.message}`);
+      }
+    } else {
+      // Different error - throw it
+      await createAdminAlert(supabase, "user_creation_failed", {
+        email: data.email,
+        error: userError.message,
+        phase: "user_creation",
+        request_id,
+      });
+      throw new Error(`Auth User Creation Failed: ${userError.message}`);
+    }
+  } else {
+    currentUserId = userData.user.id;
+  }
+}
+
+// 2. Create Account
+// NOTE: is_test_account field removed from initial insert to prevent errors if column doesn't exist
+// Will be updated after insert if test mode is active
+const { data: accountResult, error: accountError } = await supabase
+  .from("accounts")
+  .insert({
+    subscription_status: 'trial',
+    stripe_customer_id: stripeCustomerId,
+    stripe_subscription_id: stripeSubscriptionId,
+    ...accountData
+  })
+  .select("id")
+  .single();
+
+if (accountError) {
+  // Rollback user if possible, or just throw (manual rollback complex here)
+  throw new Error(`Account Insertion Failed: ${accountError.message}`);
+}
+currentAccountId = accountResult.id;
+
+// 3. Create/Link Profile
+const { error: profileError } = await supabase
+  .from("profiles")
+  .upsert({
+    id: currentUserId,
+    account_id: currentAccountId,
+    email: data.email,
+    name: data.name,
+    phone: data.phone,
+    is_primary: true,
+    role: 'customer',
+    // onboarding_status removed to fix schema mismatch (column missing in prod)
+  });
+
+if (profileError) {
+  throw new Error(`Profile Upsert Failed: ${profileError.message}`);
+}
+
+// 4. Assign owner role in account_members table (Corrected from user_roles)
+const { error: memberError } = await supabase
+  .from("account_members")
+  .insert({
+    user_id: currentUserId,
+    account_id: currentAccountId,
+    role: "owner"
+  });
+
+if (memberError) {
+  // Log but don't fail - link is critical but we have profile backup
+  logWarn("Failed to create account_member link", {
+    ...baseLogOptions,
+    error: memberError,
+    accountId: currentAccountId
+  });
+}
+
+// 5. Link Account to User Metadata (Updating existing block)
+await supabase.auth.admin.updateUserById(currentUserId, {
+  user_metadata: {
+    account_id: currentAccountId,
+    account_created_at: new Date().toISOString()
+  }
+});
+
+// Unified result object for downstream logging
+const accountTxResult = {
+  account_id: currentAccountId,
+  user_id: currentUserId
+};
+
+// accountTxError is already handled above (throws Error)
+const accountTxError = null;
+
+// DETAILED LOGGING: After account creation
+step: "create_account_transaction",
+  operation: "AFTER_CALL",
+    hasError: false,
+      hasData: true,
+        error: null,
+          result: accountTxResult,
+    });
+
+// (Removed old error handling block as it is now redundant)
+
+currentAccountId = accountTxResult.account_id;
+currentUserId = accountTxResult.user_id;
+
+// Update base context with account and user IDs
+base = {
+  ...base,
+  accountId: currentAccountId,
+  userId: currentUserId,
+};
+
+stepEnd('create_account_atomic', base, {
+  result: 'success',
+  account_id: currentAccountId,
+  user_id: currentUserId
+}, accountStart);
+
+logInfo("Account created atomically", {
+  ...baseLogOptions,
+  accountId: currentAccountId,
+  context: {
+    source: data.source
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════
+// LINK LEAD (if provided)
+// ═══════════════════════════════════════════════════════════════
+
+phase = "lead_link";
+
+if (data.leadId) {
+
+  // DETAILED LOGGING: Before lead update
+  step: "link_lead",
+    operation: "BEFORE_UPDATE",
+      table: "signup_leads",
+        payload: {
+    auth_user_id: currentUserId,
+      account_id: currentAccountId,
+        profile_id: currentUserId,
+          completed_at: new Date().toISOString(),
+            leadId: data.leadId,
+        },
+});
+
+try {
+  const { error: leadLinkError } = await supabase
+    .from("signup_leads")
+    .update({
+      auth_user_id: currentUserId,
+      account_id: currentAccountId,
+      profile_id: currentUserId,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", data.leadId);
+
+  // DETAILED LOGGING: After lead update
+  step: "link_lead",
+    operation: "AFTER_UPDATE",
+      table: "signup_leads",
+        hasError: !!leadLinkError,
           error: leadLinkError ? {
             message: leadLinkError.message,
             details: leadLinkError.details,
@@ -1578,57 +1582,57 @@ Deno.serve(async (req: Request) => {
           } : null,
         });
 
-        if (leadLinkError) {
-            error: leadLinkError.message,
+if (leadLinkError) {
+  error: leadLinkError.message,
           });
-          logWarn("Lead linking failed (non-critical)", {
-            ...baseLogOptions,
-            accountId: currentAccountId,
-            error: leadLinkError,
-          });
+logWarn("Lead linking failed (non-critical)", {
+  ...baseLogOptions,
+  accountId: currentAccountId,
+  error: leadLinkError,
+});
         }
       } catch (err: any) {
-        logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
-      }
+  logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
+}
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // LOG SIGNUP SUCCESS
-    // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// LOG SIGNUP SUCCESS
+// ═══════════════════════════════════════════════════════════════
 
-    if (data.source === "website") {
-      const clientIP =
-        req.headers.get("x-forwarded-for")?.split(",")[0] ||
-        req.headers.get("cf-connecting-ip") ||
-        "unknown";
+if (data.source === "website") {
+  const clientIP =
+    req.headers.get("x-forwarded-for")?.split(",")[0] ||
+    req.headers.get("cf-connecting-ip") ||
+    "unknown";
 
-      // DETAILED LOGGING: Before signup_attempts insert
-        step: "log_signup_success",
-        operation: "BEFORE_INSERT",
-        table: "signup_attempts",
+  // DETAILED LOGGING: Before signup_attempts insert
+  step: "log_signup_success",
+    operation: "BEFORE_INSERT",
+      table: "signup_attempts",
         payload: {
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
+    email: data.email,
+      phone: data.phone,
+        ip_address: clientIP,
           device_fingerprint: data.deviceFingerprint,
-          success: true,
+            success: true,
         },
-      });
+});
 
-      try {
-        const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: true,
-        });
+try {
+  const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
+    email: data.email,
+    phone: data.phone,
+    ip_address: clientIP,
+    device_fingerprint: data.deviceFingerprint,
+    success: true,
+  });
 
-        // DETAILED LOGGING: After signup_attempts insert
-          step: "log_signup_success",
-          operation: "AFTER_INSERT",
-          table: "signup_attempts",
-          hasError: !!signupAttemptError,
+  // DETAILED LOGGING: After signup_attempts insert
+  step: "log_signup_success",
+    operation: "AFTER_INSERT",
+      table: "signup_attempts",
+        hasError: !!signupAttemptError,
           error: signupAttemptError ? {
             message: signupAttemptError.message,
             details: signupAttemptError.details,
@@ -1638,217 +1642,217 @@ Deno.serve(async (req: Request) => {
           } : null,
         });
       } catch (err: any) {
-        logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
-      }
+  logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
+}
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // ENQUEUE ASYNC PROVISIONING JOB
-    // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// ENQUEUE ASYNC PROVISIONING JOB
+// ═══════════════════════════════════════════════════════════════
 
-    phase = "vapi_provision_start";
+phase = "vapi_provision_start";
 
-    // Check for VAPI kill switch
-    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
-    let jobError: any = null;
+// Check for VAPI kill switch
+const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+let jobError: any = null;
 
-    if (disableVapiProvisioning) {
-      logInfo("VAPI provisioning disabled by env var", {
+if (disableVapiProvisioning) {
+  logInfo("VAPI provisioning disabled by env var", {
+    ...baseLogOptions,
+    accountId: currentAccountId,
+  });
+} else if (isTestMode) {
+  // ═══════════════════════════════════════════════════════════════
+  // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
+  // Uses pre-provisioned real resources and mirrors LIVE DB structure
+  // ═══════════════════════════════════════════════════════════════
+
+  // Load demo bundle environment variables
+  const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
+  const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
+  const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
+  const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+  const allowFallback = Deno.env.get("RINGSNAP_ALLOW_DEMO_FALLBACK") === "true";
+
+  // Validate all demo bundle env vars are present
+  const hasMissingVars = !demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId;
+
+  if (hasMissingVars) {
+    const missing = [];
+    if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
+    if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
+    if (!demoVapiPhoneId) missing.push("RINGSNAP_DEMO_VAPI_PHONE_ID");
+    if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+
+    const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
+    logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
+
+    // Only allow fallback if explicitly enabled via env var (for local dev only)
+    if (!allowFallback) {
+      throw new Error(
+        `Demo bundle not configured. Set the following Supabase secrets: ${missing.join(", ")}. ` +
+        `Or set RINGSNAP_ALLOW_DEMO_FALLBACK=true to use mock values (not recommended for production).`
+      );
+    }
+
+  }
+
+  // Use demo bundle values (or fallback if explicitly allowed)
+  const phoneNumber = demoTwilioNumber || "+15005550006";
+  const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
+  const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
+  const vapiAssistantId = demoVapiAssistantId || `vapi_assistant_test_${Date.now()}`;
+  const areaCode = phoneNumber.slice(2, 5); // Extract area code from E.164
+
+  logInfo("TEST MODE: Using shared demo bundle", {
+    ...baseLogOptions,
+    accountId: currentAccountId,
+    context: {
+      zipCode: data.zipCode,
+      demoPhoneNumber: phoneNumber,
+      hasDemoBundle: !hasMissingVars,
+      usingFallback: hasMissingVars && allowFallback,
+    },
+  });
+
+  try {
+    // ══════════════════════════════════════════════════════════════
+    // Mirror LIVE success path: Create all required DB records
+    // ══════════════════════════════════════════════════════════════
+
+    // 1. Insert phone_numbers row (mirrors LIVE: provision-vapi line 426-437)
+    const { error: phoneError } = await supabase.from("phone_numbers").insert({
+      account_id: currentAccountId,
+      phone_number: phoneNumber,
+      area_code: areaCode,
+      vapi_phone_id: vapiPhoneId,
+      purpose: "primary",
+      status: "active",
+      is_primary: true,
+      // is_test_number: true, // Add once migration is applied
+    });
+
+    if (phoneError) {
+      logWarn("TEST MODE: Phone number insert error (may already exist)", {
         ...baseLogOptions,
-        accountId: currentAccountId,
+        error: phoneError,
       });
-    } else if (isTestMode) {
-      // ═══════════════════════════════════════════════════════════════
-      // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
-      // Uses pre-provisioned real resources and mirrors LIVE DB structure
-      // ═══════════════════════════════════════════════════════════════
+    }
 
-      // Load demo bundle environment variables
-      const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
-      const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
-      const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
-      const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
-      const allowFallback = Deno.env.get("RINGSNAP_ALLOW_DEMO_FALLBACK") === "true";
+    // 2. Insert vapi_assistants row (mirrors LIVE: provision-vapi line 220-227)
+    const { error: assistantError } = await supabase.from("vapi_assistants").insert({
+      account_id: currentAccountId,
+      vapi_assistant_id: vapiAssistantId,
+      config: {
+        id: vapiAssistantId,
+        name: "Demo Assistant",
+        description: "Shared demo assistant for test accounts",
+        isTestAssistant: true,
+      },
+      // is_test_assistant: true, // Add once migration is applied
+    });
 
-      // Validate all demo bundle env vars are present
-      const hasMissingVars = !demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId;
-
-      if (hasMissingVars) {
-        const missing = [];
-        if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
-        if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
-        if (!demoVapiPhoneId) missing.push("RINGSNAP_DEMO_VAPI_PHONE_ID");
-        if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
-
-        const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
-        logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
-
-        // Only allow fallback if explicitly enabled via env var (for local dev only)
-        if (!allowFallback) {
-          throw new Error(
-            `Demo bundle not configured. Set the following Supabase secrets: ${missing.join(", ")}. ` +
-            `Or set RINGSNAP_ALLOW_DEMO_FALLBACK=true to use mock values (not recommended for production).`
-          );
-        }
-
-      }
-
-      // Use demo bundle values (or fallback if explicitly allowed)
-      const phoneNumber = demoTwilioNumber || "+15005550006";
-      const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
-      const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
-      const vapiAssistantId = demoVapiAssistantId || `vapi_assistant_test_${Date.now()}`;
-      const areaCode = phoneNumber.slice(2, 5); // Extract area code from E.164
-
-      logInfo("TEST MODE: Using shared demo bundle", {
+    if (assistantError) {
+      logWarn("TEST MODE: Assistant insert error (may already exist)", {
         ...baseLogOptions,
-        accountId: currentAccountId,
-        context: {
-          zipCode: data.zipCode,
-          demoPhoneNumber: phoneNumber,
-          hasDemoBundle: !hasMissingVars,
-          usingFallback: hasMissingVars && allowFallback,
-        },
+        error: assistantError,
       });
+    }
 
-      try {
-        // ══════════════════════════════════════════════════════════════
-        // Mirror LIVE success path: Create all required DB records
-        // ══════════════════════════════════════════════════════════════
+    // 3. Update accounts row (mirrors LIVE: provision-vapi line 622-629)
+    await supabase.from("accounts").update({
+      vapi_assistant_id: vapiAssistantId,
+      vapi_phone_number: phoneNumber,
+      phone_number_e164: phoneNumber,
+      vapi_phone_number_id: vapiPhoneId,
+      phone_number_status: "active",
+      phone_provisioned_at: new Date().toISOString(),
+      // billing_test_mode: true, // Add once migration is applied
+    }).eq("id", currentAccountId);
 
-        // 1. Insert phone_numbers row (mirrors LIVE: provision-vapi line 426-437)
-        const { error: phoneError } = await supabase.from("phone_numbers").insert({
-          account_id: currentAccountId,
-          phone_number: phoneNumber,
-          area_code: areaCode,
-          vapi_phone_id: vapiPhoneId,
-          purpose: "primary",
-          status: "active",
-          is_primary: true,
-          // is_test_number: true, // Add once migration is applied
-        });
+    // 4. Mark provisioning as completed via RPC (mirrors LIVE: provision-vapi line 632-635)
+    await supabase.rpc("update_provisioning_lifecycle", {
+      p_account_id: currentAccountId,
+      p_status: "completed",
+    });
 
-        if (phoneError) {
-          logWarn("TEST MODE: Phone number insert error (may already exist)", {
-            ...baseLogOptions,
-            error: phoneError,
-          });
-        }
+    // 5. Update profile to active (mirrors LIVE: provision-vapi line 639-641)
+    if (currentUserId) {
+      await supabase.from("profiles").update({
+        onboarding_status: "active",
+      }).eq("id", currentUserId);
+    }
 
-        // 2. Insert vapi_assistants row (mirrors LIVE: provision-vapi line 220-227)
-        const { error: assistantError } = await supabase.from("vapi_assistants").insert({
-          account_id: currentAccountId,
-          vapi_assistant_id: vapiAssistantId,
-          config: {
-            id: vapiAssistantId,
-            name: "Demo Assistant",
-            description: "Shared demo assistant for test accounts",
-            isTestAssistant: true,
-          },
-          // is_test_assistant: true, // Add once migration is applied
-        });
+    logInfo("TEST MODE: Demo bundle provisioning completed successfully", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        phoneNumber,
+        vapiAssistantId,
+        vapiPhoneId,
+      },
+    });
 
-        if (assistantError) {
-          logWarn("TEST MODE: Assistant insert error (may already exist)", {
-            ...baseLogOptions,
-            error: assistantError,
-          });
-        }
+  } catch (testErr: any) {
+    logError("TEST MODE: Demo bundle provisioning failed", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error: testErr,
+    });
+    // Non-critical - signup still succeeded, user can retry
+  }
+} else {
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE MODE: Real provisioning via job queue
+  // ═══════════════════════════════════════════════════════════════
+  const enqueueStart = Date.now();
+  stepStart('enqueue_provisioning', base, { account_id: currentAccountId });
 
-        // 3. Update accounts row (mirrors LIVE: provision-vapi line 622-629)
-        await supabase.from("accounts").update({
-          vapi_assistant_id: vapiAssistantId,
-          vapi_phone_number: phoneNumber,
-          phone_number_e164: phoneNumber,
-          vapi_phone_number_id: vapiPhoneId,
-          phone_number_status: "active",
-          phone_provisioned_at: new Date().toISOString(),
-          // billing_test_mode: true, // Add once migration is applied
-        }).eq("id", currentAccountId);
+  // ... metadata build ...
+  const jobMetadata = {
+    company_name: data.companyName,
+    trade: data.trade,
+    service_area: data.serviceArea || "",
+    business_hours: data.businessHours || "Monday-Friday 8am-5pm",
+    emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
+    company_website: data.website || "",
+    assistant_gender: data.assistantGender,
+    wants_advanced_voice: data.wantsAdvancedVoice,
+    area_code: data.zipCode?.slice(0, 3) || "415",
+    fallback_phone: data.phone,
+    primary_goal: data.primaryGoal,
+  };
 
-        // 4. Mark provisioning as completed via RPC (mirrors LIVE: provision-vapi line 632-635)
-        await supabase.rpc("update_provisioning_lifecycle", {
-          p_account_id: currentAccountId,
-          p_status: "completed",
-        });
-
-        // 5. Update profile to active (mirrors LIVE: provision-vapi line 639-641)
-        if (currentUserId) {
-          await supabase.from("profiles").update({
-            onboarding_status: "active",
-          }).eq("id", currentUserId);
-        }
-
-        logInfo("TEST MODE: Demo bundle provisioning completed successfully", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: {
-            phoneNumber,
-            vapiAssistantId,
-            vapiPhoneId,
-          },
-        });
-
-      } catch (testErr: any) {
-        logError("TEST MODE: Demo bundle provisioning failed", {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          error: testErr,
-        });
-        // Non-critical - signup still succeeded, user can retry
-      }
-    } else {
-      // ═══════════════════════════════════════════════════════════════
-      // LIVE MODE: Real provisioning via job queue
-      // ═══════════════════════════════════════════════════════════════
-      const enqueueStart = Date.now();
-      stepStart('enqueue_provisioning', base, { account_id: currentAccountId });
-
-      // ... metadata build ...
-      const jobMetadata = {
-        company_name: data.companyName,
-        trade: data.trade,
-        service_area: data.serviceArea || "",
-        business_hours: data.businessHours || "Monday-Friday 8am-5pm",
-        emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
-        company_website: data.website || "",
-        assistant_gender: data.assistantGender,
-        wants_advanced_voice: data.wantsAdvancedVoice,
-        area_code: data.zipCode?.slice(0, 3) || "415",
-        fallback_phone: data.phone,
-        primary_goal: data.primaryGoal,
-      };
-
-      // DETAILED LOGGING: Before provisioning_jobs insert
-        step: "enqueue_provisioning",
-        operation: "BEFORE_INSERT",
-        table: "provisioning_jobs",
+  // DETAILED LOGGING: Before provisioning_jobs insert
+  step: "enqueue_provisioning",
+    operation: "BEFORE_INSERT",
+      table: "provisioning_jobs",
         payload: {
-          account_id: currentAccountId,
-          user_id: currentUserId,
-          job_type: "provision_phone",
+    account_id: currentAccountId,
+      user_id: currentUserId,
+        job_type: "provision_phone",
           status: "queued",
-          metadata: jobMetadata,
-          correlation_id: correlationId,
+            metadata: jobMetadata,
+              correlation_id: correlationId,
         },
-      });
+});
 
-      try {
-        // Assign to outer var - Do not redeclare const
-        // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
-        const { error } = await supabase.from("provisioning_jobs").insert({
-          account_id: currentAccountId,
-          user_id: currentUserId,
-          job_type: "provision_phone",
-          status: "queued",
-        });
-        jobError = error;
+try {
+  // Assign to outer var - Do not redeclare const
+  // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
+  const { error } = await supabase.from("provisioning_jobs").insert({
+    account_id: currentAccountId,
+    user_id: currentUserId,
+    job_type: "provision_phone",
+    status: "queued",
+  });
+  jobError = error;
 
-        // DETAILED LOGGING: After provisioning_jobs insert
-          step: "enqueue_provisioning",
-          operation: "AFTER_INSERT",
-          table: "provisioning_jobs",
-          hasError: !!jobError,
+  // DETAILED LOGGING: After provisioning_jobs insert
+  step: "enqueue_provisioning",
+    operation: "AFTER_INSERT",
+      table: "provisioning_jobs",
+        hasError: !!jobError,
           error: jobError ? {
             message: jobError.message,
             details: jobError.details,
@@ -1858,241 +1862,241 @@ Deno.serve(async (req: Request) => {
           } : null,
         });
 
-        if (jobError) {
-          stepError('enqueue_provisioning', base, jobError, {
-            reason_code: 'PROVISIONING_ENQUEUE_FAILED'
-          });
+if (jobError) {
+  stepError('enqueue_provisioning', base, jobError, {
+    reason_code: 'PROVISIONING_ENQUEUE_FAILED'
+  });
 
-          logError("Failed to enqueue provisioning job (non-critical)", {
-            ...baseLogOptions,
-            accountId: currentAccountId,
-            error: jobError,
-          });
+  logError("Failed to enqueue provisioning job (non-critical)", {
+    ...baseLogOptions,
+    accountId: currentAccountId,
+    error: jobError,
+  });
 
-          // Create admin alert for failed job enqueue
-          await createAdminAlert(supabase, "provisioning_job_enqueue_failed", {
-            email: data.email,
-            error: jobError.message || "Unknown error",
-            phase: "job_enqueue",
-            request_id,
-          }, currentAccountId);
-        } else {
-          stepEnd('enqueue_provisioning', base, { result: 'success' }, enqueueStart);
+  // Create admin alert for failed job enqueue
+  await createAdminAlert(supabase, "provisioning_job_enqueue_failed", {
+    email: data.email,
+    error: jobError.message || "Unknown error",
+    phase: "job_enqueue",
+    request_id,
+  }, currentAccountId);
+} else {
+  stepEnd('enqueue_provisioning', base, { result: 'success' }, enqueueStart);
 
-          logInfo("Provisioning job enqueued", {
-            ...baseLogOptions,
-            accountId: currentAccountId,
-          });
+  logInfo("Provisioning job enqueued", {
+    ...baseLogOptions,
+    accountId: currentAccountId,
+  });
 
-          // FIRE-AND-FORGET: Provision Vapi
-          // Use fetch directly to avoid Deno runtime issues with supabase.functions.invoke
-          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/provision-vapi`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ triggered_by: "create-trial" })
-          }).catch(err => {
-          });
+  // FIRE-AND-FORGET: Provision Vapi
+  // Use fetch directly to avoid Deno runtime issues with supabase.functions.invoke
+  fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/provision-vapi`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ triggered_by: "create-trial" })
+  }).catch(err => {
+  });
 
-          // FIRE-AND-FORGET: Send Welcome Email
-          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email: data.email,
-              name: data.name,
-              userId: currentUserId
-            })
-          }).catch(err => {
-          });
-        }
-      } catch (err: any) {
-        logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
-
-        // Create admin alert for exception during job enqueue
-        await createAdminAlert(supabase, "provisioning_job_exception", {
-          email: data.email,
-          error: err?.message || "Unknown error",
-          phase: "job_enqueue",
-          request_id,
-        }, currentAccountId);
-      }
-    }
-
-    phase = "done";
-
-    logInfo("Trial created successfully", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: {
-        source: data.source,
-        planType: data.planType,
-        subscriptionId: subscription.id,
-        provisioningStatus: "pending",
-      },
-    });
-
-    // Track Success in Analytics
-    await trackEvent(supabase, currentAccountId, currentUserId, 'trial_created', {
-      plan_type: data.planType,
-      source: data.source,
-      has_lead: !!data.leadId
-    });
-
-    // ═══════════════════════════════════════════════════════════════
-    // BUILD SUCCESS RESPONSE
-    // ═══════════════════════════════════════════════════════════════
-    stepStart('prepare_response', base);
-
-    const successResponse = {
-      success: true,
-      accountId: currentAccountId,
-      stripeCustomerId: customer.id,
-      stripeSubscriptionId: subscription.id,
-      trace_id: traceId, // Add trace ID for debugging
-      // Backward compatibility fields
-      ok: true,
-      user_id: currentUserId,
-      account_id: currentAccountId,
+  // FIRE-AND-FORGET: Send Welcome Email
+  fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
       email: data.email,
-      password: tempPassword,
-      stripe_customer_id: customer.id,
-      subscription_id: subscription.id,
-      trial_end_date: trialEndDate,
-      plan_type: data.planType,
-      source: data.source,
-      provisioning_status: "pending",
-      vapi_assistant_id: null,
-      phone_number: null,
-      message: "Trial started! Your AI receptionist is being set up...",
-    };
-
-    stepEnd('prepare_response', base, { result: 'success' });
-
-    // ═══════════════════════════════════════════════════════════════
-    // CACHE RESPONSE FOR IDEMPOTENCY
-    // ═══════════════════════════════════════════════════════════════
-
-    if (idempotencyKey) {
-      try {
-        const requestHash = await hashRequest(rawData);
-        const clientIP =
-          req.headers.get("x-forwarded-for")?.split(",")[0] ||
-          req.headers.get("cf-connecting-ip") ||
-          "unknown";
-
-        await supabase.from("idempotency_results").insert({
-          idempotency_key: idempotencyKey,
-          request_hash: requestHash,
-          request_path: "/create-trial",
-          status_code: 200,
-          response_body: successResponse,
-          response_headers: { "Content-Type": "application/json" },
-          account_id: currentAccountId,
-          user_id: currentUserId,
-          stripe_customer_id: customer.id,
-          stripe_subscription_id: subscription.id,
-          correlation_id: correlationId,
-          source_ip: clientIP,
-          user_agent: req.headers.get("user-agent") || null,
-        });
+      name: data.name,
+      userId: currentUserId
+    })
+  }).catch(err => {
+  });
+}
       } catch (err: any) {
-        logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
-      }
+  logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
+
+  // Create admin alert for exception during job enqueue
+  await createAdminAlert(supabase, "provisioning_job_exception", {
+    email: data.email,
+    error: err?.message || "Unknown error",
+    phase: "job_enqueue",
+    request_id,
+  }, currentAccountId);
+}
     }
 
+phase = "done";
 
-    return new Response(
-      JSON.stringify(successResponse),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (error: any) {
-    // Top-level error handler
-      request_id,
-      phase,
-      message: error?.message ?? "Unknown error",
-      stack: error?.stack ?? "",
-      raw: error,
+logInfo("Trial created successfully", {
+  ...baseLogOptions,
+  accountId: currentAccountId,
+  context: {
+    source: data.source,
+    planType: data.planType,
+    subscriptionId: subscription.id,
+    provisioningStatus: "pending",
+  },
+});
+
+// Track Success in Analytics
+await trackEvent(supabase, currentAccountId, currentUserId, 'trial_created', {
+  plan_type: data.planType,
+  source: data.source,
+  has_lead: !!data.leadId
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BUILD SUCCESS RESPONSE
+// ═══════════════════════════════════════════════════════════════
+stepStart('prepare_response', base);
+
+const successResponse = {
+  success: true,
+  accountId: currentAccountId,
+  stripeCustomerId: customer.id,
+  stripeSubscriptionId: subscription.id,
+  trace_id: traceId, // Add trace ID for debugging
+  // Backward compatibility fields
+  ok: true,
+  user_id: currentUserId,
+  account_id: currentAccountId,
+  email: data.email,
+  password: tempPassword,
+  stripe_customer_id: customer.id,
+  subscription_id: subscription.id,
+  trial_end_date: trialEndDate,
+  plan_type: data.planType,
+  source: data.source,
+  provisioning_status: "pending",
+  vapi_assistant_id: null,
+  phone_number: null,
+  message: "Trial started! Your AI receptionist is being set up...",
+};
+
+stepEnd('prepare_response', base, { result: 'success' });
+
+// ═══════════════════════════════════════════════════════════════
+// CACHE RESPONSE FOR IDEMPOTENCY
+// ═══════════════════════════════════════════════════════════════
+
+if (idempotencyKey) {
+  try {
+    const requestHash = await hashRequest(rawData);
+    const clientIP =
+      req.headers.get("x-forwarded-for")?.split(",")[0] ||
+      req.headers.get("cf-connecting-ip") ||
+      "unknown";
+
+    await supabase.from("idempotency_results").insert({
+      idempotency_key: idempotencyKey,
+      request_hash: requestHash,
+      request_path: "/create-trial",
+      status_code: 200,
+      response_body: successResponse,
+      response_headers: { "Content-Type": "application/json" },
       account_id: currentAccountId,
       user_id: currentUserId,
-      stripe_customer_id: stripeCustomerId,
-      stripe_subscription_id: stripeSubscriptionId,
+      stripe_customer_id: customer.id,
+      stripe_subscription_id: subscription.id,
+      correlation_id: correlationId,
+      source_ip: clientIP,
+      user_agent: req.headers.get("user-agent") || null,
+    });
+  } catch (err: any) {
+    logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
+  }
+}
+
+
+return new Response(
+  JSON.stringify(successResponse),
+  {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  }
+);
+  } catch (error: any) {
+  // Top-level error handler
+  request_id,
+    phase,
+    message: error?.message ?? "Unknown error",
+      stack: error?.stack ?? "",
+        raw: error,
+          account_id: currentAccountId,
+            user_id: currentUserId,
+              stripe_customer_id: stripeCustomerId,
+                stripe_subscription_id: stripeSubscriptionId,
     }));
 
-    logError("Trial creation failed", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      error,
-      context: { phase },
-    });
+logError("Trial creation failed", {
+  ...baseLogOptions,
+  accountId: currentAccountId,
+  error,
+  context: { phase },
+});
 
-    // Send error to Sentry
-    if (currentAccountId) {
-      setContext('accountId', currentAccountId);
+// Send error to Sentry
+if (currentAccountId) {
+  setContext('accountId', currentAccountId);
+}
+if (currentUserId) {
+  setContext('userId', currentUserId);
+}
+await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
+
+// Track failure in Analytics (Critical for Dashboard visibility)
+// Guard with supabase check in case error occurred before client initialization
+if (supabase) {
+  await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
+    error: error instanceof Error ? error.message : "Unknown error",
+    phase: phase,
+    stripeErrorType: (error as any)?.type || 'unknown',
+    email: requestEmail, // Now available from outer scope
+  });
+}
+
+const errorMessage = error instanceof Error ? error.message : "Internal server error";
+
+// Return structured error if flag enabled
+if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+  const errorResponse: TrialCreationErrorResponse = {
+    success: false,
+    errorCode: 'INTERNAL_ERROR',
+    userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
+    debugMessage: error?.message ?? errorMessage,
+    correlationId,
+    phase,
+    retryable: true,
+    suggestedAction: 'Try again or contact support if the issue persists',
+    // Legacy fields
+    error: error?.message ?? errorMessage,
+    message: String(error?.message ?? errorMessage),
+    request_id,
+    trace_id: traceId // Add trace ID for LLM debugging
+  };
+
+  return new Response(JSON.stringify(errorResponse), {
+    status: 500,
+    headers: { ...corsHeaders, "Content-Type": "application/json" }
+  });
+} else {
+  // Legacy behavior - return existing error format
+  return new Response(
+    JSON.stringify({
+      success: false,
+      request_id,
+      phase,
+      message: String(error?.message ?? errorMessage),
+      trace_id: traceId // Add trace ID even in legacy mode
+    }),
+    {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     }
-    if (currentUserId) {
-      setContext('userId', currentUserId);
-    }
-    await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
-
-    // Track failure in Analytics (Critical for Dashboard visibility)
-    // Guard with supabase check in case error occurred before client initialization
-    if (supabase) {
-      await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
-        error: error instanceof Error ? error.message : "Unknown error",
-        phase: phase,
-        stripeErrorType: (error as any)?.type || 'unknown',
-        email: requestEmail, // Now available from outer scope
-      });
-    }
-
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-
-    // Return structured error if flag enabled
-    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-      const errorResponse: TrialCreationErrorResponse = {
-        success: false,
-        errorCode: 'INTERNAL_ERROR',
-        userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
-        debugMessage: error?.message ?? errorMessage,
-        correlationId,
-        phase,
-        retryable: true,
-        suggestedAction: 'Try again or contact support if the issue persists',
-        // Legacy fields
-        error: error?.message ?? errorMessage,
-        message: String(error?.message ?? errorMessage),
-        request_id,
-        trace_id: traceId // Add trace ID for LLM debugging
-      };
-
-      return new Response(JSON.stringify(errorResponse), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    } else {
-      // Legacy behavior - return existing error format
-      return new Response(
-        JSON.stringify({
-          success: false,
-          request_id,
-          phase,
-          message: String(error?.message ?? errorMessage),
-          trace_id: traceId // Add trace ID even in legacy mode
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+  );
+}
   }
 });
