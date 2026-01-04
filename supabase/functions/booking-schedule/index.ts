@@ -37,7 +37,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { logError, logInfo, logWarn, extractTraceId, stepStart, stepEnd, stepError, maskEmailForLogs, maskPhoneForLogs, type BaseLogContext } from "../_shared/logging.ts";
 import { sendSMS } from "../_shared/sms.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 
@@ -64,11 +64,19 @@ serve(async (req: Request) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  const traceId = extractTraceId(req); // Primary trace ID for LLM-native logging
   const correlationId = `booking-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
+  };
+
+  let base: BaseLogContext = {
+    functionName: FUNCTION_NAME,
+    traceId,
+    accountId: null,
+    userId: null,
   };
 
   // Validate required environment variables
@@ -95,13 +103,16 @@ serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
     // INPUT VALIDATION
     // ═══════════════════════════════════════════════════════════════
+    const validateStart = Date.now();
+    stepStart('validate_booking_input', base);
 
     let rawData: any;
     try {
       rawData = await req.json();
     } catch (err: any) {
+      stepError('validate_booking_input', base, err, { reason_code: 'INVALID_JSON' });
       return new Response(
-        JSON.stringify({ success: false, error: "Invalid JSON body" }),
+        JSON.stringify({ success: false, error: "Invalid JSON body", trace_id: traceId }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -109,12 +120,27 @@ serve(async (req: Request) => {
     let data: z.infer<typeof bookingRequestSchema>;
     try {
       data = bookingRequestSchema.parse(rawData);
+
+      // Update base context with account ID
+      base = { ...base, accountId: data.account_id };
+
+      stepEnd('validate_booking_input', base, {
+        result: 'success',
+        customer_name: data.customer_name,
+        has_preferred_time: !!data.preferred_time_range
+      }, validateStart);
     } catch (zodError: any) {
+      stepError('validate_booking_input', base, zodError, {
+        reason_code: 'VALIDATION_FAILED',
+        errors: zodError.errors
+      });
+
       return new Response(
         JSON.stringify({
           success: false,
           error: "Invalid input data",
           details: zodError.errors,
+          trace_id: traceId,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -136,6 +162,8 @@ serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
     // LOAD ACCOUNT BOOKING PREFERENCES
     // ═══════════════════════════════════════════════════════════════
+    const accountStart = Date.now();
+    stepStart('load_account_preferences', base, { account_id: data.account_id });
 
     const { data: account, error: accountError } = await supabase
       .from("accounts")
@@ -144,6 +172,11 @@ serve(async (req: Request) => {
       .single();
 
     if (accountError || !account) {
+      stepError('load_account_preferences', base, accountError, {
+        reason_code: 'ACCOUNT_NOT_FOUND',
+        account_id: data.account_id
+      });
+
       logError("Account not found", {
         ...baseLogOptions,
         context: { account_id: data.account_id },
@@ -154,12 +187,19 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: false,
           error: "Account not found",
+          trace_id: traceId,
         }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const bookingMode = account.booking_mode || "sms_only";
+
+    stepEnd('load_account_preferences', base, {
+      result: 'success',
+      booking_mode: bookingMode,
+      has_destination_phone: !!account.destination_phone
+    }, accountStart);
 
     logInfo("Processing booking request", {
       ...baseLogOptions,
@@ -173,6 +213,11 @@ serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
     // CREATE APPOINTMENT RECORD
     // ═══════════════════════════════════════════════════════════════
+    const appointmentStart = Date.now();
+    stepStart('create_appointment_record', base, {
+      customer_name: data.customer_name,
+      phone_masked: maskPhoneForLogs(data.customer_phone)
+    });
 
     const { data: appointment, error: appointmentError } = await supabase
       .from("appointments")
@@ -188,12 +233,17 @@ serve(async (req: Request) => {
         booking_source: "phone_call",
         metadata: {
           correlation_id: correlationId,
+          trace_id: traceId,
         },
       })
       .select("id")
       .single();
 
     if (appointmentError || !appointment) {
+      stepError('create_appointment_record', base, appointmentError, {
+        reason_code: 'DB_INSERT_FAILED'
+      });
+
       logError("Failed to create appointment", {
         ...baseLogOptions,
         error: appointmentError
@@ -203,10 +253,16 @@ serve(async (req: Request) => {
         JSON.stringify({
           success: false,
           error: "Failed to create appointment",
+          trace_id: traceId,
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    stepEnd('create_appointment_record', base, {
+      result: 'success',
+      appointment_id: appointment.id
+    }, appointmentStart);
 
     logInfo("Appointment record created", {
       ...baseLogOptions,
@@ -230,6 +286,12 @@ serve(async (req: Request) => {
           `Reply to confirm or call customer directly.`;
 
         // Send SMS notification (best-effort, don't block appointment creation)
+        const smsStart = Date.now();
+        stepStart('send_sms_notification', base, {
+          notification_method: 'sms',
+          to_masked: maskPhoneForLogs(destinationPhone)
+        });
+
         try {
           const smsResult = await sendSMS({
             to: destinationPhone,
@@ -239,6 +301,11 @@ serve(async (req: Request) => {
           });
 
           if (smsResult.success) {
+            stepEnd('send_sms_notification', base, {
+              result: 'success',
+              message_id: smsResult.messageId
+            }, smsStart);
+
             logInfo("SMS notification sent", {
               ...baseLogOptions,
               context: {
@@ -248,6 +315,12 @@ serve(async (req: Request) => {
               },
             });
           } else {
+            stepEnd('send_sms_notification', base, {
+              result: 'failure',
+              reason_code: 'SMS_SEND_FAILED',
+              error: smsResult.error
+            }, smsStart);
+
             logWarn("SMS notification failed (non-blocking)", {
               ...baseLogOptions,
               context: {
@@ -258,6 +331,10 @@ serve(async (req: Request) => {
             });
           }
         } catch (smsError) {
+          stepError('send_sms_notification', base, smsError, {
+            reason_code: 'SMS_EXCEPTION'
+          });
+
           logError("SMS send exception (non-blocking)", {
             ...baseLogOptions,
             error: smsError instanceof Error ? smsError : new Error(String(smsError)),
@@ -277,6 +354,7 @@ serve(async (req: Request) => {
           appointment_id: appointment.id,
           booking_mode: "sms_only",
           message: "Appointment request created. Owner will be notified via SMS.",
+          trace_id: traceId,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -360,6 +438,7 @@ serve(async (req: Request) => {
           booking_mode: "direct_calendar",
           message: "Appointment request created. Direct calendar booking coming soon. Owner notified via SMS.",
           note: "Direct calendar integration will be available in Phase 2",
+          trace_id: traceId,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -371,6 +450,7 @@ serve(async (req: Request) => {
         success: true,
         appointment_id: appointment.id,
         message: "Appointment request created",
+        trace_id: traceId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -386,6 +466,7 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: false,
         error: error.message || "Internal server error",
+        trace_id: traceId,
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -128,10 +128,34 @@ COMMENT ON COLUMN public.orphaned_stripe_resources.status IS 'Current status of 
 COMMENT ON COLUMN public.orphaned_stripe_resources.failure_reason IS 'High-level reason why resource became orphaned (e.g., subscription_creation_failed, db_transaction_failed)';
 COMMENT ON FUNCTION public.log_orphaned_stripe_resource IS 'Helper function to insert orphaned resource records from edge functions';
 
--- Step 7: Grant appropriate permissions
--- Edge functions need to INSERT orphaned resources
-GRANT SELECT, INSERT ON public.orphaned_stripe_resources TO service_role;
-GRANT USAGE ON SEQUENCE public.orphaned_stripe_resources_id_seq TO service_role;
+-- Step 7: Enable RLS and configure permissions
+ALTER TABLE public.orphaned_stripe_resources ENABLE ROW LEVEL SECURITY;
 
--- Admins need full access for cleanup
-GRANT ALL ON public.orphaned_stripe_resources TO authenticated;
+-- Revoke default permissions
+REVOKE ALL ON public.orphaned_stripe_resources FROM authenticated;
+REVOKE ALL ON FUNCTION public.log_orphaned_stripe_resource FROM PUBLIC;
+
+-- Grant service_role access to INSERT orphaned resources
+GRANT SELECT, INSERT ON public.orphaned_stripe_resources TO service_role;
+GRANT EXECUTE ON FUNCTION public.log_orphaned_stripe_resource TO service_role;
+
+-- Create staff-only policy for viewing and managing orphaned resources
+DROP POLICY IF EXISTS "staff_can_manage_orphaned_resources" ON public.orphaned_stripe_resources;
+CREATE POLICY "staff_can_manage_orphaned_resources"
+  ON public.orphaned_stripe_resources
+  FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.staff_roles
+      WHERE user_id = auth.uid()
+      AND role::text IN ('platform_admin', 'platform_owner', 'admin', 'support', 'billing')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.staff_roles
+      WHERE user_id = auth.uid()
+      AND role::text IN ('platform_admin', 'platform_owner', 'admin', 'support', 'billing')
+    )
+  );

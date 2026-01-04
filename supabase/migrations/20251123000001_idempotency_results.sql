@@ -46,10 +46,12 @@ CREATE TABLE IF NOT EXISTS public.idempotency_results (
 CREATE INDEX idx_idempotency_results_key
   ON public.idempotency_results(idempotency_key);
 
--- Cleanup index for expired results
-CREATE INDEX idx_idempotency_results_expires
+-- Cleanup index for expired results (removed invalid STABLE predicate)
+-- Note: now() is STABLE, not IMMUTABLE, so cannot be used in index WHERE clause
+DROP INDEX IF EXISTS public.idx_idempotency_results_expires;
+CREATE INDEX IF NOT EXISTS idx_idempotency_results_expires_at
   ON public.idempotency_results(expires_at)
-  WHERE expires_at < now();
+  WHERE expires_at IS NOT NULL;
 
 -- Correlation tracking index
 CREATE INDEX idx_idempotency_results_correlation
@@ -66,8 +68,7 @@ CREATE INDEX idx_idempotency_results_account
 -- ==============================================================================
 
 COMMENT ON TABLE public.idempotency_results IS
-  'Stores idempotency keys and cached responses for create-trial API requests. ' ||
-  'Results expire after 24 hours and are automatically cleaned up.';
+  'Stores idempotency keys and cached responses for create-trial API requests. Results expire after 24 hours and are automatically cleaned up.';
 
 COMMENT ON COLUMN public.idempotency_results.idempotency_key IS
   'Unique client-provided key from Idempotency-Key header';

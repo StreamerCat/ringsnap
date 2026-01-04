@@ -32,7 +32,7 @@
 // Imports
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
 import { formatPhoneE164, tryFormatPhoneE164 } from "../_shared/validators.ts";
@@ -943,6 +943,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
 
 Deno.serve(async (req: Request) => {
   const correlationId = extractCorrelationId(req);
+  const traceId = extractTraceId(req);
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
@@ -956,7 +957,12 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const base = { functionName: FUNCTION_NAME, traceId, accountId: undefined };
+  const workerStart = Date.now();
+
   try {
+    stepStart('provision_worker_batch', base);
+
     console.log("[provision-vapi] Start", { correlationId });
 
     if (!VAPI_API_KEY) {
@@ -1158,6 +1164,8 @@ Deno.serve(async (req: Request) => {
       context: { total: jobsToProcess.length, success: successCount, failed: failureCount },
     });
 
+    stepEnd('provision_worker_batch', base, { result: 'success', total: jobsToProcess.length, success: successCount, failed: failureCount }, workerStart);
+
     return new Response(
       JSON.stringify({
         message: "Batch processing completed",
@@ -1171,6 +1179,8 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error: any) {
+    stepError('provision_worker_batch', base, error, { reason_code: error?.message || 'unknown' });
+
     console.error("[provision-vapi] Unhandled error", {
       message: error?.message,
       stack: error?.stack,

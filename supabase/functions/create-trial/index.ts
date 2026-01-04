@@ -34,7 +34,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmailForLogs, type BaseLogContext } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber, formatPhoneE164 } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
@@ -72,6 +72,7 @@ interface TrialCreationErrorResponse {
   error?: string;
   message?: string;
   request_id?: string;
+  trace_id?: string; // LLM-native trace ID for debugging
 }
 
 type ErrorCode =
@@ -188,10 +189,8 @@ async function createAdminAlert(
       },
       resolved: false,
     });
-    console.log(`[${FUNCTION_NAME}] Admin alert created: ${alertType}`);
   } catch (err: any) {
     // Don't fail the main flow if alert creation fails
-    console.error(`[${FUNCTION_NAME}] Failed to create admin alert:`, err?.message);
   }
 }
 
@@ -217,7 +216,6 @@ async function trackEvent(
     if (error) {
       // Resilience for foreign key violations on user_id
       if (error.code === '23503' && error.message.includes('user_id')) {
-        console.warn(`[${FUNCTION_NAME}] user_id ${userId} not found, falling back to null for ${eventType}`);
         await supabase.from("analytics_events").insert({
           account_id: accountId,
           user_id: null,
@@ -225,11 +223,9 @@ async function trackEvent(
           metadata: { ...metadata, original_user_id: userId },
         });
       } else {
-        console.error(`[${FUNCTION_NAME}] Failed to track event ${eventType}:`, error.message);
       }
     }
   } catch (err) {
-    console.error(`[${FUNCTION_NAME}] Exception tracking event ${eventType}:`, err);
   }
 }
 
@@ -265,7 +261,6 @@ async function getExistingUserByEmail(
       accountId: profile.account_id,
     };
   } catch (err) {
-    console.error(`[${FUNCTION_NAME}] Error checking existing user:`, err);
     return null;
   }
 }
@@ -278,7 +273,6 @@ function getStripePriceId(planType: string): string {
   // Check for live key or if the key contains "_live_" (to be extra safe)
   const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_") || stripeKey.includes("_live_");
 
-  console.log(`[getStripePriceId] Key prefix: ${stripeKey.substring(0, 8)}... isLive=${isLive} plan=${planType}`);
 
   // Use hardcoded production IDs if we are in live mode
   // This resolves an issue where environment variables were pointing to test IDs
@@ -291,13 +285,11 @@ function getStripePriceId(planType: string): string {
 
     const liveId = livePriceIds[planType as keyof typeof livePriceIds];
     if (liveId) {
-      console.log(`[getStripePriceId] Using HARDCODED LIVE price ID: ${liveId}`);
       return liveId;
     }
   }
 
   // Fallback to environment variables (Test Mode or missing config)
-  console.log("[getStripePriceId] Falling back to ENV VAR price IDs (Test Mode)");
 
   // Fallback to environment variables (Test Mode)
   const priceIds = {
@@ -603,7 +595,6 @@ async function withRetry<T>(
       return await fn();
     } catch (err: any) {
       lastError = err;
-      console.warn(`[${options.operationName}] Attempt ${i + 1} failed: ${err.message}`);
 
       // Don't retry if it looks like a permanent validation error (e.g. 400s)
       if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
@@ -620,17 +611,26 @@ async function withRetry<T>(
 }
 
 Deno.serve(async (req: Request) => {
-  console.log("FUNCTION VERSION: 2025-12-31-PM-RETRY-FIX-V1");
   const request_id = crypto.randomUUID();
-  const correlationId = extractCorrelationId(req);
+  const correlationId = extractCorrelationId(req); // Legacy compatibility
+  const traceId = extractTraceId(req); // Primary trace ID for LLM-native logging
+
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
     request_id,
   };
 
+  // Base context for step logging
+  let base: BaseLogContext = {
+    functionName: FUNCTION_NAME,
+    traceId,
+    accountId: null,
+    userId: null,
+  };
+
   // Initialize Sentry for error tracking
-  initSentry(FUNCTION_NAME, { correlationId });
+  initSentry(FUNCTION_NAME, { correlationId: traceId });
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -675,7 +675,6 @@ Deno.serve(async (req: Request) => {
   let createdStripeSubscriptionId: string | null = null;
 
   try {
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -734,19 +733,21 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "idempotency_check", message: err.message, stack: err.stack, raw: err }));
         logWarn("Idempotency check error (continuing)", { ...baseLogOptions, error: err });
       }
     }
 
     // ... Input Validation ...
     phase = "validate_input";
+    const validateStart = Date.now();
+    stepStart('validate_input', base);
+
     let rawData: any;
     try {
       rawData = await req.json();
     } catch (err: any) {
-      console.error(JSON.stringify({ request_id, phase, message: err.message }));
-      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: corsHeaders });
+      stepError('validate_input', base, err, { reason_code: 'INVALID_JSON' });
+      return new Response(JSON.stringify({ error: "Invalid JSON", trace_id: traceId }), { status: 400, headers: corsHeaders });
     }
 
     // ... Schema Parse ...
@@ -755,7 +756,13 @@ Deno.serve(async (req: Request) => {
 
     try {
       data = createTrialSchema.parse(normalizedData);
+      stepEnd('validate_input', base, { result: 'success', email: maskEmailForLogs(data.email) }, validateStart);
     } catch (zodError: any) {
+      stepError('validate_input', base, zodError, {
+        reason_code: 'VALIDATION_FAILED',
+        errors: zodError.errors
+      });
+
       logWarn("Validation error in create-trial", {
         ...baseLogOptions,
         context: { errors: zodError.errors, rawLeadId: rawData.leadId },
@@ -765,6 +772,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           error: "Invalid input data",
           details: zodError.errors,
+          trace_id: traceId,
         }),
         {
           status: 400,
@@ -794,7 +802,6 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     if (!isValidPhoneNumber(data.phone)) {
-      console.log("[create-trial] Invalid phone number", { phone: data.phone });
       return new Response(
         JSON.stringify({ error: "Invalid phone number format" }),
         {
@@ -807,13 +814,11 @@ Deno.serve(async (req: Request) => {
     // Normalize phone to E.164 immediately
     const normalizedPhone = formatPhoneE164(data.phone);
     if (normalizedPhone !== data.phone) {
-      console.log(`[create-trial] Normalized phone number: ${data.phone} -> ${normalizedPhone}`);
       // Update data.phone so it's used consistently downstream (Auth, DB, Logging)
       data.phone = normalizedPhone;
     }
 
     if (isDisposableEmail(data.email)) {
-      console.log("[create-trial] Blocked disposable email", { email: data.email });
       logWarn("Blocked disposable email", {
         ...baseLogOptions,
         context: { email: data.email },
@@ -848,7 +853,6 @@ Deno.serve(async (req: Request) => {
       ...baseLogOptions,
       context: { zipCode: data.zipCode, isTestMode, isBypassMode },
     });
-    console.log(`[${FUNCTION_NAME}] MODE=${isTestMode ? "TEST" : "LIVE"} zipCode=${data.zipCode} isBypassMode=${isBypassMode}`);
 
 
     // ═══════════════════════════════════════════════════════════════
@@ -856,7 +860,6 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     phase = "anti_abuse";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // Skip rate limits if using Bypass Mode
     if (data.source === "website" && !isBypassMode) {
@@ -877,7 +880,6 @@ Deno.serve(async (req: Request) => {
           .gte("created_at", thirtyDaysAgo.toISOString());
 
         if (ipAttempts && ipAttempts >= 3) {
-          console.log("[create-trial] IP rate limit exceeded", { clientIP, ipAttempts });
           logWarn("IP rate limit exceeded", {
             ...baseLogOptions,
             context: { clientIP, ipAttempts },
@@ -903,7 +905,6 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
         logWarn("IP rate limit check error (continuing)", { ...baseLogOptions, error: err });
       }
 
@@ -920,7 +921,6 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (recentPhoneUse) {
-          console.log("[create-trial] Phone number recently used", { phone: data.phone });
           logWarn("Phone number recently used", {
             ...baseLogOptions,
             context: { phone: data.phone },
@@ -946,7 +946,6 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
         logWarn("Phone reuse check error (continuing)", { ...baseLogOptions, error: err });
       }
     }
@@ -959,7 +958,6 @@ Deno.serve(async (req: Request) => {
     let existingUser: { id: string; hasAccount: boolean; accountId?: string } | null = null;
     try {
       phase = "check_existing_account";
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
       existingUser = await getExistingUserByEmail(supabase, data.email);
 
@@ -1011,7 +1009,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // STRIPE LOGIC
-    console.log(`[${FUNCTION_NAME}] Payment Logic Check`, {
       receivedPmId: pmId,
       hasExplicitFlag: data.bypassStripe,
       isBypassMode
@@ -1033,7 +1030,6 @@ Deno.serve(async (req: Request) => {
       // STEP 1: Retrieve payment method to check if already attached
       // ═══════════════════════════════════════════════════════════════
       phase = "stripe_payment_method_check";
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase} pmId=${data.paymentMethodId}`);
       let paymentMethodCustomerId: string | null = null;
       let reusedExistingCustomer = false;
 
@@ -1124,6 +1120,9 @@ Deno.serve(async (req: Request) => {
       // ═══════════════════════════════════════════════════════════════
       if (!reusedExistingCustomer) {
         phase = "stripe_customer";
+        const stripeCustomerStart = Date.now();
+        stepStart('create_stripe_customer', base, { email: maskEmailForLogs(data.email), source: data.source });
+
         try {
           customer = await stripe.customers.create({
             email: data.email,
@@ -1137,6 +1136,12 @@ Deno.serve(async (req: Request) => {
           }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
           stripeCustomerId = customer.id;
           createdStripeCustomerId = customer.id; // Track for safe cleanup
+
+          stepEnd('create_stripe_customer', base, {
+            result: 'success',
+            stripe_customer_id: customer.id
+          }, stripeCustomerStart);
+
           logInfo("Stripe customer created", {
             ...baseLogOptions,
             context: {
@@ -1146,6 +1151,10 @@ Deno.serve(async (req: Request) => {
             },
           });
         } catch (e: any) {
+          stepError('create_stripe_customer', base, e, {
+            reason_code: 'STRIPE_CUSTOMER_FAILED',
+            email: maskEmailForLogs(data.email)
+          });
           throw new Error(`Stripe Customer Create Failed: ${e.message}`);
         }
       }
@@ -1154,6 +1163,12 @@ Deno.serve(async (req: Request) => {
       // STEP 3: Attach payment method if not already attached
       // ═══════════════════════════════════════════════════════════════
       phase = "stripe_payment_method";
+      const pmStart = Date.now();
+      stepStart('attach_payment_method', base, {
+        payment_method_id: data.paymentMethodId,
+        already_attached: !!paymentMethodCustomerId
+      });
+
       try {
         if (!paymentMethodCustomerId) {
           // PM not attached - attach it now
@@ -1163,6 +1178,12 @@ Deno.serve(async (req: Request) => {
         await stripe.customers.update(stripeCustomerId!, {
           invoice_settings: { default_payment_method: data.paymentMethodId }
         });
+
+        stepEnd('attach_payment_method', base, {
+          result: 'success',
+          was_already_attached: !!paymentMethodCustomerId
+        }, pmStart);
+
         logInfo("Payment method configured", {
           ...baseLogOptions,
           context: {
@@ -1172,6 +1193,11 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
+        stepError('attach_payment_method', base, e, {
+          reason_code: 'STRIPE_PAYMENT_FAILED',
+          payment_method_id: data.paymentMethodId
+        });
+
         // ALWAYS log full technical details (unchanged)
         logError("Stripe payment method attach failed", {
           ...baseLogOptions,
@@ -1187,6 +1213,7 @@ Deno.serve(async (req: Request) => {
         // Return structured error if flag enabled, otherwise preserve legacy behavior
         if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
           const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          errorResponse.trace_id = traceId; // Add trace ID to response
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1201,6 +1228,9 @@ Deno.serve(async (req: Request) => {
       // STEP 4: Create subscription
       // ═══════════════════════════════════════════════════════════════
       phase = "stripe_subscription";
+      const subStart = Date.now();
+      stepStart('create_subscription', base, { plan_type: data.planType });
+
       try {
         const priceId = getStripePriceId(data.planType);
         subscription = await stripe.subscriptions.create({
@@ -1212,6 +1242,14 @@ Deno.serve(async (req: Request) => {
         }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
         stripeSubscriptionId = subscription.id;
         createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
+
+        stepEnd('create_subscription', base, {
+          result: 'success',
+          subscription_id: subscription.id,
+          plan_type: data.planType,
+          status: subscription.status
+        }, subStart);
+
         logInfo("Stripe subscription created", {
           ...baseLogOptions,
           context: {
@@ -1222,6 +1260,11 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
+        stepError('create_subscription', base, e, {
+          reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
+          plan_type: data.planType
+        });
+
         // ALWAYS log full technical details (unchanged)
         logError("Stripe subscription creation failed", {
           ...baseLogOptions,
@@ -1233,6 +1276,7 @@ Deno.serve(async (req: Request) => {
         // Return structured error if flag enabled, otherwise preserve legacy behavior
         if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
           const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          errorResponse.trace_id = traceId; // Add trace ID to response
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1246,7 +1290,8 @@ Deno.serve(async (req: Request) => {
 
     // DATABASE INSERT
     phase = "account_insert";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+    const accountStart = Date.now();
+    stepStart('create_account_atomic', base, { email: maskEmailForLogs(data.email) });
 
     const tempPassword = generateSecurePassword();
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -1298,9 +1343,6 @@ Deno.serve(async (req: Request) => {
       rawGender === "male" ? "male" : "female";
 
     // Log normalized values before RPC
-    console.log(`[${FUNCTION_NAME}] normalized plan_type =`, accountData.plan_type);
-    console.log(`[${FUNCTION_NAME}] normalized assistant_gender =`, accountData.assistant_gender);
-    console.log(`[${FUNCTION_NAME}] final accountData keys =`, Object.keys(accountData));
 
     // ═══════════════════════════════════════════════════════════════
     // MANUAL TRANSACTION: Create User -> Account -> Profile
@@ -1431,7 +1473,6 @@ Deno.serve(async (req: Request) => {
 
     if (memberError) {
       // Log but don't fail - link is critical but we have profile backup
-      console.warn("Failed to create account_member link:", memberError);
       logWarn("Failed to create account_member link", {
         ...baseLogOptions,
         error: memberError,
@@ -1457,7 +1498,6 @@ Deno.serve(async (req: Request) => {
     const accountTxError = null;
 
     // DETAILED LOGGING: After account creation
-    console.log("DB_RESULT", {
       step: "create_account_transaction",
       operation: "AFTER_CALL",
       hasError: false,
@@ -1470,6 +1510,19 @@ Deno.serve(async (req: Request) => {
 
     currentAccountId = accountTxResult.account_id;
     currentUserId = accountTxResult.user_id;
+
+    // Update base context with account and user IDs
+    base = {
+      ...base,
+      accountId: currentAccountId,
+      userId: currentUserId,
+    };
+
+    stepEnd('create_account_atomic', base, {
+      result: 'success',
+      account_id: currentAccountId,
+      user_id: currentUserId
+    }, accountStart);
 
     logInfo("Account created atomically", {
       ...baseLogOptions,
@@ -1484,12 +1537,10 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     phase = "lead_link";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     if (data.leadId) {
 
       // DETAILED LOGGING: Before lead update
-      console.log("DB_CALL", {
         step: "link_lead",
         operation: "BEFORE_UPDATE",
         table: "signup_leads",
@@ -1514,7 +1565,6 @@ Deno.serve(async (req: Request) => {
           .eq("id", data.leadId);
 
         // DETAILED LOGGING: After lead update
-        console.log("DB_RESULT", {
           step: "link_lead",
           operation: "AFTER_UPDATE",
           table: "signup_leads",
@@ -1529,7 +1579,6 @@ Deno.serve(async (req: Request) => {
         });
 
         if (leadLinkError) {
-          console.log("[create-trial] Lead linking failed (non-critical)", {
             error: leadLinkError.message,
           });
           logWarn("Lead linking failed (non-critical)", {
@@ -1539,7 +1588,6 @@ Deno.serve(async (req: Request) => {
           });
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "lead_link", message: err.message, stack: err.stack, raw: err }));
         logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
@@ -1555,7 +1603,6 @@ Deno.serve(async (req: Request) => {
         "unknown";
 
       // DETAILED LOGGING: Before signup_attempts insert
-      console.log("DB_CALL", {
         step: "log_signup_success",
         operation: "BEFORE_INSERT",
         table: "signup_attempts",
@@ -1578,7 +1625,6 @@ Deno.serve(async (req: Request) => {
         });
 
         // DETAILED LOGGING: After signup_attempts insert
-        console.log("DB_RESULT", {
           step: "log_signup_success",
           operation: "AFTER_INSERT",
           table: "signup_attempts",
@@ -1592,7 +1638,6 @@ Deno.serve(async (req: Request) => {
           } : null,
         });
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "log_signup_success", message: err.message, stack: err.stack, raw: err }));
         logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
@@ -1602,14 +1647,12 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     phase = "vapi_provision_start";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // Check for VAPI kill switch
     const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
     let jobError: any = null;
 
     if (disableVapiProvisioning) {
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
       logInfo("VAPI provisioning disabled by env var", {
         ...baseLogOptions,
         accountId: currentAccountId,
@@ -1619,7 +1662,6 @@ Deno.serve(async (req: Request) => {
       // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
       // Uses pre-provisioned real resources and mirrors LIVE DB structure
       // ═══════════════════════════════════════════════════════════════
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=test_mode_demo_bundle`);
 
       // Load demo bundle environment variables
       const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
@@ -1639,7 +1681,6 @@ Deno.serve(async (req: Request) => {
         if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
 
         const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
-        console.error(`[${FUNCTION_NAME}] ${errorMsg}`);
         logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
 
         // Only allow fallback if explicitly enabled via env var (for local dev only)
@@ -1650,7 +1691,6 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        console.log(`[${FUNCTION_NAME}] RINGSNAP_ALLOW_DEMO_FALLBACK=true - using mock values (LOCAL DEV ONLY)`);
       }
 
       // Use demo bundle values (or fallback if explicitly allowed)
@@ -1748,7 +1788,6 @@ Deno.serve(async (req: Request) => {
             vapiPhoneId,
           },
         });
-        console.log(`[${FUNCTION_NAME}] TEST MODE: Demo bundle complete for account ${currentAccountId}`);
 
       } catch (testErr: any) {
         logError("TEST MODE: Demo bundle provisioning failed", {
@@ -1762,6 +1801,9 @@ Deno.serve(async (req: Request) => {
       // ═══════════════════════════════════════════════════════════════
       // LIVE MODE: Real provisioning via job queue
       // ═══════════════════════════════════════════════════════════════
+      const enqueueStart = Date.now();
+      stepStart('enqueue_provisioning', base, { account_id: currentAccountId });
+
       // ... metadata build ...
       const jobMetadata = {
         company_name: data.companyName,
@@ -1778,7 +1820,6 @@ Deno.serve(async (req: Request) => {
       };
 
       // DETAILED LOGGING: Before provisioning_jobs insert
-      console.log("DB_CALL", {
         step: "enqueue_provisioning",
         operation: "BEFORE_INSERT",
         table: "provisioning_jobs",
@@ -1804,7 +1845,6 @@ Deno.serve(async (req: Request) => {
         jobError = error;
 
         // DETAILED LOGGING: After provisioning_jobs insert
-        console.log("DB_RESULT", {
           step: "enqueue_provisioning",
           operation: "AFTER_INSERT",
           table: "provisioning_jobs",
@@ -1819,6 +1859,10 @@ Deno.serve(async (req: Request) => {
         });
 
         if (jobError) {
+          stepError('enqueue_provisioning', base, jobError, {
+            reason_code: 'PROVISIONING_ENQUEUE_FAILED'
+          });
+
           logError("Failed to enqueue provisioning job (non-critical)", {
             ...baseLogOptions,
             accountId: currentAccountId,
@@ -1833,6 +1877,8 @@ Deno.serve(async (req: Request) => {
             request_id,
           }, currentAccountId);
         } else {
+          stepEnd('enqueue_provisioning', base, { result: 'success' }, enqueueStart);
+
           logInfo("Provisioning job enqueued", {
             ...baseLogOptions,
             accountId: currentAccountId,
@@ -1848,7 +1894,6 @@ Deno.serve(async (req: Request) => {
             },
             body: JSON.stringify({ triggered_by: "create-trial" })
           }).catch(err => {
-            console.error("Failed to trigger provision-vapi worker (background)", err);
           });
 
           // FIRE-AND-FORGET: Send Welcome Email
@@ -1864,11 +1909,9 @@ Deno.serve(async (req: Request) => {
               userId: currentUserId
             })
           }).catch(err => {
-            console.error("Failed to trigger send-welcome-email (background)", err);
           });
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "vapi_provision_start", message: err.message, stack: err.stack, raw: err }));
         logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
 
         // Create admin alert for exception during job enqueue
@@ -1882,7 +1925,6 @@ Deno.serve(async (req: Request) => {
     }
 
     phase = "done";
-    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     logInfo("Trial created successfully", {
       ...baseLogOptions,
@@ -1905,12 +1947,14 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
     // BUILD SUCCESS RESPONSE
     // ═══════════════════════════════════════════════════════════════
+    stepStart('prepare_response', base);
 
     const successResponse = {
       success: true,
       accountId: currentAccountId,
       stripeCustomerId: customer.id,
       stripeSubscriptionId: subscription.id,
+      trace_id: traceId, // Add trace ID for debugging
       // Backward compatibility fields
       ok: true,
       user_id: currentUserId,
@@ -1927,6 +1971,8 @@ Deno.serve(async (req: Request) => {
       phone_number: null,
       message: "Trial started! Your AI receptionist is being set up...",
     };
+
+    stepEnd('prepare_response', base, { result: 'success' });
 
     // ═══════════════════════════════════════════════════════════════
     // CACHE RESPONSE FOR IDEMPOTENCY
@@ -1956,12 +2002,10 @@ Deno.serve(async (req: Request) => {
           user_agent: req.headers.get("user-agent") || null,
         });
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "idempotency_cache", message: err.message, stack: err.stack, raw: err }));
         logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
 
-    console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
 
     return new Response(
       JSON.stringify(successResponse),
@@ -1972,7 +2016,6 @@ Deno.serve(async (req: Request) => {
     );
   } catch (error: any) {
     // Top-level error handler
-    console.error(JSON.stringify({
       request_id,
       phase,
       message: error?.message ?? "Unknown error",
@@ -2027,7 +2070,8 @@ Deno.serve(async (req: Request) => {
         // Legacy fields
         error: error?.message ?? errorMessage,
         message: String(error?.message ?? errorMessage),
-        request_id
+        request_id,
+        trace_id: traceId // Add trace ID for LLM debugging
       };
 
       return new Response(JSON.stringify(errorResponse), {
@@ -2042,6 +2086,7 @@ Deno.serve(async (req: Request) => {
           request_id,
           phase,
           message: String(error?.message ?? errorMessage),
+          trace_id: traceId // Add trace ID even in legacy mode
         }),
         {
           status: 500,

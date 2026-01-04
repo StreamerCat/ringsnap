@@ -43,26 +43,23 @@ ALTER TABLE public.phone_number_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provisioning_logs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can read their own notifications
-CREATE POLICY IF NOT EXISTS "users_can_read_own_notifications"
+DROP POLICY IF EXISTS "users_can_read_own_notifications" ON public.phone_number_notifications;
+CREATE POLICY "users_can_read_own_notifications"
 ON public.phone_number_notifications FOR SELECT
 USING (
   EXISTS (
     SELECT 1 FROM public.phone_numbers pn
-    JOIN public.accounts a ON a.id = pn.account_id
     WHERE pn.id = phone_number_notifications.phone_number_id
-    AND a.user_id = auth.uid()
+    AND pn.account_id = public.get_user_account_id(auth.uid())
   )
 );
 
 -- RLS Policy: Users can read their own provisioning logs
-CREATE POLICY IF NOT EXISTS "users_can_read_own_provisioning_logs"
+DROP POLICY IF EXISTS "users_can_read_own_provisioning_logs" ON public.provisioning_logs;
+CREATE POLICY "users_can_read_own_provisioning_logs"
 ON public.provisioning_logs FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1 FROM public.accounts a
-    WHERE a.id = provisioning_logs.account_id
-    AND a.user_id = auth.uid()
-  )
+  provisioning_logs.account_id = public.get_user_account_id(auth.uid())
 );
 
 -- Update indexes for performance

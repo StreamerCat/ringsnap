@@ -1,0 +1,40 @@
+name: Logging Guardrails
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/**/*.ts'
+      - 'scripts/ci/logging-guardrail.ts'
+      - '.github/workflows/logging-guardrails.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**/*.ts'
+      - 'scripts/ci/logging-guardrail.ts'
+
+jobs:
+  check-logging-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git diff
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Run Logging Guardrail Check
+        run: deno run --allow-read scripts/ci/logging-guardrail.ts
+
+      - name: Report Results
+        if: failure()
+        run: |
+          echo "❌ Logging guardrail check failed!"
+          echo "📖 Please review docs/logging.md for logging guidelines"
+          echo "🔧 Ensure critical Edge Functions use stepStart/stepEnd/stepError"
+          exit 1

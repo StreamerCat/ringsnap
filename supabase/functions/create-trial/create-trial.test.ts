@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { extractTraceId, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 
 // Mock Supabase client
 const mockSupabase = {

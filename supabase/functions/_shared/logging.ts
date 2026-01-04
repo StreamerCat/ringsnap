@@ -1,4 +1,6 @@
 export type LogLevel = 'info' | 'warn' | 'error';
+export type EventType = 'step_start' | 'step_end' | 'info' | 'error';
+export type StepResult = 'success' | 'failure' | 'partial';
 
 export interface LogOptions {
   functionName: string;
@@ -6,6 +8,13 @@ export interface LogOptions {
   accountId?: string | null;
   context?: Record<string, unknown> | undefined;
   error?: unknown;
+}
+
+export interface BaseLogContext {
+  functionName: string;
+  traceId: string;
+  accountId?: string | null;
+  userId?: string | null;
 }
 
 const SENSITIVE_KEYWORDS = [
@@ -49,11 +58,11 @@ function sanitizeValue(value: unknown, keyPath: string[]): unknown {
     }
 
     if (isLikelyEmail(value)) {
-      return maskEmail(value);
+      return maskEmailForLogs(value);
     }
 
     if (key.includes('phone') || isLikelyPhoneNumber(value)) {
-      return maskPhone(value);
+      return maskPhoneForLogs(value);
     }
 
     return value;
@@ -89,7 +98,7 @@ function maskString(value: string): string {
   return `${value.slice(0, 3)}***${value.slice(-3)}`;
 }
 
-function maskEmail(value: string): string {
+function maskEmailForLogs(value: string): string {
   const [localPart, domain] = value.split('@');
   if (!domain) {
     return maskString(value);
@@ -98,13 +107,13 @@ function maskEmail(value: string): string {
   return `${maskedLocal}@${domain}`;
 }
 
-function maskPhone(value: string): string {
+function maskPhoneForLogs(value: string): string {
   const digits = value.replace(/[^0-9]/g, '');
   if (digits.length < 4) {
     return '***';
   }
-  const maskedDigits = `${digits.slice(0, 2)}***${digits.slice(-2)}`;
-  return value.replace(/[^0-9]/g, '').length === value.length ? maskedDigits : value.replace(digits, maskedDigits);
+  // Show ONLY last 4 digits (no leading digits revealed)
+  return `***${digits.slice(-4)}`;
 }
 
 function isLikelyEmail(value: string): boolean {
@@ -196,6 +205,35 @@ export function extractCorrelationId(req: Request): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Extract trace ID from request headers, preferring x-rs-trace-id.
+ * Falls back to generating a new UUID if not present.
+ */
+export function extractTraceId(req: Request): string {
+  // Prefer RingSnap-specific trace ID header
+  const rsTraceId = req.headers.get('x-rs-trace-id');
+  if (rsTraceId) {
+    return rsTraceId;
+  }
+
+  // Fall back to other correlation headers
+  const headerCandidates = [
+    'x-correlation-id',
+    'x-request-id',
+    'requestid',
+    'traceparent'
+  ];
+
+  for (const header of headerCandidates) {
+    const value = req.headers.get(header);
+    if (value) {
+      return value;
+    }
+  }
+
+  return crypto.randomUUID();
+}
+
 export function withLogContext(base: Omit<LogOptions, 'context'>) {
   return {
     info: (message: string, context?: Record<string, unknown>) =>
@@ -205,4 +243,131 @@ export function withLogContext(base: Omit<LogOptions, 'context'>) {
     error: (message: string, error?: unknown, context?: Record<string, unknown>) =>
       logError(message, { ...base, context, error })
   };
+}
+
+// ============================================================================
+// LLM-NATIVE STEP LOGGING
+// ============================================================================
+
+/**
+ * Log the start of a step in a critical flow.
+ * Emits a single-line JSON log event optimized for LLM consumption.
+ */
+export function stepStart(
+  step: string,
+  base: BaseLogContext,
+  context?: Record<string, unknown>
+): void {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'info' as LogLevel,
+    event_type: 'step_start' as EventType,
+    trace_id: base.traceId,
+    function_name: base.functionName,
+    step,
+    message: `Step started: ${step}`,
+    account_id: base.accountId ?? null,
+    user_id: base.userId ?? null,
+    context: sanitizeContext(context)
+  };
+
+  console.log(JSON.stringify(payload));
+}
+
+/**
+ * Log the end of a step in a critical flow.
+ * Automatically calculates duration_ms from startTime.
+ */
+export function stepEnd(
+  step: string,
+  base: BaseLogContext,
+  context: Record<string, unknown> & { result?: StepResult } = {},
+  startTime?: number
+): void {
+  const durationMs = startTime ? Date.now() - startTime : undefined;
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'info' as LogLevel,
+    event_type: 'step_end' as EventType,
+    trace_id: base.traceId,
+    function_name: base.functionName,
+    step,
+    message: `Step completed: ${step}`,
+    account_id: base.accountId ?? null,
+    user_id: base.userId ?? null,
+    duration_ms: durationMs,
+    result: context.result ?? 'success',
+    context: sanitizeContext(context)
+  };
+
+  console.log(JSON.stringify(payload));
+}
+
+/**
+ * Log a step error in a critical flow.
+ */
+export function stepError(
+  step: string,
+  base: BaseLogContext,
+  error: unknown,
+  context?: Record<string, unknown>
+): void {
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'error' as LogLevel,
+    event_type: 'error' as EventType,
+    trace_id: base.traceId,
+    function_name: base.functionName,
+    step,
+    message: `Step failed: ${step}`,
+    account_id: base.accountId ?? null,
+    user_id: base.userId ?? null,
+    error: serializeError(error),
+    context: sanitizeContext(context)
+  };
+
+  console.error(JSON.stringify(payload));
+}
+
+// ============================================================================
+// EXPORTED MASKING UTILITIES (FOR LOGS ONLY - DO NOT USE IN OPERATIONAL CODE)
+// ============================================================================
+
+/**
+ * Mask an email address for safe logging.
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in:
+ * - Database writes
+ * - API payloads to external services (Stripe, Twilio, Vapi)
+ * - Operational/business logic
+ *
+ * Example: "user@example.com" => "u***r@example.com"
+ */
+export { maskEmailForLogs };
+
+/**
+ * Mask a phone number for safe logging.
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in:
+ * - Database writes
+ * - API payloads to external services (Stripe, Twilio, Vapi)
+ * - Operational/business logic
+ *
+ * Reveals ONLY last 4 digits.
+ * Examples:
+ * - "+14155551234" => "***1234"
+ * - "415-555-1234" => "***1234"
+ * - "123" => "***"
+ */
+export { maskPhoneForLogs };
+
+/**
+ * Manually redact/sanitize an object for safe logging.
+ * Automatically masks emails, phones, and sensitive keys.
+ *
+ * ⚠️ FOR LOGS ONLY - Do NOT use in operational code.
+ */
+export function redact(obj: Record<string, unknown>): Record<string, unknown> {
+  return sanitizeValue(obj, []) as Record<string, unknown>;
 }

@@ -58,7 +58,7 @@ AS $$
     AND role IN ('owner', 'admin')
   ) OR EXISTS (
     -- User is a staff platform_admin or platform_owner
-    SELECT 1 FROM staff_roles WHERE user_id = auth.uid() AND role IN ('platform_admin', 'platform_owner')
+    SELECT 1 FROM staff_roles WHERE user_id = auth.uid() AND role::text IN ('platform_admin', 'platform_owner')
   );
 $$;
 

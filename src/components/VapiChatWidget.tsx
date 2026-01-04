@@ -4,6 +4,7 @@ import Vapi from "@vapi-ai/web";
 import { VapiWidget } from "@vapi-ai/client-sdk-react";
 import * as Sentry from "@sentry/react";
 import { useVapiWidget } from "@/lib/VapiWidgetContext";
+import { featureFlags } from "@/lib/featureFlags";
 
 const PUBLIC_KEY = import.meta.env.VITE_VAPI_PUBLIC_KEY;
 const ASSISTANT_ID = import.meta.env.VITE_VAPI_WIDGET_ASSISTANT_ID;
@@ -147,11 +148,24 @@ export function VapiChatWidget() {
         return null;
     }
 
-    // Dynamic Mobile Positioning
-    const mobileBottomClass = widgetMode === 'customer' ? 'bottom-4' : 'bottom-28';
+    // Dynamic Mobile Positioning with Safe Offset
+    // When widgetSafeOffset is enabled, use higher offset to avoid overlapping CTAs
+    const getMobileBottomClass = () => {
+        if (featureFlags.widgetSafeOffset) {
+            // Safe offset mode: use higher offset on customer routes to avoid CTA overlap
+            if (widgetMode === 'customer') {
+                return 'bottom-20'; // Higher offset on dashboard to avoid fixed CTAs
+            }
+            return 'bottom-28'; // Marketing/pricing pages
+        }
+        // Legacy behavior
+        return widgetMode === 'customer' ? 'bottom-4' : 'bottom-28';
+    };
+
+    const mobileBottomClass = getMobileBottomClass();
 
     return (
-        <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out safe-area-bottom-right`}>
+        <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out`}>
             <Sentry.ErrorBoundary fallback={null}>
                 <VapiWidget
                     key={modeKey}

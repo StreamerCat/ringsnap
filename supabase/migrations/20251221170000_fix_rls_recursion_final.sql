@@ -35,7 +35,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.staff_roles
     WHERE user_id = auth.uid()
-    AND role IN ('admin', 'support', 'platform_owner', 'platform_admin')
+    AND role::text IN ('admin', 'support', 'platform_owner', 'platform_admin')
   ) THEN
     RETURN true;
   END IF;

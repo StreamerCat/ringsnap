@@ -74,16 +74,20 @@ export interface VapiMessage {
     cost?: number;
 }
 
+export type TagSourceType = 'structured' | 'transcript' | 'none';
+
 export interface CallExtractionResult {
     callerName: string | null;
     reason: string | null;
+    reasonSource: TagSourceType;
+    tagSource: TagSourceType;
     booked: boolean;
     appointmentStart: string | null;
     appointmentEnd: string | null;
     appointmentWindow: string | null;
     outcome: 'booked' | 'lead' | 'other' | null;
     leadCaptured: boolean;
-    address: string | null; // NEW
+    address: string | null;
 }
 
 // ==========================================
@@ -98,14 +102,31 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
     const successEval = analysis?.successEvaluation; // boolean or string "true"
 
     // Priority: Message Transcript > Call Transcript
-    const transcript = (message.transcript ?? call.transcript ?? "").toLowerCase();
+    const rawTranscript = message.transcript ?? call.transcript ?? "";
+    const transcript = rawTranscript.toLowerCase();
     const summary = (message.summary ?? analysis?.summary ?? "").toLowerCase();
+
+    // Determine if transcript is meaningful (has actual content)
+    const hasTranscript = rawTranscript.length >= 50;
 
     // 2. Extract Fields
     const fromNumber = call.customer?.number ?? call.transport?.from ?? null;
     const callerName = extractCallerName(call, transcript, structuredData, summary, fromNumber);
-    const reason = extractReason(call, transcript, structuredData, summary);
     const address = extractAddress(structuredData, summary);
+
+    // 3. Extract Reason with Source Tracking
+    // Priority: structured > transcript > none (NEVER from summary alone)
+    const { reason, reasonSource } = extractReasonWithSource(call, transcript, structuredData, hasTranscript);
+
+    // 4. Determine Tag Source
+    // Only allow tagging from structured data or transcript, not summary
+    let tagSource: TagSourceType = 'none';
+    if (structuredData.reason || structuredData.callReason || structuredData.intent) {
+        tagSource = 'structured';
+    } else if (hasTranscript) {
+        tagSource = 'transcript';
+    }
+    // If neither, tagSource stays 'none' and frontend should not derive tags
 
     const { booked, appointmentStart, appointmentEnd, appointmentWindow } = detectBooking(
         call,
@@ -116,10 +137,8 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
         successEval
     );
 
-    // 3. Determine Outcome
-    // Lead Captured if we have Name AND Phone (Phone is checked in index.ts usually, but we assume if we found a name we are good candidates)
-    // Note: index.ts logic checks (isEndOfCall && name && phone).
-    // Here we just return what we found.
+    // 5. Determine Outcome
+    // Lead Captured if we have Name AND Phone
     const leadCaptured = !!callerName;
 
     let outcome: 'booked' | 'lead' | 'other' = 'other';
@@ -132,6 +151,8 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
     return {
         callerName,
         reason,
+        reasonSource,
+        tagSource,
         booked,
         appointmentStart,
         appointmentEnd,
@@ -140,6 +161,55 @@ export function extractCallDetails(call: VapiCall, message: VapiMessage): CallEx
         leadCaptured,
         address
     };
+}
+
+/**
+ * Extract reason with source tracking
+ * NEVER derive reason from summary alone - that causes incorrect auto-tagging
+ */
+function extractReasonWithSource(
+    call: VapiCall,
+    transcript: string,
+    structuredData: Record<string, any>,
+    hasTranscript: boolean
+): { reason: string | null; reasonSource: TagSourceType } {
+    // 1. Structured Data (Highest Priority)
+    if (typeof structuredData.reason === 'string') {
+        return { reason: cleanReason(structuredData.reason), reasonSource: 'structured' };
+    }
+    if (typeof structuredData.callReason === 'string') {
+        return { reason: cleanReason(structuredData.callReason), reasonSource: 'structured' };
+    }
+    if (typeof structuredData.intent === 'string') {
+        return { reason: cleanReason(structuredData.intent), reasonSource: 'structured' };
+    }
+
+    // 2. Transcript-based extraction (if transcript is available)
+    if (hasTranscript) {
+        // Look for explicit reason patterns in transcript
+        const reasonPatterns = [
+            /(?:i'm calling|i am calling|calling) (?:about|for|to|regarding)\s+([^.!?]+)/i,
+            /(?:i need|i want|looking for)\s+([^.!?]+)/i,
+            /(?:my|the)\s+([^.!?]+)\s+(?:is|are|isn't|aren't|needs|need)/i,
+        ];
+
+        for (const pattern of reasonPatterns) {
+            const match = transcript.match(pattern);
+            if (match && match[1]) {
+                const extracted = match[1].trim();
+                if (extracted.length > 5 && extracted.length < 100) {
+                    return { reason: cleanReason(extracted), reasonSource: 'transcript' };
+                }
+            }
+        }
+
+        // No explicit pattern found, but we have transcript
+        // Return null reason but mark source as transcript (tags can still be derived)
+        return { reason: null, reasonSource: 'transcript' };
+    }
+
+    // 3. No valid source - do not use summary
+    return { reason: null, reasonSource: 'none' };
 }
 
 // ==========================================
