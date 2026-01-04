@@ -1013,501 +1013,502 @@ Deno.serve(async (req: Request) => {
     }
 
     // STRIPE LOGIC
-    receivedPmId: pmId,
+    console.log(`[${FUNCTION_NAME}] Payment Logic Check`, {
+      receivedPmId: pmId,
       hasExplicitFlag: data.bypassStripe,
-        isBypassMode
-  });
+      isBypassMode
+    });
 
-if (isBypassMode) {
-  logInfo("BYPASS MODE: Skipping Stripe API calls", baseLogOptions);
-  customer = { id: `cus_bypass_${Date.now()}` };
-  subscription = { id: `sub_bypass_${Date.now()}`, status: 'active' };
-  stripeCustomerId = customer.id;
-  stripeSubscriptionId = subscription.id;
-} else {
-  // Real Stripe Flow
-  if (!stripe) throw new Error("Stripe not initialized");
+    if (isBypassMode) {
+      logInfo("BYPASS MODE: Skipping Stripe API calls", baseLogOptions);
+      customer = { id: `cus_bypass_${Date.now()}` };
+      subscription = { id: `sub_bypass_${Date.now()}`, status: 'active' };
+      stripeCustomerId = customer.id;
+      stripeSubscriptionId = subscription.id;
+    } else {
+      // Real Stripe Flow
+      if (!stripe) throw new Error("Stripe not initialized");
 
-  const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
+      const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
-  // ═══════════════════════════════════════════════════════════════
-  // STEP 1: Retrieve payment method to check if already attached
-  // ═══════════════════════════════════════════════════════════════
-  phase = "stripe_payment_method_check";
-  let paymentMethodCustomerId: string | null = null;
-  let reusedExistingCustomer = false;
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 1: Retrieve payment method to check if already attached
+      // ═══════════════════════════════════════════════════════════════
+      phase = "stripe_payment_method_check";
+      let paymentMethodCustomerId: string | null = null;
+      let reusedExistingCustomer = false;
 
-  try {
-    const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
-    paymentMethodCustomerId = typeof paymentMethod.customer === 'string'
-      ? paymentMethod.customer
-      : (paymentMethod.customer as any)?.id ?? null;
+      try {
+        const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
+        paymentMethodCustomerId = typeof paymentMethod.customer === 'string'
+          ? paymentMethod.customer
+          : (paymentMethod.customer as any)?.id ?? null;
 
-    if (paymentMethodCustomerId) {
-      logInfo("Payment method already attached to a customer", {
-        ...baseLogOptions,
-        context: {
-          paymentMethodId: data.paymentMethodId,
-          existingCustomerId: paymentMethodCustomerId
-        },
-      });
-
-      // Validate the existing customer's email matches the request email
-      const existingCustomer = await stripe.customers.retrieve(paymentMethodCustomerId);
-      if (existingCustomer.deleted) {
-        // Customer was deleted, treat as if PM is not attached
-        paymentMethodCustomerId = null;
-        logInfo("Existing customer was deleted, will create new customer", {
-          ...baseLogOptions,
-          context: { paymentMethodId: data.paymentMethodId },
-        });
-      } else {
-        const existingEmail = (existingCustomer as any).email?.toLowerCase();
-        const requestEmailLower = data.email.toLowerCase();
-
-        if (existingEmail && existingEmail !== requestEmailLower) {
-          // Email mismatch - fail safely
-          logError("Payment method customer email mismatch", {
+        if (paymentMethodCustomerId) {
+          logInfo("Payment method already attached to a customer", {
             ...baseLogOptions,
             context: {
               paymentMethodId: data.paymentMethodId,
-              pmCustomerEmail: existingEmail,
-              requestEmail: requestEmailLower,
+              existingCustomerId: paymentMethodCustomerId
             },
           });
 
-          if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-            return new Response(JSON.stringify({
-              success: false,
-              errorCode: 'PAYMENT_METHOD_MISMATCH',
-              userMessage: 'This card is associated with a different email. Please use a different card or check your email address.',
-              correlationId,
-              phase,
-              retryable: true,
-              suggestedAction: 'Try a different payment method',
-              error: 'Payment method email mismatch',
-              message: 'Payment method email mismatch',
-              request_id,
-            }), {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
+          // Validate the existing customer's email matches the request email
+          const existingCustomer = await stripe.customers.retrieve(paymentMethodCustomerId);
+          if (existingCustomer.deleted) {
+            // Customer was deleted, treat as if PM is not attached
+            paymentMethodCustomerId = null;
+            logInfo("Existing customer was deleted, will create new customer", {
+              ...baseLogOptions,
+              context: { paymentMethodId: data.paymentMethodId },
             });
           } else {
-            throw new Error("Payment method is associated with a different email address");
+            const existingEmail = (existingCustomer as any).email?.toLowerCase();
+            const requestEmailLower = data.email.toLowerCase();
+
+            if (existingEmail && existingEmail !== requestEmailLower) {
+              // Email mismatch - fail safely
+              logError("Payment method customer email mismatch", {
+                ...baseLogOptions,
+                context: {
+                  paymentMethodId: data.paymentMethodId,
+                  pmCustomerEmail: existingEmail,
+                  requestEmail: requestEmailLower,
+                },
+              });
+
+              if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+                return new Response(JSON.stringify({
+                  success: false,
+                  errorCode: 'PAYMENT_METHOD_MISMATCH',
+                  userMessage: 'This card is associated with a different email. Please use a different card or check your email address.',
+                  correlationId,
+                  phase,
+                  retryable: true,
+                  suggestedAction: 'Try a different payment method',
+                  error: 'Payment method email mismatch',
+                  message: 'Payment method email mismatch',
+                  request_id,
+                }), {
+                  status: 400,
+                  headers: { ...corsHeaders, "Content-Type": "application/json" }
+                });
+              } else {
+                throw new Error("Payment method is associated with a different email address");
+              }
+            }
+
+            // Email matches or existing customer has no email - reuse this customer
+            reusedExistingCustomer = true;
+            customer = existingCustomer;
+            stripeCustomerId = paymentMethodCustomerId;
+            logInfo("Reusing existing customer for payment method", {
+              ...baseLogOptions,
+              context: {
+                customerId: paymentMethodCustomerId,
+                email: data.email,
+              },
+            });
           }
         }
-
-        // Email matches or existing customer has no email - reuse this customer
-        reusedExistingCustomer = true;
-        customer = existingCustomer;
-        stripeCustomerId = paymentMethodCustomerId;
-        logInfo("Reusing existing customer for payment method", {
+      } catch (e: any) {
+        // If PM retrieve fails, log and continue to create new customer
+        logWarn("Failed to retrieve payment method (will create new customer)", {
           ...baseLogOptions,
-          context: {
-            customerId: paymentMethodCustomerId,
-            email: data.email,
-          },
+          error: e,
+          context: { paymentMethodId: data.paymentMethodId },
         });
       }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 2: Create customer if not reusing existing
+      // ═══════════════════════════════════════════════════════════════
+      if (!reusedExistingCustomer) {
+        phase = "stripe_customer";
+        const stripeCustomerStart = Date.now();
+        stepStart('create_stripe_customer', base, { email: maskEmailForLogs(data.email), source: data.source });
+
+        try {
+          customer = await stripe.customers.create({
+            email: data.email,
+            name: data.name,
+            phone: data.phone,
+            metadata: {
+              company_name: data.companyName,
+              trade: data.trade,
+              source: data.source
+            }
+          }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
+          stripeCustomerId = customer.id;
+          createdStripeCustomerId = customer.id; // Track for safe cleanup
+
+          stepEnd('create_stripe_customer', base, {
+            result: 'success',
+            stripe_customer_id: customer.id
+          }, stripeCustomerStart);
+
+          logInfo("Stripe customer created", {
+            ...baseLogOptions,
+            context: {
+              customerId: customer.id,
+              source: data.source,
+              email: data.email,
+            },
+          });
+        } catch (e: any) {
+          stepError('create_stripe_customer', base, e, {
+            reason_code: 'STRIPE_CUSTOMER_FAILED',
+            email: maskEmailForLogs(data.email)
+          });
+          throw new Error(`Stripe Customer Create Failed: ${e.message}`);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 3: Attach payment method if not already attached
+      // ═══════════════════════════════════════════════════════════════
+      phase = "stripe_payment_method";
+      const pmStart = Date.now();
+      stepStart('attach_payment_method', base, {
+        payment_method_id: data.paymentMethodId,
+        already_attached: !!paymentMethodCustomerId
+      });
+
+      try {
+        if (!paymentMethodCustomerId) {
+          // PM not attached - attach it now
+          await stripe.paymentMethods.attach(data.paymentMethodId, { customer: stripeCustomerId! });
+        }
+        // Always set as default payment method
+        await stripe.customers.update(stripeCustomerId!, {
+          invoice_settings: { default_payment_method: data.paymentMethodId }
+        });
+
+        stepEnd('attach_payment_method', base, {
+          result: 'success',
+          was_already_attached: !!paymentMethodCustomerId
+        }, pmStart);
+
+        logInfo("Payment method configured", {
+          ...baseLogOptions,
+          context: {
+            customerId: stripeCustomerId,
+            reusedExisting: reusedExistingCustomer,
+            wasAlreadyAttached: !!paymentMethodCustomerId,
+          },
+        });
+      } catch (e: any) {
+        stepError('attach_payment_method', base, e, {
+          reason_code: 'STRIPE_PAYMENT_FAILED',
+          payment_method_id: data.paymentMethodId
+        });
+
+        // ALWAYS log full technical details (unchanged)
+        logError("Stripe payment method attach failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: e,
+          context: {
+            phase,
+            customerId: stripeCustomerId,
+            paymentMethodId: data.paymentMethodId
+          }
+        });
+
+        // Return structured error if flag enabled, otherwise preserve legacy behavior
+        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          errorResponse.trace_id = traceId; // Add trace ID to response
+          return new Response(JSON.stringify(errorResponse), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } else {
+          // Legacy behavior - throw error as before
+          throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // STEP 4: Create subscription
+      // ═══════════════════════════════════════════════════════════════
+      phase = "stripe_subscription";
+      const subStart = Date.now();
+      stepStart('create_subscription', base, { plan_type: data.planType });
+
+      try {
+        const priceId = getStripePriceId(data.planType);
+        subscription = await stripe.subscriptions.create({
+          customer: stripeCustomerId!,
+          items: [{ price: priceId }],
+          trial_period_days: 3,
+          payment_behavior: "default_incomplete",
+          metadata: { source: data.source, plan_type: data.planType }
+        }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
+        stripeSubscriptionId = subscription.id;
+        createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
+
+        stepEnd('create_subscription', base, {
+          result: 'success',
+          subscription_id: subscription.id,
+          plan_type: data.planType,
+          status: subscription.status
+        }, subStart);
+
+        logInfo("Stripe subscription created", {
+          ...baseLogOptions,
+          context: {
+            subscriptionId: subscription.id,
+            planType: data.planType,
+            source: data.source,
+            status: subscription.status,
+          },
+        });
+      } catch (e: any) {
+        stepError('create_subscription', base, e, {
+          reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
+          plan_type: data.planType
+        });
+
+        // ALWAYS log full technical details (unchanged)
+        logError("Stripe subscription creation failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: e,
+          context: { phase, customerId: stripeCustomerId }
+        });
+
+        // Return structured error if flag enabled, otherwise preserve legacy behavior
+        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+          errorResponse.trace_id = traceId; // Add trace ID to response
+          return new Response(JSON.stringify(errorResponse), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        } else {
+          // Legacy behavior - throw error as before
+          throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
+        }
+      }
     }
-  } catch (e: any) {
-    // If PM retrieve fails, log and continue to create new customer
-    logWarn("Failed to retrieve payment method (will create new customer)", {
-      ...baseLogOptions,
-      error: e,
-      context: { paymentMethodId: data.paymentMethodId },
-    });
-  }
 
-  // ═══════════════════════════════════════════════════════════════
-  // STEP 2: Create customer if not reusing existing
-  // ═══════════════════════════════════════════════════════════════
-  if (!reusedExistingCustomer) {
-    phase = "stripe_customer";
-    const stripeCustomerStart = Date.now();
-    stepStart('create_stripe_customer', base, { email: maskEmailForLogs(data.email), source: data.source });
+    // DATABASE INSERT
+    phase = "account_insert";
+    const accountStart = Date.now();
+    stepStart('create_account_atomic', base, { email: maskEmailForLogs(data.email) });
 
-    try {
-      customer = await stripe.customers.create({
+    const tempPassword = generateSecurePassword();
+    const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    const billingState = data.zipCode ? getStateFromZip(data.zipCode) : "CA";
+
+    let businessHoursValue = null;
+    if (data.businessHours) {
+      try {
+        businessHoursValue = JSON.parse(data.businessHours);
+      } catch {
+        businessHoursValue = { text: data.businessHours };
+      }
+    }
+
+    const accountData = {
+      company_name: data.companyName,
+      trade: data.trade,
+      plan_type: data.planType,
+      phone_number_area_code: data.zipCode?.slice(0, 3) || null,
+      zip_code: data.zipCode || null,
+      business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
+      assistant_gender: data.assistantGender,
+      wants_advanced_voice: data.wantsAdvancedVoice,
+      company_website: data.website || null,
+      service_area: data.serviceArea || null,
+      emergency_policy: data.emergencyPolicy || null,
+      billing_state: billingState,
+    };
+
+    // Normalize plan_type to match SQL constraint (starter|professional|premium)
+    const rawPlan = (accountData.plan_type || "starter")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    accountData.plan_type =
+      rawPlan === "pro" ? "professional" :
+        rawPlan === "professional" ? "professional" :
+          rawPlan === "premium" ? "premium" :
+            "starter";
+
+    // Normalize assistant_gender to match SQL constraint (male|female)
+    const rawGender = (accountData.assistant_gender || "female")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    accountData.assistant_gender =
+      rawGender === "male" ? "male" : "female";
+
+    // Log normalized values before RPC
+
+    // ═══════════════════════════════════════════════════════════════
+    // MANUAL TRANSACTION: Create User -> Account -> Profile
+    // ═══════════════════════════════════════════════════════════════
+
+    // Note: existingUser with hasAccount was already checked before Stripe calls
+    // If we're here, either existingUser doesn't have an account, or they're new
+    if (existingUser && !existingUser.hasAccount) {
+      // User exists but has no account - we'll create an account for them
+      logInfo("Existing user found without account, creating account", {
+        ...baseLogOptions,
+        context: { email: data.email, userId: existingUser.id },
+      });
+      currentUserId = existingUser.id;
+    } else if (!existingUser) {
+      // 1b. Create new Auth User
+      const { data: userData, error: userError } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: data.name,
+          company_name: data.companyName,
+        }
+      });
+
+      if (userError) {
+        // Check if this is specifically "user already exists" error
+        if (userError.message?.includes("already been registered") ||
+          userError.message?.includes("already exists")) {
+          // Try to look them up in profiles as a fallback
+          const { data: fallbackProfile } = await supabase
+            .from("profiles")
+            .select("id, account_id")
+            .eq("email", data.email)
+            .maybeSingle();
+
+          if (fallbackProfile?.account_id) {
+            // They have an account - redirect to login
+            return new Response(
+              JSON.stringify({
+                error: "An account with this email already exists. Please log in instead.",
+                code: "ACCOUNT_EXISTS",
+                redirect: "/login",
+              }),
+              { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          if (fallbackProfile?.id) {
+            // They exist but no account - use their ID
+            currentUserId = fallbackProfile.id;
+            logInfo("Recovered existing user ID from profile", {
+              ...baseLogOptions,
+              context: { email: data.email, userId: currentUserId },
+            });
+          } else {
+            // Can't recover - create admin alert and return error
+            await createAdminAlert(supabase, "user_creation_failed", {
+              email: data.email,
+              error: userError.message,
+              phase: "user_creation",
+              request_id,
+            });
+            throw new Error(`Auth User Creation Failed: ${userError.message}`);
+          }
+        } else {
+          // Different error - throw it
+          await createAdminAlert(supabase, "user_creation_failed", {
+            email: data.email,
+            error: userError.message,
+            phase: "user_creation",
+            request_id,
+          });
+          throw new Error(`Auth User Creation Failed: ${userError.message}`);
+        }
+      } else {
+        currentUserId = userData.user.id;
+      }
+    }
+
+    // 2. Create Account
+    // NOTE: is_test_account field removed from initial insert to prevent errors if column doesn't exist
+    // Will be updated after insert if test mode is active
+    const { data: accountResult, error: accountError } = await supabase
+      .from("accounts")
+      .insert({
+        subscription_status: 'trial',
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        ...accountData
+      })
+      .select("id")
+      .single();
+
+    if (accountError) {
+      // Rollback user if possible, or just throw (manual rollback complex here)
+      throw new Error(`Account Insertion Failed: ${accountError.message}`);
+    }
+    currentAccountId = accountResult.id;
+
+    // 3. Create/Link Profile
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert({
+        id: currentUserId,
+        account_id: currentAccountId,
         email: data.email,
         name: data.name,
         phone: data.phone,
-        metadata: {
-          company_name: data.companyName,
-          trade: data.trade,
-          source: data.source
-        }
-      }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
-      stripeCustomerId = customer.id;
-      createdStripeCustomerId = customer.id; // Track for safe cleanup
+        is_primary: true,
+        role: 'customer',
+        // onboarding_status removed to fix schema mismatch (column missing in prod)
+      });
 
-      stepEnd('create_stripe_customer', base, {
-        result: 'success',
-        stripe_customer_id: customer.id
-      }, stripeCustomerStart);
+    if (profileError) {
+      throw new Error(`Profile Upsert Failed: ${profileError.message}`);
+    }
 
-      logInfo("Stripe customer created", {
+    // 4. Assign owner role in account_members table (Corrected from user_roles)
+    const { error: memberError } = await supabase
+      .from("account_members")
+      .insert({
+        user_id: currentUserId,
+        account_id: currentAccountId,
+        role: "owner"
+      });
+
+    if (memberError) {
+      // Log but don't fail - link is critical but we have profile backup
+      logWarn("Failed to create account_member link", {
         ...baseLogOptions,
-        context: {
-          customerId: customer.id,
-          source: data.source,
-          email: data.email,
-        },
+        error: memberError,
+        accountId: currentAccountId
       });
-    } catch (e: any) {
-      stepError('create_stripe_customer', base, e, {
-        reason_code: 'STRIPE_CUSTOMER_FAILED',
-        email: maskEmailForLogs(data.email)
-      });
-      throw new Error(`Stripe Customer Create Failed: ${e.message}`);
     }
-  }
 
-  // ═══════════════════════════════════════════════════════════════
-  // STEP 3: Attach payment method if not already attached
-  // ═══════════════════════════════════════════════════════════════
-  phase = "stripe_payment_method";
-  const pmStart = Date.now();
-  stepStart('attach_payment_method', base, {
-    payment_method_id: data.paymentMethodId,
-    already_attached: !!paymentMethodCustomerId
-  });
-
-  try {
-    if (!paymentMethodCustomerId) {
-      // PM not attached - attach it now
-      await stripe.paymentMethods.attach(data.paymentMethodId, { customer: stripeCustomerId! });
-    }
-    // Always set as default payment method
-    await stripe.customers.update(stripeCustomerId!, {
-      invoice_settings: { default_payment_method: data.paymentMethodId }
-    });
-
-    stepEnd('attach_payment_method', base, {
-      result: 'success',
-      was_already_attached: !!paymentMethodCustomerId
-    }, pmStart);
-
-    logInfo("Payment method configured", {
-      ...baseLogOptions,
-      context: {
-        customerId: stripeCustomerId,
-        reusedExisting: reusedExistingCustomer,
-        wasAlreadyAttached: !!paymentMethodCustomerId,
-      },
-    });
-  } catch (e: any) {
-    stepError('attach_payment_method', base, e, {
-      reason_code: 'STRIPE_PAYMENT_FAILED',
-      payment_method_id: data.paymentMethodId
-    });
-
-    // ALWAYS log full technical details (unchanged)
-    logError("Stripe payment method attach failed", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      error: e,
-      context: {
-        phase,
-        customerId: stripeCustomerId,
-        paymentMethodId: data.paymentMethodId
+    // 5. Link Account to User Metadata (Updating existing block)
+    await supabase.auth.admin.updateUserById(currentUserId, {
+      user_metadata: {
+        account_id: currentAccountId,
+        account_created_at: new Date().toISOString()
       }
     });
 
-    // Return structured error if flag enabled, otherwise preserve legacy behavior
-    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-      const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-      errorResponse.trace_id = traceId; // Add trace ID to response
-      return new Response(JSON.stringify(errorResponse), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    } else {
-      // Legacy behavior - throw error as before
-      throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
-    }
-  }
+    // Unified result object for downstream logging
+    const accountTxResult = {
+      account_id: currentAccountId,
+      user_id: currentUserId
+    };
 
-  // ═══════════════════════════════════════════════════════════════
-  // STEP 4: Create subscription
-  // ═══════════════════════════════════════════════════════════════
-  phase = "stripe_subscription";
-  const subStart = Date.now();
-  stepStart('create_subscription', base, { plan_type: data.planType });
+    // accountTxError is already handled above (throws Error)
+    const accountTxError = null;
 
-  try {
-    const priceId = getStripePriceId(data.planType);
-    subscription = await stripe.subscriptions.create({
-      customer: stripeCustomerId!,
-      items: [{ price: priceId }],
-      trial_period_days: 3,
-      payment_behavior: "default_incomplete",
-      metadata: { source: data.source, plan_type: data.planType }
-    }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
-    stripeSubscriptionId = subscription.id;
-    createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
-
-    stepEnd('create_subscription', base, {
-      result: 'success',
-      subscription_id: subscription.id,
-      plan_type: data.planType,
-      status: subscription.status
-    }, subStart);
-
-    logInfo("Stripe subscription created", {
-      ...baseLogOptions,
-      context: {
-        subscriptionId: subscription.id,
-        planType: data.planType,
-        source: data.source,
-        status: subscription.status,
-      },
-    });
-  } catch (e: any) {
-    stepError('create_subscription', base, e, {
-      reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
-      plan_type: data.planType
-    });
-
-    // ALWAYS log full technical details (unchanged)
-    logError("Stripe subscription creation failed", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      error: e,
-      context: { phase, customerId: stripeCustomerId }
-    });
-
-    // Return structured error if flag enabled, otherwise preserve legacy behavior
-    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-      const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-      errorResponse.trace_id = traceId; // Add trace ID to response
-      return new Response(JSON.stringify(errorResponse), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    } else {
-      // Legacy behavior - throw error as before
-      throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
-    }
-  }
-}
-
-// DATABASE INSERT
-phase = "account_insert";
-const accountStart = Date.now();
-stepStart('create_account_atomic', base, { email: maskEmailForLogs(data.email) });
-
-const tempPassword = generateSecurePassword();
-const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-const billingState = data.zipCode ? getStateFromZip(data.zipCode) : "CA";
-
-let businessHoursValue = null;
-if (data.businessHours) {
-  try {
-    businessHoursValue = JSON.parse(data.businessHours);
-  } catch {
-    businessHoursValue = { text: data.businessHours };
-  }
-}
-
-const accountData = {
-  company_name: data.companyName,
-  trade: data.trade,
-  plan_type: data.planType,
-  phone_number_area_code: data.zipCode?.slice(0, 3) || null,
-  zip_code: data.zipCode || null,
-  business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
-  assistant_gender: data.assistantGender,
-  wants_advanced_voice: data.wantsAdvancedVoice,
-  company_website: data.website || null,
-  service_area: data.serviceArea || null,
-  emergency_policy: data.emergencyPolicy || null,
-  billing_state: billingState,
-};
-
-// Normalize plan_type to match SQL constraint (starter|professional|premium)
-const rawPlan = (accountData.plan_type || "starter")
-  .toString()
-  .trim()
-  .toLowerCase();
-
-accountData.plan_type =
-  rawPlan === "pro" ? "professional" :
-    rawPlan === "professional" ? "professional" :
-      rawPlan === "premium" ? "premium" :
-        "starter";
-
-// Normalize assistant_gender to match SQL constraint (male|female)
-const rawGender = (accountData.assistant_gender || "female")
-  .toString()
-  .trim()
-  .toLowerCase();
-
-accountData.assistant_gender =
-  rawGender === "male" ? "male" : "female";
-
-// Log normalized values before RPC
-
-// ═══════════════════════════════════════════════════════════════
-// MANUAL TRANSACTION: Create User -> Account -> Profile
-// ═══════════════════════════════════════════════════════════════
-
-// Note: existingUser with hasAccount was already checked before Stripe calls
-// If we're here, either existingUser doesn't have an account, or they're new
-if (existingUser && !existingUser.hasAccount) {
-  // User exists but has no account - we'll create an account for them
-  logInfo("Existing user found without account, creating account", {
-    ...baseLogOptions,
-    context: { email: data.email, userId: existingUser.id },
-  });
-  currentUserId = existingUser.id;
-} else if (!existingUser) {
-  // 1b. Create new Auth User
-  const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-    email: data.email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: {
-      full_name: data.name,
-      company_name: data.companyName,
-    }
-  });
-
-  if (userError) {
-    // Check if this is specifically "user already exists" error
-    if (userError.message?.includes("already been registered") ||
-      userError.message?.includes("already exists")) {
-      // Try to look them up in profiles as a fallback
-      const { data: fallbackProfile } = await supabase
-        .from("profiles")
-        .select("id, account_id")
-        .eq("email", data.email)
-        .maybeSingle();
-
-      if (fallbackProfile?.account_id) {
-        // They have an account - redirect to login
-        return new Response(
-          JSON.stringify({
-            error: "An account with this email already exists. Please log in instead.",
-            code: "ACCOUNT_EXISTS",
-            redirect: "/login",
-          }),
-          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (fallbackProfile?.id) {
-        // They exist but no account - use their ID
-        currentUserId = fallbackProfile.id;
-        logInfo("Recovered existing user ID from profile", {
-          ...baseLogOptions,
-          context: { email: data.email, userId: currentUserId },
-        });
-      } else {
-        // Can't recover - create admin alert and return error
-        await createAdminAlert(supabase, "user_creation_failed", {
-          email: data.email,
-          error: userError.message,
-          phase: "user_creation",
-          request_id,
-        });
-        throw new Error(`Auth User Creation Failed: ${userError.message}`);
-      }
-    } else {
-      // Different error - throw it
-      await createAdminAlert(supabase, "user_creation_failed", {
-        email: data.email,
-        error: userError.message,
-        phase: "user_creation",
-        request_id,
-      });
-      throw new Error(`Auth User Creation Failed: ${userError.message}`);
-    }
-  } else {
-    currentUserId = userData.user.id;
-  }
-}
-
-// 2. Create Account
-// NOTE: is_test_account field removed from initial insert to prevent errors if column doesn't exist
-// Will be updated after insert if test mode is active
-const { data: accountResult, error: accountError } = await supabase
-  .from("accounts")
-  .insert({
-    subscription_status: 'trial',
-    stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: stripeSubscriptionId,
-    ...accountData
-  })
-  .select("id")
-  .single();
-
-if (accountError) {
-  // Rollback user if possible, or just throw (manual rollback complex here)
-  throw new Error(`Account Insertion Failed: ${accountError.message}`);
-}
-currentAccountId = accountResult.id;
-
-// 3. Create/Link Profile
-const { error: profileError } = await supabase
-  .from("profiles")
-  .upsert({
-    id: currentUserId,
-    account_id: currentAccountId,
-    email: data.email,
-    name: data.name,
-    phone: data.phone,
-    is_primary: true,
-    role: 'customer',
-    // onboarding_status removed to fix schema mismatch (column missing in prod)
-  });
-
-if (profileError) {
-  throw new Error(`Profile Upsert Failed: ${profileError.message}`);
-}
-
-// 4. Assign owner role in account_members table (Corrected from user_roles)
-const { error: memberError } = await supabase
-  .from("account_members")
-  .insert({
-    user_id: currentUserId,
-    account_id: currentAccountId,
-    role: "owner"
-  });
-
-if (memberError) {
-  // Log but don't fail - link is critical but we have profile backup
-  logWarn("Failed to create account_member link", {
-    ...baseLogOptions,
-    error: memberError,
-    accountId: currentAccountId
-  });
-}
-
-// 5. Link Account to User Metadata (Updating existing block)
-await supabase.auth.admin.updateUserById(currentUserId, {
-  user_metadata: {
-    account_id: currentAccountId,
-    account_created_at: new Date().toISOString()
-  }
-});
-
-// Unified result object for downstream logging
-const accountTxResult = {
-  account_id: currentAccountId,
-  user_id: currentUserId
-};
-
-// accountTxError is already handled above (throws Error)
-const accountTxError = null;
-
-// DETAILED LOGGING: After account creation
-step: "create_account_transaction",
-  operation: "AFTER_CALL",
-    hasError: false,
-      hasData: true,
-        error: null,
-          result: accountTxResult,
+    // DETAILED LOGGING: After account creation
+    step: "create_account_transaction",
+      operation: "AFTER_CALL",
+        hasError: false,
+          hasData: true,
+            error: null,
+              result: accountTxResult,
     });
 
 // (Removed old error handling block as it is now redundant)
