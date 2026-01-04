@@ -1,33 +1,77 @@
-# Fix: Move Toasts to Top-Right to Avoid Vapi Widget Overlap
+# Fix Provisioning E.164 Regression + Onboarding Guardrails
 
-## Problem
+## Summary
 
-System notifications (toasts) were appearing in the bottom-right corner, where they were frequently obscured by the floating Vapi chat widget. This resulted in poor UX as users could miss important success or error messages.
+Fixes a provisioning failure caused by unformatted phone numbers being passed to Vapi, and adds server-side onboarding state management with guardrail UI components.
 
-## Solution
+## Root Cause
 
-Moved all toast notifications to the **Top-Right** of the screen.
+The `provision-phone-number` and `provision-vapi` Edge Functions were passing `phone` values directly to Vapi's `fallbackDestination.number` without E.164 normalization. Formatted strings like `(303) 555-1234` caused Vapi to reject with:
 
-- **Option A** selected: A consistent top-right position avoids the widget entirely.
-- Added explicit top margin/padding to ensure toasts do not render underneath the fixed `SiteHeader`.
+```
+{"message":["fallbackDestination.number must be a valid phone number in E.164 format."]}
+```
 
 ## Changes
 
-1. **`src/components/ui/sonner.tsx`**:
-    - Set `position="top-right"`.
-    - Added `mt-16` className to clear the header.
+### Phase 0: E.164 Fix (Critical)
 
-2. **`src/components/ui/toast.tsx` (Shadcn)**:
-    - Updated `ToastViewport` to use `sm:top-0` and `sm:right-0` on desktop.
-    - Added `sm:pt-20` to verify safe header clearance.
+| File | Change |
+|------|--------|
+| `validators.ts` | `formatPhoneE164` now returns `null` on invalid input. Added `tryFormatPhoneE164` with logging. |
+| `provision-phone-number/index.ts` | Uses `tryFormatPhoneE164` + `VAPI_FALLBACK_E164` env var fallback. Omits `fallbackDestination` if invalid (Vapi accepts this). |
+| `provision-vapi/index.ts` | Same pattern for consistency. |
+| `validators.test.ts` | Unit tests verifying null-return on invalid inputs. |
 
-## Assumptions
+### Phase 1-5: Onboarding Guardrails
 
-- `SiteHeader` is approximately `h-14` (56px).
-- `mt-16` (64px) and `pt-20` (80px) provide sufficient safe area.
+| Phase | Description |
+|-------|-------------|
+| 1 | RPC migration: `get_onboarding_state` (uses `phone_number_id` join), `track_onboarding_event` |
+| 2 | `useOnboardingState` hook with polling |
+| 3 | Dashboard `OnboardingUiGuardrail` + Phones tab `OnboardingRecoveryPanel` |
+| 4 | `detect-test-call-alert` cron function |
+| 5 | CI path triggers for onboarding components |
 
-## Verification
+## Testing
 
-- [x] **Desktop**: Verified toasts appear top-right and do not overlap the header.
-- [x] **Mobile**: Verified toasts appear at the top and respect safe areas.
-- [x] **Widget**: Confirmed no overlap with Vapi widget (bottom-right).
+- [x] Vapi API docs confirm `fallbackDestination` is optional
+- [x] Unit tests for `formatPhoneE164` pass
+- [ ] Manual: Create trial and verify provisioning completes
+
+## Rollback
+
+### Quick Rollback (ActivationStepper)
+
+```typescript
+// In src/pages/Activation.tsx, line 21
+const USE_NEW_FLOW = false;  // Change to false
+```
+
+### Full Rollback (Edge Functions)
+
+```bash
+# Revert to previous commit
+git checkout main -- supabase/functions/provision-phone-number/index.ts
+git checkout main -- supabase/functions/provision-vapi/index.ts
+git checkout main -- supabase/functions/_shared/validators.ts
+
+# Redeploy
+npx supabase functions deploy provision-phone-number --no-verify-jwt
+npx supabase functions deploy provision-vapi --no-verify-jwt
+```
+
+### Rollback RPC (if needed)
+
+```sql
+-- Run in Supabase SQL Editor
+DROP FUNCTION IF EXISTS get_onboarding_state(UUID);
+DROP FUNCTION IF EXISTS track_onboarding_event(TEXT, JSONB);
+```
+
+## Checklist
+
+- [x] Migrations applied
+- [x] Edge Functions deployed
+- [x] Branch pushed
+- [ ] PR merged to main
