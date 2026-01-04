@@ -8,9 +8,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneNumberCard } from "@/components/PhoneNumberCard";
-import { HelpCircle, Phone, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
+import { HelpCircle, Phone, ArrowRight, ShieldCheck, Loader2, Plus, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
+import { featureFlags } from "@/lib/featureFlags";
+import { trackOnboardingEvent, trackOnboardingError } from "@/lib/sentry-tracking";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PhoneNumbersTabProps {
     account: any;
@@ -19,13 +23,26 @@ interface PhoneNumbersTabProps {
 
 import { OnboardingRecoveryPanel } from "@/components/dashboard/OnboardingRecoveryPanel";
 
+// Add number wizard steps
+type AddNumberStep = 'config' | 'provisioning' | 'success' | 'error';
+
 export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps) {
+    const navigate = useNavigate();
     const [showForwardingInfo, setShowForwardingInfo] = useState(false);
     const [showTestInfo, setShowTestInfo] = useState(false);
     const [editingNumber, setEditingNumber] = useState<any>(null);
     const [editLabel, setEditLabel] = useState("");
     const [saving, setSaving] = useState(false);
     const { toast } = useToast();
+
+    // Add number modal state
+    const [showAddNumberModal, setShowAddNumberModal] = useState(false);
+    const [addNumberStep, setAddNumberStep] = useState<AddNumberStep>('config');
+    const [newNumberLabel, setNewNumberLabel] = useState("");
+    const [newNumberAreaCode, setNewNumberAreaCode] = useState("");
+    const [provisioningNumber, setProvisioningNumber] = useState(false);
+    const [newNumber, setNewNumber] = useState<string | null>(null);
+    const [provisionError, setProvisionError] = useState<string | null>(null);
 
     // Choose a primary RingSnap number to display.
     const primaryNumber = useMemo(() => {
@@ -104,6 +121,94 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
         }
     };
 
+    // Plan eligibility check
+    const isEligibleForAdditionalNumbers = account.plan_type !== 'starter';
+
+    // Handle Add Number button click
+    const handleAddNumberClick = () => {
+        trackOnboardingEvent('phone_number.add_clicked', {
+            planType: account.plan_type,
+            currentNumberCount: phoneNumbers?.length || 0
+        });
+
+        if (!isEligibleForAdditionalNumbers) {
+            // Redirect to billing for upgrade
+            navigate('/dashboard?tab=billing');
+            toast({
+                title: "Upgrade Required",
+                description: "Add additional phone numbers on Professional or Premium plans."
+            });
+            return;
+        }
+
+        if (!featureFlags.addPhoneNumberFlow) {
+            // Feature flag off - show coming soon
+            toast({
+                title: "Coming Soon",
+                description: "Adding additional phone numbers will be available soon. Contact support for immediate assistance."
+            });
+            return;
+        }
+
+        // Open the add number modal
+        setShowAddNumberModal(true);
+        setAddNumberStep('config');
+        setNewNumberLabel("");
+        setNewNumberAreaCode("");
+        setProvisionError(null);
+    };
+
+    // Handle provisioning a new number
+    const handleProvisionNumber = async () => {
+        setProvisioningNumber(true);
+        setProvisionError(null);
+        setAddNumberStep('provisioning');
+
+        try {
+            // Call the provision-phone-number edge function
+            const { data, error } = await supabase.functions.invoke('provision-phone-number', {
+                body: {
+                    accountId: account.id,
+                    areaCode: newNumberAreaCode || undefined,
+                    label: newNumberLabel || undefined
+                }
+            });
+
+            if (error) throw error;
+
+            if (data?.phone_number) {
+                setNewNumber(data.phone_number);
+                setAddNumberStep('success');
+                trackOnboardingEvent('phone_number.add_success', {
+                    phoneNumber: data.phone_number
+                });
+            } else if (data?.error) {
+                throw new Error(data.error);
+            } else {
+                throw new Error('No phone number returned');
+            }
+        } catch (error: any) {
+            const errorMessage = error.message || 'Failed to provision phone number';
+            setProvisionError(errorMessage);
+            setAddNumberStep('error');
+            trackOnboardingError('phone_number.add_failed', error, {
+                areaCode: newNumberAreaCode || null,
+                accountId: account.id
+            });
+        } finally {
+            setProvisioningNumber(false);
+        }
+    };
+
+    // Reset and close add number modal
+    const handleCloseAddNumberModal = () => {
+        setShowAddNumberModal(false);
+        // Reload if we added a number
+        if (addNumberStep === 'success') {
+            window.location.reload();
+        }
+    };
+
     return (
         <div className="space-y-6">
             <OnboardingRecoveryPanel accountId={account.id} />
@@ -148,10 +253,11 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
             </Card>
 
             {/* Header + Add Button */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <h2 className="text-2xl font-bold">Your Phone Numbers</h2>
-                <Button disabled={account.plan_type === "starter"}>
-                    {account.plan_type === "starter"
+                <Button onClick={handleAddNumberClick} className="w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {!isEligibleForAdditionalNumbers
                         ? "Upgrade to Add Numbers"
                         : "Add Phone Number"}
                 </Button>
@@ -347,6 +453,132 @@ export function PhoneNumbersTab({ account, phoneNumbers }: PhoneNumbersTabProps)
                                 "Save"
                             )}
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Add Phone Number Modal */}
+            <Dialog open={showAddNumberModal} onOpenChange={handleCloseAddNumberModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {addNumberStep === 'success' ? 'Number Added!' :
+                             addNumberStep === 'error' ? 'Provisioning Failed' :
+                             addNumberStep === 'provisioning' ? 'Adding Number...' :
+                             'Add Phone Number'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {addNumberStep === 'config' && "Add a new RingSnap number to your account."}
+                            {addNumberStep === 'provisioning' && "Please wait while we provision your new number..."}
+                            {addNumberStep === 'success' && "Your new RingSnap number is ready to use."}
+                            {addNumberStep === 'error' && "We couldn't provision a new number. Please try again."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {/* Step: Config */}
+                    {addNumberStep === 'config' && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="new-label">Label (optional)</Label>
+                                <Input
+                                    id="new-label"
+                                    placeholder="e.g., Sales Line, Support"
+                                    value={newNumberLabel}
+                                    onChange={(e) => setNewNumberLabel(e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    A friendly name to identify this number
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="area-code">Preferred Area Code (optional)</Label>
+                                <Input
+                                    id="area-code"
+                                    placeholder="e.g., 415, 212"
+                                    value={newNumberAreaCode}
+                                    onChange={(e) => setNewNumberAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                    maxLength={3}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    We'll try to match your preferred area code if available
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step: Provisioning */}
+                    {addNumberStep === 'provisioning' && (
+                        <div className="py-8 flex flex-col items-center justify-center space-y-4">
+                            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">
+                                Securing your new phone number...
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Step: Success */}
+                    {addNumberStep === 'success' && newNumber && (
+                        <div className="py-6 flex flex-col items-center justify-center space-y-4">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <CheckCircle className="h-8 w-8 text-green-600" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-2xl font-bold font-mono">{formatPhoneNumber(newNumber)}</p>
+                                {newNumberLabel && (
+                                    <p className="text-sm text-muted-foreground mt-1">{newNumberLabel}</p>
+                                )}
+                            </div>
+                            <Alert className="mt-4">
+                                <AlertDescription className="text-sm">
+                                    This number is now active and linked to your primary assistant.
+                                    Set up call forwarding to start receiving calls.
+                                </AlertDescription>
+                            </Alert>
+                        </div>
+                    )}
+
+                    {/* Step: Error */}
+                    {addNumberStep === 'error' && (
+                        <div className="py-6 flex flex-col items-center justify-center space-y-4">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                                <AlertCircle className="h-8 w-8 text-red-600" />
+                            </div>
+                            <Alert variant="destructive">
+                                <AlertDescription>
+                                    {provisionError || 'An unknown error occurred'}
+                                </AlertDescription>
+                            </Alert>
+                        </div>
+                    )}
+
+                    <DialogFooter className="flex-col sm:flex-row gap-2">
+                        {addNumberStep === 'config' && (
+                            <>
+                                <Button variant="outline" onClick={handleCloseAddNumberModal} className="w-full sm:w-auto">
+                                    Cancel
+                                </Button>
+                                <Button onClick={handleProvisionNumber} className="w-full sm:w-auto">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add Number
+                                </Button>
+                            </>
+                        )}
+                        {addNumberStep === 'success' && (
+                            <Button onClick={handleCloseAddNumberModal} className="w-full">
+                                Done
+                            </Button>
+                        )}
+                        {addNumberStep === 'error' && (
+                            <>
+                                <Button variant="outline" onClick={handleCloseAddNumberModal} className="w-full sm:w-auto">
+                                    Cancel
+                                </Button>
+                                <Button onClick={() => setAddNumberStep('config')} className="w-full sm:w-auto">
+                                    Try Again
+                                </Button>
+                            </>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

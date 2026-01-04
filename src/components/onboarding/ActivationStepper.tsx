@@ -1,17 +1,23 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useOnboardingState, OnboardingState } from "@/hooks/useOnboardingState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Check, Copy, Phone, ArrowRight, ExternalLink, Loader2, RefreshCw, Smartphone } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Check, Copy, Phone, ArrowRight, ExternalLink, Loader2, RefreshCw, Smartphone, AlertTriangle, HelpCircle, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/utils";
 import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { useNavigate } from "react-router-dom";
+import { featureFlags } from "@/lib/featureFlags";
+import { trackOnboardingEvent } from "@/lib/sentry-tracking";
 
 interface ActivationStepperProps {
     accountId: string;
 }
+
+// Timeout before showing troubleshooting panel (25 seconds)
+const TROUBLESHOOTING_TIMEOUT_MS = 25000;
 
 export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
     const navigate = useNavigate();
@@ -19,6 +25,11 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
     const [activeStep, setActiveStep] = useState(1);
     const [verifying, setVerifying] = useState(false);
     const [copiedNumber, setCopiedNumber] = useState(false);
+
+    // Troubleshooting state
+    const [callAttemptedAt, setCallAttemptedAt] = useState<Date | null>(null);
+    const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+    const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
 
     useEffect(() => {
         if (state) {
@@ -38,15 +49,64 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
         let intervalId: NodeJS.Timeout;
         const shouldPoll =
             (activeStep === 2 && !state.test_call_detected) ||
-            (activeStep === 4 && !state.test_call_detected); // If verifying, we also want to catch test calls
+            (activeStep === 4 && !state.test_call_detected);
 
         if (shouldPoll) {
             intervalId = setInterval(() => {
                 refreshState();
+                setLastCheckedAt(new Date());
             }, 5000);
         }
         return () => clearInterval(intervalId);
     }, [state, activeStep, refreshState]);
+
+    // Troubleshooting timeout effect
+    useEffect(() => {
+        if (!featureFlags.activationTroubleshooting) return;
+        if (!callAttemptedAt || state?.test_call_detected || showTroubleshooting) return;
+
+        const timeout = setTimeout(() => {
+            setShowTroubleshooting(true);
+            trackEvent('onboarding.test_call_troubleshoot_shown');
+            trackOnboardingEvent('activation.troubleshooting_shown', {
+                phoneNumberId: state?.primary_phone_number_id || null,
+                secondsWaited: Math.round((Date.now() - callAttemptedAt.getTime()) / 1000)
+            });
+        }, TROUBLESHOOTING_TIMEOUT_MS);
+
+        return () => clearTimeout(timeout);
+    }, [callAttemptedAt, state?.test_call_detected, showTroubleshooting, trackEvent, state?.primary_phone_number_id]);
+
+    // Reset troubleshooting when test call detected
+    useEffect(() => {
+        if (state?.test_call_detected) {
+            setShowTroubleshooting(false);
+            trackOnboardingEvent('activation.test_call_detected', {
+                phoneNumberId: state?.primary_phone_number_id || null
+            });
+        }
+    }, [state?.test_call_detected, state?.primary_phone_number_id]);
+
+    // Handle Call Now click with tracking
+    const handleCallNowClick = useCallback(async () => {
+        setCallAttemptedAt(new Date());
+        setShowTroubleshooting(false);
+        await trackEvent('onboarding.test_call_initiated', {
+            phone_number_id: state?.primary_phone_number_id,
+            ring_snap_number: state?.primary_phone_number,
+            route: '/activation',
+            user_agent: navigator.userAgent
+        });
+        trackOnboardingEvent('activation.test_call_initiated', {
+            phoneNumberId: state?.primary_phone_number_id || null
+        });
+    }, [trackEvent, state?.primary_phone_number_id, state?.primary_phone_number]);
+
+    // Handle proceeding to forwarding step without test call
+    const handleSkipToForwarding = useCallback(() => {
+        setActiveStep(3);
+        toast.info("You can always test your number later from the dashboard.");
+    }, []);
 
     const handleCopyNumber = () => {
         if (state?.primary_phone_number) {
@@ -156,15 +216,15 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
                         <CardContent className="space-y-6">
                             <div className="bg-muted p-6 rounded-lg text-center space-y-4">
                                 <p className="text-sm text-muted-foreground uppercase tracking-wide">Call this number now</p>
-                                <div className="text-3xl sm:text-4xl font-bold text-foreground">
+                                <div className="text-3xl sm:text-4xl font-bold text-foreground break-all">
                                     {state.primary_phone_number ? formatPhoneNumber(state.primary_phone_number) : "..."}
                                 </div>
-                                <div className="flex justify-center gap-3">
+                                <div className="flex flex-wrap justify-center gap-3">
                                     <Button variant="outline" size="sm" onClick={handleCopyNumber}>
                                         {copiedNumber ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
                                         Copy
                                     </Button>
-                                    <Button variant="default" size="sm" asChild>
+                                    <Button variant="default" size="sm" asChild onClick={handleCallNowClick}>
                                         <a href={`tel:${state.primary_phone_number}`}>
                                             <Phone className="mr-2 h-4 w-4" />
                                             Call Now
@@ -173,9 +233,89 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-center p-4 bg-amber-50 rounded-md text-amber-800 text-sm gap-3">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Waiting for you to complete the call...
+                            {/* Waiting status */}
+                            {!showTroubleshooting && (
+                                <div className="flex items-center justify-center p-4 bg-amber-50 rounded-md text-amber-800 text-sm gap-3">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <div className="text-left">
+                                        <div>Waiting for you to complete the call...</div>
+                                        {lastCheckedAt && (
+                                            <div className="text-xs text-amber-600 mt-1">
+                                                Last checked: {lastCheckedAt.toLocaleTimeString()}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Troubleshooting Panel */}
+                            {showTroubleshooting && featureFlags.activationTroubleshooting && (
+                                <Alert className="border-amber-200 bg-amber-50">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                    <AlertTitle className="text-amber-800">Call not detected yet?</AlertTitle>
+                                    <AlertDescription className="text-amber-700 space-y-3">
+                                        <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+                                            <li>Make sure you stayed on the call for at least 10 seconds</li>
+                                            <li>Try calling from a different phone</li>
+                                            <li>Check that you dialed the correct number</li>
+                                        </ul>
+                                        <div className="flex flex-wrap gap-2 pt-3">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    handleCallNowClick();
+                                                    setShowTroubleshooting(false);
+                                                }}
+                                                asChild
+                                            >
+                                                <a href={`tel:${state.primary_phone_number}`}>
+                                                    <Phone className="mr-2 h-3 w-3" />
+                                                    Try Again
+                                                </a>
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    refreshState();
+                                                    setLastCheckedAt(new Date());
+                                                }}
+                                            >
+                                                <RefreshCw className="mr-2 h-3 w-3" />
+                                                Refresh Status
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={handleSkipToForwarding}
+                                            >
+                                                Continue to Forwarding
+                                                <ArrowRight className="ml-2 h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div className="pt-2 border-t border-amber-200 mt-3">
+                                            <a
+                                                href="mailto:support@ringsnap.com?subject=Test%20Call%20Issue"
+                                                className="text-xs text-amber-600 hover:text-amber-800 flex items-center gap-1"
+                                            >
+                                                <MessageCircle className="h-3 w-3" />
+                                                Contact Support
+                                            </a>
+                                        </div>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {/* Skip option (always visible) */}
+                            <div className="pt-2 border-t">
+                                <Button
+                                    variant="ghost"
+                                    className="w-full text-xs text-muted-foreground"
+                                    onClick={handleSkipToForwarding}
+                                >
+                                    Skip test call and set up forwarding
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

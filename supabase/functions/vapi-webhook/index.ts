@@ -307,6 +307,9 @@ Deno.serve(withSentryEdge(
                 return new Response(JSON.stringify({ message: "Skipped: unmapped" }), { status: 200, headers: corsHeaders });
             }
 
+            // Track activation call if account is in onboarding
+            await trackActivationCallIfApplicable(supabase, mappingResult.accountId!, mappingResult.phoneNumberId);
+
             // Extraction & Build Record
             const callRecord = buildCallRecord(call, message, mappingResult, body);
 
@@ -504,6 +507,8 @@ function buildCallRecord(
         // Rich Details from Parser
         record.caller_name = details.callerName;
         record.reason = details.reason;
+        record.reason_source = details.reasonSource;
+        record.tag_source = details.tagSource;
         record.outcome = details.outcome;
         record.booked = details.booked;
         record.lead_captured = details.leadCaptured;
@@ -682,5 +687,48 @@ async function createAppointmentFromCall(
             payload: { error: String(e) },
             error: String(e)
         });
+    }
+}
+
+/**
+ * Track activation call event if account is in onboarding window
+ * This is diagnostic only - does not mark activation complete
+ */
+async function trackActivationCallIfApplicable(
+    supabase: ReturnType<typeof createClient>,
+    accountId: string,
+    phoneNumberId: string | null
+): Promise<void> {
+    try {
+        // Check if there's a recent onboarding event (within last 30 minutes)
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+        const { data: recentEvents } = await supabase
+            .from('system_events')
+            .select('id')
+            .eq('account_id', accountId)
+            .in('event_name', ['onboarding.test_call_initiated', 'onboarding.verification_started'])
+            .gte('created_at', thirtyMinutesAgo)
+            .limit(1);
+
+        if (recentEvents && recentEvents.length > 0) {
+            // Account is in activation window - log the call received event
+            await supabase.from('system_events').insert({
+                event_name: 'onboarding.activation_call_received',
+                level: 'info',
+                account_id: accountId,
+                metadata: { phone_number_id: phoneNumberId },
+                trace_id: crypto.randomUUID()
+            });
+
+            console.log(JSON.stringify({
+                event: 'activation_call_tracked',
+                accountId,
+                phoneNumberId
+            }));
+        }
+    } catch (e) {
+        // Fail silently - this is diagnostic only
+        console.warn('Failed to track activation call:', e);
     }
 }
