@@ -35,7 +35,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
-import { generateReferralCode, formatPhoneE164 } from "../_shared/validators.ts";
+import { generateReferralCode, tryFormatPhoneE164 } from "../_shared/validators.ts";
 import { POOL_CONFIG } from "../_shared/pool-config.ts";
 import { provisionPhoneNumber } from "../_shared/telephony.ts";
 
@@ -283,24 +283,35 @@ serve(async (req) => {
         context: { areaCode }
       });
 
+      // Resolve fallback phone number for Vapi
+      // Priority: 1) User's phone (normalized) 2) Env var 3) Omit if all invalid
+      const VAPI_FALLBACK_E164 = Deno.env.get("VAPI_FALLBACK_E164");
+      const fallbackE164 = tryFormatPhoneE164(phone, { accountId })
+        || VAPI_FALLBACK_E164
+        || null;
+
+      logInfo("Vapi fallback phone resolution", {
+        ...baseLogOptions,
+        accountId,
+        context: {
+          rawPhoneMasked: phone ? phone.substring(0, 6) + "***" : "empty",
+          resolvedFallback: fallbackE164 || "omitted",
+          usedEnvVar: !tryFormatPhoneE164(phone) && !!VAPI_FALLBACK_E164,
+        },
+      });
+
+      // Build fallbackDestination only if we have a valid E.164
+      const fallbackDestination = fallbackE164 ? {
+        type: "number" as const,
+        number: fallbackE164,
+      } : undefined;
+
       try {
         // Option A: Try with area code first, fallback to no area code if unavailable
         let phoneData;
         try {
           phoneData = await retryWithBackoff(
             async () => {
-              // Log payload for observability (redact sensitive parts)
-              const fallbackE164 = formatPhoneE164(phone || "4155551234");
-              logInfo("Vapi phone payload (legacy path)", {
-                ...baseLogOptions,
-                accountId,
-                context: {
-                  fallbackE164,
-                  rawPhone: phone ? phone.substring(0, 6) + "***" : "empty",
-                  areaCode,
-                },
-              });
-
               const phoneResponse = await fetch("https://api.vapi.ai/phone-number", {
                 method: "POST",
                 headers: {
@@ -310,11 +321,8 @@ serve(async (req) => {
                 body: JSON.stringify({
                   provider: "vapi",
                   name: `${companyName} - Primary`,
-                  fallbackDestination: {
-                    type: "number",
-                    // CRITICAL: Normalize to E.164 - Vapi requires strict format
-                    number: formatPhoneE164(phone || "4155551234"),
-                  },
+                  // Only include fallbackDestination if we have a valid E.164
+                  ...(fallbackDestination && { fallbackDestination }),
                   numberDesiredAreaCode: areaCode,
                 }),
               });
@@ -358,11 +366,8 @@ serve(async (req) => {
                   body: JSON.stringify({
                     provider: "vapi",
                     name: `${companyName} - Primary`,
-                    fallbackDestination: {
-                      type: "number",
-                      // CRITICAL: Normalize to E.164 - Vapi requires strict format
-                      number: formatPhoneE164(phone || "4155551234"),
-                    },
+                    // Only include fallbackDestination if we have a valid E.164
+                    ...(fallbackDestination && { fallbackDestination }),
                     // No numberDesiredAreaCode - accept any available number
                   }),
                 });
