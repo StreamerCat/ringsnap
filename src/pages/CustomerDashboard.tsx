@@ -219,7 +219,7 @@ export default function CustomerDashboard() {
           .from("state_recording_laws")
           .select("*")
           .eq("state_code", profileData.accounts.billing_state)
-          .single();
+          .maybeSingle();
         setRecordingState(stateData);
       }
 
