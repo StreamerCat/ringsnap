@@ -34,9 +34,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmailForLogs, type BaseLogContext } from "../_shared/logging.ts";
+import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
-import { isValidPhoneNumber, formatPhoneE164 } from "../_shared/validators.ts";
+import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 
@@ -72,7 +72,6 @@ interface TrialCreationErrorResponse {
   error?: string;
   message?: string;
   request_id?: string;
-  trace_id?: string; // LLM-native trace ID for debugging
 }
 
 type ErrorCode =
@@ -189,8 +188,10 @@ async function createAdminAlert(
       },
       resolved: false,
     });
+    console.log(`[${FUNCTION_NAME}] Admin alert created: ${alertType}`);
   } catch (err: any) {
     // Don't fail the main flow if alert creation fails
+    console.error(`[${FUNCTION_NAME}] Failed to create admin alert:`, err?.message);
   }
 }
 
@@ -206,26 +207,14 @@ async function trackEvent(
 ): Promise<void> {
   // Allow tracking events without account_id (e.g. signup_started)
   try {
-    const { error } = await supabase.from("analytics_events").insert({
+    await supabase.from("analytics_events").insert({
       account_id: accountId, // Can be null now
       user_id: userId,
       event_type: eventType,
       metadata: metadata,
     });
-
-    if (error) {
-      // Resilience for foreign key violations on user_id
-      if (error.code === '23503' && error.message.includes('user_id')) {
-        await supabase.from("analytics_events").insert({
-          account_id: accountId,
-          user_id: null,
-          event_type: eventType,
-          metadata: { ...metadata, original_user_id: userId },
-        });
-      } else {
-      }
-    }
   } catch (err) {
+    console.error(`[${FUNCTION_NAME}] Failed to track event ${eventType}:`, err);
   }
 }
 
@@ -261,6 +250,7 @@ async function getExistingUserByEmail(
       accountId: profile.account_id,
     };
   } catch (err) {
+    console.error(`[${FUNCTION_NAME}] Error checking existing user:`, err);
     return null;
   }
 }
@@ -273,6 +263,7 @@ function getStripePriceId(planType: string): string {
   // Check for live key or if the key contains "_live_" (to be extra safe)
   const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_") || stripeKey.includes("_live_");
 
+  console.log(`[getStripePriceId] Key prefix: ${stripeKey.substring(0, 8)}... isLive=${isLive} plan=${planType}`);
 
   // Use hardcoded production IDs if we are in live mode
   // This resolves an issue where environment variables were pointing to test IDs
@@ -285,11 +276,13 @@ function getStripePriceId(planType: string): string {
 
     const liveId = livePriceIds[planType as keyof typeof livePriceIds];
     if (liveId) {
+      console.log(`[getStripePriceId] Using HARDCODED LIVE price ID: ${liveId}`);
       return liveId;
     }
   }
 
   // Fallback to environment variables (Test Mode or missing config)
+  console.log("[getStripePriceId] Falling back to ENV VAR price IDs (Test Mode)");
 
   // Fallback to environment variables (Test Mode)
   const priceIds = {
@@ -365,38 +358,34 @@ async function hashRequest(body: any): Promise<string> {
 
 /**
  * Cleanup Stripe resources on failure (compensation logic)
- * 
- * IMPORTANT: Only pass resources that were CREATED in this request.
- * Do NOT pass reused customer IDs - cleanup must not delete customers
- * that existed before this request.
  */
 async function cleanupStripeResources(
   stripe: Stripe,
-  createdCustomerId: string | null,  // Only cleanup if WE created it in this request
-  createdSubscriptionId: string | null, // Only cleanup if WE created it in this request
+  customerId: string | null,
+  subscriptionId: string | null,
   logOptions: any
 ): Promise<void> {
   try {
-    if (createdSubscriptionId) {
+    if (subscriptionId) {
       logWarn("Canceling Stripe subscription due to account creation failure", {
         ...logOptions,
-        context: { subscriptionId: createdSubscriptionId },
+        context: { subscriptionId },
       });
-      await stripe.subscriptions.cancel(createdSubscriptionId);
+      await stripe.subscriptions.cancel(subscriptionId);
     }
 
-    if (createdCustomerId) {
+    if (customerId) {
       logWarn("Deleting Stripe customer due to account creation failure", {
         ...logOptions,
-        context: { customerId: createdCustomerId },
+        context: { customerId },
       });
-      await stripe.customers.del(createdCustomerId);
+      await stripe.customers.del(customerId);
     }
   } catch (cleanupError: any) {
     logError("Stripe cleanup failed (non-critical)", {
       ...logOptions,
       error: cleanupError,
-      context: { customerId: createdCustomerId, subscriptionId: createdSubscriptionId },
+      context: { customerId, subscriptionId },
     });
   }
 }
@@ -405,8 +394,6 @@ async function cleanupStripeResources(
  * Map Stripe error to user-friendly error response
  * ONLY used when ENABLE_STRUCTURED_TRIAL_ERRORS is true
  * Preserves legacy fields for backward compatibility
- * 
- * Prefers Stripe error fields (type, code, decline_code) over message parsing
  */
 function mapStripeErrorToUserError(
   stripeError: any,
@@ -414,171 +401,126 @@ function mapStripeErrorToUserError(
   correlationId: string,
   requestId?: string
 ): TrialCreationErrorResponse {
-  // Extract Stripe error fields - more reliable than message parsing
-  const errorCode = stripeError.code || '';
-  const declineCode = stripeError.raw?.decline_code || stripeError.decline_code || '';
   const message = stripeError.message?.toLowerCase() || '';
 
-  // Helper to build error response
-  const buildResponse = (
-    code: string,
-    userMessage: string,
-    action: string
-  ): TrialCreationErrorResponse => ({
+  // Card not supported
+  if (message.includes('does not support this type of purchase')) {
+    return {
+      success: false,
+      errorCode: 'CARD_NOT_SUPPORTED',
+      userMessage: 'This card was declined by your bank. Please try a different card or contact your bank.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      // Legacy fields
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Generic card declined
+  if (message.includes('card_declined') || message.includes('card was declined') || message.includes('declined')) {
+    return {
+      success: false,
+      errorCode: 'CARD_DECLINED',
+      userMessage: 'Your card was declined. Please try a different card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Insufficient funds
+  if (message.includes('insufficient') || message.includes('funds')) {
+    return {
+      success: false,
+      errorCode: 'INSUFFICIENT_FUNDS',
+      userMessage: 'Your card was declined due to insufficient funds. Please try a different card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Expired card
+  if (message.includes('expired')) {
+    return {
+      success: false,
+      errorCode: 'CARD_EXPIRED',
+      userMessage: 'Your card has expired. Please use a valid card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Update your payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Incorrect CVC
+  if (message.includes('cvc') || message.includes('security code') || message.includes('incorrect_cvc')) {
+    return {
+      success: false,
+      errorCode: 'INCORRECT_CVC',
+      userMessage: 'The security code (CVC) was incorrect. Please check and try again.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Verify your card security code',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Authentication required
+  if (message.includes('authentication') || message.includes('3d secure')) {
+    return {
+      success: false,
+      errorCode: 'PAYMENT_AUTH_REQUIRED',
+      userMessage: 'Your card requires additional verification. Please try a different card.',
+      debugMessage: stripeError.message,
+      correlationId,
+      phase,
+      retryable: true,
+      suggestedAction: 'Try a different payment method',
+      error: stripeError.message,
+      message: stripeError.message,
+      request_id: requestId
+    };
+  }
+
+  // Fallback for payment errors
+  return {
     success: false,
-    errorCode: code,
-    userMessage,
+    errorCode: 'PAYMENT_PROCESSOR_ERROR',
+    userMessage: 'We could not process your payment. Please try again or use a different card.',
     debugMessage: stripeError.message,
     correlationId,
     phase,
     retryable: true,
-    suggestedAction: action,
-    // Legacy fields
+    suggestedAction: 'Try again or contact support',
     error: stripeError.message,
     message: stripeError.message,
-    request_id: requestId,
-  });
-
-  // ═══════════════════════════════════════════════════════════════
-  // PRIMARY: Check by Stripe error code (most reliable)
-  // ═══════════════════════════════════════════════════════════════
-
-  // Card declined - check decline_code for specifics
-  if (errorCode === 'card_declined') {
-    if (declineCode === 'insufficient_funds') {
-      return buildResponse(
-        'INSUFFICIENT_FUNDS',
-        'Your card was declined due to insufficient funds. Please try a different card.',
-        'Try a different payment method'
-      );
-    }
-    if (declineCode === 'expired_card') {
-      return buildResponse(
-        'CARD_EXPIRED',
-        'Your card has expired. Please use a valid card.',
-        'Update your payment method'
-      );
-    }
-    if (declineCode === 'incorrect_cvc') {
-      return buildResponse(
-        'INCORRECT_CVC',
-        'The security code (CVC) was incorrect. Please check and try again.',
-        'Verify your card security code'
-      );
-    }
-    if (declineCode === 'card_not_supported') {
-      return buildResponse(
-        'CARD_NOT_SUPPORTED',
-        'This card was declined by your bank. Please try a different card or contact your bank.',
-        'Try a different payment method'
-      );
-    }
-    if (declineCode === 'do_not_honor') {
-      return buildResponse(
-        'CARD_DECLINED',
-        'Your card was declined. Please contact your bank or try a different card.',
-        'Try a different payment method'
-      );
-    }
-    // Generic card declined
-    return buildResponse(
-      'CARD_DECLINED',
-      'Your card was declined. Please try a different card.',
-      'Try a different payment method'
-    );
-  }
-
-  if (errorCode === 'incorrect_cvc') {
-    return buildResponse(
-      'INCORRECT_CVC',
-      'The security code (CVC) was incorrect. Please check and try again.',
-      'Verify your card security code'
-    );
-  }
-
-  if (errorCode === 'expired_card') {
-    return buildResponse(
-      'CARD_EXPIRED',
-      'Your card has expired. Please use a valid card.',
-      'Update your payment method'
-    );
-  }
-
-  if (errorCode === 'processing_error') {
-    return buildResponse(
-      'PAYMENT_PROCESSOR_ERROR',
-      'There was an error processing your card. Please try again.',
-      'Try again in a moment'
-    );
-  }
-
-  if (errorCode === 'authentication_required') {
-    return buildResponse(
-      'PAYMENT_AUTH_REQUIRED',
-      'Your card requires additional verification. Please try a different card.',
-      'Try a different payment method'
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // FALLBACK: Message-based detection for edge cases
-  // ═══════════════════════════════════════════════════════════════
-
-  if (message.includes('does not support this type of purchase')) {
-    return buildResponse(
-      'CARD_NOT_SUPPORTED',
-      'This card was declined by your bank. Please try a different card or contact your bank.',
-      'Try a different payment method'
-    );
-  }
-
-  if (message.includes('card was declined') || message.includes('declined')) {
-    return buildResponse(
-      'CARD_DECLINED',
-      'Your card was declined. Please try a different card.',
-      'Try a different payment method'
-    );
-  }
-
-  if (message.includes('insufficient') || message.includes('funds')) {
-    return buildResponse(
-      'INSUFFICIENT_FUNDS',
-      'Your card was declined due to insufficient funds. Please try a different card.',
-      'Try a different payment method'
-    );
-  }
-
-  if (message.includes('expired')) {
-    return buildResponse(
-      'CARD_EXPIRED',
-      'Your card has expired. Please use a valid card.',
-      'Update your payment method'
-    );
-  }
-
-  if (message.includes('cvc') || message.includes('security code')) {
-    return buildResponse(
-      'INCORRECT_CVC',
-      'The security code (CVC) was incorrect. Please check and try again.',
-      'Verify your card security code'
-    );
-  }
-
-  if (message.includes('authentication') || message.includes('3d secure')) {
-    return buildResponse(
-      'PAYMENT_AUTH_REQUIRED',
-      'Your card requires additional verification. Please try a different card.',
-      'Try a different payment method'
-    );
-  }
-
-  // Fallback for any other payment errors
-  return buildResponse(
-    'PAYMENT_PROCESSOR_ERROR',
-    'We could not process your payment. Please try again or use a different card.',
-    'Try again or contact support'
-  );
-}
+    request_id: requestId
+  };
+};
 
 
 /**
@@ -595,6 +537,7 @@ async function withRetry<T>(
       return await fn();
     } catch (err: any) {
       lastError = err;
+      console.warn(`[${options.operationName}] Attempt ${i + 1} failed: ${err.message}`);
 
       // Don't retry if it looks like a permanent validation error (e.g. 400s)
       if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
@@ -611,26 +554,17 @@ async function withRetry<T>(
 }
 
 Deno.serve(async (req: Request) => {
+  console.log("FUNCTION VERSION: 2025-12-10-LOGGING-FIX-V3");
   const request_id = crypto.randomUUID();
-  const correlationId = extractCorrelationId(req); // Legacy compatibility
-  const traceId = extractTraceId(req); // Primary trace ID for LLM-native logging
-
+  const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
     functionName: FUNCTION_NAME,
     correlationId,
     request_id,
   };
 
-  // Base context for step logging
-  let base: BaseLogContext = {
-    functionName: FUNCTION_NAME,
-    traceId,
-    accountId: null,
-    userId: null,
-  };
-
   // Initialize Sentry for error tracking
-  initSentry(FUNCTION_NAME, { correlationId: traceId });
+  initSentry(FUNCTION_NAME, { correlationId });
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -657,7 +591,7 @@ Deno.serve(async (req: Request) => {
   }
 
   let currentAccountId: string | null = null;
-  let currentUserId: string | null = null;
+  let currentUserId: string | null = null; // Restore missing var
   // Initialize customer/subscription as basic objects to satisfy TS before assignment
   let customer: any = null;
   let subscription: any = null;
@@ -665,18 +599,9 @@ Deno.serve(async (req: Request) => {
   let stripeSubscriptionId: string | null = null;
   let phase = "start";
 
-  // Hoisted to outer scope so catch block can access them
-  let supabase: any = null;
-  let stripe: Stripe | null = null;
-  let requestEmail: string | null = null; // For logging in catch block
-
-  // Track resources created in this request for safe cleanup
-  let createdStripeCustomerId: string | null = null;
-  let createdStripeSubscriptionId: string | null = null;
-
   try {
-
-    // Initialize Supabase client
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+    // ... Initialization ...
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -684,11 +609,11 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing Supabase environment variables");
     }
 
-    supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // Initialize Stripe client
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
-    stripe = stripeKey ? new Stripe(stripeKey, {
+    // Only init stripe if key exists to avoid crash, though assertEnv checks it later
+    const stripe = stripeKey ? new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
       httpClient: Stripe.createFetchHttpClient(),
     }) : null;
@@ -733,21 +658,19 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "idempotency_check", message: err.message, stack: err.stack, raw: err }));
         logWarn("Idempotency check error (continuing)", { ...baseLogOptions, error: err });
       }
     }
 
     // ... Input Validation ...
     phase = "validate_input";
-    const validateStart = Date.now();
-    stepStart('validate_input', base);
-
     let rawData: any;
     try {
       rawData = await req.json();
     } catch (err: any) {
-      stepError('validate_input', base, err, { reason_code: 'INVALID_JSON' });
-      return new Response(JSON.stringify({ error: "Invalid JSON", trace_id: traceId }), { status: 400, headers: corsHeaders });
+      console.error(JSON.stringify({ request_id, phase, message: err.message }));
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: corsHeaders });
     }
 
     // ... Schema Parse ...
@@ -756,13 +679,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       data = createTrialSchema.parse(normalizedData);
-      stepEnd('validate_input', base, { result: 'success', email: maskEmailForLogs(data.email) }, validateStart);
     } catch (zodError: any) {
-      stepError('validate_input', base, zodError, {
-        reason_code: 'VALIDATION_FAILED',
-        errors: zodError.errors
-      });
-
       logWarn("Validation error in create-trial", {
         ...baseLogOptions,
         context: { errors: zodError.errors, rawLeadId: rawData.leadId },
@@ -772,7 +689,6 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           error: "Invalid input data",
           details: zodError.errors,
-          trace_id: traceId,
         }),
         {
           status: 400,
@@ -791,9 +707,6 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    // Persist email to outer scope for catch block logging
-    requestEmail = data.email;
-
     // We can't track 'signup_started' in DB yet because we don't have an account_id.
     // We will track it once the account is created.
 
@@ -802,6 +715,7 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     if (!isValidPhoneNumber(data.phone)) {
+      console.log("[create-trial] Invalid phone number", { phone: data.phone });
       return new Response(
         JSON.stringify({ error: "Invalid phone number format" }),
         {
@@ -811,18 +725,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Normalize phone to E.164 immediately
-    const normalizedPhone = formatPhoneE164(data.phone);
-    if (normalizedPhone && normalizedPhone !== data.phone) {
-      console.log(`[create-trial] Normalized phone number: ${data.phone} -> ${normalizedPhone}`);
-      // Update data.phone so it's used consistently downstream (Auth, DB, Logging)
-      data.phone = normalizedPhone;
-    } else if (!normalizedPhone) {
-      // Phone couldn't be normalized - log but continue with original value
-      console.warn(`[create-trial] Phone could not be normalized to E.164: ${data.phone?.substring(0, 6)}***`);
-    }
-
     if (isDisposableEmail(data.email)) {
+      console.log("[create-trial] Blocked disposable email", { email: data.email });
       logWarn("Blocked disposable email", {
         ...baseLogOptions,
         context: { email: data.email },
@@ -857,6 +761,7 @@ Deno.serve(async (req: Request) => {
       ...baseLogOptions,
       context: { zipCode: data.zipCode, isTestMode, isBypassMode },
     });
+    console.log(`[${FUNCTION_NAME}] MODE=${isTestMode ? "TEST" : "LIVE"} zipCode=${data.zipCode} isBypassMode=${isBypassMode}`);
 
 
     // ═══════════════════════════════════════════════════════════════
@@ -864,6 +769,7 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     phase = "anti_abuse";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // Skip rate limits if using Bypass Mode
     if (data.source === "website" && !isBypassMode) {
@@ -884,6 +790,7 @@ Deno.serve(async (req: Request) => {
           .gte("created_at", thirtyDaysAgo.toISOString());
 
         if (ipAttempts && ipAttempts >= 3) {
+          console.log("[create-trial] IP rate limit exceeded", { clientIP, ipAttempts });
           logWarn("IP rate limit exceeded", {
             ...baseLogOptions,
             context: { clientIP, ipAttempts },
@@ -909,6 +816,7 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
         logWarn("IP rate limit check error (continuing)", { ...baseLogOptions, error: err });
       }
 
@@ -925,6 +833,7 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (recentPhoneUse) {
+          console.log("[create-trial] Phone number recently used", { phone: data.phone });
           logWarn("Phone number recently used", {
             ...baseLogOptions,
             context: { phone: data.phone },
@@ -950,66 +859,9 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
         logWarn("Phone reuse check error (continuing)", { ...baseLogOptions, error: err });
       }
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // EARLY EXIT: Check if user already has an account (BEFORE Stripe calls)
-    // This prevents orphan Stripe resources when user should log in instead
-    // Wrapped in try-catch to prevent crashes if this check fails
-    // ═══════════════════════════════════════════════════════════════
-    let existingUser: { id: string; hasAccount: boolean; accountId?: string } | null = null;
-    try {
-      phase = "check_existing_account";
-
-      existingUser = await getExistingUserByEmail(supabase, data.email);
-
-      // Also check account_members in case profiles.account_id is null but user is linked
-      let hasAccountViaMember = false;
-      if (existingUser && !existingUser.accountId) {
-        const { data: memberLink } = await supabase
-          .from("account_members")
-          .select("account_id")
-          .eq("user_id", existingUser.id)
-          .maybeSingle();
-        if (memberLink?.account_id) {
-          hasAccountViaMember = true;
-          existingUser.accountId = memberLink.account_id;
-          existingUser.hasAccount = true;
-        }
-      }
-
-      if (existingUser?.hasAccount) {
-        logWarn("User already has an account - returning 409 before Stripe", {
-          ...baseLogOptions,
-          context: {
-            email: data.email,
-            existingAccountId: existingUser.accountId,
-            detectedVia: hasAccountViaMember ? "account_members" : "profiles.account_id"
-          },
-        });
-
-        // Note: Considered sending magic link here but supabase.functions.invoke 
-        // causes Deno runtime compatibility issues. User should use login page.
-
-        return new Response(
-          JSON.stringify({
-            error: "An account with this email already exists. Please log in instead.",
-            code: "ACCOUNT_EXISTS",
-            redirect: "/login",
-            userMessage: "Looks like you already have an account. Please log in to continue.",
-          }),
-          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    } catch (existingUserErr: any) {
-      // Non-critical - if check fails, continue with normal flow
-      logWarn("Existing user check failed (continuing)", {
-        ...baseLogOptions,
-        error: existingUserErr,
-        context: { email: data.email }
-      });
     }
 
     // STRIPE LOGIC
@@ -1031,178 +883,44 @@ Deno.serve(async (req: Request) => {
 
       const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 1: Retrieve payment method to check if already attached
-      // ═══════════════════════════════════════════════════════════════
-      phase = "stripe_payment_method_check";
-      let paymentMethodCustomerId: string | null = null;
-      let reusedExistingCustomer = false;
-
+      // Customer
+      phase = "stripe_customer";
       try {
-        const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
-        paymentMethodCustomerId = typeof paymentMethod.customer === 'string'
-          ? paymentMethod.customer
-          : (paymentMethod.customer as any)?.id ?? null;
-
-        if (paymentMethodCustomerId) {
-          logInfo("Payment method already attached to a customer", {
-            ...baseLogOptions,
-            context: {
-              paymentMethodId: data.paymentMethodId,
-              existingCustomerId: paymentMethodCustomerId
-            },
-          });
-
-          // Validate the existing customer's email matches the request email
-          const existingCustomer = await stripe.customers.retrieve(paymentMethodCustomerId);
-          if (existingCustomer.deleted) {
-            // Customer was deleted, treat as if PM is not attached
-            paymentMethodCustomerId = null;
-            logInfo("Existing customer was deleted, will create new customer", {
-              ...baseLogOptions,
-              context: { paymentMethodId: data.paymentMethodId },
-            });
-          } else {
-            const existingEmail = (existingCustomer as any).email?.toLowerCase();
-            const requestEmailLower = data.email.toLowerCase();
-
-            if (existingEmail && existingEmail !== requestEmailLower) {
-              // Email mismatch - fail safely
-              logError("Payment method customer email mismatch", {
-                ...baseLogOptions,
-                context: {
-                  paymentMethodId: data.paymentMethodId,
-                  pmCustomerEmail: existingEmail,
-                  requestEmail: requestEmailLower,
-                },
-              });
-
-              if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-                return new Response(JSON.stringify({
-                  success: false,
-                  errorCode: 'PAYMENT_METHOD_MISMATCH',
-                  userMessage: 'This card is associated with a different email. Please use a different card or check your email address.',
-                  correlationId,
-                  phase,
-                  retryable: true,
-                  suggestedAction: 'Try a different payment method',
-                  error: 'Payment method email mismatch',
-                  message: 'Payment method email mismatch',
-                  request_id,
-                }), {
-                  status: 400,
-                  headers: { ...corsHeaders, "Content-Type": "application/json" }
-                });
-              } else {
-                throw new Error("Payment method is associated with a different email address");
-              }
-            }
-
-            // Email matches or existing customer has no email - reuse this customer
-            reusedExistingCustomer = true;
-            customer = existingCustomer;
-            stripeCustomerId = paymentMethodCustomerId;
-            logInfo("Reusing existing customer for payment method", {
-              ...baseLogOptions,
-              context: {
-                customerId: paymentMethodCustomerId,
-                email: data.email,
-              },
-            });
+        customer = await stripe.customers.create({
+          email: data.email,
+          name: data.name,
+          phone: data.phone,
+          metadata: {
+            company_name: data.companyName,
+            trade: data.trade,
+            source: data.source
           }
-        }
-      } catch (e: any) {
-        // If PM retrieve fails, log and continue to create new customer
-        logWarn("Failed to retrieve payment method (will create new customer)", {
-          ...baseLogOptions,
-          error: e,
-          context: { paymentMethodId: data.paymentMethodId },
-        });
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 2: Create customer if not reusing existing
-      // ═══════════════════════════════════════════════════════════════
-      if (!reusedExistingCustomer) {
-        phase = "stripe_customer";
-        const stripeCustomerStart = Date.now();
-        stepStart('create_stripe_customer', base, { email: maskEmailForLogs(data.email), source: data.source });
-
-        try {
-          customer = await stripe.customers.create({
-            email: data.email,
-            name: data.name,
-            phone: data.phone,
-            metadata: {
-              company_name: data.companyName,
-              trade: data.trade,
-              source: data.source
-            }
-          }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
-          stripeCustomerId = customer.id;
-          createdStripeCustomerId = customer.id; // Track for safe cleanup
-
-          stepEnd('create_stripe_customer', base, {
-            result: 'success',
-            stripe_customer_id: customer.id
-          }, stripeCustomerStart);
-
-          logInfo("Stripe customer created", {
-            ...baseLogOptions,
-            context: {
-              customerId: customer.id,
-              source: data.source,
-              email: data.email,
-            },
-          });
-        } catch (e: any) {
-          stepError('create_stripe_customer', base, e, {
-            reason_code: 'STRIPE_CUSTOMER_FAILED',
-            email: maskEmailForLogs(data.email)
-          });
-          throw new Error(`Stripe Customer Create Failed: ${e.message}`);
-        }
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 3: Attach payment method if not already attached
-      // ═══════════════════════════════════════════════════════════════
-      phase = "stripe_payment_method";
-      const pmStart = Date.now();
-      stepStart('attach_payment_method', base, {
-        payment_method_id: data.paymentMethodId,
-        already_attached: !!paymentMethodCustomerId
-      });
-
-      try {
-        if (!paymentMethodCustomerId) {
-          // PM not attached - attach it now
-          await stripe.paymentMethods.attach(data.paymentMethodId, { customer: stripeCustomerId! });
-        }
-        // Always set as default payment method
-        await stripe.customers.update(stripeCustomerId!, {
-          invoice_settings: { default_payment_method: data.paymentMethodId }
-        });
-
-        stepEnd('attach_payment_method', base, {
-          result: 'success',
-          was_already_attached: !!paymentMethodCustomerId
-        }, pmStart);
-
-        logInfo("Payment method configured", {
+        }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
+        stripeCustomerId = customer.id;
+        logInfo("Stripe customer created", {
           ...baseLogOptions,
           context: {
-            customerId: stripeCustomerId,
-            reusedExisting: reusedExistingCustomer,
-            wasAlreadyAttached: !!paymentMethodCustomerId,
+            customerId: customer.id,
+            source: data.source,
+            email: data.email,
           },
         });
       } catch (e: any) {
-        stepError('attach_payment_method', base, e, {
-          reason_code: 'STRIPE_PAYMENT_FAILED',
-          payment_method_id: data.paymentMethodId
-        });
+        throw new Error(`Stripe Customer Create Failed: ${e.message}`);
+      }
 
+      // Payment Method
+      phase = "stripe_payment_method";
+      try {
+        await stripe.paymentMethods.attach(data.paymentMethodId, { customer: customer.id });
+        await stripe.customers.update(customer.id, {
+          invoice_settings: { default_payment_method: data.paymentMethodId }
+        });
+        logInfo("Payment method attached", {
+          ...baseLogOptions,
+          context: { customerId: customer.id },
+        });
+      } catch (e: any) {
         // ALWAYS log full technical details (unchanged)
         logError("Stripe payment method attach failed", {
           ...baseLogOptions,
@@ -1210,7 +928,7 @@ Deno.serve(async (req: Request) => {
           error: e,
           context: {
             phase,
-            customerId: stripeCustomerId,
+            customerId: customer.id,
             paymentMethodId: data.paymentMethodId
           }
         });
@@ -1218,7 +936,6 @@ Deno.serve(async (req: Request) => {
         // Return structured error if flag enabled, otherwise preserve legacy behavior
         if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
           const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-          errorResponse.trace_id = traceId; // Add trace ID to response
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1229,32 +946,18 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // STEP 4: Create subscription
-      // ═══════════════════════════════════════════════════════════════
+      // Subscription
       phase = "stripe_subscription";
-      const subStart = Date.now();
-      stepStart('create_subscription', base, { plan_type: data.planType });
-
       try {
         const priceId = getStripePriceId(data.planType);
         subscription = await stripe.subscriptions.create({
-          customer: stripeCustomerId!,
+          customer: customer.id,
           items: [{ price: priceId }],
           trial_period_days: 3,
           payment_behavior: "default_incomplete",
           metadata: { source: data.source, plan_type: data.planType }
         }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
         stripeSubscriptionId = subscription.id;
-        createdStripeSubscriptionId = subscription.id; // Track for safe cleanup
-
-        stepEnd('create_subscription', base, {
-          result: 'success',
-          subscription_id: subscription.id,
-          plan_type: data.planType,
-          status: subscription.status
-        }, subStart);
-
         logInfo("Stripe subscription created", {
           ...baseLogOptions,
           context: {
@@ -1265,23 +968,17 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
-        stepError('create_subscription', base, e, {
-          reason_code: 'STRIPE_SUBSCRIPTION_FAILED',
-          plan_type: data.planType
-        });
-
         // ALWAYS log full technical details (unchanged)
         logError("Stripe subscription creation failed", {
           ...baseLogOptions,
           accountId: currentAccountId,
           error: e,
-          context: { phase, customerId: stripeCustomerId }
+          context: { phase, customerId: customer.id }
         });
 
         // Return structured error if flag enabled, otherwise preserve legacy behavior
         if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
           const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-          errorResponse.trace_id = traceId; // Add trace ID to response
           return new Response(JSON.stringify(errorResponse), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -1295,8 +992,7 @@ Deno.serve(async (req: Request) => {
 
     // DATABASE INSERT
     phase = "account_insert";
-    const accountStart = Date.now();
-    stepStart('create_account_atomic', base, { email: maskEmailForLogs(data.email) });
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     const tempPassword = generateSecurePassword();
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -1348,21 +1044,42 @@ Deno.serve(async (req: Request) => {
       rawGender === "male" ? "male" : "female";
 
     // Log normalized values before RPC
+    console.log(`[${FUNCTION_NAME}] normalized plan_type =`, accountData.plan_type);
+    console.log(`[${FUNCTION_NAME}] normalized assistant_gender =`, accountData.assistant_gender);
+    console.log(`[${FUNCTION_NAME}] final accountData keys =`, Object.keys(accountData));
 
     // ═══════════════════════════════════════════════════════════════
     // MANUAL TRANSACTION: Create User -> Account -> Profile
     // ═══════════════════════════════════════════════════════════════
 
-    // Note: existingUser with hasAccount was already checked before Stripe calls
-    // If we're here, either existingUser doesn't have an account, or they're new
-    if (existingUser && !existingUser.hasAccount) {
+    // 1. Check if user already exists
+    const existingUser = await getExistingUserByEmail(supabase, data.email);
+
+    if (existingUser) {
+      if (existingUser.hasAccount) {
+        // User already has an account - they should log in instead
+        logWarn("User already has an account", {
+          ...baseLogOptions,
+          context: { email: data.email, existingAccountId: existingUser.accountId },
+        });
+
+        return new Response(
+          JSON.stringify({
+            error: "An account with this email already exists. Please log in instead.",
+            code: "ACCOUNT_EXISTS",
+            redirect: "/login",
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // User exists but has no account - we'll create an account for them
       logInfo("Existing user found without account, creating account", {
         ...baseLogOptions,
         context: { email: data.email, userId: existingUser.id },
       });
       currentUserId = existingUser.id;
-    } else if (!existingUser) {
+    } else {
       // 1b. Create new Auth User
       const { data: userData, error: userError } = await supabase.auth.admin.createUser({
         email: data.email,
@@ -1478,6 +1195,7 @@ Deno.serve(async (req: Request) => {
 
     if (memberError) {
       // Log but don't fail - link is critical but we have profile backup
+      console.warn("Failed to create account_member link:", memberError);
       logWarn("Failed to create account_member link", {
         ...baseLogOptions,
         error: memberError,
@@ -1503,77 +1221,68 @@ Deno.serve(async (req: Request) => {
     const accountTxError = null;
 
     // DETAILED LOGGING: After account creation
-    step: "create_account_transaction",
+    console.log("DB_RESULT", {
+      step: "create_account_transaction",
       operation: "AFTER_CALL",
-        hasError: false,
-          hasData: true,
-            error: null,
-              result: accountTxResult,
+      hasError: false,
+      hasData: true,
+      error: null,
+      result: accountTxResult,
     });
 
-// (Removed old error handling block as it is now redundant)
+    // (Removed old error handling block as it is now redundant)
 
-currentAccountId = accountTxResult.account_id;
-currentUserId = accountTxResult.user_id;
+    currentAccountId = accountTxResult.account_id;
+    currentUserId = accountTxResult.user_id;
 
-// Update base context with account and user IDs
-base = {
-  ...base,
-  accountId: currentAccountId,
-  userId: currentUserId,
-};
+    logInfo("Account created atomically", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        source: data.source
+      },
+    });
 
-stepEnd('create_account_atomic', base, {
-  result: 'success',
-  account_id: currentAccountId,
-  user_id: currentUserId
-}, accountStart);
+    // ═══════════════════════════════════════════════════════════════
+    // LINK LEAD (if provided)
+    // ═══════════════════════════════════════════════════════════════
 
-logInfo("Account created atomically", {
-  ...baseLogOptions,
-  accountId: currentAccountId,
-  context: {
-    source: data.source
-  },
-});
+    phase = "lead_link";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-// ═══════════════════════════════════════════════════════════════
-// LINK LEAD (if provided)
-// ═══════════════════════════════════════════════════════════════
+    if (data.leadId) {
 
-phase = "lead_link";
-
-if (data.leadId) {
-
-  // DETAILED LOGGING: Before lead update
-  step: "link_lead",
-    operation: "BEFORE_UPDATE",
-      table: "signup_leads",
+      // DETAILED LOGGING: Before lead update
+      console.log("DB_CALL", {
+        step: "link_lead",
+        operation: "BEFORE_UPDATE",
+        table: "signup_leads",
         payload: {
-    auth_user_id: currentUserId,
-      account_id: currentAccountId,
-        profile_id: currentUserId,
+          auth_user_id: currentUserId,
+          account_id: currentAccountId,
+          profile_id: currentUserId,
           completed_at: new Date().toISOString(),
-            leadId: data.leadId,
+          leadId: data.leadId,
         },
-});
+      });
 
-try {
-  const { error: leadLinkError } = await supabase
-    .from("signup_leads")
-    .update({
-      auth_user_id: currentUserId,
-      account_id: currentAccountId,
-      profile_id: currentUserId,
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", data.leadId);
+      try {
+        const { error: leadLinkError } = await supabase
+          .from("signup_leads")
+          .update({
+            auth_user_id: currentUserId,
+            account_id: currentAccountId,
+            profile_id: currentUserId,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", data.leadId);
 
-  // DETAILED LOGGING: After lead update
-  step: "link_lead",
-    operation: "AFTER_UPDATE",
-      table: "signup_leads",
-        hasError: !!leadLinkError,
+        // DETAILED LOGGING: After lead update
+        console.log("DB_RESULT", {
+          step: "link_lead",
+          operation: "AFTER_UPDATE",
+          table: "signup_leads",
+          hasError: !!leadLinkError,
           error: leadLinkError ? {
             message: leadLinkError.message,
             details: leadLinkError.details,
@@ -1583,57 +1292,61 @@ try {
           } : null,
         });
 
-if (leadLinkError) {
-  error: leadLinkError.message,
+        if (leadLinkError) {
+          console.log("[create-trial] Lead linking failed (non-critical)", {
+            error: leadLinkError.message,
           });
-logWarn("Lead linking failed (non-critical)", {
-  ...baseLogOptions,
-  accountId: currentAccountId,
-  error: leadLinkError,
-});
+          logWarn("Lead linking failed (non-critical)", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: leadLinkError,
+          });
         }
       } catch (err: any) {
-  logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
-}
+        console.error(JSON.stringify({ request_id, phase: "lead_link", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
+      }
     }
 
-// ═══════════════════════════════════════════════════════════════
-// LOG SIGNUP SUCCESS
-// ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // LOG SIGNUP SUCCESS
+    // ═══════════════════════════════════════════════════════════════
 
-if (data.source === "website") {
-  const clientIP =
-    req.headers.get("x-forwarded-for")?.split(",")[0] ||
-    req.headers.get("cf-connecting-ip") ||
-    "unknown";
+    if (data.source === "website") {
+      const clientIP =
+        req.headers.get("x-forwarded-for")?.split(",")[0] ||
+        req.headers.get("cf-connecting-ip") ||
+        "unknown";
 
-  // DETAILED LOGGING: Before signup_attempts insert
-  step: "log_signup_success",
-    operation: "BEFORE_INSERT",
-      table: "signup_attempts",
+      // DETAILED LOGGING: Before signup_attempts insert
+      console.log("DB_CALL", {
+        step: "log_signup_success",
+        operation: "BEFORE_INSERT",
+        table: "signup_attempts",
         payload: {
-    email: data.email,
-      phone: data.phone,
-        ip_address: clientIP,
+          email: data.email,
+          phone: data.phone,
+          ip_address: clientIP,
           device_fingerprint: data.deviceFingerprint,
-            success: true,
+          success: true,
         },
-});
+      });
 
-try {
-  const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
-    email: data.email,
-    phone: data.phone,
-    ip_address: clientIP,
-    device_fingerprint: data.deviceFingerprint,
-    success: true,
-  });
+      try {
+        const { error: signupAttemptError } = await supabase.from("signup_attempts").insert({
+          email: data.email,
+          phone: data.phone,
+          ip_address: clientIP,
+          device_fingerprint: data.deviceFingerprint,
+          success: true,
+        });
 
-  // DETAILED LOGGING: After signup_attempts insert
-  step: "log_signup_success",
-    operation: "AFTER_INSERT",
-      table: "signup_attempts",
-        hasError: !!signupAttemptError,
+        // DETAILED LOGGING: After signup_attempts insert
+        console.log("DB_RESULT", {
+          step: "log_signup_success",
+          operation: "AFTER_INSERT",
+          table: "signup_attempts",
+          hasError: !!signupAttemptError,
           error: signupAttemptError ? {
             message: signupAttemptError.message,
             details: signupAttemptError.details,
@@ -1643,217 +1356,222 @@ try {
           } : null,
         });
       } catch (err: any) {
-  logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
-}
+        console.error(JSON.stringify({ request_id, phase: "log_signup_success", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
+      }
     }
 
-// ═══════════════════════════════════════════════════════════════
-// ENQUEUE ASYNC PROVISIONING JOB
-// ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // ENQUEUE ASYNC PROVISIONING JOB
+    // ═══════════════════════════════════════════════════════════════
 
-phase = "vapi_provision_start";
+    phase = "vapi_provision_start";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-// Check for VAPI kill switch
-const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
-let jobError: any = null;
+    // Check for VAPI kill switch
+    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+    let jobError: any = null;
 
-if (disableVapiProvisioning) {
-  logInfo("VAPI provisioning disabled by env var", {
-    ...baseLogOptions,
-    accountId: currentAccountId,
-  });
-} else if (isTestMode) {
-  // ═══════════════════════════════════════════════════════════════
-  // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
-  // Uses pre-provisioned real resources and mirrors LIVE DB structure
-  // ═══════════════════════════════════════════════════════════════
-
-  // Load demo bundle environment variables
-  const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
-  const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
-  const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
-  const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
-  const allowFallback = Deno.env.get("RINGSNAP_ALLOW_DEMO_FALLBACK") === "true";
-
-  // Validate all demo bundle env vars are present
-  const hasMissingVars = !demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId;
-
-  if (hasMissingVars) {
-    const missing = [];
-    if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
-    if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
-    if (!demoVapiPhoneId) missing.push("RINGSNAP_DEMO_VAPI_PHONE_ID");
-    if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
-
-    const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
-    logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
-
-    // Only allow fallback if explicitly enabled via env var (for local dev only)
-    if (!allowFallback) {
-      throw new Error(
-        `Demo bundle not configured. Set the following Supabase secrets: ${missing.join(", ")}. ` +
-        `Or set RINGSNAP_ALLOW_DEMO_FALLBACK=true to use mock values (not recommended for production).`
-      );
-    }
-
-  }
-
-  // Use demo bundle values (or fallback if explicitly allowed)
-  const phoneNumber = demoTwilioNumber || "+15005550006";
-  const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
-  const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
-  const vapiAssistantId = demoVapiAssistantId || `vapi_assistant_test_${Date.now()}`;
-  const areaCode = phoneNumber.slice(2, 5); // Extract area code from E.164
-
-  logInfo("TEST MODE: Using shared demo bundle", {
-    ...baseLogOptions,
-    accountId: currentAccountId,
-    context: {
-      zipCode: data.zipCode,
-      demoPhoneNumber: phoneNumber,
-      hasDemoBundle: !hasMissingVars,
-      usingFallback: hasMissingVars && allowFallback,
-    },
-  });
-
-  try {
-    // ══════════════════════════════════════════════════════════════
-    // Mirror LIVE success path: Create all required DB records
-    // ══════════════════════════════════════════════════════════════
-
-    // 1. Insert phone_numbers row (mirrors LIVE: provision-vapi line 426-437)
-    const { error: phoneError } = await supabase.from("phone_numbers").insert({
-      account_id: currentAccountId,
-      phone_number: phoneNumber,
-      area_code: areaCode,
-      vapi_phone_id: vapiPhoneId,
-      purpose: "primary",
-      status: "active",
-      is_primary: true,
-      // is_test_number: true, // Add once migration is applied
-    });
-
-    if (phoneError) {
-      logWarn("TEST MODE: Phone number insert error (may already exist)", {
+    if (disableVapiProvisioning) {
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
+      logInfo("VAPI provisioning disabled by env var", {
         ...baseLogOptions,
-        error: phoneError,
+        accountId: currentAccountId,
       });
-    }
+    } else if (isTestMode) {
+      // ═══════════════════════════════════════════════════════════════
+      // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
+      // Uses pre-provisioned real resources and mirrors LIVE DB structure
+      // ═══════════════════════════════════════════════════════════════
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=test_mode_demo_bundle`);
 
-    // 2. Insert vapi_assistants row (mirrors LIVE: provision-vapi line 220-227)
-    const { error: assistantError } = await supabase.from("vapi_assistants").insert({
-      account_id: currentAccountId,
-      vapi_assistant_id: vapiAssistantId,
-      config: {
-        id: vapiAssistantId,
-        name: "Demo Assistant",
-        description: "Shared demo assistant for test accounts",
-        isTestAssistant: true,
-      },
-      // is_test_assistant: true, // Add once migration is applied
-    });
+      // Load demo bundle environment variables
+      const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
+      const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
+      const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
+      const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+      const allowFallback = Deno.env.get("RINGSNAP_ALLOW_DEMO_FALLBACK") === "true";
 
-    if (assistantError) {
-      logWarn("TEST MODE: Assistant insert error (may already exist)", {
+      // Validate all demo bundle env vars are present
+      const hasMissingVars = !demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId;
+
+      if (hasMissingVars) {
+        const missing = [];
+        if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
+        if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
+        if (!demoVapiPhoneId) missing.push("RINGSNAP_DEMO_VAPI_PHONE_ID");
+        if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
+
+        const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
+        console.error(`[${FUNCTION_NAME}] ${errorMsg}`);
+        logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
+
+        // Only allow fallback if explicitly enabled via env var (for local dev only)
+        if (!allowFallback) {
+          throw new Error(
+            `Demo bundle not configured. Set the following Supabase secrets: ${missing.join(", ")}. ` +
+            `Or set RINGSNAP_ALLOW_DEMO_FALLBACK=true to use mock values (not recommended for production).`
+          );
+        }
+
+        console.log(`[${FUNCTION_NAME}] RINGSNAP_ALLOW_DEMO_FALLBACK=true - using mock values (LOCAL DEV ONLY)`);
+      }
+
+      // Use demo bundle values (or fallback if explicitly allowed)
+      const phoneNumber = demoTwilioNumber || "+15005550006";
+      const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
+      const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
+      const vapiAssistantId = demoVapiAssistantId || `vapi_assistant_test_${Date.now()}`;
+      const areaCode = phoneNumber.slice(2, 5); // Extract area code from E.164
+
+      logInfo("TEST MODE: Using shared demo bundle", {
         ...baseLogOptions,
-        error: assistantError,
-      });
-    }
-
-    // 3. Update accounts row (mirrors LIVE: provision-vapi line 622-629)
-    await supabase.from("accounts").update({
-      vapi_assistant_id: vapiAssistantId,
-      vapi_phone_number: phoneNumber,
-      phone_number_e164: phoneNumber,
-      vapi_phone_number_id: vapiPhoneId,
-      phone_number_status: "active",
-      phone_provisioned_at: new Date().toISOString(),
-      // billing_test_mode: true, // Add once migration is applied
-    }).eq("id", currentAccountId);
-
-    // 4. Mark provisioning as completed via RPC (mirrors LIVE: provision-vapi line 632-635)
-    await supabase.rpc("update_provisioning_lifecycle", {
-      p_account_id: currentAccountId,
-      p_status: "completed",
-    });
-
-    // 5. Update profile to active (mirrors LIVE: provision-vapi line 639-641)
-    if (currentUserId) {
-      await supabase.from("profiles").update({
-        onboarding_status: "active",
-      }).eq("id", currentUserId);
-    }
-
-    logInfo("TEST MODE: Demo bundle provisioning completed successfully", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      context: {
-        phoneNumber,
-        vapiAssistantId,
-        vapiPhoneId,
-      },
-    });
-
-  } catch (testErr: any) {
-    logError("TEST MODE: Demo bundle provisioning failed", {
-      ...baseLogOptions,
-      accountId: currentAccountId,
-      error: testErr,
-    });
-    // Non-critical - signup still succeeded, user can retry
-  }
-} else {
-  // ═══════════════════════════════════════════════════════════════
-  // LIVE MODE: Real provisioning via job queue
-  // ═══════════════════════════════════════════════════════════════
-  const enqueueStart = Date.now();
-  stepStart('enqueue_provisioning', base, { account_id: currentAccountId });
-
-  // ... metadata build ...
-  const jobMetadata = {
-    company_name: data.companyName,
-    trade: data.trade,
-    service_area: data.serviceArea || "",
-    business_hours: data.businessHours || "Monday-Friday 8am-5pm",
-    emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
-    company_website: data.website || "",
-    assistant_gender: data.assistantGender,
-    wants_advanced_voice: data.wantsAdvancedVoice,
-    area_code: data.zipCode?.slice(0, 3) || "415",
-    fallback_phone: data.phone,
-    primary_goal: data.primaryGoal,
-  };
-
-  // DETAILED LOGGING: Before provisioning_jobs insert
-  step: "enqueue_provisioning",
-    operation: "BEFORE_INSERT",
-      table: "provisioning_jobs",
-        payload: {
-    account_id: currentAccountId,
-      user_id: currentUserId,
-        job_type: "provision_phone",
-          status: "queued",
-            metadata: jobMetadata,
-              correlation_id: correlationId,
+        accountId: currentAccountId,
+        context: {
+          zipCode: data.zipCode,
+          demoPhoneNumber: phoneNumber,
+          hasDemoBundle: !hasMissingVars,
+          usingFallback: hasMissingVars && allowFallback,
         },
-});
+      });
 
-try {
-  // Assign to outer var - Do not redeclare const
-  // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
-  const { error } = await supabase.from("provisioning_jobs").insert({
-    account_id: currentAccountId,
-    user_id: currentUserId,
-    job_type: "provision_phone",
-    status: "queued",
-  });
-  jobError = error;
+      try {
+        // ══════════════════════════════════════════════════════════════
+        // Mirror LIVE success path: Create all required DB records
+        // ══════════════════════════════════════════════════════════════
 
-  // DETAILED LOGGING: After provisioning_jobs insert
-  step: "enqueue_provisioning",
-    operation: "AFTER_INSERT",
-      table: "provisioning_jobs",
-        hasError: !!jobError,
+        // 1. Insert phone_numbers row (mirrors LIVE: provision-vapi line 426-437)
+        const { error: phoneError } = await supabase.from("phone_numbers").insert({
+          account_id: currentAccountId,
+          phone_number: phoneNumber,
+          area_code: areaCode,
+          vapi_phone_id: vapiPhoneId,
+          purpose: "primary",
+          status: "active",
+          is_primary: true,
+          // is_test_number: true, // Add once migration is applied
+        });
+
+        if (phoneError) {
+          logWarn("TEST MODE: Phone number insert error (may already exist)", {
+            ...baseLogOptions,
+            error: phoneError,
+          });
+        }
+
+        // 2. Insert vapi_assistants row (mirrors LIVE: provision-vapi line 220-227)
+        const { error: assistantError } = await supabase.from("vapi_assistants").insert({
+          account_id: currentAccountId,
+          vapi_assistant_id: vapiAssistantId,
+          config: {
+            id: vapiAssistantId,
+            name: "Demo Assistant",
+            description: "Shared demo assistant for test accounts",
+            isTestAssistant: true,
+          },
+          // is_test_assistant: true, // Add once migration is applied
+        });
+
+        if (assistantError) {
+          logWarn("TEST MODE: Assistant insert error (may already exist)", {
+            ...baseLogOptions,
+            error: assistantError,
+          });
+        }
+
+        // 3. Update accounts row (mirrors LIVE: provision-vapi line 622-629)
+        await supabase.from("accounts").update({
+          vapi_assistant_id: vapiAssistantId,
+          vapi_phone_number: phoneNumber,
+          phone_number_e164: phoneNumber,
+          vapi_phone_number_id: vapiPhoneId,
+          phone_number_status: "active",
+          phone_provisioned_at: new Date().toISOString(),
+          // billing_test_mode: true, // Add once migration is applied
+        }).eq("id", currentAccountId);
+
+        // 4. Mark provisioning as completed via RPC (mirrors LIVE: provision-vapi line 632-635)
+        await supabase.rpc("update_provisioning_lifecycle", {
+          p_account_id: currentAccountId,
+          p_status: "completed",
+        });
+
+        // 5. Update profile to active (mirrors LIVE: provision-vapi line 639-641)
+        if (currentUserId) {
+          await supabase.from("profiles").update({
+            onboarding_status: "active",
+          }).eq("id", currentUserId);
+        }
+
+        logInfo("TEST MODE: Demo bundle provisioning completed successfully", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          context: {
+            phoneNumber,
+            vapiAssistantId,
+            vapiPhoneId,
+          },
+        });
+        console.log(`[${FUNCTION_NAME}] TEST MODE: Demo bundle complete for account ${currentAccountId}`);
+
+      } catch (testErr: any) {
+        logError("TEST MODE: Demo bundle provisioning failed", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: testErr,
+        });
+        // Non-critical - signup still succeeded, user can retry
+      }
+    } else {
+      // ═══════════════════════════════════════════════════════════════
+      // LIVE MODE: Real provisioning via job queue
+      // ═══════════════════════════════════════════════════════════════
+      // ... metadata build ...
+      const jobMetadata = {
+        company_name: data.companyName,
+        trade: data.trade,
+        service_area: data.serviceArea || "",
+        business_hours: data.businessHours || "Monday-Friday 8am-5pm",
+        emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
+        company_website: data.website || "",
+        assistant_gender: data.assistantGender,
+        wants_advanced_voice: data.wantsAdvancedVoice,
+        area_code: data.zipCode?.slice(0, 3) || "415",
+        fallback_phone: data.phone,
+        primary_goal: data.primaryGoal,
+      };
+
+      // DETAILED LOGGING: Before provisioning_jobs insert
+      console.log("DB_CALL", {
+        step: "enqueue_provisioning",
+        operation: "BEFORE_INSERT",
+        table: "provisioning_jobs",
+        payload: {
+          account_id: currentAccountId,
+          user_id: currentUserId,
+          job_type: "provision_phone",
+          status: "queued",
+          metadata: jobMetadata,
+          correlation_id: correlationId,
+        },
+      });
+
+      try {
+        // Assign to outer var - Do not redeclare const
+        // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
+        const { error } = await supabase.from("provisioning_jobs").insert({
+          account_id: currentAccountId,
+          user_id: currentUserId,
+          status: "queued",
+        });
+        jobError = error;
+
+        // DETAILED LOGGING: After provisioning_jobs insert
+        console.log("DB_RESULT", {
+          step: "enqueue_provisioning",
+          operation: "AFTER_INSERT",
+          table: "provisioning_jobs",
+          hasError: !!jobError,
           error: jobError ? {
             message: jobError.message,
             details: jobError.details,
@@ -1863,241 +1581,222 @@ try {
           } : null,
         });
 
-if (jobError) {
-  stepError('enqueue_provisioning', base, jobError, {
-    reason_code: 'PROVISIONING_ENQUEUE_FAILED'
-  });
+        if (jobError) {
+          logError("Failed to enqueue provisioning job (non-critical)", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            error: jobError,
+          });
 
-  logError("Failed to enqueue provisioning job (non-critical)", {
-    ...baseLogOptions,
-    accountId: currentAccountId,
-    error: jobError,
-  });
+          // Create admin alert for failed job enqueue
+          await createAdminAlert(supabase, "provisioning_job_enqueue_failed", {
+            email: data.email,
+            error: jobError.message || "Unknown error",
+            phase: "job_enqueue",
+            request_id,
+          }, currentAccountId);
+        } else {
+          logInfo("Provisioning job enqueued", {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+          });
 
-  // Create admin alert for failed job enqueue
-  await createAdminAlert(supabase, "provisioning_job_enqueue_failed", {
-    email: data.email,
-    error: jobError.message || "Unknown error",
-    phase: "job_enqueue",
-    request_id,
-  }, currentAccountId);
-} else {
-  stepEnd('enqueue_provisioning', base, { result: 'success' }, enqueueStart);
+          // FIRE-AND-FORGET: Provision Vapi
+          supabase.functions.invoke("provision-vapi", {
+            body: { triggered_by: "create-trial" }
+          }).catch(err => {
+            console.error("Failed to trigger provision-vapi worker (background)", err);
+          });
 
-  logInfo("Provisioning job enqueued", {
-    ...baseLogOptions,
-    accountId: currentAccountId,
-  });
-
-  // FIRE-AND-FORGET: Provision Vapi
-  // Use fetch directly to avoid Deno runtime issues with supabase.functions.invoke
-  fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/provision-vapi`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ triggered_by: "create-trial" })
-  }).catch(err => {
-  });
-
-  // FIRE-AND-FORGET: Send Welcome Email
-  fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: data.email,
-      name: data.name,
-      userId: currentUserId
-    })
-  }).catch(err => {
-  });
-}
+          // FIRE-AND-FORGET: Send Welcome Email
+          supabase.functions.invoke("send-welcome-email", {
+            body: {
+              email: data.email,
+              name: data.name,
+              userId: currentUserId
+            }
+          }).catch(err => {
+            console.error("Failed to trigger send-welcome-email (background)", err);
+          });
+        }
       } catch (err: any) {
-  logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
+        console.error(JSON.stringify({ request_id, phase: "vapi_provision_start", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
 
-  // Create admin alert for exception during job enqueue
-  await createAdminAlert(supabase, "provisioning_job_exception", {
-    email: data.email,
-    error: err?.message || "Unknown error",
-    phase: "job_enqueue",
-    request_id,
-  }, currentAccountId);
-}
+        // Create admin alert for exception during job enqueue
+        await createAdminAlert(supabase, "provisioning_job_exception", {
+          email: data.email,
+          error: err?.message || "Unknown error",
+          phase: "job_enqueue",
+          request_id,
+        }, currentAccountId);
+      }
     }
 
-phase = "done";
+    phase = "done";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-logInfo("Trial created successfully", {
-  ...baseLogOptions,
-  accountId: currentAccountId,
-  context: {
-    source: data.source,
-    planType: data.planType,
-    subscriptionId: subscription.id,
-    provisioningStatus: "pending",
-  },
-});
-
-// Track Success in Analytics
-await trackEvent(supabase, currentAccountId, currentUserId, 'trial_created', {
-  plan_type: data.planType,
-  source: data.source,
-  has_lead: !!data.leadId
-});
-
-// ═══════════════════════════════════════════════════════════════
-// BUILD SUCCESS RESPONSE
-// ═══════════════════════════════════════════════════════════════
-stepStart('prepare_response', base);
-
-const successResponse = {
-  success: true,
-  accountId: currentAccountId,
-  stripeCustomerId: customer.id,
-  stripeSubscriptionId: subscription.id,
-  trace_id: traceId, // Add trace ID for debugging
-  // Backward compatibility fields
-  ok: true,
-  user_id: currentUserId,
-  account_id: currentAccountId,
-  email: data.email,
-  password: tempPassword,
-  stripe_customer_id: customer.id,
-  subscription_id: subscription.id,
-  trial_end_date: trialEndDate,
-  plan_type: data.planType,
-  source: data.source,
-  provisioning_status: "pending",
-  vapi_assistant_id: null,
-  phone_number: null,
-  message: "Trial started! Your AI receptionist is being set up...",
-};
-
-stepEnd('prepare_response', base, { result: 'success' });
-
-// ═══════════════════════════════════════════════════════════════
-// CACHE RESPONSE FOR IDEMPOTENCY
-// ═══════════════════════════════════════════════════════════════
-
-if (idempotencyKey) {
-  try {
-    const requestHash = await hashRequest(rawData);
-    const clientIP =
-      req.headers.get("x-forwarded-for")?.split(",")[0] ||
-      req.headers.get("cf-connecting-ip") ||
-      "unknown";
-
-    await supabase.from("idempotency_results").insert({
-      idempotency_key: idempotencyKey,
-      request_hash: requestHash,
-      request_path: "/create-trial",
-      status_code: 200,
-      response_body: successResponse,
-      response_headers: { "Content-Type": "application/json" },
-      account_id: currentAccountId,
-      user_id: currentUserId,
-      stripe_customer_id: customer.id,
-      stripe_subscription_id: subscription.id,
-      correlation_id: correlationId,
-      source_ip: clientIP,
-      user_agent: req.headers.get("user-agent") || null,
+    logInfo("Trial created successfully", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      context: {
+        source: data.source,
+        planType: data.planType,
+        subscriptionId: subscription.id,
+        provisioningStatus: "pending",
+      },
     });
-  } catch (err: any) {
-    logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
-  }
-}
 
+    // ═══════════════════════════════════════════════════════════════
+    // BUILD SUCCESS RESPONSE
+    // ═══════════════════════════════════════════════════════════════
 
-return new Response(
-  JSON.stringify(successResponse),
-  {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  }
-);
-  } catch (error: any) {
-  // Top-level error handler
-  request_id,
-    phase,
-    message: error?.message ?? "Unknown error",
-      stack: error?.stack ?? "",
-        raw: error,
+    const successResponse = {
+      success: true,
+      accountId: currentAccountId,
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: subscription.id,
+      // Backward compatibility fields
+      ok: true,
+      user_id: currentUserId,
+      account_id: currentAccountId,
+      email: data.email,
+      password: tempPassword,
+      stripe_customer_id: customer.id,
+      subscription_id: subscription.id,
+      trial_end_date: trialEndDate,
+      plan_type: data.planType,
+      source: data.source,
+      provisioning_status: "pending",
+      vapi_assistant_id: null,
+      phone_number: null,
+      message: "Trial started! Your AI receptionist is being set up...",
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // CACHE RESPONSE FOR IDEMPOTENCY
+    // ═══════════════════════════════════════════════════════════════
+
+    if (idempotencyKey) {
+      try {
+        const requestHash = await hashRequest(rawData);
+        const clientIP =
+          req.headers.get("x-forwarded-for")?.split(",")[0] ||
+          req.headers.get("cf-connecting-ip") ||
+          "unknown";
+
+        await supabase.from("idempotency_results").insert({
+          idempotency_key: idempotencyKey,
+          request_hash: requestHash,
+          request_path: "/create-trial",
+          status_code: 200,
+          response_body: successResponse,
+          response_headers: { "Content-Type": "application/json" },
           account_id: currentAccountId,
-            user_id: currentUserId,
-              stripe_customer_id: stripeCustomerId,
-                stripe_subscription_id: stripeSubscriptionId,
-    }));
+          user_id: currentUserId,
+          stripe_customer_id: customer.id,
+          stripe_subscription_id: subscription.id,
+          correlation_id: correlationId,
+          source_ip: clientIP,
+          user_agent: req.headers.get("user-agent") || null,
+        });
+      } catch (err: any) {
+        console.error(JSON.stringify({ request_id, phase: "idempotency_cache", message: err.message, stack: err.stack, raw: err }));
+        logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
+      }
+    }
 
-logError("Trial creation failed", {
-  ...baseLogOptions,
-  accountId: currentAccountId,
-  error,
-  context: { phase },
-});
+    console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
 
-// Send error to Sentry
-if (currentAccountId) {
-  setContext('accountId', currentAccountId);
-}
-if (currentUserId) {
-  setContext('userId', currentUserId);
-}
-await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
-
-// Track failure in Analytics (Critical for Dashboard visibility)
-// Guard with supabase check in case error occurred before client initialization
-if (supabase) {
-  await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
-    error: error instanceof Error ? error.message : "Unknown error",
-    phase: phase,
-    stripeErrorType: (error as any)?.type || 'unknown',
-    email: requestEmail, // Now available from outer scope
-  });
-}
-
-const errorMessage = error instanceof Error ? error.message : "Internal server error";
-
-// Return structured error if flag enabled
-if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-  const errorResponse: TrialCreationErrorResponse = {
-    success: false,
-    errorCode: 'INTERNAL_ERROR',
-    userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
-    debugMessage: error?.message ?? errorMessage,
-    correlationId,
-    phase,
-    retryable: true,
-    suggestedAction: 'Try again or contact support if the issue persists',
-    // Legacy fields
-    error: error?.message ?? errorMessage,
-    message: String(error?.message ?? errorMessage),
-    request_id,
-    trace_id: traceId // Add trace ID for LLM debugging
-  };
-
-  return new Response(JSON.stringify(errorResponse), {
-    status: 500,
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
-} else {
-  // Legacy behavior - return existing error format
-  return new Response(
-    JSON.stringify({
-      success: false,
+    return new Response(
+      JSON.stringify(successResponse),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error: any) {
+    // Top-level error handler
+    console.error(JSON.stringify({
       request_id,
       phase,
-      message: String(error?.message ?? errorMessage),
-      trace_id: traceId // Add trace ID even in legacy mode
-    }),
-    {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      message: error?.message ?? "Unknown error",
+      stack: error?.stack ?? "",
+      raw: error,
+      account_id: currentAccountId,
+      user_id: currentUserId,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+    }));
+
+    logError("Trial creation failed", {
+      ...baseLogOptions,
+      accountId: currentAccountId,
+      error,
+      context: { phase },
+    });
+
+    // Send error to Sentry
+    if (currentAccountId) {
+      setContext('accountId', currentAccountId);
     }
-  );
-}
+    if (currentUserId) {
+      setContext('userId', currentUserId);
+    }
+    await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
+
+    // Track failure in Analytics (Critical for Dashboard visibility)
+    // We try to access 'data' if it was parsed, otherwise we lose the email.
+    // Since 'data' is scoped to the try block, we can't access it here directly if not lifted.
+    // However, most failures happen after parsing. 
+    // TODO: Ideally we retrieve email from a wider scope variable. 
+    // For now, we will track what we have.
+    await trackEvent(supabase, currentAccountId, currentUserId, 'trial_creation_failed', {
+      error: error instanceof Error ? error.message : "Unknown error",
+      phase: phase,
+      stripeErrorType: (error as any)?.type || 'unknown',
+      // In a real refactor we would lift 'email' to outer scope. 
+      // For this specific 'catch', we might be limited.
+      // But wait, we can log the event without email if needed.
+    });
+
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+
+    // Return structured error if flag enabled
+    if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
+      const errorResponse: TrialCreationErrorResponse = {
+        success: false,
+        errorCode: 'INTERNAL_ERROR',
+        userMessage: 'We hit a snag while creating your trial. Please try again in a moment.',
+        debugMessage: error?.message ?? errorMessage,
+        correlationId,
+        phase,
+        retryable: true,
+        suggestedAction: 'Try again or contact support if the issue persists',
+        // Legacy fields
+        error: error?.message ?? errorMessage,
+        message: String(error?.message ?? errorMessage),
+        request_id
+      };
+
+      return new Response(JSON.stringify(errorResponse), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    } else {
+      // Legacy behavior - return existing error format
+      return new Response(
+        JSON.stringify({
+          success: false,
+          request_id,
+          phase,
+          message: String(error?.message ?? errorMessage),
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
   }
 });
