@@ -1,53 +1,79 @@
+/**
+ * OnboardingUiGuardrail
+ * 
+ * Non-intrusive banner displayed in the dashboard when onboarding is incomplete.
+ * Routes user to the correct next step based on recommended_next_step.
+ */
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useOnboardingState } from "@/hooks/useOnboardingState";
-import { ArrowRight, AlertTriangle, PhoneCall, CheckCircle } from "lucide-react";
+import { ArrowRight, Phone, Settings, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-export const OnboardingUiGuardrail = ({ accountId }: { accountId: string }) => {
+interface OnboardingUiGuardrailProps {
+    accountId: string;
+}
+
+export function OnboardingUiGuardrail({ accountId }: OnboardingUiGuardrailProps) {
     const navigate = useNavigate();
     const { state, loading } = useOnboardingState(accountId);
 
-    if (loading || !state) return null;
+    // Don't show if loading or onboarding is complete
+    if (loading || !state || state.recommended_next_step === 'complete') {
+        return null;
+    }
 
-    // Don't show if complete
-    if (state.recommended_next_step === 'complete') return null;
-
-    // Don't show if provisioning is still happening (the ProvisioningBanner takes care of that)
-    if (state.recommended_next_step === 'provisioning') return null;
-
-    const handleAction = () => {
-        navigate('/activation');
+    const stepConfig = {
+        provisioning: {
+            title: "Setting up your phone number...",
+            description: "We're provisioning your dedicated RingSnap line. This usually takes less than a minute.",
+            action: null,
+            icon: <Loader2 className="h-4 w-4 animate-spin" />,
+        },
+        test_call: {
+            title: "Complete your setup",
+            description: "Make a test call to your new RingSnap number to hear your agent in action.",
+            action: () => navigate('/activation'),
+            actionLabel: "Continue Setup",
+            icon: <Phone className="h-4 w-4" />,
+        },
+        forwarding: {
+            title: "One step left: Set up call forwarding",
+            description: "Forward your business line to never miss a call.",
+            action: () => navigate('/activation'),
+            actionLabel: "Set Up Forwarding",
+            icon: <Settings className="h-4 w-4" />,
+        },
     };
 
+    const config = stepConfig[state.recommended_next_step as keyof typeof stepConfig];
+    if (!config) return null;
+
     return (
-        <div className="mb-6">
-            <Alert className="border-l-4 border-l-amber-500 bg-amber-50/50">
-                <div className="flex justify-between items-center w-full">
-                    <div className="flex gap-3 items-center">
-                        {state.recommended_next_step === 'test_call' && <PhoneCall className="h-5 w-5 text-amber-600" />}
-                        {state.recommended_next_step === 'forwarding' && <AlertTriangle className="h-5 w-5 text-amber-600" />}
-
-                        <div>
-                            <AlertTitle className="text-amber-800 font-semibold">
-                                {state.recommended_next_step === 'test_call' && "Complete Your Setup: Test Your Number"}
-                                {state.recommended_next_step === 'forwarding' && "Important: Call Forwarding Not Detected"}
-                                {state.recommended_next_step === 'verify' && "Verify Your Call Forwarding"}
-                            </AlertTitle>
-                            <AlertDescription className="text-amber-700">
-                                {state.recommended_next_step === 'test_call' && "Make a quick test call to ensure your agent is working."}
-                                {state.recommended_next_step === 'forwarding' && "Your agent is active, but calls aren't forwarding yet."}
-                                {state.recommended_next_step === 'verify' && "Double check that your business calls are reaching us."}
-                            </AlertDescription>
-                        </div>
-                    </div>
-
-                    <Button size="sm" onClick={handleAction} className="bg-amber-600 hover:bg-amber-700 text-white border-none shadow-sm whitespace-nowrap">
-                        Finish Setup <ArrowRight className="ml-2 w-4 h-4" />
-                    </Button>
+        <Alert className="border-amber-200 bg-amber-50 mb-6">
+            <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-amber-600">
+                    {config.icon}
                 </div>
-            </Alert>
-        </div>
+                <div className="flex-1">
+                    <AlertTitle className="text-amber-800">{config.title}</AlertTitle>
+                    <AlertDescription className="text-amber-700 mt-1">
+                        {config.description}
+                    </AlertDescription>
+                </div>
+                {config.action && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={config.action}
+                        className="shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
+                    >
+                        {config.actionLabel}
+                        <ArrowRight className="ml-2 h-3 w-3" />
+                    </Button>
+                )}
+            </div>
+        </Alert>
     );
-};
+}
