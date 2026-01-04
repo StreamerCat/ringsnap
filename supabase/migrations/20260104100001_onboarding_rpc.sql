@@ -3,6 +3,10 @@
 -- Date: 2026-01-04
 -- Purpose: Server-side onboarding state computation and event tracking
 -- ============================================================================
+-- Drop existing functions if they exist (handles different return types)
+DROP FUNCTION IF EXISTS get_onboarding_state(UUID);
+DROP FUNCTION IF EXISTS track_onboarding_event(TEXT);
+DROP FUNCTION IF EXISTS track_onboarding_event(TEXT, JSONB);
 -- ============================================================================
 -- RPC: get_onboarding_state
 -- Returns current onboarding state for an account
