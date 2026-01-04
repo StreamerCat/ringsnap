@@ -35,7 +35,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { getAccountTemplate, upsertAccountTemplate } from "../_shared/template-service.ts";
-import { formatPhoneE164 } from "../_shared/validators.ts";
+import { formatPhoneE164, tryFormatPhoneE164 } from "../_shared/validators.ts";
 import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { trackEvent } from "../_shared/analytics.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
@@ -462,30 +462,28 @@ async function provisionVapiPhone(
       twilioApiSecret: twilioApiSecret,
       name: metadata.company_name ? `${metadata.company_name} Line` : undefined,
       assistantId: vapiAssistantId, // Bind immediately
-      fallbackDestination: {
-        type: "number",
-        // Ensure we ALWAYS have a valid E.164 fallback. Double-check the formatted result.
-        number: (() => {
-          const rawFallback = metadata.fallback_phone?.trim() || "";
-          const formatted = formatPhoneE164(rawFallback || "4155551234");
+      // Resolve fallback: 1) User's phone (normalized) 2) Env var 3) Omit if all invalid
+      ...(() => {
+        const rawFallback = metadata.fallback_phone?.trim() || "";
+        const VAPI_FALLBACK_E164 = Deno.env.get("VAPI_FALLBACK_E164");
+        const resolvedFallback = tryFormatPhoneE164(rawFallback) || VAPI_FALLBACK_E164 || null;
 
-          logInfo("Formatting fallback phone", {
-            ...baseLogOptions,
-            context: { rawFallback, formatted }
-          });
+        logInfo("Vapi fallback phone resolution", {
+          ...baseLogOptions,
+          context: {
+            rawFallbackMasked: rawFallback ? rawFallback.substring(0, 6) + "***" : "empty",
+            resolvedFallback: resolvedFallback || "omitted",
+            usedEnvVar: !tryFormatPhoneE164(rawFallback) && !!VAPI_FALLBACK_E164,
+          },
+        });
 
-          // Validate the result is actually E.164
-          if (formatted.startsWith('+') && formatted.length >= 11) {
-            return formatted;
+        return resolvedFallback ? {
+          fallbackDestination: {
+            type: "number" as const,
+            number: resolvedFallback,
           }
-          // Hardcoded safe fallback if formatting somehow failed
-          logWarn("Fallback phone formatting failed validation, using hardcoded default", {
-            ...baseLogOptions,
-            context: { rawFallback, formatted }
-          });
-          return "+14155551234";
-        })(),
-      }
+        } : {};
+      })(),
     };
   }
 

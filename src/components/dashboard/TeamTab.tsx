@@ -42,23 +42,52 @@ export function TeamTab({ accountId }: TeamTabProps) {
     // Load team members
     const loadMembers = async () => {
         try {
-            const { data, error } = await supabase
+            // 1. Fetch members
+            const { data: membersData, error: membersError } = await supabase
                 .from("account_members")
-                .select(`
-          id,
-          user_id,
-          role,
-          profiles (
-            name,
-            email,
-            phone
-          )
-        `)
-                .eq("account_id", accountId)
-                .order("role", { ascending: true });
+                .select("id, user_id, role")
+                .eq("account_id", accountId);
 
-            if (error) throw error;
-            setMembers(data as any || []);
+            if (membersError) throw membersError;
+
+            // 2. Fetch profiles for these members
+            const memberIds = membersData?.map(m => m.user_id) || [];
+
+            let profilesData: any[] = [];
+
+            // Only fetch profiles if we have members
+            if (memberIds.length > 0) {
+                const { data: profiles, error: profilesError } = await supabase
+                    .from("profiles")
+                    .select("id, name, email, phone")
+                    .in("id", memberIds);
+
+                if (profilesError) {
+                    console.error("Error fetching member profiles:", profilesError);
+                    // Don't throw, just continue with empty profiles
+                } else {
+                    profilesData = profiles || [];
+                }
+            }
+
+            // 3. Merge data
+            const mergedMembers = membersData?.map(member => {
+                const profile = profilesData.find(p => p.id === member.user_id);
+                return {
+                    ...member,
+                    profiles: {
+                        name: profile?.name || "Unknown",
+                        email: profile?.email || "N/A",
+                        phone: profile?.phone || "N/A"
+                    }
+                };
+            }).sort((a, b) => {
+                // Sort by role (owner first, then admin, then member)
+                const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
+                return (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99);
+            });
+
+            setMembers(mergedMembers as any || []);
         } catch (error: any) {
             // Only log, don't toast - empty results or permission issues  
             // are not necessarily errors for a new account with no members yet.

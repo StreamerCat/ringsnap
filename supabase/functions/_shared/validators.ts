@@ -58,68 +58,77 @@ export function isValidPhoneNumber(phone: string): boolean {
  * Format phone number to E.164 format (+15551234567)
  * Handles various input formats and ensures valid E.164 output
  * CRITICAL: Vapi requires STRICT E.164 - only '+' followed by digits
+ * 
+ * @returns Valid E.164 string or null if normalization fails
  */
-export function formatPhoneE164(phone: string): string {
+export function formatPhoneE164(phone: string | null | undefined): string | null {
   if (!phone || phone.trim() === '') {
-    // Return a valid default US number if empty
-    return "+14155551234";
+    return null;
   }
 
   // ALWAYS strip to just digits first, regardless of input format
   const digitsOnly = phone.replace(/\D/g, '');
 
-  // If no digits found at all, return default
+  // If no digits found at all, return null
   if (digitsOnly.length === 0) {
-    console.warn(`[formatPhoneE164] No digits found in: ${phone}, using default`);
-    return "+14155551234";
+    return null;
   }
 
   // Handle 10-digit US number (no country code provided)
   // e.g., 5551234567 -> +15551234567
   if (digitsOnly.length === 10) {
-    // If it starts with 1, it's ambiguous (could be 1+9 digits or a 10-digit number starting with 1)
-    // US area codes cannot start with 1. If it starts with 1 and is 10 digits, 
-    // it's almost certainly a user error or international.
-    if (digitsOnly[0] === '1') {
-      console.warn(`[formatPhoneE164] 10-digit number starts with 1: ${digitsOnly}. Assuming it needs +.`);
-      return `+${digitsOnly}`; // Try +1-XXX-XXX-X? No, Vapi wants 11 digits for US. 
-      // Actually, if it's 10 digits starting with 1, it's invalid for US E.164 (+1 + 10 digits = 11 digits).
-      // Let's assume they meant a 10-digit US number and just add +1 IF the area code is valid,
-      // but if it starts with 1, it's better to just return as-is with + and let Vapi/Twilio validate.
+    // US area codes cannot start with 0 or 1
+    if (digitsOnly[0] === '0' || digitsOnly[0] === '1') {
+      // Invalid US area code - could be international or malformed
+      return null;
     }
     return `+1${digitsOnly}`;
   }
 
   // Handle 11-digit US number starting with 1 (e.g., 15551234567)
   if (digitsOnly.length === 11 && digitsOnly[0] === '1') {
+    // Validate area code (2nd digit can't be 0 or 1)
+    if (digitsOnly[1] === '0' || digitsOnly[1] === '1') {
+      return null;
+    }
     return `+${digitsOnly}`;
   }
 
-  // Handle 12+ digit international numbers (already has country code)
-  if (digitsOnly.length >= 11 && digitsOnly.length <= 15) {
+  // Handle international numbers (12-15 digits, already has country code)
+  if (digitsOnly.length >= 12 && digitsOnly.length <= 15) {
     return `+${digitsOnly}`;
   }
 
-  // If we have digits but not the right length, try to salvage it
-  if (digitsOnly.length > 0) {
-    // If it's longer than 15 digits, take the last 10 (US assumption)
-    if (digitsOnly.length > 15) {
-      const last10 = digitsOnly.slice(-10);
-      console.warn(`[formatPhoneE164] Too many digits (${digitsOnly.length}), using last 10: ${last10}`);
-      return `+1${last10}`;
-    }
+  // Cannot normalize - return null
+  return null;
+}
 
-    // If it's between 7-9 digits, pad with zeros and add +1
-    if (digitsOnly.length >= 7 && digitsOnly.length < 10) {
-      const padded = digitsOnly.padStart(10, '0');
-      console.warn(`[formatPhoneE164] Short number (${digitsOnly.length} digits), padding: ${padded}`);
-      return `+1${padded}`;
-    }
+/**
+ * Try to format phone to E.164, with logging for failures.
+ * Use this in contexts where you have accountId available for diagnostics.
+ * 
+ * @param phone Raw phone input
+ * @param context Optional context for logging (accountId, jobId)
+ * @returns Valid E.164 string or null
+ */
+export function tryFormatPhoneE164(
+  phone: string | null | undefined,
+  context?: { accountId?: string; jobId?: string }
+): string | null {
+  const result = formatPhoneE164(phone);
+
+  if (result === null && phone) {
+    // Log failure with masked value for diagnostics
+    const masked = phone.length > 6 ? phone.substring(0, 6) + '***' : phone.substring(0, 3) + '***';
+    console.warn(`[tryFormatPhoneE164] Normalization failed`, {
+      rawPhoneMasked: masked,
+      rawLength: phone.length,
+      accountId: context?.accountId || 'unknown',
+      jobId: context?.jobId || 'unknown',
+    });
   }
 
-  // Fallback to a valid default if we can't parse it
-  console.warn(`[formatPhoneE164] Unable to format phone: ${phone} (digits: ${digitsOnly}), using default`);
-  return "+14155551234";
+  return result;
 }
 
 /**

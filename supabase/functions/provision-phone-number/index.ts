@@ -365,6 +365,29 @@ serve(async (req) => {
         context: { areaCode }
       });
 
+      // Resolve fallback phone number for Vapi
+      // Priority: 1) User's phone (normalized) 2) Env var 3) Omit if all invalid
+      const VAPI_FALLBACK_E164 = Deno.env.get("VAPI_FALLBACK_E164");
+      const fallbackE164 = tryFormatPhoneE164(phone, { accountId })
+        || VAPI_FALLBACK_E164
+        || null;
+
+      logInfo("Vapi fallback phone resolution", {
+        ...baseLogOptions,
+        accountId,
+        context: {
+          rawPhoneMasked: phone ? phone.substring(0, 6) + "***" : "empty",
+          resolvedFallback: fallbackE164 || "omitted",
+          usedEnvVar: !tryFormatPhoneE164(phone) && !!VAPI_FALLBACK_E164,
+        },
+      });
+
+      // Build fallbackDestination only if we have a valid E.164
+      const fallbackDestination = fallbackE164 ? {
+        type: "number" as const,
+        number: fallbackE164,
+      } : undefined;
+
       try {
         // Option A: Try with area code first, fallback to no area code if unavailable
         let phoneData;
@@ -380,10 +403,8 @@ serve(async (req) => {
                 body: JSON.stringify({
                   provider: "vapi",
                   name: `${companyName} - Primary`,
-                  fallbackDestination: {
-                    type: "number",
-                    number: phone || "+14155551234",
-                  },
+                  // Only include fallbackDestination if we have a valid E.164
+                  ...(fallbackDestination && { fallbackDestination }),
                   numberDesiredAreaCode: areaCode,
                 }),
               });
@@ -427,10 +448,8 @@ serve(async (req) => {
                   body: JSON.stringify({
                     provider: "vapi",
                     name: `${companyName} - Primary`,
-                    fallbackDestination: {
-                      type: "number",
-                      number: phone || "+14155551234",
-                    },
+                    // Only include fallbackDestination if we have a valid E.164
+                    ...(fallbackDestination && { fallbackDestination }),
                     // No numberDesiredAreaCode - accept any available number
                   }),
                 });

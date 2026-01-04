@@ -1,76 +1,77 @@
-# Fix: Call Logging Pipeline Overhaul
+# Fix Provisioning E.164 Regression + Onboarding Guardrails
 
 ## Summary
 
-Complete fix of the call logging pipeline from Vapi webhook to dashboard display. Calls now reliably populate in `call_logs` and appear on dashboards.
+Fixes a provisioning failure caused by unformatted phone numbers being passed to Vapi, and adds server-side onboarding state management with guardrail UI components.
 
-## Problem
+## Root Cause
 
-- Webhook was not successfully parsing or storing real calls from Vapi
-- Inconsistent naming across codebase (`vapi_id`, `vapi_phone_id`, `vapi_call_id`, etc.)
-- Account mapping used fragile OR-based phone matching that silently failed
-- No visibility into failed webhooks
-- Dashboards depended solely on Realtime (missing calls if subscription failed)
+The `provision-phone-number` and `provision-vapi` Edge Functions were passing `phone` values directly to Vapi's `fallbackDestination.number` without E.164 normalization. Formatted strings like `(303) 555-1234` caused Vapi to reject with:
 
-## Solution
+```
+{"message":["fallbackDestination.number must be a valid phone number in E.164 format."]}
+```
 
-### Database Changes
-- **New table**: `call_webhook_inbox` - Dead letter queue for failed webhooks
-- **New columns**: `provider_phone_number_id`, `e164_number`, `twilio_phone_number_sid` in `phone_numbers`
-- **New view**: `phone_number_identity` for debugging
+## Changes
 
-### Webhook Rewrite (`vapi-webhook`)
-- Robust payload normalization matching Vapi event shape
-- Sequential account mapping (not OR chains):
-  1. `provider_phone_number_id`
-  2. `vapi_phone_id` (legacy fallback)
-  3. `e164_number`
-  4. `phone_number` (legacy fallback)
-- **Always** writes to `call_webhook_inbox` on any failure
-- Creates minimal call record even without `ended_at`
-
-### New Edge Functions
-- **`vapi-reconcile-calls`**: Feature-flagged job to backfill missing calls from Vapi API
-- **`call-logs-cleanup`**: Data retention (7d raw_payload, 30d transcript)
-
-### Frontend
-- CustomerDashboard now subscribes to both INSERT + UPDATE events
-- 60-second polling fallback in case Realtime misses events
-
-## Files Changed
+### Phase 0: E.164 Fix (Critical)
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/20251217000001_call_webhook_inbox.sql` | New dead letter inbox table |
-| `supabase/migrations/20251217000002_standardize_phone_identifiers.sql` | Canonical phone columns + backfill |
-| `supabase/functions/vapi-webhook/index.ts` | Complete rewrite |
-| `supabase/functions/vapi-reconcile-calls/index.ts` | New reconciliation job |
-| `supabase/functions/call-logs-cleanup/index.ts` | New retention job |
-| `src/pages/CustomerDashboard.tsx` | UPDATE listener + polling |
-| `docs/CALL_LOGS.md` | Documentation |
-| `fixtures/vapi-end-of-call-report.json` | Test payload |
+| `validators.ts` | `formatPhoneE164` now returns `null` on invalid input. Added `tryFormatPhoneE164` with logging. |
+| `provision-phone-number/index.ts` | Uses `tryFormatPhoneE164` + `VAPI_FALLBACK_E164` env var fallback. Omits `fallbackDestination` if invalid (Vapi accepts this). |
+| `provision-vapi/index.ts` | Same pattern for consistency. |
+| `validators.test.ts` | Unit tests verifying null-return on invalid inputs. |
 
-## Deployment Notes
+### Phase 1-5: Onboarding Guardrails
 
-Edge functions already deployed. Migrations already applied via SQL Editor.
-
-To enable reconciliation (optional):
-```
-CALL_RECONCILE_ENABLED=true
-```
+| Phase | Description |
+|-------|-------------|
+| 1 | RPC migration: `get_onboarding_state` (uses `phone_number_id` join), `track_onboarding_event` |
+| 2 | `useOnboardingState` hook with polling |
+| 3 | Dashboard `OnboardingUiGuardrail` + Phones tab `OnboardingRecoveryPanel` |
+| 4 | `detect-test-call-alert` cron function |
+| 5 | CI path triggers for onboarding components |
 
 ## Testing
 
-1. Make a real call to a RingSnap number
-2. Verify call appears in `call_logs` within 60 seconds
-3. If missing, check `call_webhook_inbox` for reason
-4. Dashboard should show call without manual refresh
+- [x] Vapi API docs confirm `fallbackDestination` is optional
+- [x] Unit tests for `formatPhoneE164` pass
+- [ ] Manual: Create trial and verify provisioning completes
 
-## Backward Compatibility
+## Rollback
 
-All changes are additive. Legacy columns preserved:
-- `vapi_phone_id` still populated
-- `phone_number` still populated
-- `vapi_call_id` still used as upsert key
+### Quick Rollback (ActivationStepper)
 
-Signup/provisioning flows unchanged.
+```typescript
+// In src/pages/Activation.tsx, line 21
+const USE_NEW_FLOW = false;  // Change to false
+```
+
+### Full Rollback (Edge Functions)
+
+```bash
+# Revert to previous commit
+git checkout main -- supabase/functions/provision-phone-number/index.ts
+git checkout main -- supabase/functions/provision-vapi/index.ts
+git checkout main -- supabase/functions/_shared/validators.ts
+
+# Redeploy
+npx supabase functions deploy provision-phone-number --no-verify-jwt
+npx supabase functions deploy provision-vapi --no-verify-jwt
+```
+
+### Rollback RPC (if needed)
+
+```sql
+-- Run in Supabase SQL Editor
+DROP FUNCTION IF EXISTS get_onboarding_state(UUID);
+DROP FUNCTION IF EXISTS track_onboarding_event(TEXT, JSONB);
+```
+
+## Checklist
+
+- [x] Migrations applied
+- [x] Edge Functions deployed
+- [x] Branch pushed
+- [ ] PR merged to main
