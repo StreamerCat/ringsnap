@@ -60,29 +60,10 @@ serve(async (req) => {
       defaultAvailability,
       connectCalendar,
       referralCode,
-      timezone
+      timezone,
+      skipOnboarding,
+      accountId: passedAccountId
     } = await req.json();
-
-    // Validate required fields
-    if (!areaCode || !selectedNumber || !companyName || !trade || !assistantGender) {
-      return new Response(
-        JSON.stringify({ error: 'Area code, phone number, company name, trade, and assistant voice are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate area code format
-    if (!/^\d{3}$/.test(areaCode)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid area code format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    logInfo('Using selected phone number and company details', {
-      ...baseLogOptions,
-      context: { areaCode, selectedNumber, companyName }
-    });
 
     // Get user's profile to find account_id
     const { data: profile, error: profileError } = await supabase
@@ -102,8 +83,94 @@ serve(async (req) => {
       );
     }
 
-    const accountId = profile.account_id;
+    const accountId = passedAccountId || profile.account_id;
     currentAccountId = accountId;
+
+    // SECURITY: Ensure user owns the account they are trying to access
+    // We enforce strict ownership: profile.account_id MUST match the target accountId
+    // This prevents any user from completing onboarding for another account
+    if (accountId !== profile.account_id) {
+      logError('Unauthorized onboarding completion attempt for different account', {
+        ...baseLogOptions,
+        accountId,
+        profileAccountId: profile.account_id
+      });
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized attempt' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // SKIP MODE: Bypass all validations and just mark onboarding complete
+    if (skipOnboarding === true) {
+      logInfo('Skip onboarding mode activated', {
+        ...baseLogOptions,
+        accountId
+      });
+
+      // Set onboarding_completed_at without modifying other fields
+      const { error: skipError } = await supabase
+        .from('accounts')
+        .update({
+          onboarding_completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', accountId);
+
+      if (skipError) {
+        logError('Failed to skip onboarding', {
+          ...baseLogOptions,
+          accountId,
+          error: skipError
+        });
+        return new Response(
+          JSON.stringify({ error: 'Failed to skip onboarding' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Log skip event
+      await supabase.from('onboarding_events').insert({
+        account_id: accountId,
+        user_id: user.id,
+        step: 'complete',
+        status: 'skipped',
+        metadata: { reason: 'user_skip' }
+      });
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          message: 'Onboarding skipped successfully.'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate required fields (only for normal flow)
+    if (!areaCode || !selectedNumber || !companyName || !trade || !assistantGender) {
+      return new Response(
+        JSON.stringify({ error: 'Area code, phone number, company name, trade, and assistant voice are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+
+    // Validate area code format
+    if (!/^\d{3}$/.test(areaCode)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid area code format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    logInfo('Using selected phone number and company details', {
+      ...baseLogOptions,
+      context: { areaCode, selectedNumber, companyName }
+    });
+
+    // Note: profile and accountId already fetched above (before skip mode check)
+
 
     // Update account with setup data
     const updateData: Record<string, unknown> = {
@@ -113,7 +180,8 @@ serve(async (req) => {
       phone_number_area_code: areaCode,
       provisioning_status: 'provisioning',
       updated_at: new Date().toISOString(),
-      timezone: timezone || 'America/Denver' // Use passed timezone or fallback
+      timezone: timezone || 'America/Denver', // Use passed timezone or fallback
+      onboarding_completed_at: new Date().toISOString()
     };
 
     // Add optional fields if provided

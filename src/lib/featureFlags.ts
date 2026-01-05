@@ -98,6 +98,23 @@ export interface FeatureFlags {
    * Set via: VITE_FEATURE_CALL_RECORDING_IMMEDIATE_APPLY=true
    */
   callRecordingImmediateApply: boolean;
+
+  /**
+   * KILL SWITCH: Enable onboarding route guard.
+   * When enabled, users with onboarding_completed_at IS NULL redirect to /activation.
+   * Set to false to disable guard and allow all users to access /dashboard.
+   * 
+   * Default: true (guard enabled)
+   * Set via: VITE_FEATURE_ONBOARDING_GUARD_ENABLED=false
+   */
+  onboardingGuardEnabled: boolean;
+
+  /**
+   * Allow internal skip of onboarding (dev/internal allowlist only).
+   * Enables "Skip for now" button in activation flow.
+   * Set via: VITE_FEATURE_INTERNAL_SKIP_ONBOARDING=true
+   */
+  internalSkipOnboarding: boolean;
 }
 
 /**
@@ -189,6 +206,18 @@ export const featureFlags: FeatureFlags = {
   callRecordingImmediateApply: parseBoolEnv(
     import.meta.env.VITE_FEATURE_CALL_RECORDING_IMMEDIATE_APPLY,
     true
+  ),
+
+  // Onboarding guard: ENABLED by default (kill switch)
+  onboardingGuardEnabled: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_ONBOARDING_GUARD_ENABLED,
+    true
+  ),
+
+  // Internal skip onboarding: dev only by default
+  internalSkipOnboarding: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_INTERNAL_SKIP_ONBOARDING,
+    import.meta.env.DEV
   ),
 };
 
