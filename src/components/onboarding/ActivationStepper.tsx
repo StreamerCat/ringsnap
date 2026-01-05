@@ -4,13 +4,15 @@ import { useOnboardingState, OnboardingState } from "@/hooks/useOnboardingState"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Check, Copy, Phone, ArrowRight, ExternalLink, Loader2, RefreshCw, Smartphone, AlertTriangle, HelpCircle, MessageCircle } from "lucide-react";
+import { Check, Copy, Phone, ArrowRight, ExternalLink, Loader2, RefreshCw, Smartphone, AlertTriangle, HelpCircle, MessageCircle, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/utils";
 import { CarrierForwardingInstructions } from "@/components/CarrierForwardingInstructions";
 import { useNavigate } from "react-router-dom";
 import { featureFlags } from "@/lib/featureFlags";
 import { trackOnboardingEvent } from "@/lib/sentry-tracking";
+import { supabase } from "@/integrations/supabase/client";
+
 
 interface ActivationStepperProps {
     accountId: string;
@@ -137,6 +139,30 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
     const handleContinue = () => {
         navigate('/dashboard');
     };
+
+    // Skip onboarding entirely (dev/internal only)
+    const handleSkipOnboarding = useCallback(async () => {
+        if (!featureFlags.internalSkipOnboarding) return;
+
+        try {
+            const { error } = await supabase.functions.invoke('complete-onboarding', {
+                body: { skipOnboarding: true }
+            });
+
+            if (error) {
+                toast.error('Failed to skip onboarding');
+                console.error('Skip onboarding error:', error);
+                return;
+            }
+
+            toast.success('Onboarding skipped');
+            navigate('/dashboard');
+        } catch (err) {
+            toast.error('Failed to skip onboarding');
+            console.error('Skip onboarding error:', err);
+        }
+    }, [navigate]);
+
 
     if (loading && !state) {
         return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -386,6 +412,21 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
                     </Card>
                 )}
             </div>
+
+            {/* Skip Onboarding Button - Dev/Internal Only */}
+            {featureFlags.internalSkipOnboarding && (
+                <div className="mt-8 pt-4 border-t border-dashed text-center">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={handleSkipOnboarding}
+                    >
+                        <SkipForward className="h-3 w-3 mr-1" />
+                        Skip for now (dev only)
+                    </Button>
+                </div>
+            )}
         </div>
     );
 };

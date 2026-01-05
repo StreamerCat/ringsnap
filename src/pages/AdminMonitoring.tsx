@@ -291,6 +291,23 @@ const AdminMonitoring = () => {
     }
   }, [provisioningFailuresError, toast]);
 
+  // Onboarding events query
+  const { data: onboardingEvents = [], isLoading: onboardingEventsLoading } = useQuery({
+    queryKey: ["admin-monitoring", "onboarding-events"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("onboarding_events")
+        .select("*, accounts(company_name)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isAuthorized,
+    staleTime: 30_000,
+  });
+
   // MRR calculation from active accounts
   const PLAN_PRICING: Record<string, number> = {
     starter: 99,
@@ -828,6 +845,80 @@ const AdminMonitoring = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Onboarding Events Feed */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    Live Onboarding Events
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {onboardingEventsLoading ? (
+                    <div className="flex h-32 items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[300px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Account</TableHead>
+                            <TableHead>Step</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Metadata</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {onboardingEvents.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                No recent onboarding events.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            onboardingEvents.map((event: any) => (
+                              <TableRow key={event.id}>
+                                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                                  {formatDateTime(event.created_at)}
+                                </TableCell>
+                                <TableCell className="font-medium text-sm">
+                                  {event.accounts?.company_name || "Unknown"}
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {event.account_id.split("-")[0]}...
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <Badge variant="outline">{event.step}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${event.status === "completed"
+                                      ? "bg-green-100 text-green-800"
+                                      : event.status === "skipped"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : event.status === "failed"
+                                          ? "bg-red-100 text-red-800"
+                                          : "bg-slate-100 text-slate-800"
+                                      }`}
+                                  >
+                                    {event.status}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                                  {JSON.stringify(event.metadata)}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -844,7 +935,7 @@ const AdminMonitoring = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </div >
   );
 };
 

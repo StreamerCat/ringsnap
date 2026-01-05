@@ -5,6 +5,7 @@ import LegacyActivation from "./LegacyActivation";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { useOnboardingGuard } from "@/hooks/useOnboardingGuard";
 
 /**
  * Activation Page Entry Point
@@ -13,6 +14,9 @@ import { Loader2 } from "lucide-react";
  * Rollback: Change `USE_NEW_FLOW` to false to revert to LegacyActivation.
  */
 export default function Activation() {
+    // Redirect to dashboard if onboarding already complete
+    useOnboardingGuard({ redirectToDashboard: true });
+
     const [searchParams] = useSearchParams();
     const [accountId, setAccountId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);

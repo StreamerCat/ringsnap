@@ -35,10 +35,17 @@ import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
 
 
 import { OnboardingUiGuardrail } from "@/components/dashboard/OnboardingUiGuardrail";
+import { useOnboardingGuard } from "@/hooks/useOnboardingGuard";
 
 
 export default function CustomerDashboard() {
+  // Route guard: redirect to /activation if onboarding incomplete
+  const { isLoading: guardLoading, isOnboardingComplete } = useOnboardingGuard({
+    redirectToActivation: true, // Redirect if onboarding_completed_at IS NULL
+  });
+
   const navigate = useNavigate();
+
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { setWidgetContext } = useVapiWidget();

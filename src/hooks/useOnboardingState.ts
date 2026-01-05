@@ -16,8 +16,10 @@ export interface OnboardingState {
     primary_phone_number: string | null;
     activated_at: string | null;
     test_call_detected: boolean;
+    test_call_verified_at: string | null;
     forwarding_confirmed: boolean;
     forwarding_verify_started_at: string | null;
+    onboarding_completed_at: string | null;
     recommended_next_step: 'provisioning' | 'test_call' | 'forwarding' | 'complete';
 }
 
@@ -103,18 +105,64 @@ export function useOnboardingState(accountId: string | null): UseOnboardingState
         refreshState();
     }, [refreshState]);
 
-    // Set up polling for state changes (every 5 seconds while waiting for provisioning/test call)
+    // Set up polling for state changes with backoff
     useEffect(() => {
-        if (!state || state.recommended_next_step === 'complete') {
+        // Stop polling if completely finished or if we have a verified test call (RPC handles persistence, so we can relax)
+        // Actually, we should poll until recommended_next_step advances or we are complete.
+        if (!state) return;
+
+        // Stop condition: Onboarding complete
+        if (state.onboarding_completed_at) {
             return;
         }
 
-        const pollInterval = setInterval(() => {
-            refreshState();
-        }, 5000);
+        // Also stop if recommended_step is complete (though onboarding_completed_at is the ultimate source)
+        if (state.recommended_next_step === 'complete') {
+            return;
+        }
 
-        return () => clearInterval(pollInterval);
-    }, [state?.recommended_next_step, refreshState]);
+        let timeoutId: ReturnType<typeof setTimeout>;
+        let attempt = 0;
+
+        const poll = async () => {
+            // Adaptive backoff: 5s initially, then 10s after 12 attempts (1 min), capped at 15s
+            const interval = attempt < 12 ? 5000 : (attempt < 24 ? 10000 : 15000);
+
+            timeoutId = setTimeout(async () => {
+                attempt++;
+                await refreshState();
+                // Schedule next poll
+                poll();
+            }, interval);
+        };
+
+        poll();
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+        // Re-run poll setup only if completion state changes, not on every state update to avoid reset backoff
+        // However, if we put [state.onboarding_completed_at] it might not update frequently enough if we don't poll.
+        // We rely on refreshState being stable.
+        // Actually, simple interval with state check inside is safer for React hooks unless we use a ref.
+    }, [state?.onboarding_completed_at, state?.recommended_next_step, refreshState]);
+
+    // Track state transitions
+    useEffect(() => {
+        if (!state) return;
+
+        // Example: Log when test call is first verified
+        if (state.test_call_verified_at && !state.test_call_detected) {
+            // This case might happen if we miss the exact transition frame, but RPC handles event verification.
+            // Client-side logging is just for debugging visibility if needed.
+            Sentry.addBreadcrumb({
+                category: 'onboarding',
+                message: 'Test call verified',
+                level: 'info',
+                data: { verified_at: state.test_call_verified_at }
+            });
+        }
+    }, [state?.test_call_verified_at]);
 
     return {
         state,
