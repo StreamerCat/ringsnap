@@ -148,9 +148,8 @@ const AdminMonitoring = () => {
   const { data: provisioningSummary = [], isLoading: provisioningLoading, error: provisioningError } = useQuery({
     queryKey: ["admin-monitoring", "provisioning-summary"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_provisioning_status_counts" as any)
-        .select("*");
+      // Use RPC function for secure admin-only access
+      const { data, error } = await supabase.rpc("rpc_admin_provisioning_status_counts");
 
       if (error) throw error;
       return (data || []).map((row: any) => ({
@@ -178,9 +177,8 @@ const AdminMonitoring = () => {
   const { data: callStats = [], isLoading: callStatsLoading, error: callStatsError } = useQuery({
     queryKey: ["admin-monitoring", "call-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_daily_call_stats" as any)
-        .select("*");
+      // Use RPC function for secure admin-only access
+      const { data, error } = await supabase.rpc("rpc_admin_daily_call_stats");
 
       if (error) throw error;
       return (data || []).map((row: any) => ({
@@ -209,15 +207,15 @@ const AdminMonitoring = () => {
   const { data: edgeFunctionErrors = [] as EdgeFunctionErrorRow[], isLoading: edgeErrorsLoading, error: edgeErrorsError } = useQuery({
     queryKey: ["admin-monitoring", "edge-function-errors"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_edge_function_error_feed" as any)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(25);
+      // Use RPC function for secure admin-only access
+      const { data, error } = await supabase.rpc("rpc_admin_edge_function_error_feed");
 
       if (error) throw error;
       if (!data) return [];
-      return data as unknown as EdgeFunctionErrorRow[];
+      // Sort and limit client-side since RPC doesn't support those directly
+      return (data as unknown as EdgeFunctionErrorRow[])
+        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+        .slice(0, 25);
     },
     enabled: isAuthorized,
     staleTime: 30_000,
@@ -237,16 +235,17 @@ const AdminMonitoring = () => {
   const { data: flaggedAccounts = [] as FlaggedAccountRow[], isLoading: flaggedAccountsLoading, error: flaggedAccountsError } = useQuery({
     queryKey: ["admin-monitoring", "flagged-accounts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_flagged_accounts" as any)
-        .select("*")
-        .order("updated_at", { ascending: false });
+      // Use RPC function for secure admin-only access
+      const { data, error } = await supabase.rpc("rpc_admin_flagged_accounts");
 
       if (error) throw error;
-      return (data || []).map((row: any) => ({
-        ...row,
-        total_alerts: Number(row.total_alerts) || 0,
-      })) as FlaggedAccountRow[];
+      // Sort client-side since RPC doesn't support those directly
+      return ((data || []) as any[])
+        .map((row: any) => ({
+          ...row,
+          total_alerts: Number(row.total_alerts) || 0,
+        }))
+        .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime()) as FlaggedAccountRow[];
     },
     enabled: isAuthorized,
     staleTime: 60_000,
@@ -266,15 +265,15 @@ const AdminMonitoring = () => {
   const { data: provisioningFailures = [] as ProvisioningFailureRow[], isLoading: provisioningFailuresLoading, error: provisioningFailuresError } = useQuery({
     queryKey: ["admin-monitoring", "provisioning-failures"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_provisioning_failures" as any)
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(25);
+      // Use RPC function for secure admin-only access
+      const { data, error } = await supabase.rpc("rpc_admin_provisioning_failures");
 
       if (error) throw error;
       if (!data) return [];
-      return data as unknown as ProvisioningFailureRow[];
+      // Sort and limit client-side since RPC doesn't support those directly
+      return (data as unknown as ProvisioningFailureRow[])
+        .sort((a, b) => new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime())
+        .slice(0, 25);
     },
     enabled: isAuthorized,
     staleTime: 30_000,

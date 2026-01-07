@@ -92,17 +92,14 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
 
   const loadOperatorData = async () => {
     try {
-      // Load summary stats from view
+      // Load summary stats via secure RPC function (replaces direct view access)
       const { data: statsData, error: statsError } = await supabase
-        .from("operator_dashboard_summary")
-        .select("*")
-        .eq("account_id", accountId)
-        .single();
+        .rpc("rpc_operator_dashboard_summary", { _account_id: accountId });
 
       if (statsError) {
         console.error("Failed to load operator stats:", statsError);
-      } else {
-        setStats(statsData);
+      } else if (statsData && statsData.length > 0) {
+        setStats(statsData[0]);
       }
 
       // Load data directly from RPC to ensure freshness and bypass RLS
