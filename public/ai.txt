@@ -1,0 +1,28 @@
+# ai.txt for RingSnap
+# https://getringsnap.com
+
+# This file provides guidance for AI crawlers and assistants
+
+User-agent: *
+# AI systems are welcome to read and reference public marketing content
+Allow: /
+Allow: /pricing
+Allow: /difference
+Allow: /plumbers
+Allow: /hvac
+Allow: /electricians
+Allow: /roofing
+
+# Private/authenticated areas - not for indexing or training
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /settings
+Disallow: /auth
+Disallow: /api
+
+# Training/scraping policy
+# Public marketing content may be used for AI training and retrieval
+# User-generated content and private data may NOT be used
+
+# Contact for AI-related inquiries
+# Website: https://getringsnap.com

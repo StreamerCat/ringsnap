@@ -158,20 +158,22 @@ const Index = () => {
           name="keywords"
           content="virtual answering service, contractor receptionist, human-sounding receptionist, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, voice agent, virtual assistant"
         />
-        <link rel="canonical" href="https://www.getringsnap.com/" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://getringsnap.com/" />
 
         {/* Open Graph */}
         <meta property="og:title" content="RingSnap: The 24/7 Virtual Receptionist" />
         <meta property="og:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.getringsnap.com/" />
-        <meta property="og:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
+        <meta property="og:url" content="https://getringsnap.com/" />
+        <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta property="og:site_name" content="RingSnap" />
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="RingSnap: The 24/7 Virtual Receptionist" />
         <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
-        <meta name="twitter:image" content="https://www.getringsnap.com/assets/social/ringsnap-og.jpg" />
+        <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
         {/* Structured Data */}
         <script type="application/ld+json">

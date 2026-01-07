@@ -124,7 +124,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       title: "Virtual Answering Service for Plumbers | Never Miss Another Emergency Call",
       description: "Stop losing $6,800/month to unanswered calls. RingSnap's Voice Agent answers in under 1 second, handles emergencies, and books jobs 24/7. Made for plumbers who never want to miss a call.",
       keywords: "plumber answering service, plumbing call service, emergency plumber calls, virtual receptionist for plumbers, plumbing receptionist, 24/7 plumber phone, burst pipe calls, after hours plumbing",
-      canonical: "https://www.getringsnap.com/plumbers"
+      canonical: "https://getringsnap.com/plumbers"
     }
   },
 
@@ -203,7 +203,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       title: "Virtual Answering Service for HVAC Contractors | Capture Every Emergency Call",
       description: "Stop losing $8,200/month to missed calls. RingSnap handles AC breakdowns, furnace emergencies, and maintenance calls 24/7. Answers in under 1 second. Sounds human.",
       keywords: "HVAC answering service, AC repair calls, furnace emergency service, HVAC receptionist, 24/7 HVAC calls, air conditioning answering service, heating repair calls",
-      canonical: "https://www.getringsnap.com/hvac"
+      canonical: "https://getringsnap.com/hvac"
     }
   },
 
@@ -282,7 +282,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       title: "Virtual Answering Service for Electricians | Never Miss Emergency or Quote Calls",
       description: "Stop losing $7,400/month to unanswered calls. RingSnap answers in under 1 second, triages electrical emergencies, and books jobs 24/7. Made for electricians who work hot.",
       keywords: "electrician answering service, electrical emergency calls, panel upgrade quotes, electrician receptionist, 24/7 electrical service, sparking panel calls, electrical fire emergency",
-      canonical: "https://www.getringsnap.com/electricians"
+      canonical: "https://getringsnap.com/electricians"
     }
   },
 
@@ -361,7 +361,7 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       title: "Virtual Answering Service for Roofers | Capture Every Storm Damage & Leak Call",
       description: "Stop losing $12,000/month in storm season. RingSnap answers in under 1 second, books emergency leak repairs and inspections 24/7. Made for roofing contractors.",
       keywords: "roofing answering service, roof leak emergency, storm damage calls, roofing receptionist, 24/7 roofer calls, roof inspection booking, insurance claim calls",
-      canonical: "https://www.getringsnap.com/roofing"
+      canonical: "https://getringsnap.com/roofing"
     }
   }
 };
