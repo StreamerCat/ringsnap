@@ -55,6 +55,7 @@ import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { extractUserError, logClientError } from "@/lib/errors";
 import { trackFunnelEvent, trackCheckpoint, trackConversion, trackFormEvent, trackTiming } from "@/lib/sentry-tracking";
+import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
 
 
@@ -956,6 +957,10 @@ function OnboardingChatInner() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
+      <Helmet>
+        <title>Setup | RingSnap</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       {/* Header */}
       <header className="p-3 border-b bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center justify-between">

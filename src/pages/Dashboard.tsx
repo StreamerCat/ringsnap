@@ -15,6 +15,8 @@ const PLAN_PRICING: Record<string, number> = {
   premium: 1497,
 };
 
+import { Helmet } from "react-helmet-async";
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [dateFilter, setDateFilter] = useState("30");
@@ -238,6 +240,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 pb-12">
+      <Helmet>
+        <title>Sales Dashboard | RingSnap</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       {/* Provisioning Status Banner */}
       {accountStatus && accountStatus.provisioning_status !== "completed" && accountStatus.provisioning_status !== "active" && (
         <div className={`w-full p-4 text-center text-sm font-medium ${accountStatus.provisioning_status?.startsWith("failed")

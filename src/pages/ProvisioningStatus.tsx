@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, CheckCircle2, AlertCircle, ArrowRight, Phone, Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { featureFlags } from "@/lib/featureFlags";
+import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
 
 const TIMEOUT_MS = 60000; // 60 seconds
@@ -237,6 +238,10 @@ export default function ProvisioningStatus() {
 
     return (
         <div className="min-h-[100dvh] h-[100dvh] w-full bg-slate-50 flex flex-col items-center justify-center p-4 overflow-hidden relative">
+            <Helmet>
+                <title>Setting Up | RingSnap</title>
+                <meta name="robots" content="noindex, nofollow" />
+            </Helmet>
             <div className="w-full max-w-2xl space-y-8 text-center z-10">
 
                 {/* Logo or Brand */}

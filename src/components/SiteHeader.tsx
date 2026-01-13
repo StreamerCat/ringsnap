@@ -16,12 +16,18 @@ export const SiteHeader = () => {
           />
         </Link>
         <nav className="flex items-center gap-4">
-          {/* <Link
+          <Link
+            to="/pricing"
+            className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors hidden sm:block"
+          >
+            Pricing
+          </Link>
+          <Link
             to="/difference"
             className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors hidden sm:block"
           >
             The Difference
-          </Link> */}
+          </Link>
           <Button
             variant="outline"
             size="sm"
