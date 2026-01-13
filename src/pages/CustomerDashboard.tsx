@@ -38,6 +38,8 @@ import { OnboardingUiGuardrail } from "@/components/dashboard/OnboardingUiGuardr
 import { useOnboardingGuard } from "@/hooks/useOnboardingGuard";
 
 
+import { Helmet } from "react-helmet-async";
+
 export default function CustomerDashboard() {
   // Route guard: redirect to /activation if onboarding incomplete
   const { isLoading: guardLoading, isOnboardingComplete } = useOnboardingGuard({
@@ -423,6 +425,10 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Dashboard | RingSnap</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <div className="container mx-auto py-4 sm:py-8 px-3 sm:px-4 max-w-7xl">
         {/* Header - responsive: stacks on mobile */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
