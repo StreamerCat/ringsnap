@@ -30,14 +30,18 @@ const Difference = () => {
         <Helmet>
             <title>The RingSnap Difference | Trained Front Desk for Home Services</title>
             <meta name="description" content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes. Built for contractors." />
-            <link rel="canonical" href="https://www.getringsnap.com/difference" />
+            <meta name="robots" content="index, follow" />
+            <link rel="canonical" href="https://getringsnap.com/difference" />
             <meta property="og:title" content="The RingSnap Difference | Trained Front Desk for Home Services" />
             <meta property="og:description" content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes." />
             <meta property="og:type" content="website" />
-            <meta property="og:url" content="https://www.getringsnap.com/difference" />
+            <meta property="og:url" content="https://getringsnap.com/difference" />
+            <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+            <meta property="og:site_name" content="RingSnap" />
             <meta name="twitter:card" content="summary_large_image" />
             <meta name="twitter:title" content="The RingSnap Difference" />
             <meta name="twitter:description" content="The trained front desk that books jobs and gets sharper over time." />
+            <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
         </Helmet>
 
         <SiteHeader />

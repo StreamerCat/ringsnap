@@ -23,16 +23,20 @@ const Electricians = () => {
         <title>{config.seo.title}</title>
         <meta name="description" content={config.seo.description} />
         <meta name="keywords" content={config.seo.keywords} />
+        <meta name="robots" content="index, follow" />
         <link rel="canonical" href={config.seo.canonical} />
 
         <meta property="og:title" content={config.seo.title} />
         <meta property="og:description" content={config.seo.description} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={config.seo.canonical} />
+        <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta property="og:site_name" content="RingSnap" />
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={config.seo.title} />
         <meta name="twitter:description" content={config.seo.description} />
+        <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">

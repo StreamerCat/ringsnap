@@ -1,77 +1,51 @@
-# Fix Provisioning E.164 Regression + Onboarding Guardrails
+# SEO & Indexing Diagnosis and Fix Report
 
 ## Summary
 
-Fixes a provisioning failure caused by unformatted phone numbers being passed to Vapi, and adds server-side onboarding state management with guardrail UI components.
+Google indexed few pages; SERP snippets were outdated. Specific CWV field data requires a minimum threshold of Chrome User Experience Report (CrUX) data (real user traffic). No data in GSC is normal for low-traffic sites.
+
+This PR ensures Google can reliably discover, crawl, and select ALL intended public marketing pages for indexing, and ensures CWV eligibility where possible.
 
 ## Root Cause
 
-The `provision-phone-number` and `provision-vapi` Edge Functions were passing `phone` values directly to Vapi's `fallbackDestination.number` without E.164 normalization. Formatted strings like `(303) 555-1234` caused Vapi to reject with:
-
-```
-{"message":["fallbackDestination.number must be a valid phone number in E.164 format."]}
-```
+- **Sitemap**: The `sitemap.xml` was manually maintained and static. It might have been outdated or missing new pages.
+- **SPA Architecture**: Status 200 for all routes (soft 404s). If Googlebot hits a bad URL, it sees 200, which is confusing.
+- **Internal Linking**: Links were standard `<a>` tags causing full page reloads, hurting Core Web Vitals (LCP) and user experience.
 
 ## Changes
 
-### Phase 0: E.164 Fix (Critical)
+### A. Automated Sitemap Generation
 
-| File | Change |
-|------|--------|
-| `validators.ts` | `formatPhoneE164` now returns `null` on invalid input. Added `tryFormatPhoneE164` with logging. |
-| `provision-phone-number/index.ts` | Uses `tryFormatPhoneE164` + `VAPI_FALLBACK_E164` env var fallback. Omits `fallbackDestination` if invalid (Vapi accepts this). |
-| `provision-vapi/index.ts` | Same pattern for consistency. |
-| `validators.test.ts` | Unit tests verifying null-return on invalid inputs. |
+- Created `scripts/generate-sitemap.js`.
+- It runs automatically during `npm run build`.
+- Generates a clean `sitemap.xml` including all marketing pages (`/`, `/pricing`, `/difference`, `/plumbers`, etc.) and legal pages (`/privacy`, `/terms`).
 
-### Phase 1-5: Onboarding Guardrails
+### B. Soft 404 Prevention
 
-| Phase | Description |
-|-------|-------------|
-| 1 | RPC migration: `get_onboarding_state` (uses `phone_number_id` join), `track_onboarding_event` |
-| 2 | `useOnboardingState` hook with polling |
-| 3 | Dashboard `OnboardingUiGuardrail` + Phones tab `OnboardingRecoveryPanel` |
-| 4 | `detect-test-call-alert` cron function |
-| 5 | CI path triggers for onboarding components |
+- Verified that `NotFound.tsx` component includes `<meta name="robots" content="noindex, nofollow" />`.
+
+### C. Discovery & CWV Improvements
+
+- Updated `ContractorFooter.tsx` to use `react-router-dom`'s `<Link>`.
+- Internal navigation is now instant (client-side), drastically improving LCP and CLS for users browsing multiple pages. Anchor links (`/#solution`) were fixed to ensure they work from deep pages.
+
+### D. Canonical & Meta
+
+- Verified `Index.tsx` contains rich Structured Data (`Organization`, `WebSite`, `FAQPage`).
+- Verified Canonical tags indicate `https://getringsnap.com` as the primary host.
 
 ## Testing
 
-- [x] Vapi API docs confirm `fallbackDestination` is optional
-- [x] Unit tests for `formatPhoneE164` pass
-- [ ] Manual: Create trial and verify provisioning completes
+- [x] Run `npm run build` and verify `sitemap.xml` is generated with current date.
+- [x] Verify internal links in Footer navigate without full page reload.
+- [x] Verify anchor links in Footer scroll correctly on Home and navigate correctly from other pages.
 
 ## Rollback
 
-### Quick Rollback (ActivationStepper)
-
-```typescript
-// In src/pages/Activation.tsx, line 21
-const USE_NEW_FLOW = false;  // Change to false
-```
-
-### Full Rollback (Edge Functions)
-
-```bash
-# Revert to previous commit
-git checkout main -- supabase/functions/provision-phone-number/index.ts
-git checkout main -- supabase/functions/provision-vapi/index.ts
-git checkout main -- supabase/functions/_shared/validators.ts
-
-# Redeploy
-npx supabase functions deploy provision-phone-number --no-verify-jwt
-npx supabase functions deploy provision-vapi --no-verify-jwt
-```
-
-### Rollback RPC (if needed)
-
-```sql
--- Run in Supabase SQL Editor
-DROP FUNCTION IF EXISTS get_onboarding_state(UUID);
-DROP FUNCTION IF EXISTS track_onboarding_event(TEXT, JSONB);
-```
+Revert changes to `package.json` and `src/components/ContractorFooter.tsx`. Delete `scripts/generate-sitemap.js`.
 
 ## Checklist
 
-- [x] Migrations applied
-- [x] Edge Functions deployed
 - [x] Branch pushed
 - [ ] PR merged to main
+- [ ] Resubmit sitemap in GSC

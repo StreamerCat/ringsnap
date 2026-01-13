@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2, Phone, ArrowRight, CheckCircle, Shield, Clock, Zap } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -268,126 +269,132 @@ export default function Start() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted">
-      {/* Header */}
-      <header className="p-4 md:p-6">
-        <div className="max-w-6xl mx-auto flex items-center gap-2">
-          <Phone className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">RingSnap</span>
-        </div>
-      </header>
+    <>
+      <Helmet>
+        <title>Start Your Free Trial | RingSnap</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted">
+        {/* Header */}
+        <header className="p-4 md:p-6">
+          <div className="max-w-6xl mx-auto flex items-center gap-2">
+            <Phone className="h-6 w-6 text-primary" />
+            <span className="font-semibold text-lg">RingSnap</span>
+          </div>
+        </header>
 
-      {/* Main Content */}
-      <main className="flex items-center justify-center px-4 py-8 md:py-16">
-        <div className="w-full max-w-md">
-          <Card className="shadow-xl border-2">
-            <CardContent className="p-6 md:p-8">
-              {/* Headline */}
-              <div className="text-center mb-8">
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-                  Stop Losing $4K+/Month to Unanswered Calls
-                </h1>
-                <p className="text-muted-foreground">
-                  Get your Virtual Receptionist in under 2 minutes
-                </p>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} action="javascript:void(0);" className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Your name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Smith"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={isSubmitting}
-                    className="h-12 text-base"
-                    autoComplete="name"
-                    autoFocus
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Work email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@acmeplumbing.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isSubmitting}
-                    className="h-12 text-base"
-                    autoComplete="email"
-                  />
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Shield className="h-3 w-3" />
-                    Use your business email for faster approval
+        {/* Main Content */}
+        <main className="flex items-center justify-center px-4 py-8 md:py-16">
+          <div className="w-full max-w-md">
+            <Card className="shadow-xl border-2">
+              <CardContent className="p-6 md:p-8">
+                {/* Headline */}
+                <div className="text-center mb-8">
+                  <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
+                    Stop Losing $4K+/Month to Unanswered Calls
+                  </h1>
+                  <p className="text-muted-foreground">
+                    Get your Virtual Receptionist in under 2 minutes
                   </p>
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full h-12 text-base font-semibold"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Setting up...
-                    </>
-                  ) : (
-                    <>
-                      Start My Free Trial
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
-                  )}
-                </Button>
-              </form>
+                {/* Form */}
+                <form onSubmit={handleSubmit} action="javascript:void(0);" className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Your name</Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="John Smith"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={isSubmitting}
+                      className="h-12 text-base"
+                      autoComplete="name"
+                      autoFocus
+                    />
+                  </div>
 
-              {/* Trust Badges */}
-              <div className="mt-6 pt-6 border-t">
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span>No credit card required</span>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Work email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@acmeplumbing.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isSubmitting}
+                      className="h-12 text-base"
+                      autoComplete="email"
+                    />
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Use your business email for faster approval
+                    </p>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <span>Setup in 2 minutes</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="h-4 w-4 text-yellow-600" />
-                    <span>150 minutes included</span>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-base font-semibold"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Setting up...
+                      </>
+                    ) : (
+                      <>
+                        Start My Free Trial
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                {/* Trust Badges */}
+                <div className="mt-6 pt-6 border-t">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>No credit card required</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span>Setup in 2 minutes</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="h-4 w-4 text-yellow-600" />
+                      <span>150 minutes included</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Sign In Link */}
-              <div className="mt-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Already have an account?{' '}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto font-semibold"
-                    onClick={() => navigate('/auth/login')}
-                  >
-                    Sign in
-                  </Button>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                {/* Sign In Link */}
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Already have an account?{' '}
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto font-semibold"
+                      onClick={() => navigate('/auth/login')}
+                    >
+                      Sign in
+                    </Button>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Social Proof */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Trusted by 500+ contractors and home service businesses
-            </p>
+            {/* Social Proof */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Trusted by 500+ contractors and home service businesses
+              </p>
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </>
   );
 }

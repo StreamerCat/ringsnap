@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { getAreaCodeFromZip } from "../_shared/area-code-lookup.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { generateReferralCode } from "../_shared/validators.ts";
@@ -333,7 +333,7 @@ serve(async (req) => {
     // 5. Insert phone number record
     let phoneNumberId = null;
     if (phoneNumber && vapiPhoneId) {
-      const { data: phoneRecord } = await supabase
+      const { data: phoneRecord, error: phoneInsertError } = await supabase
         .from('phone_numbers')
         .insert({
           account_id: accountId,
@@ -347,12 +347,21 @@ serve(async (req) => {
         .select()
         .single();
 
+      if (phoneInsertError) {
+        logError('Failed to insert phone number record', {
+          ...baseLogOptions,
+          accountId,
+          error: phoneInsertError
+        });
+        throw new Error(`Failed to insert phone number: ${phoneInsertError.message}`);
+      }
+
       phoneNumberId = phoneRecord?.id;
     }
 
     // 6. Insert assistant record
     if (vapiAssistantId) {
-      await supabase.from('assistants').insert({
+      const { error: assistantInsertError } = await supabase.from('assistants').insert({
         account_id: accountId,
         phone_number_id: phoneNumberId,
         vapi_assistant_id: vapiAssistantId,
@@ -362,12 +371,24 @@ serve(async (req) => {
         is_primary: true,
         status: 'active',
       });
+
+      if (assistantInsertError) {
+        logError('Failed to insert assistant record', {
+          ...baseLogOptions,
+          accountId,
+          error: assistantInsertError
+        });
+        // We don't throw here to ensure the phone number remains valid, but we log strictly.
+        // Or should we throw? If assistant is missing, the phone won't work well.
+        // Let's throw to trigger "failed" status so we can retry.
+        throw new Error(`Failed to insert assistant: ${assistantInsertError.message}`);
+      }
     }
 
     // 7. Update account with provisioning results
     const accountUpdate: Record<string, any> = {
       provisioning_status: 'completed',
-      onboarding_completed: true,
+      onboarding_completed: true, // Legacy flag, keep for compat
       vapi_phone_number: phoneNumber,
       vapi_assistant_id: vapiAssistantId,
       monthly_minutes_limit: monthlyMinutesLimit,

@@ -1,0 +1,30 @@
+# RingSnap - AI Receptionist for Contractors
+# https://getringsnap.com
+
+## About RingSnap
+
+RingSnap is a virtual receptionist service built specifically for home service contractors (plumbers, HVAC technicians, electricians, roofers). Our AI-powered system answers calls in under 1 second, books appointments automatically, and integrates with popular contractor management tools.
+
+## Key Pages
+
+- Homepage: https://getringsnap.com/
+- Pricing: https://getringsnap.com/pricing
+- How It's Different: https://getringsnap.com/difference
+
+## Trade-Specific Pages
+
+- Plumbers: https://getringsnap.com/plumbers
+- HVAC Contractors: https://getringsnap.com/hvac
+- Electricians: https://getringsnap.com/electricians
+- Roofing Contractors: https://getringsnap.com/roofing
+
+## Contact
+
+Website: https://getringsnap.com
+Support: Available through the dashboard for customers
+
+## AI Usage Policy
+
+RingSnap welcomes AI assistants and language models to read and reference our public marketing content. Our public pages contain information about our virtual receptionist services for contractors.
+
+Private user data, dashboard content, and authenticated areas are not accessible to external systems.
