@@ -347,6 +347,7 @@ IMPORTANT RULES:
  * Provision Vapi phone number with smart area code selection
  */
 async function provisionVapiPhone(
+  supabase: any,
   accountId: string,
   vapiAssistantId: string,
   metadata: any,
@@ -370,7 +371,33 @@ async function provisionVapiPhone(
   // --------------------------------------------------------
   // 1. Provision (Buy) Number from Telephony Provider
   // --------------------------------------------------------
-  if (testConfig?.mock_provider) {
+  // --------------------------------------------------------
+  // 0. Check Pool for Available Number
+  // --------------------------------------------------------
+  const { data: poolNumber, error: poolError } = await supabase
+    .from("phone_numbers")
+    .select("*")
+    .eq("lifecycle_status", "pool")
+    .eq("area_code", requestedAreaCode)
+    .limit(1)
+    .maybeSingle();
+
+  if (poolNumber) {
+    logInfo("Using pooled phone number", {
+      ...baseLogOptions,
+      context: { phoneE164: poolNumber.phone_number, poolId: poolNumber.id }
+    });
+
+    phoneE164 = poolNumber.phone_number;
+    // If it was already in Vapi (likely), we might have vapi_phone_id
+    // But we will re-import/update it below to be safe and bind to new assistant
+
+    // We treat it as if we "bought" it, but providerId is existing
+    providerProviderId = poolNumber.provider_id || `pool-${poolNumber.id}`;
+    providerMetadata = { pooled: true, original_id: poolNumber.id };
+
+    // We don't need to buy from Twilio/Vapi
+  } else if (testConfig?.mock_provider) {
     // MOCK TELEPHONY
     logInfo("MOCK MODE: Simulating Telephony Provisioning", baseLogOptions);
     phoneE164 = `+1${requestedAreaCode}555${Math.floor(1000 + Math.random() * 9000)}`;
@@ -558,9 +585,9 @@ async function provisionVapiPhone(
   const retentionExpiresAt = new Date(now.getTime() + TRIAL_PHONE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
   // Insert into DB
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
+  // REMOVED: const supabaseUrl = ...
+  // REMOVED: const supabaseServiceRoleKey = ...
+  // REMOVED: const supabase = createClient(...)
 
   logInfo("Inserting phone number into database", {
     ...baseLogOptions,
@@ -571,25 +598,55 @@ async function provisionVapiPhone(
     },
   });
 
-  const { data: phoneRow, error: phoneDbError } = await supabase
-    .from("phone_numbers")
-    .insert({
-      account_id: accountId,
-      phone_number: finalNumber,
-      e164_number: finalNumber, // Ensure e164_number is set for webhook lookup
-      area_code: requestedAreaCode,
-      vapi_phone_id: vapiPhoneId,
-      purpose: "primary",
-      status: "active",
-      is_primary: true,
-      // Phone Pooling fields - CRITICAL for proper assignment
-      lifecycle_status: "assigned",
-      assigned_account_id: accountId,
-      assigned_at: new Date().toISOString(),
-      activated_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
+  let phoneRow;
+  let phoneDbError;
+
+  if (providerMetadata?.pooled && providerMetadata?.original_id) {
+    // UPDATE existing pool row
+    logInfo("Updating pooled phone number record", { ...baseLogOptions });
+    const { data: updatedRow, error: updateError } = await supabase
+      .from("phone_numbers")
+      .update({
+        account_id: accountId,
+        vapi_phone_id: vapiPhoneId, // Might have changed or same
+        purpose: "primary",
+        status: "active",
+        is_primary: true,
+        lifecycle_status: "assigned",
+        assigned_account_id: accountId,
+        assigned_at: new Date().toISOString(),
+        activated_at: new Date().toISOString(),
+      })
+      .eq("id", providerMetadata.original_id)
+      .select("id")
+      .single();
+
+    phoneRow = updatedRow;
+    phoneDbError = updateError;
+  } else {
+    // INSERT new row
+    const { data: insertedRow, error: insertError } = await supabase
+      .from("phone_numbers")
+      .insert({
+        account_id: accountId,
+        phone_number: finalNumber,
+        e164_number: finalNumber,
+        area_code: requestedAreaCode,
+        vapi_phone_id: vapiPhoneId,
+        purpose: "primary",
+        status: "active",
+        is_primary: true,
+        lifecycle_status: "assigned",
+        assigned_account_id: accountId,
+        assigned_at: new Date().toISOString(),
+        activated_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    phoneRow = insertedRow;
+    phoneDbError = insertError;
+  }
 
   if (phoneDbError) {
     logError("Failed to save phone to DB", {
@@ -782,6 +839,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
       phoneDbId = existingPhone.id;
     } else {
       const phoneResult = await provisionVapiPhone(
+        supabase, // Pass supabase client
         job.account_id,
         vapiAssistantId,
         metadata,

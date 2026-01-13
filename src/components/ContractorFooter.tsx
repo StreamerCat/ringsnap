@@ -1,5 +1,7 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Phone } from "lucide-react";
+import { Link } from "react-router-dom";
+
 export const ContractorFooter = () => {
   const faqs = [{
     question: "Will it sound like a robot?",
@@ -26,10 +28,11 @@ export const ContractorFooter = () => {
     question: "What if I go over my included minutes?",
     answer: "No problem! We never cut off your service mid-month. If you exceed your included minutes, additional minutes are billed at:\n\n• Starter: $0.16/minute\n• Professional: $0.13/minute\n• Premium: $0.11/minute\n\nYou'll receive email notifications at 75% and 90% usage so you're never surprised. Most customers stay within their plan limits, but busy months happen—we've got you covered.\n\nIf you consistently exceed your limit, we'll proactively suggest upgrading to the next tier, which usually saves you money compared to paying for additional minutes each month."
   }];
+
   const footerLinks = {
     product: [{
       label: "Features",
-      href: "#solution"
+      href: "/#solution"
     }, {
       label: "Pricing",
       href: "/pricing"
@@ -38,7 +41,7 @@ export const ContractorFooter = () => {
       href: "/difference"
     }, {
       label: "ROI Calculator",
-      href: "#calculator"
+      href: "/#calculator"
     }],
     trades: [{
       label: "For Plumbers",
@@ -61,6 +64,37 @@ export const ContractorFooter = () => {
       href: "/terms"
     }]
   };
+
+  const renderLink = (link: { label: string; href: string }, index: number) => {
+    // Check if the link is an internal route (starts with /) but not just an anchor on current page
+    const isInternal = link.href.startsWith("/");
+    // If it's an anchor link to home (e.g. /#solution), we can use Link or a regular anchor.
+    // React Router HashLink is often used for this, but standard Link with hash works if on other page.
+    // However, if we are on Home, Link to="/#solution" might not scroll.
+    // For simplicity in this task (SEO/Discovery), standard <a> is safer for anchors,
+    // but Link is better for pages.
+    // Actually, simple Link to="/path" is best for pages.
+
+    if (isInternal && !link.href.includes("#")) {
+      return (
+        <li key={index}>
+          <Link to={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
+            {link.label}
+          </Link>
+        </li>
+      );
+    }
+
+    // For anchors or external, use <a>
+    return (
+      <li key={index}>
+        <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
+          {link.label}
+        </a>
+      </li>
+    );
+  };
+
   return <footer className="bg-gradient-to-br from-cream/30 to-off-white border-t border-charcoal/20">
     {/* FAQ Section */}
     <div className="container mx-auto px-4 py-16">
@@ -98,11 +132,7 @@ export const ContractorFooter = () => {
           <div>
             <h3 className="font-semibold mb-4">Product</h3>
             <ul className="space-y-2">
-              {footerLinks.product.map((link, index) => <li key={index}>
-                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                  {link.label}
-                </a>
-              </li>)}
+              {footerLinks.product.map(renderLink)}
             </ul>
           </div>
 
@@ -110,11 +140,7 @@ export const ContractorFooter = () => {
           <div>
             <h3 className="font-semibold mb-4">For Contractors</h3>
             <ul className="space-y-2">
-              {footerLinks.trades.map((link, index) => <li key={index}>
-                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                  {link.label}
-                </a>
-              </li>)}
+              {footerLinks.trades.map(renderLink)}
             </ul>
           </div>
 
@@ -122,11 +148,7 @@ export const ContractorFooter = () => {
           <div>
             <h3 className="font-semibold mb-4">Legal</h3>
             <ul className="space-y-2">
-              {footerLinks.company.map((link, index) => <li key={index}>
-                <a href={link.href} className="text-sm text-foreground/60 hover:text-primary transition-colors">
-                  {link.label}
-                </a>
-              </li>)}
+              {footerLinks.company.map(renderLink)}
             </ul>
           </div>
         </div>
