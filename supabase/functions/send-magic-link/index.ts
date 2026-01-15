@@ -36,7 +36,6 @@ if (supabaseUrlSource && supabaseUrlSource !== 'SUPABASE_URL') {
     `[send-magic-link] Using Supabase URL from ${supabaseUrlSource}; prefer SUPABASE_URL for clarity`
   );
 }
-const SITE_URL = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
 const MAGIC_LINK_TTL_MINUTES = parseInt(Deno.env.get('AUTH_MAGIC_LINK_TTL_MINUTES') || '20');
 
 interface RequestBody {
@@ -50,6 +49,13 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Determine SITE_URL from request origin (for local dev) or fallback to env
+  const origin = req.headers.get('origin');
+  const envSiteUrl = Deno.env.get('SITE_URL');
+  // Use origin if it's a valid URL (localhost or known domain), otherwise fallback
+  const SITE_URL = origin || envSiteUrl || 'https://getringsnap.com';
+
 
   try {
     // Check required environment variables

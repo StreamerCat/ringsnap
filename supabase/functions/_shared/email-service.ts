@@ -148,12 +148,12 @@ function getRedirectUrlForChannel(channel: SignupChannel): string {
   const baseUrl = Deno.env.get("PUBLIC_APP_URL") || "https://app.ringsnap.com";
 
   switch (channel) {
+    // All channels should route through the main auth callback
+    // The AuthCallback component will handle role-based redirection
+    // and onboarding status checks automatically.
     case "self_service":
-      return `${baseUrl}/onboarding/welcome`;
     case "sales_guided":
-      return `${baseUrl}/onboarding/sales-guided`;
     case "enterprise":
-      return `${baseUrl}/onboarding/enterprise`;
     default:
       return `${baseUrl}/auth/callback`;
   }
