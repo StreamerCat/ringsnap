@@ -188,8 +188,8 @@ serve(async (req) => {
       supabase,
       normalizedEmail,
       userId,
-      MAGIC_LINK_TTL_MINUTES,
-      deviceNonce
+      MAGIC_LINK_TTL_MINUTES
+      // deviceNonce - explicitly omitted to allow cross-device login (email to mobile/desktop)
     );
 
     // Build magic link URL
