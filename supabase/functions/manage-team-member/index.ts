@@ -1,9 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from '../_shared/cors.ts';
 import { buildTeamInviteEmail } from '../_shared/email-templates.ts';
 import { sendEmail } from '../_shared/resend-client.ts';
 
+console.log("Manage Team Member function loaded");
+
 Deno.serve(async (req) => {
+  console.log(`Received request: ${req.method} ${req.url}`);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
