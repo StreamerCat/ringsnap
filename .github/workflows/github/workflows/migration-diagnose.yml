@@ -1,0 +1,144 @@
+name: Migration Diagnose (PR Comment)
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/scripts/**'
+      - '.github/workflows/migration-diagnose.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Configure Local Env (dummy values)
+        run: |
+          cp .env.example .env
+          sed -i 's/sk_test_your_secret_key_here/sk_test_dummy_key/g' .env
+          sed -i 's/price_starter_plan_id/price_test_starter/g' .env
+          sed -i 's/price_professional_plan_id/price_test_prof/g' .env
+          sed -i 's/price_premium_plan_id/price_test_prem/g' .env
+          sed -i 's/your-vapi-api-key/dummy_vapi_key/g' .env || true
+
+      - name: Lint migrations
+        run: bash .github/scripts/lint-migrations.sh
+
+      - name: Run supabase start (capture logs)
+        id: supabase_start
+        shell: bash
+        run: |
+          set +e
+          supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector --no-verify-jwt 2>&1 | tee supabase_start.log
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Build diagnosis comment body
+        if: steps.supabase_start.outputs.exit_code != '0'
+        shell: bash
+        run: |
+          FAILING_MIGRATION="$(grep -E "Applying migration " supabase_start.log | tail -n 1 | sed -E 's/^.*Applying migration ([^ ]+)\.\.\..*$/\1/')"
+          ERROR_LINE="$(grep -E "ERROR:" supabase_start.log | tail -n 1 || true)"
+          LOG_TAIL="$(tail -n 120 supabase_start.log)"
+
+          cat > migration_diagnosis.md <<EOF
+          <!-- MIGRATION_DIAGNOSE -->
+          ## CI Migration Failure (auto-diagnosis)
+
+          **Failing migration:** \`${FAILING_MIGRATION:-unknown}\`  
+          **Error:** \`${ERROR_LINE:-unknown}\`
+
+          ### Log excerpt (last 120 lines)
+          \`\`\`
+          ${LOG_TAIL}
+          \`\`\`
+
+          ### Paste-ready prompt for Claude
+          \`\`\`
+          Fix CI migrations with minimal changes and no refactors.
+
+          Context:
+          - CI runs: supabase start on a fresh local DB.
+          - It stops at the first failure.
+
+          Current failure:
+          - Failing migration: ${FAILING_MIGRATION:-unknown}
+          - Error: ${ERROR_LINE:-unknown}
+
+          Task:
+          1) Open the failing migration file and make it apply cleanly on a fresh DB.
+          2) Prefer idempotent patterns:
+             - DROP ... IF EXISTS
+             - CREATE ... IF NOT EXISTS
+             - DO blocks with to_regclass checks for optional dependencies
+             - Avoid COMMENT ON using ||
+             - Avoid GRANT USAGE ON SEQUENCE for UUID PK tables
+             - Avoid now() or other non-IMMUTABLE functions in index predicates
+          3) Run locally: supabase stop; supabase start; confirm it completes.
+
+          Deliver:
+          - PR-ready diff and a 3 bullet summary of what changed and why.
+          \`\`\`
+          EOF
+
+      - name: Post or update PR comment
+        if: steps.supabase_start.outputs.exit_code != '0' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- MIGRATION_DIAGNOSE -->';
+            const body = fs.readFileSync('migration_diagnosis.md', 'utf8');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100
+            });
+
+            const existing = comments.find(c =>
+              (c.user && c.user.type === 'Bot') &&
+              typeof c.body === 'string' &&
+              c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body
+              });
+            }
+
+      - name: Upload supabase logs artifact
+        if: steps.supabase_start.outputs.exit_code != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase_start_log
+          path: supabase_start.log
+          retention-days: 7
+
+      - name: Teardown
+        if: always()
+        run: supabase stop
+
+      - name: Fail job if supabase start failed
+        if: steps.supabase_start.outputs.exit_code != '0'
+        run: exit 1
