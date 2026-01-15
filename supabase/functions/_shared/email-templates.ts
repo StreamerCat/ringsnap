@@ -25,7 +25,7 @@ interface InviteParams {
   invitedBy: string;
   companyName: string;
   loginLink: string;
-  tempPassword: string;
+  tempPassword?: string;
 }
 
 const RINGSNAP_LOGO = "https://getringsnap.com/assets/RS_logo_color.svg";
@@ -46,7 +46,7 @@ const BASE_STYLES = `
 
 export function buildPasswordResetEmail({ recipientName, resetLink }: PasswordResetParams): EmailTemplate {
   const name = recipientName || "there";
-  
+
   return {
     subject: "Reset your RingSnap password",
     html: `
@@ -111,14 +111,20 @@ export function buildTeamInviteEmail({ recipientName, invitedBy, companyName, lo
       <p>Hi ${recipientName},</p>
       <p>${invitedBy} has invited you to join <strong>${companyName}</strong>'s RingSnap account.</p>
       <p>RingSnap is an AI-powered answering service that ensures you never miss a customer call.</p>
+      ${tempPassword ? `
       <p><strong>Your temporary password:</strong></p>
       <p class="code">${tempPassword}</p>
+      ` : `
+      <p>Please log in with your existing account to accept the invitation.</p>
+      `}
       <p style="text-align: center;">
         <a href="${loginLink}" class="button">Sign In to RingSnap</a>
       </p>
       <div class="help">
-        <strong>First time logging in?</strong><br>
-        Use the temporary password above, then you'll be prompted to create your own secure password.
+        <strong>${tempPassword ? 'First time logging in?' : 'Already have an account?'}</strong><br>
+        ${tempPassword
+        ? "Use the temporary password above, then you'll be prompted to create your own secure password."
+        : "Simply sign in to access the new team."}
       </div>
       <div class="footer">
         <p>Questions? Contact us at <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a></p>
@@ -132,11 +138,11 @@ export function buildTeamInviteEmail({ recipientName, invitedBy, companyName, lo
 
 ${invitedBy} has invited you to join ${companyName}'s RingSnap account.
 
-Your temporary password: ${tempPassword}
+${tempPassword ? `Your temporary password: ${tempPassword}` : 'Please log in with your existing account.'}
 
 Sign in here: ${loginLink}
 
-You'll be prompted to create your own password after first login.
+${tempPassword ? "You'll be prompted to create your own password after first login." : ''}
 
 Questions? Contact ${SUPPORT_EMAIL}
 

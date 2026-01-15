@@ -1,51 +1,39 @@
-# SEO & Indexing Diagnosis and Fix Report
+# Fix: Invite Team/Members Flow
 
-## Summary
+## Description
 
-Google indexed few pages; SERP snippets were outdated. Specific CWV field data requires a minimum threshold of Chrome User Experience Report (CrUX) data (real user traffic). No data in GSC is normal for low-traffic sites.
-
-This PR ensures Google can reliably discover, crawl, and select ALL intended public marketing pages for indexing, and ensures CWV eligibility where possible.
-
-## Root Cause
-
-- **Sitemap**: The `sitemap.xml` was manually maintained and static. It might have been outdated or missing new pages.
-- **SPA Architecture**: Status 200 for all routes (soft 404s). If Googlebot hits a bad URL, it sees 200, which is confusing.
-- **Internal Linking**: Links were standard `<a>` tags causing full page reloads, hurting Core Web Vitals (LCP) and user experience.
+This PR fixes the broken "Invite team/members" functionality. Previously, the invite flow would fail if the invited user already existed in the system, or if a user was re-invited. This update ensures that existing users are correctly added to the team and prevents duplicate invites.
 
 ## Changes
 
-### A. Automated Sitemap Generation
+### Backend
 
-- Created `scripts/generate-sitemap.js`.
-- It runs automatically during `npm run build`.
-- Generates a clean `sitemap.xml` including all marketing pages (`/`, `/pricing`, `/difference`, `/plumbers`, etc.) and legal pages (`/privacy`, `/terms`).
+- **`supabase/functions/manage-team-member/index.ts`**:
+  - Refactored `invite` action to check for existing users before attempting to create them.
+  - Implemented logic to add existing users to the `account_members` table if they are not already a member.
+  - Added checks to prevent re-inviting users who are already members of the team.
+  - Improved logging for invite attempts.
+- **`supabase/functions/_shared/email-templates.ts`**:
+  - Updated `buildTeamInviteEmail` to accept an optional `tempPassword`.
+  - Modified email template to display "Login with your existing account" if no temporary password is provided.
 
-### B. Soft 404 Prevention
+### Frontend
 
-- Verified that `NotFound.tsx` component includes `<meta name="robots" content="noindex, nofollow" />`.
+- **`src/components/dashboard/TeamTab.tsx`**:
+  - Enhanced error handling to display specific, user-friendly messages (e.g., "This user is already a member of the team").
 
-### C. Discovery & CWV Improvements
+### Tests
 
-- Updated `ContractorFooter.tsx` to use `react-router-dom`'s `<Link>`.
-- Internal navigation is now instant (client-side), drastically improving LCP and CLS for users browsing multiple pages. Anchor links (`/#solution`) were fixed to ensure they work from deep pages.
+- Added `tests/invite_member.test.ts` to verify:
+  - Inviting a completely new user.
+  - Inviting an existing user (should bind to team).
+  - Inviting a user already in the team (should fail gracefully).
 
-### D. Canonical & Meta
+## Verification
 
-- Verified `Index.tsx` contains rich Structured Data (`Organization`, `WebSite`, `FAQPage`).
-- Verified Canonical tags indicate `https://getringsnap.com` as the primary host.
+- [ ] Manual verification in Dashboard > Team > Invite Member.
+- [ ] Automated tests pass (requires `SUPABASE_SERVICE_ROLE_KEY`).
 
-## Testing
+## Related Issues
 
-- [x] Run `npm run build` and verify `sitemap.xml` is generated with current date.
-- [x] Verify internal links in Footer navigate without full page reload.
-- [x] Verify anchor links in Footer scroll correctly on Home and navigate correctly from other pages.
-
-## Rollback
-
-Revert changes to `package.json` and `src/components/ContractorFooter.tsx`. Delete `scripts/generate-sitemap.js`.
-
-## Checklist
-
-- [x] Branch pushed
-- [ ] PR merged to main
-- [ ] Resubmit sitemap in GSC
+- Fixes "Invite team/members" function being reported as broken.

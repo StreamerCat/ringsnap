@@ -66,35 +66,82 @@ Deno.serve(async (req) => {
     const { action, email, name, phone, new_role, target_user_id } = await req.json();
 
     if (action === 'invite') {
-      // Generate temporary password
-      const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+      let targetUserId: string;
+      let isNewUser = false;
+      let tempPassword = "";
 
-      // Create new user with temp password
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: { name, phone }
-      });
+      // 1. Try to find existing auth user first
+      // We use listUsers because getByEmail isn't readily available in all SDK versions or requires different permissions
+      // Note: listUsers is expensive on large userbases but manageable for invites
+      const { data: { users: foundUsers }, error: findError } = await supabase.auth.admin.listUsers();
 
-      if (createError) throw createError;
+      const existingUser = foundUsers?.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
-      // Create profile
-      await supabase
-        .from('profiles')
-        .insert({
-          id: newUser.user.id,
-          account_id: profile.account_id,
-          name,
-          phone,
-          is_primary: false
+      if (existingUser) {
+        targetUserId = existingUser.id;
+        console.log(`User ${email} already exists (id: ${targetUserId}). Adding to team.`);
+      } else {
+        // 2. Create new user if doesn't exist
+        isNewUser = true;
+        tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+
+        const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+          email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: { name, phone }
         });
 
-      // Create account member role
+        if (createError) {
+          // Handle race condition if user was created between our check and now
+          if (createError.message?.toLowerCase().includes("already registered")) {
+            console.log(`Race condition: User ${email} created concurrently. treating as existing.`);
+            // Re-fetch to get ID (or fail if we can't) - simplistic retry
+            const { data: { users: retryUsers } } = await supabase.auth.admin.listUsers();
+            const retryUser = retryUsers?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+            if (!retryUser) throw createError;
+            targetUserId = retryUser.id;
+            isNewUser = false;
+          } else {
+            throw createError;
+          }
+        } else {
+          targetUserId = newUser.user.id;
+
+          // Create profile immediately for new user
+          await supabase
+            .from('profiles')
+            .insert({
+              id: targetUserId,
+              account_id: profile.account_id, // Default to inviter's account for now, logical for expanded teams
+              name,
+              phone,
+              is_primary: false
+            });
+        }
+      }
+
+      // 3. Check if already in THIS team
+      const { data: existingMember } = await supabase
+        .from('account_members')
+        .select('id')
+        .eq('user_id', targetUserId)
+        .eq('account_id', profile.account_id)
+        .single();
+
+      if (existingMember) {
+        console.log(`User ${targetUserId} is already a member of account ${profile.account_id}`);
+        return new Response(
+          JSON.stringify({ error: 'User is already a member of this team.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 4. Add to account_members
       await supabase
         .from('account_members')
         .insert({
-          user_id: newUser.user.id,
+          user_id: targetUserId,
           account_id: profile.account_id,
           role: new_role || 'member'
         });
@@ -103,7 +150,7 @@ Deno.serve(async (req) => {
       await supabase
         .from('role_audit_log')
         .insert({
-          user_id: newUser.user.id,
+          user_id: targetUserId,
           changed_by: user.id,
           role_type: 'account',
           old_role: null,
@@ -132,7 +179,7 @@ Deno.serve(async (req) => {
           invitedBy: inviterProfile?.name || 'Your team',
           companyName: account?.company_name || 'your team',
           loginLink: `${Deno.env.get("VITE_SUPABASE_URL") || "https://getringsnap.com"}/login`,
-          tempPassword
+          tempPassword: isNewUser ? tempPassword : undefined // Only send temp password to new users
         });
 
         await sendEmail(Deno.env.get("RESEND_PROD_KEY")!, {
@@ -143,14 +190,14 @@ Deno.serve(async (req) => {
           text: inviteEmail.text
         });
 
-        console.log(`Team invite email sent to ${email}`);
+        console.log(`Team invite email sent to ${email} (New User: ${isNewUser})`);
       } catch (emailError) {
         console.error('Error sending invite email:', emailError);
         // Don't fail the whole request if email fails
       }
 
       return new Response(
-        JSON.stringify({ success: true, user_id: newUser.user.id }),
+        JSON.stringify({ success: true, user_id: targetUserId }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else if (action === 'update_role') {

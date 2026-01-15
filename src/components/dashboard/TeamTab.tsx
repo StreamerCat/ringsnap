@@ -142,20 +142,32 @@ export function TeamTab({ accountId }: TeamTabProps) {
             loadMembers();
         } catch (error: any) {
             console.error("Failed to invite member:", error);
+
             // Extract better error message from edge function response
             let errorMsg = "Failed to send invitation. Please try again.";
-            if (error.message) {
-                try {
-                    const parsed = JSON.parse(error.message);
-                    errorMsg = parsed.error || error.message;
-                } catch {
-                    errorMsg = error.message;
+
+            // Try to parse the error body if it's a response object or string
+            if (typeof error === 'object' && error !== null) {
+                if (error.message) {
+                    try {
+                        const parsed = JSON.parse(error.message);
+                        errorMsg = parsed.error || error.message;
+                    } catch {
+                        errorMsg = error.message;
+                    }
+                } else if (error.error) {
+                    errorMsg = error.error;
                 }
             }
+
             // Handle common error case: user already exists
-            if (errorMsg.toLowerCase().includes("already") || errorMsg.toLowerCase().includes("exists")) {
-                errorMsg = "This email is already registered. They can sign in and join the team.";
+            if (errorMsg.toLowerCase().includes("already") && errorMsg.toLowerCase().includes("member")) {
+                errorMsg = "This user is already a member of the team.";
+            } else if (errorMsg.toLowerCase().includes("already") || errorMsg.toLowerCase().includes("exists")) {
+                // This branch might be less common now with backend fix, but good fallback
+                errorMsg = "This email is already registered. Trying to add them to the team...";
             }
+
             toast({
                 title: "Invite Failed",
                 description: errorMsg,
