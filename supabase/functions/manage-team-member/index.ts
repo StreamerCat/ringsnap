@@ -188,10 +188,20 @@ Deno.serve(async (req) => {
         });
 
         // Check for API key presence
-        const resendKey = Deno.env.get("RESEND_PROD_KEY") || Deno.env.get("RESEND_API_KEY");
+        const envObj = Deno.env.toObject();
+        let resendKey = Deno.env.get("RESEND_PROD_KEY") || Deno.env.get("RESEND_API_KEY");
+
+        // Fallback to searching object directly if get() failed but key exists
+        if (!resendKey) {
+          if (envObj["RESEND_PROD_KEY"]) resendKey = envObj["RESEND_PROD_KEY"];
+          else if (envObj["RESEND_API_KEY"]) resendKey = envObj["RESEND_API_KEY"];
+        }
 
         if (!resendKey) {
-          console.error("CRITICAL: RESEND_PROD_KEY and RESEND_API_KEY are missing. Cannot send invite email.");
+          // Diagnostic logging
+          const hasProdKey = "RESEND_PROD_KEY" in envObj;
+          const prodKeyVal = hasProdKey ? `"${envObj["RESEND_PROD_KEY"]}"` : "N/A";
+          console.error(`CRITICAL: RESEND_PROD_KEY missing or empty. In Env? ${hasProdKey}. Value: ${prodKeyVal}`);
         } else {
           const emailResult = await sendEmail(resendKey, {
             from: "RingSnap <support@getringsnap.com>",
