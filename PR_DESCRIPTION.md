@@ -1,24 +1,50 @@
-# Fix Password Reset and Magic Link Redirection
+# Fix: Invite Team/Members Flow
 
-## Overview
+## Description
 
-This PR resolves critical issues with the password reset flow and magic link sign-in process where users were being redirected to the home page or invalid routes instead of their intended destination. It also fixes a "Link or token has expired" error caused by device binding mismatches.
+This PR fixes the broken "Invite team/members" functionality. Previously, the invite flow would fail if the invited user already existed in the system, or if a user was re-invited.
+
+Additionally, this PR **fixes an issue where invite emails were silently failing** due to unhandled API errors and environment variable configuration issues.
 
 ## Changes
 
+### Backend
+
+- **`supabase/functions/manage-team-member/index.ts`**:
+  - Refactored `invite` action to check for existing users before attempting to create them.
+  - Implemented logic to add existing users to the `account_members` table if they are not already a member.
+  - Added checks to prevent re-inviting users who are already members of the team.
+  - **Email Reliability**:
+    - Added robust checking for `RESEND_PROD_KEY` (and `RESEND_API_KEY` fallback).
+    - Added explicit logging of email sending results (success/failure) to Supabase Logs.
+    - Fixed syntax errors and import paths to ensure successful deployment.
+- **`supabase/functions/_shared/email-templates.ts`**:
+  - Updated `buildTeamInviteEmail` to accept an optional `tempPassword`.
+  - Modified email template to display "Login with your existing account" if no temporary password is provided.
+
 ### Frontend
 
-- **`src/pages/AuthLogin.tsx`**: Updated the password reset flow to use `/auth/callback?next=/reset-password` as the redirect URL. This ensures the PKCE code exchange happens correctly via the `AuthCallback` component before landing on the reset password page.
+- **`src/components/dashboard/TeamTab.tsx`**:
+  - Enhanced error handling to display specific, user-friendly messages (e.g., "This user is already a member of the team").
 
-### Backend (Response Edge Functions)
+### Tests
 
-- **`supabase/functions/send-magic-link/index.ts`**:
-  - Updated the function to dynamically determine the `SITE_URL` from the request `origin` header. This fixes issues where local development or staging environments would redirect to the production domain determined by environment variables.
-  - **[NEW]** Removed `deviceNonce` binding from magic link generation. This resolves the "Link or token has expired" error when a user requests a link on one device (e.g., desktop) and clicks it on another (e.g., mobile), ensuring cross-device authentication works as expected for email links.
-- **`supabase/functions/_shared/email-service.ts`**: Standardized the magic link redirect URL to always point to `/auth/callback`. Removed invalid paths (e.g., `/onboarding/welcome`) that were causing 404s or unintended home page redirects.
+- Added `tests/invite_member.test.ts` to verify:
+  - Inviting a completely new user.
+  - Inviting an existing user (should bind to team).
+  - Inviting a user already in the team (should fail gracefully).
 
-## Testing
+## Deployment Notes
 
-- Verified that requesting a password reset link now correctly redirects to the reset password page after clicking the email link.
-- Verified that magic links correctly sign the user in and redirect to the dashboard (or onboarding) regardless of the environment (local vs. prod).
-- Confirmed that magic links can be opened on a different device than the one that requested them.
+- This PR includes changes to the `manage-team-member` Edge Function.
+- **Action Required**: The function must be deployed for changes to take effect.
+
+  ```bash
+  npx supabase functions deploy manage-team-member
+  ```
+
+## Verification
+
+- [ ] Manual verification in Dashboard > Team > Invite Member.
+- [ ] Verify email is received (check Spam).
+- [ ] Verify logs in Supabase Dashboard show "Team invite email sent successfully".

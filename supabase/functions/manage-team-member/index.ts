@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from '../_shared/cors.ts';
 import { buildTeamInviteEmail } from '../_shared/email-templates.ts';
 import { sendEmail } from '../_shared/resend-client.ts';
+import { getResendApiKey } from '../_shared/env.ts';
 
 console.log("Manage Team Member function loaded");
 
@@ -186,18 +187,28 @@ Deno.serve(async (req) => {
           tempPassword: isNewUser ? tempPassword : undefined // Only send temp password to new users
         });
 
-        await sendEmail(Deno.env.get("RESEND_PROD_KEY")!, {
-          from: "RingSnap <support@getringsnap.com>",
-          to: email,
-          subject: inviteEmail.subject,
-          html: inviteEmail.html,
-          text: inviteEmail.text
-        });
+        // Check for API key presence
+        const resendKey = Deno.env.get("RESEND_PROD_KEY") || Deno.env.get("RESEND_API_KEY");
 
-        console.log(`Team invite email sent to ${email} (New User: ${isNewUser})`);
+        if (!resendKey) {
+          console.error("CRITICAL: RESEND_PROD_KEY and RESEND_API_KEY are missing. Cannot send invite email.");
+        } else {
+          const emailResult = await sendEmail(resendKey, {
+            from: "RingSnap <support@getringsnap.com>",
+            to: email,
+            subject: inviteEmail.subject,
+            html: inviteEmail.html,
+            text: inviteEmail.text
+          });
+
+          if (!emailResult.success) {
+            console.error("Failed to send invite email (API Error):", emailResult.error);
+          } else {
+            console.log(`Team invite email sent successfully to ${email} (ID: ${emailResult.emailId})`);
+          }
+        }
       } catch (emailError) {
-        console.error('Error sending invite email:', emailError);
-        // Don't fail the whole request if email fails
+        console.error('Unexpected error sending invite email:', emailError);
       }
 
       return new Response(
