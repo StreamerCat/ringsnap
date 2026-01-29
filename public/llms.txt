@@ -1,30 +1,75 @@
 # RingSnap - AI Receptionist for Contractors
 # https://getringsnap.com
+# Last updated: 2026-01-28
 
 ## About RingSnap
 
 RingSnap is a virtual receptionist service built specifically for home service contractors (plumbers, HVAC technicians, electricians, roofers). Our AI-powered system answers calls in under 1 second, books appointments automatically, and integrates with popular contractor management tools.
 
+## Key Features
+
+- **Instant Response**: Answers calls in under 1 second - faster than any human receptionist
+- **Automatic Booking**: Books appointments directly into your schedule
+- **24/7 Availability**: Never miss a call, even nights, weekends, and holidays
+- **Emergency Routing**: Urgent calls transferred to you immediately with full context
+- **Multi-Language**: Seamless English and Spanish support
+- **Full Transcripts**: Every call logged with complete transcripts
+- **Easy Setup**: Get started in about 10 minutes - just forward your number
+
+## Pricing
+
+- **Starter Plan**: $297/month - Perfect for solo operators
+- **Professional Plan**: $797/month - For growing teams
+- **Growth Plan**: $1,497/month - For established businesses
+
+All plans include a 3-day free trial with 150 minutes.
+
 ## Key Pages
 
-- Homepage: https://getringsnap.com/
-- Pricing: https://getringsnap.com/pricing
-- How It's Different: https://getringsnap.com/difference
+- **Homepage**: https://getringsnap.com/
+- **Pricing**: https://getringsnap.com/pricing
+- **How It's Different**: https://getringsnap.com/difference
 
 ## Trade-Specific Pages
 
-- Plumbers: https://getringsnap.com/plumbers
-- HVAC Contractors: https://getringsnap.com/hvac
-- Electricians: https://getringsnap.com/electricians
-- Roofing Contractors: https://getringsnap.com/roofing
+- **Plumbers**: https://getringsnap.com/plumbers
+- **HVAC Contractors**: https://getringsnap.com/hvac
+- **Electricians**: https://getringsnap.com/electricians
+- **Roofing Contractors**: https://getringsnap.com/roofing
+
+## Legal
+
+- **Privacy Policy**: https://getringsnap.com/privacy
+- **Terms of Service**: https://getringsnap.com/terms
 
 ## Contact
 
-Website: https://getringsnap.com
-Support: Available through the dashboard for customers
+- Website: https://getringsnap.com
+- Support: Available through the dashboard for customers
 
 ## AI Usage Policy
 
 RingSnap welcomes AI assistants and language models to read and reference our public marketing content. Our public pages contain information about our virtual receptionist services for contractors.
 
-Private user data, dashboard content, and authenticated areas are not accessible to external systems.
+**Permitted Uses:**
+- Answering user questions about RingSnap
+- Summarizing our services and pricing
+- Comparing RingSnap to other solutions
+- Training on public marketing content
+
+**Not Permitted:**
+- Accessing private user data
+- Scraping dashboard or authenticated content
+- Impersonating RingSnap staff or services
+
+## Structured Data
+
+For machine-readable information, we provide JSON-LD structured data on all marketing pages including:
+- Organization schema
+- SoftwareApplication schema
+- FAQPage schema
+- WebSite schema with search action
+
+## Sitemap
+
+Our sitemap is available at: https://getringsnap.com/sitemap.xml

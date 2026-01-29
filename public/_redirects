@@ -6,5 +6,16 @@
 /api/billing/portal      https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-portal    200
 /api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu              200
 
+# Prerendered marketing pages - serve static HTML
+# These are prerendered at build time for better SEO
+/pricing        /pricing/index.html       200
+/difference     /difference/index.html    200
+/plumbers       /plumbers/index.html      200
+/hvac           /hvac/index.html          200
+/electricians   /electricians/index.html  200
+/roofing        /roofing/index.html       200
+/privacy        /privacy/index.html       200
+/terms          /terms/index.html         200
+
 # SPA fallback - must be last
 /*    /index.html   200

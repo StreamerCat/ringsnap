@@ -1,5 +1,5 @@
 # RingSnap Robots.txt
-# Last updated: 2026-01-07
+# Last updated: 2026-01-28
 # https://getringsnap.com
 
 # Allow all major search engines full access to marketing pages
@@ -60,6 +60,97 @@ Disallow: /overview
 Disallow: /calendar
 Disallow: /appointments
 Disallow: /api/
+
+# AI Search Crawlers - allow marketing pages for AI search visibility
+User-agent: GPTBot
+Allow: /
+Allow: /pricing
+Allow: /difference
+Allow: /plumbers
+Allow: /hvac
+Allow: /electricians
+Allow: /roofing
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /settings/
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /pricing
+Allow: /difference
+Allow: /plumbers
+Allow: /hvac
+Allow: /electricians
+Allow: /roofing
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /settings/
+
+User-agent: Claude-Web
+Allow: /
+Allow: /pricing
+Allow: /difference
+Allow: /plumbers
+Allow: /hvac
+Allow: /electricians
+Allow: /roofing
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /settings/
+
+User-agent: anthropic-ai
+Allow: /
+Allow: /pricing
+Allow: /difference
+Allow: /plumbers
+Allow: /hvac
+Allow: /electricians
+Allow: /roofing
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /settings/
+
+User-agent: Perplexitybot
+Allow: /
+Allow: /pricing
+Allow: /difference
+Allow: /plumbers
+Allow: /hvac
+Allow: /electricians
+Allow: /roofing
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /settings/
 
 # Social crawlers - allow marketing pages
 User-agent: Twitterbot

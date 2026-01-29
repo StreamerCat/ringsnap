@@ -66,7 +66,7 @@ const Index = () => {
       "worstRating": "1"
     },
 
-    "image": "https://www.getringsnap.com/assets/social/ringsnap-og.jpg",
+    "image": "https://getringsnap.com/assets/social/ringsnap-og.jpg",
     "featureList": [
       "Answers in under 1 second",
       "Books appointments automatically",
@@ -84,8 +84,8 @@ const Index = () => {
     "name": "RingSnap",
     "alternateName": "RingSnap Answering Service",
     "description": "Virtual answering service built for contractors. Never miss a call, book more jobs.",
-    "url": "https://www.getringsnap.com",
-    "logo": "https://www.getringsnap.com/assets/RS_logo_color.svg",
+    "url": "https://getringsnap.com",
+    "logo": "https://getringsnap.com/assets/RS_logo_color.svg",
     "slogan": "Built to book jobs",
     "contactPoint": {
       "@type": "ContactPoint",
@@ -99,10 +99,10 @@ const Index = () => {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "RingSnap",
-    "url": "https://www.getringsnap.com",
+    "url": "https://getringsnap.com",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://www.getringsnap.com/search?q={search_term_string}",
+      "target": "https://getringsnap.com/search?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };

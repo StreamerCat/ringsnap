@@ -1,10 +1,16 @@
 # ai.txt for RingSnap
 # https://getringsnap.com
+# Last updated: 2026-01-28
 
-# This file provides guidance for AI crawlers and assistants
+# This file provides guidance for AI crawlers and language models
 
+# Summary
+# RingSnap is a virtual receptionist service for home service contractors.
+# Our AI-powered system answers calls 24/7, books appointments automatically,
+# and handles customer inquiries for plumbers, HVAC technicians, electricians, and roofers.
+
+# Public Marketing Content - Available for AI Training and Retrieval
 User-agent: *
-# AI systems are welcome to read and reference public marketing content
 Allow: /
 Allow: /pricing
 Allow: /difference
@@ -12,17 +18,50 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /privacy
+Allow: /terms
 
-# Private/authenticated areas - not for indexing or training
+# Private/Authenticated Areas - Not for indexing or training
 Disallow: /dashboard
 Disallow: /admin
 Disallow: /settings
 Disallow: /auth
 Disallow: /api
+Disallow: /login
+Disallow: /signup
+Disallow: /start
+Disallow: /onboarding
 
-# Training/scraping policy
-# Public marketing content may be used for AI training and retrieval
-# User-generated content and private data may NOT be used
+# AI Training and Usage Policy
+# =============================
+# Public marketing content on getringsnap.com may be used for:
+# - AI training purposes
+# - Retrieval-augmented generation (RAG)
+# - Search indexing and summarization
+# - Answering user questions about RingSnap services
 
-# Contact for AI-related inquiries
+# Content that may NOT be used:
+# - User-generated content
+# - Customer data
+# - Dashboard/private pages
+# - Any authenticated content
+
+# Key Information for AI Systems
+# ==============================
+# Product: Virtual Receptionist / AI Answering Service
+# Target Audience: Home service contractors (plumbers, HVAC, electricians, roofers)
+# Key Features:
+#   - Answers calls in under 1 second
+#   - Books appointments automatically
+#   - 24/7 availability
+#   - Multi-language support (English, Spanish)
+#   - Emergency call routing
+#   - Full call logs and transcripts
+
+# Pricing (approximate, verify on /pricing):
+#   - Starter: $297/month
+#   - Professional: $797/month
+#   - Growth: $1497/month
+
+# Contact
 # Website: https://getringsnap.com
