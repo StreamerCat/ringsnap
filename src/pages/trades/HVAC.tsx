@@ -6,6 +6,7 @@ import { TradeTestimonials } from "@/components/trades/TradeTestimonials";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getTradeConfig } from "@/components/trades/tradeConfig";
+import { SiteHeader } from "@/components/SiteHeader";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -39,7 +40,8 @@ const HVAC = () => {
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
       </Helmet>
 
-      <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
+      <SiteHeader />
+      <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0 pt-14">
         <h1 className="sr-only">{config.seo.title}</h1>
 
         <TradeHero config={config} />
