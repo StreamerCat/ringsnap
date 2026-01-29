@@ -5,14 +5,15 @@
  * to static HTML for better Google indexing and AI search visibility.
  * 
  * Usage: node scripts/prerender.mjs
+ * 
+ * Note: If Puppeteer is unavailable (e.g., in CI environments like Vercel),
+ * the script will skip prerendering gracefully.
  */
 
-import puppeteer from 'puppeteer';
 import { createServer } from 'http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { createReadStream, statSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,7 +41,12 @@ function createStaticServer() {
         let filePath = join(DIST_DIR, req.url === '/' ? '/index.html' : req.url);
 
         // Check if file exists, otherwise serve index.html (SPA fallback)
-        if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
+        try {
+            const stats = existsSync(filePath) && require('fs').statSync(filePath);
+            if (!stats || stats.isDirectory()) {
+                filePath = join(DIST_DIR, 'index.html');
+            }
+        } catch {
             filePath = join(DIST_DIR, 'index.html');
         }
 
@@ -139,16 +145,44 @@ async function main() {
         process.exit(1);
     }
 
+    // Check if we're in CI or an environment where Puppeteer won't work
+    const isCI = process.env.CI === 'true' || process.env.VERCEL === '1' || process.env.NETLIFY === 'true';
+
+    // Try to import Puppeteer
+    let puppeteer;
+    try {
+        puppeteer = await import('puppeteer');
+    } catch (err) {
+        console.log('⚠️  Puppeteer not available, skipping prerendering.');
+        console.log('   The SPA will work normally but won\'t have prerendered HTML.');
+        process.exit(0);
+    }
+
     // Start local server
     const server = createStaticServer();
     await new Promise((resolve) => server.listen(PORT, resolve));
     console.log(`📡 Static server running on ${BASE_URL}\n`);
 
     // Launch browser
-    const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    let browser;
+    try {
+        browser = await puppeteer.default.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        });
+    } catch (err) {
+        console.log('⚠️  Could not launch browser:', err.message);
+        if (isCI) {
+            console.log('   This is expected in CI environments without Chrome.');
+            console.log('   Skipping prerendering - the SPA will work normally.');
+            server.close();
+            process.exit(0);
+        } else {
+            console.error('   Try installing Chrome or run: npx puppeteer browsers install chrome');
+            server.close();
+            process.exit(1);
+        }
+    }
 
     let successCount = 0;
     let failCount = 0;
@@ -177,5 +211,11 @@ async function main() {
 
 main().catch((err) => {
     console.error('Fatal error:', err);
+    // Don't fail the build if prerendering fails in CI
+    const isCI = process.env.CI === 'true' || process.env.VERCEL === '1' || process.env.NETLIFY === 'true';
+    if (isCI) {
+        console.log('⚠️  Prerendering failed but continuing build (CI environment).');
+        process.exit(0);
+    }
     process.exit(1);
 });
