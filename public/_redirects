@@ -8,14 +8,11 @@
 
 # Prerendered marketing pages - serve static HTML
 # These are prerendered at build time for better SEO
-/pricing        /pricing/index.html       200
-/difference     /difference/index.html    200
-/plumbers       /plumbers/index.html      200
-/hvac           /hvac/index.html          200
-/electricians   /electricians/index.html  200
-/roofing        /roofing/index.html       200
-/privacy        /privacy/index.html       200
-/terms          /terms/index.html         200
+# Prerendered marketing pages - serve static HTML
+# These are prerendered at build time for better SEO
+# Netlify will automatically serve /foo/index.html if available when /foo is requested
+# If NOT available (e.g. skipped prerender), it falls through to the SPA rule below
+
 
 # SPA fallback - must be last
 /*    /index.html   200
