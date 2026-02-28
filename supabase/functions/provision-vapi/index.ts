@@ -39,6 +39,7 @@ import { formatPhoneE164, tryFormatPhoneE164 } from "../_shared/validators.ts";
 import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { trackEvent } from "../_shared/analytics.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
+import { getLiveCallModel } from "../_shared/live-call-model.ts";
 
 import { provisionPhoneNumber, ProviderConfig } from "../_shared/telephony.ts";
 
@@ -259,7 +260,8 @@ IMPORTANT RULES:
     name: `${metadata.company_name} Assistant`,
     model: {
       provider: "openai",
-      model: "gpt-4",
+      // Canonical source of truth for LIVE-CALL model selection.
+      model: getLiveCallModel(),
       messages: [
         {
           role: "system",
