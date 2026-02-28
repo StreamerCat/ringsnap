@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import * as Sentry from "@sentry/react";
 
@@ -51,6 +51,30 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const Activation = lazy(() => import("./pages/Activation"));
 
 const queryClient = new QueryClient();
+
+const HashScrollHandler = () => {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+
+    const targetId = decodeURIComponent(hash.slice(1));
+    const scrollToTarget = () => {
+      const target = document.getElementById(targetId);
+      if (!target) return false;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      return true;
+    };
+
+    if (scrollToTarget()) return;
+
+    const timeout = window.setTimeout(scrollToTarget, 250);
+    return () => window.clearTimeout(timeout);
+  }, [hash]);
+
+  return null;
+};
+
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
 // OnboardingChat handles its own auth logic - supports both authenticated users
 // and unauthenticated users with lead_id (two-step signup flow)
@@ -63,6 +87,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <HashScrollHandler />
             <VapiChatWidget />
             <Suspense fallback={
               <div className="flex h-screen w-full items-center justify-center bg-background">

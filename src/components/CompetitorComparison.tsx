@@ -46,7 +46,7 @@ export const CompetitorComparison = () => {
   };
 
   return (
-    <section className="section-spacer bg-background">
+    <section id="features" className="section-spacer bg-background">
       <div className="container mx-auto px-4 max-w-7xl">
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-6xl mx-auto text-center mb-8 sm:mb-12">

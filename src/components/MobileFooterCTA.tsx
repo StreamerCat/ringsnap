@@ -52,7 +52,7 @@ export const MobileFooterCTA = () => {
           className="flex-1 h-12 rounded-full bg-white border-2 active:scale-95 transition-transform shadow-sm text-sm font-semibold"
           style={{ borderColor: 'hsl(var(--charcoal) / 0.3)', color: 'hsl(var(--charcoal))' }}
           aria-label="Calculate potential revenue from missed calls with RingSnap"
-          onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })}
+          onClick={() => document.getElementById('roi-calculator')?.scrollIntoView({ behavior: 'smooth' })}
         >
           <Calculator className="w-4 h-4" />
           <span className="ml-1.5">Calculate</span>
