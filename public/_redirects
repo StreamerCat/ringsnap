@@ -6,13 +6,20 @@
 /api/billing/portal      https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-portal    200
 /api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu              200
 
-# Prerendered marketing pages - serve static HTML
-# These are prerendered at build time for better SEO
-# Prerendered marketing pages - serve static HTML
-# These are prerendered at build time for better SEO
-# Netlify will automatically serve /foo/index.html if available when /foo is requested
-# If NOT available (e.g. skipped prerender), it falls through to the SPA rule below
+# Canonical trailing-slash removal — prevents GSC "Page with redirect" from Netlify Pretty URLs
+/pricing/        /pricing        301
+/difference/     /difference     301
+/plumbers/       /plumbers       301
+/hvac/           /hvac           301
+/electricians/   /electricians   301
+/roofing/        /roofing        301
+/privacy/        /privacy        301
+/terms/          /terms          301
 
+# Legacy signup routes — server-side 301 so bots don't need JS to follow the redirect
+/signup          /start          301
+/signup/form     /start          301
+/onboarding      /onboarding-chat 301
 
 # SPA fallback - must be last
 /*    /index.html   200
