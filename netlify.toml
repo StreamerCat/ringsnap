@@ -59,43 +59,45 @@
     X-Content-Type-Options = "nosniff"
 
 # Prerendered marketing pages - light caching for better performance
+# Note: patterns match the exact page path (no trailing wildcard) so the header
+# applies to the canonical URL that Googlebot actually crawls (e.g. /pricing, not /pricing/*).
 [[headers]]
-  for = "/pricing/*"
+  for = "/pricing"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/difference/*"
+  for = "/difference"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/plumbers/*"
+  for = "/plumbers"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/hvac/*"
+  for = "/hvac"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/electricians/*"
+  for = "/electricians"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/roofing/*"
+  for = "/roofing"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/privacy/*"
+  for = "/privacy"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
 [[headers]]
-  for = "/terms/*"
+  for = "/terms"
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 

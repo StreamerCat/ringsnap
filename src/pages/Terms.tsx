@@ -25,8 +25,9 @@ export default function Terms() {
     <>
       <Helmet>
         <title>Terms of Service | RingSnap</title>
-        <meta name="description" content="Terms of Service for RingSnap platform" />
-        <meta name="robots" content="noindex" />
+        <meta name="description" content="RingSnap's terms of service govern the use of our AI receptionist platform for contractors." />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://getringsnap.com/terms" />
       </Helmet>
 
       <div className="min-h-screen bg-background">

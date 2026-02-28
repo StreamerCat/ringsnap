@@ -23,8 +23,9 @@ export default function Privacy() {
     <>
       <Helmet>
         <title>Privacy Policy | RingSnap</title>
-        <meta name="description" content="Privacy Policy for RingSnap platform" />
-        <meta name="robots" content="noindex" />
+        <meta name="description" content="RingSnap's privacy policy explains how we collect, use, and protect your data." />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://getringsnap.com/privacy" />
       </Helmet>
 
       <div className="min-h-screen bg-background">
