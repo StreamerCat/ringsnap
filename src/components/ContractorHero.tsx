@@ -6,7 +6,7 @@ import logo from "@/assets/RS_logo_color.svg";
 export const ContractorHero = () => {
   const navigate = useNavigate();
   const scrollToVapiDemo = () => {
-    document.getElementById('vapi-chat-container')?.scrollIntoView({
+    document.getElementById('live-demo')?.scrollIntoView({
       behavior: 'smooth'
     });
   };

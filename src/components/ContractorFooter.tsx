@@ -32,7 +32,10 @@ export const ContractorFooter = () => {
   const footerLinks = {
     product: [{
       label: "Features",
-      href: "/#solution"
+      href: "/#features"
+    }, {
+      label: "Hear it in action",
+      href: "/#live-demo"
     }, {
       label: "Pricing",
       href: "/pricing"
@@ -41,7 +44,7 @@ export const ContractorFooter = () => {
       href: "/difference"
     }, {
       label: "ROI Calculator",
-      href: "/#calculator"
+      href: "/#roi-calculator"
     }],
     trades: [{
       label: "For Plumbers",
@@ -66,14 +69,7 @@ export const ContractorFooter = () => {
   };
 
   const renderLink = (link: { label: string; href: string }, index: number) => {
-    // Check if the link is an internal route (starts with /) but not just an anchor on current page
     const isInternal = link.href.startsWith("/");
-    // If it's an anchor link to home (e.g. /#solution), we can use Link or a regular anchor.
-    // React Router HashLink is often used for this, but standard Link with hash works if on other page.
-    // However, if we are on Home, Link to="/#solution" might not scroll.
-    // For simplicity in this task (SEO/Discovery), standard <a> is safer for anchors,
-    // but Link is better for pages.
-    // Actually, simple Link to="/path" is best for pages.
 
     if (isInternal && !link.href.includes("#")) {
       return (

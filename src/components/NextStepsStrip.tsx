@@ -3,17 +3,17 @@ const steps = [{
   icon: Headphones,
   title: "Hear the AI",
   description: "Run the 60-second live demo to feel the call quality.",
-  anchor: "#demo"
+  anchor: "/#live-demo"
 }, {
   icon: Calculator,
   title: "See your ROI",
   description: "Drop in call volume to quantify the revenue RingSnap recovers.",
-  anchor: "#calculator"
+  anchor: "/#roi-calculator"
 }, {
   icon: ArrowRightCircle,
   title: "Start your trial",
   description: "Flip it on in 10 minutes and never miss a high-intent call again.",
-  anchor: "#pricing"
+  anchor: "/pricing#pricing"
 }];
 export const NextStepsStrip = () => <section className="bg-primary/5">
     <div className="container mx-auto px-4 py-8">
