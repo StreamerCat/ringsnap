@@ -1549,16 +1549,40 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Assign to outer var - Do not redeclare const
-        // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
-        const { error } = await supabase.from("provisioning_jobs").insert({
+        // NOTE: Some environments may lag schema columns (e.g. correlation_id/metadata).
+        // Use graceful fallback inserts to avoid breaking mission-critical signup flow.
+        const fullJobPayload = {
           account_id: currentAccountId,
           user_id: currentUserId,
           job_type: "provision_phone",
           status: "queued",
           metadata: jobMetadata,
           correlation_id: correlationId,
-        });
-        jobError = error;
+        };
+
+        const fallbackPayloads: Array<Record<string, unknown>> = [
+          fullJobPayload,
+          { ...fullJobPayload, correlation_id: undefined },
+          { ...fullJobPayload, correlation_id: undefined, metadata: undefined },
+        ];
+
+        let enqueueError: any = null;
+        for (const payload of fallbackPayloads) {
+          const { error } = await supabase.from("provisioning_jobs").insert(payload);
+          enqueueError = error;
+
+          if (!enqueueError) {
+            break;
+          }
+
+          const msg = String(enqueueError.message || "").toLowerCase();
+          const isSchemaMismatch = msg.includes("column") || msg.includes("does not exist") || msg.includes("schema cache");
+          if (!isSchemaMismatch) {
+            break;
+          }
+        }
+
+        jobError = enqueueError;
 
         stepEnd("enqueue_provisioning", {
           traceId: correlationId,

@@ -56,6 +56,9 @@ GROUP BY account_id;
 -- PART 2: Create views that depend on OPTIONAL tables (dynamic SQL)
 -- ==============================================================================
 
+-- Drop summary view first to avoid dependency/version conflicts while recreating optional views
+DROP VIEW IF EXISTS public.operator_dashboard_summary;
+
 -- View: Leads today by account (created only if customer_leads exists)
 DO $$
 DECLARE
@@ -72,7 +75,8 @@ BEGIN
 
     IF v_has_customer_leads_urgency THEN
       EXECUTE $view$
-        CREATE OR REPLACE VIEW public.operator_leads_today AS
+        DROP VIEW IF EXISTS public.operator_leads_today;
+        CREATE VIEW public.operator_leads_today AS
         SELECT
           account_id,
           COUNT(*) as leads_count,
@@ -90,7 +94,8 @@ BEGIN
       $view$;
     ELSE
       EXECUTE $view$
-        CREATE OR REPLACE VIEW public.operator_leads_today AS
+        DROP VIEW IF EXISTS public.operator_leads_today;
+        CREATE VIEW public.operator_leads_today AS
         SELECT
           account_id,
           COUNT(*) as leads_count,
@@ -133,7 +138,8 @@ BEGIN
 
     IF v_has_appointments_urgency THEN
       EXECUTE $view$
-        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+        DROP VIEW IF EXISTS public.operator_pending_appointments;
+        CREATE VIEW public.operator_pending_appointments AS
         SELECT
           account_id,
           COUNT(*) as pending_count,
@@ -147,7 +153,8 @@ BEGIN
       $view$;
     ELSE
       EXECUTE $view$
-        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+        DROP VIEW IF EXISTS public.operator_pending_appointments;
+        CREATE VIEW public.operator_pending_appointments AS
         SELECT
           account_id,
           COUNT(*) as pending_count,
@@ -180,7 +187,7 @@ DO $$
 BEGIN
   -- Always try to create the summary view - LEFT JOINs handle missing dependencies
   EXECUTE $view$
-    CREATE OR REPLACE VIEW public.operator_dashboard_summary AS
+    CREATE VIEW public.operator_dashboard_summary AS
     SELECT
       a.id as account_id,
       a.company_name,
@@ -208,7 +215,7 @@ EXCEPTION
     -- If operator_leads_today or operator_pending_appointments don't exist, create simplified version
     RAISE NOTICE 'Creating simplified operator_dashboard_summary (some dependency views missing)';
     EXECUTE $view$
-      CREATE OR REPLACE VIEW public.operator_dashboard_summary AS
+      CREATE VIEW public.operator_dashboard_summary AS
       SELECT
         a.id as account_id,
         a.company_name,
