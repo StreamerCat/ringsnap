@@ -10,34 +10,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { Wrench, Zap, Thermometer, Home } from "lucide-react";
-
-const trades = [
-    {
-        title: "Plumbers",
-        href: "/plumbers",
-        description: "24/7 answering for emergency leaks and dispatch.",
-        icon: Wrench,
-    },
-    {
-        title: "HVAC",
-        href: "/hvac",
-        description: "Book tune-ups and capture emergency failures.",
-        icon: Thermometer,
-    },
-    {
-        title: "Electricians",
-        href: "/electricians",
-        description: "Safety-focused intake for sparkies and residential.",
-        icon: Zap,
-    },
-    {
-        title: "Roofing",
-        href: "/roofing",
-        description: "Capture storm leads and qualify insurance jobs.",
-        icon: Home,
-    },
-];
+import { topLevelNavItems, tradeNavItems } from "@/components/siteNavConfig";
 
 export const SiteNavigation = () => {
     const location = useLocation();
@@ -52,7 +25,7 @@ export const SiteNavigation = () => {
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                         <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                            {trades.map((trade) => (
+                            {tradeNavItems.map((trade) => (
                                 <ListItem
                                     key={trade.title}
                                     title={trade.title}
@@ -67,49 +40,27 @@ export const SiteNavigation = () => {
                 </NavigationMenuItem>
 
                 {/* PRICING */}
-                <NavigationMenuItem>
-                    <Link to="/pricing">
-                        <NavigationMenuLink
-                            className={cn(
-                                navigationMenuTriggerStyle(),
-                                "text-sm font-semibold text-foreground hover:text-primary bg-transparent hover:bg-transparent focus:bg-transparent px-3 h-auto py-2 cursor-pointer",
-                                location.pathname === "/pricing" && "text-primary"
-                            )}
-                        >
-                            Pricing
-                        </NavigationMenuLink>
-                    </Link>
-                </NavigationMenuItem>
+                {topLevelNavItems.map((item) => {
+                    const isActive = item.href === "/resources"
+                        ? location.pathname.startsWith("/resources")
+                        : location.pathname === item.href;
 
-                {/* THE DIFFERENCE */}
-                <NavigationMenuItem>
-                    <Link to="/difference">
-                        <NavigationMenuLink
-                            className={cn(
-                                navigationMenuTriggerStyle(),
-                                "text-sm font-semibold text-foreground hover:text-primary bg-transparent hover:bg-transparent focus:bg-transparent px-3 h-auto py-2 cursor-pointer",
-                                location.pathname === "/difference" && "text-primary"
-                            )}
-                        >
-                            The Difference
-                        </NavigationMenuLink>
-                    </Link>
-                </NavigationMenuItem>
-
-                {/* FIELD GUIDES */}
-                <NavigationMenuItem>
-                    <Link to="/resources">
-                        <NavigationMenuLink
-                            className={cn(
-                                navigationMenuTriggerStyle(),
-                                "text-sm font-semibold text-foreground hover:text-primary bg-transparent hover:bg-transparent focus:bg-transparent px-3 h-auto py-2 cursor-pointer",
-                                location.pathname.startsWith("/resources") && "text-primary"
-                            )}
-                        >
-                            Field Guides
-                        </NavigationMenuLink>
-                    </Link>
-                </NavigationMenuItem>
+                    return (
+                        <NavigationMenuItem key={item.href}>
+                            <Link to={item.href}>
+                                <NavigationMenuLink
+                                    className={cn(
+                                        navigationMenuTriggerStyle(),
+                                        "text-sm font-semibold text-foreground hover:text-primary bg-transparent hover:bg-transparent focus:bg-transparent px-3 h-auto py-2 cursor-pointer",
+                                        isActive && "text-primary"
+                                    )}
+                                >
+                                    {item.label}
+                                </NavigationMenuLink>
+                            </Link>
+                        </NavigationMenuItem>
+                    );
+                })}
 
             </NavigationMenuList>
         </NavigationMenu>
