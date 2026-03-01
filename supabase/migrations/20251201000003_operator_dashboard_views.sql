@@ -58,25 +58,57 @@ GROUP BY account_id;
 
 -- View: Leads today by account (created only if customer_leads exists)
 DO $$
+DECLARE
+  v_has_customer_leads_urgency BOOLEAN;
 BEGIN
   IF to_regclass('public.customer_leads') IS NOT NULL THEN
-    EXECUTE $view$
-      CREATE OR REPLACE VIEW public.operator_leads_today AS
-      SELECT
-        account_id,
-        COUNT(*) as leads_count,
-        COUNT(*) FILTER (WHERE lead_status = 'new') as new_count,
-        COUNT(*) FILTER (WHERE lead_status = 'contacted') as contacted_count,
-        COUNT(*) FILTER (WHERE intent = 'appointment') as appointment_intent_count,
-        COUNT(*) FILTER (WHERE intent = 'quote') as quote_intent_count,
-        COUNT(*) FILTER (WHERE urgency = 'emergency') as emergency_count,
-        COUNT(*) FILTER (WHERE urgency = 'high') as high_urgency_count,
-        MAX(created_at) as last_lead_at
-      FROM public.customer_leads
-      WHERE created_at >= CURRENT_DATE
-        AND created_at < CURRENT_DATE + INTERVAL '1 day'
-      GROUP BY account_id
-    $view$;
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'customer_leads'
+        AND column_name = 'urgency'
+    ) INTO v_has_customer_leads_urgency;
+
+    IF v_has_customer_leads_urgency THEN
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_leads_today AS
+        SELECT
+          account_id,
+          COUNT(*) as leads_count,
+          COUNT(*) FILTER (WHERE lead_status = 'new') as new_count,
+          COUNT(*) FILTER (WHERE lead_status = 'contacted') as contacted_count,
+          COUNT(*) FILTER (WHERE intent = 'appointment') as appointment_intent_count,
+          COUNT(*) FILTER (WHERE intent = 'quote') as quote_intent_count,
+          COUNT(*) FILTER (WHERE urgency = 'emergency') as emergency_count,
+          COUNT(*) FILTER (WHERE urgency = 'high') as high_urgency_count,
+          MAX(created_at) as last_lead_at
+        FROM public.customer_leads
+        WHERE created_at >= CURRENT_DATE
+          AND created_at < CURRENT_DATE + INTERVAL '1 day'
+        GROUP BY account_id
+      $view$;
+    ELSE
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_leads_today AS
+        SELECT
+          account_id,
+          COUNT(*) as leads_count,
+          COUNT(*) FILTER (WHERE lead_status = 'new') as new_count,
+          COUNT(*) FILTER (WHERE lead_status = 'contacted') as contacted_count,
+          COUNT(*) FILTER (WHERE intent = 'appointment') as appointment_intent_count,
+          COUNT(*) FILTER (WHERE intent = 'quote') as quote_intent_count,
+          0::bigint as emergency_count,
+          0::bigint as high_urgency_count,
+          MAX(created_at) as last_lead_at
+        FROM public.customer_leads
+        WHERE created_at >= CURRENT_DATE
+          AND created_at < CURRENT_DATE + INTERVAL '1 day'
+        GROUP BY account_id
+      $view$;
+      RAISE NOTICE 'Created view: operator_leads_today (urgency column missing, emergency metrics default to 0)';
+    END IF;
+
     RAISE NOTICE 'Created view: operator_leads_today';
   ELSE
     -- Clean up stale view if table is missing
@@ -87,21 +119,49 @@ END $$;
 
 -- View: Pending appointments by account (created only if appointments exists)
 DO $$
+DECLARE
+  v_has_appointments_urgency BOOLEAN;
 BEGIN
   IF to_regclass('public.appointments') IS NOT NULL THEN
-    EXECUTE $view$
-      CREATE OR REPLACE VIEW public.operator_pending_appointments AS
-      SELECT
-        account_id,
-        COUNT(*) as pending_count,
-        COUNT(*) FILTER (WHERE urgency = 'emergency') as emergency_count,
-        COUNT(*) FILTER (WHERE urgency = 'high') as high_urgency_count,
-        MIN(created_at) as oldest_pending_at,
-        MAX(created_at) as newest_pending_at
-      FROM public.appointments
-      WHERE status = 'pending_confirmation'
-      GROUP BY account_id
-    $view$;
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'appointments'
+        AND column_name = 'urgency'
+    ) INTO v_has_appointments_urgency;
+
+    IF v_has_appointments_urgency THEN
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+        SELECT
+          account_id,
+          COUNT(*) as pending_count,
+          COUNT(*) FILTER (WHERE urgency = 'emergency') as emergency_count,
+          COUNT(*) FILTER (WHERE urgency = 'high') as high_urgency_count,
+          MIN(created_at) as oldest_pending_at,
+          MAX(created_at) as newest_pending_at
+        FROM public.appointments
+        WHERE status = 'pending_confirmation'
+        GROUP BY account_id
+      $view$;
+    ELSE
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+        SELECT
+          account_id,
+          COUNT(*) as pending_count,
+          0::bigint as emergency_count,
+          0::bigint as high_urgency_count,
+          MIN(created_at) as oldest_pending_at,
+          MAX(created_at) as newest_pending_at
+        FROM public.appointments
+        WHERE status = 'pending_confirmation'
+        GROUP BY account_id
+      $view$;
+      RAISE NOTICE 'Created view: operator_pending_appointments (urgency column missing, emergency metrics default to 0)';
+    END IF;
+
     RAISE NOTICE 'Created view: operator_pending_appointments';
   ELSE
     -- Clean up stale view if table is missing
