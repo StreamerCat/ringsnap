@@ -257,6 +257,10 @@ IMPORTANT RULES:
 
   const assistantPayload = {
     name: `${metadata.company_name} Assistant`,
+    metadata: {
+      source: "pstn_customer",
+      accountId,
+    },
     model: {
       provider: "openai",
       model: "gpt-4",
@@ -489,6 +493,10 @@ async function provisionVapiPhone(
       twilioApiSecret: twilioApiSecret,
       name: metadata.company_name ? `${metadata.company_name} Line` : undefined,
       assistantId: vapiAssistantId, // Bind immediately
+      metadata: {
+        source: "pstn_customer",
+        accountId,
+      },
       // Resolve fallback: 1) User's phone (normalized) 2) Env var 3) Omit if all invalid
       ...(() => {
         const rawFallback = metadata.fallback_phone?.trim() || "";
