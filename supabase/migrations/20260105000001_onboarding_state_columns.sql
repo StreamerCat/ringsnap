@@ -47,19 +47,19 @@ SELECT USING (
                 AND role IN (
                     'platform_owner',
                     'platform_admin',
-                    'support_agent'
+                    'support'
                 )
         )
     );
 -- Backfill: set onboarding_completed_at for existing activated accounts
 -- This prevents lockout of internal/test accounts that already completed onboarding
 UPDATE accounts
-SET onboarding_completed_at = COALESCE(activated_at, created_at)
-WHERE activated_at IS NOT NULL
+SET onboarding_completed_at = COALESCE(phone_provisioned_at, created_at)
+WHERE phone_provisioned_at IS NOT NULL
     AND onboarding_completed_at IS NULL;
 -- Also backfill accounts with completed provisioning as a safety net
 UPDATE accounts
-SET onboarding_completed_at = COALESCE(activated_at, updated_at, created_at)
+SET onboarding_completed_at = COALESCE(phone_provisioned_at, updated_at, created_at)
 WHERE provisioning_status = 'completed'
     AND onboarding_completed_at IS NULL;
 COMMENT ON COLUMN accounts.test_call_verified_at IS 'Timestamp when a valid test call (>=10s inbound) was first detected';

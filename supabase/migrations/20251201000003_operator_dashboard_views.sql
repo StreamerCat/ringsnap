@@ -138,8 +138,12 @@ BEGIN
 
     IF v_has_urgency_column THEN
       EXECUTE $view$
+<<<<<<< HEAD
         DROP VIEW IF EXISTS public.operator_pending_appointments;
         CREATE VIEW public.operator_pending_appointments AS
+=======
+        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+>>>>>>> origin/main
         SELECT
           account_id,
           COUNT(*) as pending_count,
@@ -151,10 +155,17 @@ BEGIN
         WHERE status = 'pending_confirmation'
         GROUP BY account_id
       $view$;
+<<<<<<< HEAD
     ELSE
       EXECUTE $view$
         DROP VIEW IF EXISTS public.operator_pending_appointments;
         CREATE VIEW public.operator_pending_appointments AS
+=======
+      RAISE NOTICE 'Created view: operator_pending_appointments (with urgency)';
+    ELSE
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+>>>>>>> origin/main
         SELECT
           account_id,
           COUNT(*) as pending_count,
@@ -166,10 +177,15 @@ BEGIN
         WHERE status = 'pending_confirmation'
         GROUP BY account_id
       $view$;
+<<<<<<< HEAD
       RAISE NOTICE 'Created view: operator_pending_appointments (urgency column missing, emergency metrics default to 0)';
     END IF;
 
     RAISE NOTICE 'Created view: operator_pending_appointments (with urgency compatibility)';
+=======
+      RAISE NOTICE 'Created view: operator_pending_appointments (urgency column missing; counts default to 0)';
+    END IF;
+>>>>>>> origin/main
   ELSE
     -- Clean up stale view if table is missing
     DROP VIEW IF EXISTS public.operator_pending_appointments;

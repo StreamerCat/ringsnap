@@ -1,5 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import { lazy, Suspense, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ContractorHero } from "@/components/ContractorHero";
 import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
@@ -19,6 +20,7 @@ const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Index = () => {
+  const navigate = useNavigate();
   // Track landing page view for funnel analytics
   useEffect(() => {
     trackPageLoad('Index');
@@ -212,10 +214,32 @@ const Index = () => {
               <NextStepsStrip />
               <CallValueCalculator />
               <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
-                <div className="container mx-auto px-4 max-w-4xl">
+                <div className="site-container max-w-4xl text-center">
                   <PricingTeaserCard headingLevel="h2" />
                 </div>
               </section>
+
+              {/* Resource Center Teaser */}
+              <section className="section-spacer bg-white border-t border-border/5">
+                <div className="site-container">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-cream/30 to-off-white border border-border/10 shadow-sm">
+                    <div className="max-w-2xl text-center md:text-left">
+                      <h2 className="text-3xl font-bold mb-4">Contractor Resource Center</h2>
+                      <p className="text-lg text-muted-foreground mb-0">
+                        Free dispatcher scripts, phone intake checklists, and profit calculators designed specifically for home service trades.
+                      </p>
+                    </div>
+                    <Button
+                      size="lg"
+                      className="rounded-full px-8 h-14 text-lg font-semibold whitespace-nowrap"
+                      onClick={() => navigate('/resources')}
+                    >
+                      Browse Resources
+                    </Button>
+                  </div>
+                </div>
+              </section>
+
               <ContractorFooter />
             </Suspense>
           </ErrorBoundary>

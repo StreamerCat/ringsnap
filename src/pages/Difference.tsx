@@ -20,6 +20,8 @@ const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({
     default: m.MobileFooterCTA
 })));
+import { VoiceDemoWidget } from "@/components/VoiceDemoWidget";
+
 const Difference = () => {
     const navigate = useNavigate();
 
@@ -73,7 +75,7 @@ const Difference = () => {
     };
 
     const scrollToDemo = () => {
-        document.getElementById("mechanism-section")?.scrollIntoView({
+        document.getElementById("live-demo")?.scrollIntoView({
             behavior: "smooth"
         });
     };
@@ -192,11 +194,8 @@ const Difference = () => {
             <section id="mechanism-section" className="section-spacer bg-background">
                 <div id="main-content" className="container mx-auto px-4 max-w-6xl">
                     <div className="text-center mb-4">
-                        <p className="text-body-small uppercase tracking-widest text-primary font-semibold mb-2">
-                            The System
-                        </p>
                         <p className="text-body-default text-muted-foreground">
-                            This is the system. Not a script. Not a chatbot.
+                            Real call handling, clear decisions, and outcomes your team can act on.
                         </p>
                     </div>
 
@@ -212,8 +211,24 @@ const Difference = () => {
                 </div>
             </section>
 
+            {/* SECTION 3.5: Voice Demo */}
+            <section id="live-demo" className="section-spacer bg-background pt-0">
+                <div className="container mx-auto px-4 max-w-4xl">
+                    <div className="text-center mb-8">
+                        <h2 className="text-h2 mb-4">Hear it in action</h2>
+                        <p className="text-body-default text-muted-foreground">
+                            Real-time AI voice that sounds human and handles complexity.
+                        </p>
+                    </div>
+
+                    <div className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative border-primary/20">
+                        <VoiceDemoWidget />
+                    </div>
+                </div>
+            </section>
+
             {/* SECTION 4: It Learns Three Things */}
-            <section className="section-spacer bg-muted/30">
+            <section id="learning-section" className="section-spacer bg-muted/30">
                 <div className="container mx-auto px-4 max-w-6xl">
                     <div className="text-center mb-10">
                         <h2 className="text-h2 mb-4">It learns the instincts that great
@@ -271,7 +286,7 @@ const Difference = () => {
             </section>
 
             {/* SECTION 5: Control and Safety */}
-            <section className="section-spacer bg-background">
+            <section id="control-section" className="section-spacer bg-background">
                 <div className="container mx-auto px-4 max-w-4xl">
                     <div className="text-center mb-10">
                         <h2 className="text-h2 mb-4">You stay in control</h2>
@@ -306,7 +321,7 @@ const Difference = () => {
             {/* SECTION 6: Proof */}
             <ErrorBoundary>
                 <Suspense fallback={<div className="w-full h-64 flex items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-                    <div className="relative">
+                    <div id="proof-section" className="relative">
                         {/* Helper line above */}
                         <div className="bg-muted/30 pt-8 pb-0">
                             <p className="text-center text-sm text-muted-foreground">Not demos. These are real outcomes from home service teams.</p>
