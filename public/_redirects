@@ -6,15 +6,11 @@
 /api/billing/portal      https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-portal    200
 /api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu              200
 
-# Canonical trailing-slash removal — prevents GSC "Page with redirect" from Netlify Pretty URLs
-/pricing/        /pricing        301
-/difference/     /difference     301
-/plumbers/       /plumbers       301
-/hvac/           /hvac           301
-/electricians/   /electricians   301
-/roofing/        /roofing        301
-/privacy/        /privacy        301
-/terms/          /terms          301
+# NOTE:
+# Do not force slash-removal redirects here.
+# Netlify Pretty URLs may redirect path forms internally, and adding explicit
+# trailing-slash rewrites can create redirect loops on pages like /pricing
+# and /difference in some hosting setups.
 
 # Legacy signup routes — server-side 301 so bots don't need JS to follow the redirect
 /signup          /start          301
