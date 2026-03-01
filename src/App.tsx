@@ -50,6 +50,25 @@ const Difference = lazy(() => import("./pages/Difference"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Activation = lazy(() => import("./pages/Activation"));
 
+// Resource Center pages
+const ResourceHub = lazy(() => import("./pages/resources/ResourceHub"));
+const HvacDispatcherScript = lazy(() => import("./pages/resources/HvacDispatcherScript"));
+const PlumbingDispatcherScript = lazy(() => import("./pages/resources/PlumbingDispatcherScript"));
+const ElectricianCallScript = lazy(() => import("./pages/resources/ElectricianCallScript"));
+const HvacAfterHoursScript = lazy(() => import("./pages/resources/HvacAfterHoursScript"));
+const HvacPriceShopperScript = lazy(() => import("./pages/resources/HvacPriceShopperScript"));
+const HvacEmergencyTriage = lazy(() => import("./pages/resources/HvacEmergencyTriage"));
+const BurstPipeCallScript = lazy(() => import("./pages/resources/BurstPipeCallScript"));
+const SewerBackupCallScript = lazy(() => import("./pages/resources/SewerBackupCallScript"));
+const DrainCleaningUpsellScript = lazy(() => import("./pages/resources/DrainCleaningUpsellScript"));
+const ElectricalSafetyTriage = lazy(() => import("./pages/resources/ElectricalSafetyTriage"));
+const PanelUpgradeBookingScript = lazy(() => import("./pages/resources/PanelUpgradeBookingScript"));
+const PowerOutageCallScript = lazy(() => import("./pages/resources/PowerOutageCallScript"));
+const MissedCallCalculator = lazy(() => import("./pages/resources/MissedCallCalculator"));
+const AfterHoursCalculator = lazy(() => import("./pages/resources/AfterHoursCalculator"));
+const ServicePricingCalculator = lazy(() => import("./pages/resources/ServicePricingCalculator"));
+const AverageTicketPlanner = lazy(() => import("./pages/resources/AverageTicketPlanner"));
+
 const queryClient = new QueryClient();
 
 const HashScrollHandler = () => {
@@ -145,6 +164,24 @@ const App = () => (
                 {/* Marketing landing pages */}
                 <Route path="/difference" element={<Difference />} />
                 <Route path="/pricing" element={<Pricing />} />
+                {/* Resource Center */}
+                <Route path="/resources" element={<ResourceHub />} />
+                <Route path="/resources/hvac-dispatcher-script-template" element={<HvacDispatcherScript />} />
+                <Route path="/resources/plumbing-dispatcher-script-template" element={<PlumbingDispatcherScript />} />
+                <Route path="/resources/electrician-call-answering-script" element={<ElectricianCallScript />} />
+                <Route path="/resources/hvac-after-hours-answering-script" element={<HvacAfterHoursScript />} />
+                <Route path="/resources/hvac-price-shopper-phone-script" element={<HvacPriceShopperScript />} />
+                <Route path="/resources/hvac-emergency-call-triage" element={<HvacEmergencyTriage />} />
+                <Route path="/resources/burst-pipe-call-script" element={<BurstPipeCallScript />} />
+                <Route path="/resources/sewer-backup-call-script" element={<SewerBackupCallScript />} />
+                <Route path="/resources/drain-cleaning-upsell-script" element={<DrainCleaningUpsellScript />} />
+                <Route path="/resources/electrical-safety-triage-questions" element={<ElectricalSafetyTriage />} />
+                <Route path="/resources/panel-upgrade-booking-script" element={<PanelUpgradeBookingScript />} />
+                <Route path="/resources/power-outage-call-script" element={<PowerOutageCallScript />} />
+                <Route path="/resources/missed-call-revenue-calculator" element={<MissedCallCalculator />} />
+                <Route path="/resources/after-hours-call-calculator" element={<AfterHoursCalculator />} />
+                <Route path="/resources/service-pricing-calculator" element={<ServicePricingCalculator />} />
+                <Route path="/resources/increase-average-ticket" element={<AverageTicketPlanner />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

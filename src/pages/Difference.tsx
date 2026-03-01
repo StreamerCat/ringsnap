@@ -20,6 +20,8 @@ const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({
     default: m.MobileFooterCTA
 })));
+import { VoiceDemoWidget } from "@/components/VoiceDemoWidget";
+
 const Difference = () => {
     const navigate = useNavigate();
 
@@ -73,7 +75,7 @@ const Difference = () => {
     };
 
     const scrollToDemo = () => {
-        document.getElementById("mechanism-section")?.scrollIntoView({
+        document.getElementById("live-demo")?.scrollIntoView({
             behavior: "smooth"
         });
     };
@@ -209,6 +211,22 @@ const Difference = () => {
                     <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
                         You set the rules and boundaries. RingSnap escalates when unsure. Calls are not shared with other businesses.
                     </p>
+                </div>
+            </section>
+
+            {/* SECTION 3.5: Voice Demo */}
+            <section id="live-demo" className="section-spacer bg-background pt-0">
+                <div className="container mx-auto px-4 max-w-4xl">
+                    <div className="text-center mb-8">
+                        <h2 className="text-h2 mb-4">Hear it in action</h2>
+                        <p className="text-body-default text-muted-foreground">
+                            Real-time AI voice that sounds human and handles complexity.
+                        </p>
+                    </div>
+
+                    <div className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative border-primary/20">
+                        <VoiceDemoWidget />
+                    </div>
                 </div>
             </section>
 

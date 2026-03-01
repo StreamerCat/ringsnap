@@ -30,6 +30,24 @@ const ROUTES = [
     '/roofing',
     '/privacy',
     '/terms',
+    // Resource Center
+    '/resources',
+    '/resources/hvac-dispatcher-script-template',
+    '/resources/plumbing-dispatcher-script-template',
+    '/resources/electrician-call-answering-script',
+    '/resources/hvac-after-hours-answering-script',
+    '/resources/hvac-price-shopper-phone-script',
+    '/resources/hvac-emergency-call-triage',
+    '/resources/burst-pipe-call-script',
+    '/resources/sewer-backup-call-script',
+    '/resources/drain-cleaning-upsell-script',
+    '/resources/electrical-safety-triage-questions',
+    '/resources/panel-upgrade-booking-script',
+    '/resources/power-outage-call-script',
+    '/resources/missed-call-revenue-calculator',
+    '/resources/after-hours-call-calculator',
+    '/resources/service-pricing-calculator',
+    '/resources/increase-average-ticket',
 ];
 
 const PORT = 8787;

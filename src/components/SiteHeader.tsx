@@ -1,5 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { SiteNavigation } from "@/components/SiteNavigation";
 import logo from "@/assets/RS_logo_color.svg";
 
 export const SiteHeader = () => {
@@ -7,7 +9,7 @@ export const SiteHeader = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-      <div className="container mx-auto flex items-center justify-between h-14 px-4 max-w-screen-xl">
+      <div className="site-container flex items-center justify-between h-14">
         <Link to="/">
           <img
             src={logo}
@@ -16,18 +18,9 @@ export const SiteHeader = () => {
           />
         </Link>
         <nav className="flex items-center gap-4">
-          <Link
-            to="/pricing"
-            className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors hidden sm:block"
-          >
-            Pricing
-          </Link>
-          <Link
-            to="/difference"
-            className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors hidden sm:block"
-          >
-            The Difference
-          </Link>
+          <div className="hidden md:block">
+            <SiteNavigation />
+          </div>
           <Button
             variant="outline"
             size="sm"

@@ -1,50 +1,19 @@
-# Fix: Invite Team/Members Flow
+# Fix Google Indexing Issues (404s)
 
-## Description
+## Overview
 
-This PR fixes the broken "Invite team/members" functionality. Previously, the invite flow would fail if the invited user already existed in the system, or if a user was re-invited.
-
-Additionally, this PR **fixes an issue where invite emails were silently failing** due to unhandled API errors and environment variable configuration issues.
+This PR resolves an issue where Google bots and users were encountering 404 errors on marketing pages (e.g., `/pricing`, `/difference`) because the server was configured to look for non-existent static HTML files.
 
 ## Changes
 
-### Backend
+### DevOps / Configuration
 
-- **`supabase/functions/manage-team-member/index.ts`**:
-  - Refactored `invite` action to check for existing users before attempting to create them.
-  - Implemented logic to add existing users to the `account_members` table if they are not already a member.
-  - Added checks to prevent re-inviting users who are already members of the team.
-  - **Email Reliability**:
-    - Added robust checking for `RESEND_PROD_KEY` (and `RESEND_API_KEY` fallback).
-    - Added explicit logging of email sending results (success/failure) to Supabase Logs.
-    - Fixed syntax errors and import paths to ensure successful deployment.
-- **`supabase/functions/_shared/email-templates.ts`**:
-  - Updated `buildTeamInviteEmail` to accept an optional `tempPassword`.
-  - Modified email template to display "Login with your existing account" if no temporary password is provided.
-
-### Frontend
-
-- **`src/components/dashboard/TeamTab.tsx`**:
-  - Enhanced error handling to display specific, user-friendly messages (e.g., "This user is already a member of the team").
-
-### Tests
-
-- Added `tests/invite_member.test.ts` to verify:
-  - Inviting a completely new user.
-  - Inviting an existing user (should bind to team).
-  - Inviting a user already in the team (should fail gracefully).
-
-## Deployment Notes
-
-- This PR includes changes to the `manage-team-member` Edge Function.
-- **Action Required**: The function must be deployed for changes to take effect.
-
-  ```bash
-  npx supabase functions deploy manage-team-member
-  ```
+- **`public/_redirects`**: Removed explicit rewrite rules that pointed to `dist/PAGE/index.html`.
+  - **Before**: Forced Netlify to serve a specific static file. If the file was missing (e.g., due to skipped prerendering in CI), it returned a 404.
+  - **After**: Relies on Netlify's default behavior. It will serve the static file *if it exists*; otherwise, it automatically falls back to the SPA (`/index.html`), ensuring the page always loads correctly.
 
 ## Verification
 
-- [ ] Manual verification in Dashboard > Team > Invite Member.
-- [ ] Verify email is received (check Spam).
-- [ ] Verify logs in Supabase Dashboard show "Team invite email sent successfully".
+- Verified that the explicit rewrite rules causing the 404s are removed.
+- Use `npm run build` locally to confirm the build process is unaffected.
+- **Post-Deploy Test**: Visit `/pricing` and `/difference` to ensure they load with a 200 OK status.

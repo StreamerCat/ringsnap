@@ -3,6 +3,7 @@
 -- Date: 2026-01-05
 -- Purpose: Fix NOT NULL violation by supplying trace_id
 -- ============================================================================
+DROP FUNCTION IF EXISTS public.track_onboarding_event(TEXT, JSONB);
 CREATE OR REPLACE FUNCTION track_onboarding_event(
         p_event_name TEXT,
         p_metadata JSONB DEFAULT '{}'::JSONB
