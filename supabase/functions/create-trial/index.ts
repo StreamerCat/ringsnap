@@ -202,7 +202,16 @@ async function createAdminAlert(
     console.log(`[${FUNCTION_NAME}] Admin alert created: ${alertType}`);
   } catch (err: any) {
     // Don't fail the main flow if alert creation fails
-    console.error(`[${FUNCTION_NAME}] Failed to create admin alert:`, err?.message);
+    logError("Failed to create admin alert", {
+      functionName: FUNCTION_NAME,
+      correlationId: typeof details?.request_id === "string" ? details.request_id : crypto.randomUUID(),
+      accountId: accountId ?? null,
+      error: err,
+      context: {
+        alertType,
+        phase: "admin_alert",
+      },
+    });
   }
 }
 
@@ -214,7 +223,8 @@ async function trackEvent(
   accountId: string | null,
   userId: string | null,
   eventType: string,
-  metadata: any = {}
+  metadata: any = {},
+  correlationId?: string
 ): Promise<void> {
   // Allow tracking events without account_id (e.g. signup_started)
   try {
@@ -225,7 +235,17 @@ async function trackEvent(
       metadata: metadata,
     });
   } catch (err) {
-    console.error(`[${FUNCTION_NAME}] Failed to track event ${eventType}:`, err);
+    logError("Failed to track analytics event", {
+      functionName: FUNCTION_NAME,
+      correlationId: correlationId ?? crypto.randomUUID(),
+      accountId: accountId ?? null,
+      error: err,
+      context: {
+        eventType,
+        phase: "analytics_tracking",
+        userId: userId ?? null,
+      },
+    });
   }
 }
 
@@ -234,7 +254,8 @@ async function trackEvent(
  */
 async function getExistingUserByEmail(
   supabase: any,
-  email: string
+  email: string,
+  correlationId?: string
 ): Promise<{ id: string; hasAccount: boolean; accountId?: string } | null> {
   try {
     // First, try to find the user in auth.users via admin API
@@ -261,7 +282,15 @@ async function getExistingUserByEmail(
       accountId: profile.account_id,
     };
   } catch (err) {
-    console.error(`[${FUNCTION_NAME}] Error checking existing user:`, err);
+    logError("Error checking existing user", {
+      functionName: FUNCTION_NAME,
+      correlationId: correlationId ?? crypto.randomUUID(),
+      error: err,
+      context: {
+        phase: "existing_user_check",
+        email: maskEmailForLogs(email),
+      },
+    });
     return null;
   }
 }
@@ -680,7 +709,7 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "idempotency_check", message: err.message, stack: err.stack, raw: err }));
+        stepError("idempotency_check", baseStepContext(), err, { phase: "idempotency_check" });
         logWarn("Idempotency check error (continuing)", { ...baseLogOptions, error: err });
       }
     }
@@ -691,7 +720,7 @@ Deno.serve(async (req: Request) => {
     try {
       rawData = await req.json();
     } catch (err: any) {
-      console.error(JSON.stringify({ request_id, phase, message: err.message }));
+      logWarn("Invalid JSON in request body", { ...baseLogOptions, error: err, context: { phase } });
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: corsHeaders });
     }
 
@@ -838,7 +867,7 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        stepError("ip_rate_limit_check", baseStepContext(), err, { phase });
         logWarn("IP rate limit check error (continuing)", { ...baseLogOptions, error: err });
       }
 
@@ -881,7 +910,7 @@ Deno.serve(async (req: Request) => {
           );
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase, message: err.message, stack: err.stack, raw: err }));
+        stepError("phone_reuse_check", baseStepContext(), err, { phase });
         logWarn("Phone reuse check error (continuing)", { ...baseLogOptions, error: err });
       }
     }
@@ -1075,7 +1104,7 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     // 1. Check if user already exists
-    const existingUser = await getExistingUserByEmail(supabase, data.email);
+    const existingUser = await getExistingUserByEmail(supabase, data.email, correlationId);
 
     if (existingUser) {
       if (existingUser.hasAccount) {
@@ -1312,7 +1341,7 @@ Deno.serve(async (req: Request) => {
           });
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "lead_link", message: err.message, stack: err.stack, raw: err }));
+        stepError("lead_link", baseStepContext(), err, { phase: "lead_link" });
         logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
@@ -1402,7 +1431,9 @@ Deno.serve(async (req: Request) => {
         if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
 
         const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
-        console.error(`[${FUNCTION_NAME}] ${errorMsg}`);
+        stepError("demo_bundle_env_validation", baseStepContext(), new Error(errorMsg), {
+          phase: "demo_bundle_env_validation",
+        });
         logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
 
         // Only allow fallback if explicitly enabled via env var (for local dev only)
@@ -1627,11 +1658,13 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
             userId: currentUserId,
           }).catch(err => {
-            console.error("Failed to send admin signup notifications (background)", err);
+            stepError("admin_signup_notifications_background", baseStepContext(), err, {
+              phase: "background_notification",
+            });
           });
         }
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "vapi_provision_start", message: err.message, stack: err.stack, raw: err }));
+        stepError("vapi_provision_start", baseStepContext(), err, { phase: "vapi_provision_start" });
         logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
 
         // Create admin alert for exception during job enqueue
@@ -1712,7 +1745,7 @@ Deno.serve(async (req: Request) => {
           user_agent: req.headers.get("user-agent") || null,
         });
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "idempotency_cache", message: err.message, stack: err.stack, raw: err }));
+        stepError("idempotency_cache", baseStepContext(), err, { phase: "idempotency_cache" });
         logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
@@ -1728,17 +1761,12 @@ Deno.serve(async (req: Request) => {
     );
   } catch (error: any) {
     // Top-level error handler
-    console.error(JSON.stringify({
-      request_id,
+    stepError("trial_creation", baseStepContext(), error, {
       phase,
-      message: error?.message ?? "Unknown error",
-      stack: error?.stack ?? "",
-      raw: error,
-      account_id: currentAccountId,
-      user_id: currentUserId,
+      request_id,
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId,
-    }));
+    });
 
     logError("Trial creation failed", {
       ...baseLogOptions,
@@ -1769,7 +1797,7 @@ Deno.serve(async (req: Request) => {
       // In a real refactor we would lift 'email' to outer scope. 
       // For this specific 'catch', we might be limited.
       // But wait, we can log the event without email if needed.
-    });
+    }, correlationId);
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
