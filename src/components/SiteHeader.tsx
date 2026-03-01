@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SiteNavigation } from "@/components/SiteNavigation";
+import { MobileNav } from "@/components/MobileNav";
 import logo from "@/assets/RS_logo_color.svg";
 
 export const SiteHeader = () => {
@@ -18,6 +18,7 @@ export const SiteHeader = () => {
           />
         </Link>
         <nav className="flex items-center gap-4">
+          <MobileNav />
           <div className="hidden md:block">
             <SiteNavigation />
           </div>
@@ -25,7 +26,7 @@ export const SiteHeader = () => {
             variant="outline"
             size="sm"
             onClick={() => navigate('/auth/login')}
-            className="font-medium"
+            className="hidden md:inline-flex font-medium"
           >
             Sign In
           </Button>
