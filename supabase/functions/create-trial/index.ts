@@ -34,7 +34,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import {
+  extractCorrelationId,
+  logError,
+  logInfo,
+  logWarn,
+  maskEmailForLogs,
+  maskPhoneForLogs,
+  stepEnd,
+  stepError,
+  stepStart,
+} from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
@@ -554,7 +564,6 @@ async function withRetry<T>(
 }
 
 Deno.serve(async (req: Request) => {
-  console.log("FUNCTION VERSION: 2025-12-10-LOGGING-FIX-V3");
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
@@ -562,6 +571,18 @@ Deno.serve(async (req: Request) => {
     correlationId,
     request_id,
   };
+
+  const baseStepContext = () => ({
+    functionName: FUNCTION_NAME,
+    traceId: request_id,
+    accountId: currentAccountId,
+    userId: currentUserId,
+  });
+
+  logInfo("create-trial invocation started", {
+    ...baseLogOptions,
+    context: { version: "2025-12-10-LOGGING-FIX-V3" },
+  });
 
   // Initialize Sentry for error tracking
   initSentry(FUNCTION_NAME, { correlationId });
@@ -1195,7 +1216,9 @@ Deno.serve(async (req: Request) => {
 
     if (memberError) {
       // Log but don't fail - link is critical but we have profile backup
-      console.warn("Failed to create account_member link:", memberError);
+      stepError("link_account_member", baseStepContext(), memberError, {
+        accountId: currentAccountId,
+      });
       logWarn("Failed to create account_member link", {
         ...baseLogOptions,
         error: memberError,
@@ -1220,15 +1243,12 @@ Deno.serve(async (req: Request) => {
     // accountTxError is already handled above (throws Error)
     const accountTxError = null;
 
-    // DETAILED LOGGING: After account creation
-    console.log("DB_RESULT", {
-      step: "create_account_transaction",
-      operation: "AFTER_CALL",
+    stepEnd("create_account_transaction", baseStepContext(), {
+      operation: "after_call",
       hasError: false,
       hasData: true,
-      error: null,
       result: accountTxResult,
-    });
+    }, Date.now());
 
     // (Removed old error handling block as it is now redundant)
 
@@ -1251,19 +1271,15 @@ Deno.serve(async (req: Request) => {
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     if (data.leadId) {
+      const leadLinkStart = Date.now();
 
-      // DETAILED LOGGING: Before lead update
-      console.log("DB_CALL", {
-        step: "link_lead",
-        operation: "BEFORE_UPDATE",
+      stepStart("link_lead", baseStepContext(), {
+        operation: "before_update",
         table: "signup_leads",
-        payload: {
-          auth_user_id: currentUserId,
-          account_id: currentAccountId,
-          profile_id: currentUserId,
-          completed_at: new Date().toISOString(),
-          leadId: data.leadId,
-        },
+        auth_user_id: currentUserId,
+        account_id: currentAccountId,
+        profile_id: currentUserId,
+        leadId: data.leadId,
       });
 
       try {
@@ -1277,20 +1293,12 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", data.leadId);
 
-        // DETAILED LOGGING: After lead update
-        console.log("DB_RESULT", {
-          step: "link_lead",
-          operation: "AFTER_UPDATE",
+        stepEnd("link_lead", baseStepContext(), {
+          operation: "after_update",
           table: "signup_leads",
           hasError: !!leadLinkError,
-          error: leadLinkError ? {
-            message: leadLinkError.message,
-            details: leadLinkError.details,
-            hint: leadLinkError.hint,
-            code: leadLinkError.code,
-            fullError: leadLinkError,
-          } : null,
-        });
+          errorCode: leadLinkError?.code ?? null,
+        }, leadLinkStart);
 
         if (leadLinkError) {
           console.log("[create-trial] Lead linking failed (non-critical)", {
@@ -1318,18 +1326,15 @@ Deno.serve(async (req: Request) => {
         req.headers.get("cf-connecting-ip") ||
         "unknown";
 
-      // DETAILED LOGGING: Before signup_attempts insert
-      console.log("DB_CALL", {
-        step: "log_signup_success",
-        operation: "BEFORE_INSERT",
+      const signupAttemptStart = Date.now();
+      stepStart("log_signup_success", baseStepContext(), {
+        operation: "before_insert",
         table: "signup_attempts",
-        payload: {
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: true,
-        },
+        email: maskEmailForLogs(data.email),
+        phone: maskPhoneForLogs(data.phone),
+        ip_address: clientIP,
+        has_device_fingerprint: !!data.deviceFingerprint,
+        success: true,
       });
 
       try {
@@ -1341,22 +1346,15 @@ Deno.serve(async (req: Request) => {
           success: true,
         });
 
-        // DETAILED LOGGING: After signup_attempts insert
-        console.log("DB_RESULT", {
-          step: "log_signup_success",
-          operation: "AFTER_INSERT",
+        stepEnd("log_signup_success", baseStepContext(), {
           table: "signup_attempts",
           hasError: !!signupAttemptError,
-          error: signupAttemptError ? {
-            message: signupAttemptError.message,
-            details: signupAttemptError.details,
-            hint: signupAttemptError.hint,
-            code: signupAttemptError.code,
-            fullError: signupAttemptError,
-          } : null,
-        });
+          errorCode: signupAttemptError?.code ?? null,
+        }, signupAttemptStart);
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "log_signup_success", message: err.message, stack: err.stack, raw: err }));
+        stepError("log_signup_success", baseStepContext(), err, {
+          phase: "log_signup_success",
+        });
         logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
@@ -1527,59 +1525,51 @@ Deno.serve(async (req: Request) => {
       // LIVE MODE: Real provisioning via job queue
       // ═══════════════════════════════════════════════════════════════
       // ... metadata build ...
-      const jobMetadata = {
-        company_name: data.companyName,
-        trade: data.trade,
-        service_area: data.serviceArea || "",
-        business_hours: data.businessHours || "Monday-Friday 8am-5pm",
-        emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
-        company_website: data.website || "",
-        assistant_gender: data.assistantGender,
-        wants_advanced_voice: data.wantsAdvancedVoice,
-        area_code: data.zipCode?.slice(0, 3) || "415",
-        fallback_phone: data.phone,
-        primary_goal: data.primaryGoal,
-      };
 
-      // DETAILED LOGGING: Before provisioning_jobs insert
-      console.log("DB_CALL", {
-        step: "enqueue_provisioning",
-        operation: "BEFORE_INSERT",
+      const enqueueProvisioningStart = Date.now();
+      stepStart("enqueue_provisioning", baseStepContext(), {
+        operation: "before_insert",
         table: "provisioning_jobs",
-        payload: {
-          account_id: currentAccountId,
-          user_id: currentUserId,
-          job_type: "provision_phone",
-          status: "queued",
-          metadata: jobMetadata,
-          correlation_id: correlationId,
-        },
+        account_id: currentAccountId,
+        user_id: currentUserId,
+        status: "queued",
       });
 
       try {
         // Assign to outer var - Do not redeclare const
         // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
-        const { error } = await supabase.from("provisioning_jobs").insert({
+        const baseProvisioningJobInsert = {
           account_id: currentAccountId,
           user_id: currentUserId,
           status: "queued",
+        };
+
+        // Prefer explicit job_type for critical guardrails/invariants.
+        // Fallback keeps backward compatibility if a stale environment is missing this column.
+        let { error } = await supabase.from("provisioning_jobs").insert({
+          ...baseProvisioningJobInsert,
+          job_type: "provision_phone",
         });
+
+        if (error && /job_type|column/i.test(error.message || "")) {
+          stepError("enqueue_provisioning_with_job_type", baseStepContext(), error, {
+            phase: "vapi_provision_start",
+            fallback: "retry_without_job_type",
+          });
+
+          const fallbackResult = await supabase
+            .from("provisioning_jobs")
+            .insert(baseProvisioningJobInsert);
+          error = fallbackResult.error;
+        }
+
         jobError = error;
 
-        // DETAILED LOGGING: After provisioning_jobs insert
-        console.log("DB_RESULT", {
-          step: "enqueue_provisioning",
-          operation: "AFTER_INSERT",
+        stepEnd("enqueue_provisioning", baseStepContext(), {
           table: "provisioning_jobs",
           hasError: !!jobError,
-          error: jobError ? {
-            message: jobError.message,
-            details: jobError.details,
-            hint: jobError.hint,
-            code: jobError.code,
-            fullError: jobError,
-          } : null,
-        });
+          errorCode: jobError?.code ?? null,
+        }, enqueueProvisioningStart);
 
         if (jobError) {
           logError("Failed to enqueue provisioning job (non-critical)", {
@@ -1605,7 +1595,9 @@ Deno.serve(async (req: Request) => {
           supabase.functions.invoke("provision-vapi", {
             body: { triggered_by: "create-trial" }
           }).catch(err => {
-            console.error("Failed to trigger provision-vapi worker (background)", err);
+            stepError("trigger_provision_vapi_background", baseStepContext(), err, {
+              phase: "vapi_provision_start",
+            });
           });
 
           // FIRE-AND-FORGET: Send Welcome Email
@@ -1616,7 +1608,10 @@ Deno.serve(async (req: Request) => {
               userId: currentUserId
             }
           }).catch(err => {
-            console.error("Failed to trigger send-welcome-email (background)", err);
+            stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
+              phase: "vapi_provision_start",
+              email: maskEmailForLogs(data.email),
+            });
           });
         }
       } catch (err: any) {

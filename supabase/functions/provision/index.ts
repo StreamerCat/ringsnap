@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError } from "../_shared/logging.ts";
+import { getLiveCallModel } from "../_shared/live-call-model.ts";
 
 type Json = Record<string, unknown>;
 
@@ -15,7 +16,8 @@ type ProvisionPayload = {
 
 const FUNCTION_NAME = "provision";
 const DEFAULT_VOICE = { provider: "azure", voiceId: "en-US-JennyNeural" };
-const DEFAULT_MODEL = { provider: "openai", model: "gpt-4o" };
+
+const DEFAULT_MODEL = { provider: "openai", model: getLiveCallModel() };
 
 const VAPI_BASE_URL = Deno.env.get("VAPI_BASE_URL") ?? "https://api.vapi.ai";
 const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
