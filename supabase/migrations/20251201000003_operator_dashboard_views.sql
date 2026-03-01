@@ -125,7 +125,7 @@ END $$;
 -- View: Pending appointments by account (created only if appointments exists)
 DO $$
 DECLARE
-  v_has_appointments_urgency BOOLEAN;
+  v_has_urgency_column BOOLEAN;
 BEGIN
   IF to_regclass('public.appointments') IS NOT NULL THEN
     SELECT EXISTS (
@@ -134,9 +134,9 @@ BEGIN
       WHERE table_schema = 'public'
         AND table_name = 'appointments'
         AND column_name = 'urgency'
-    ) INTO v_has_appointments_urgency;
+    ) INTO v_has_urgency_column;
 
-    IF v_has_appointments_urgency THEN
+    IF v_has_urgency_column THEN
       EXECUTE $view$
         DROP VIEW IF EXISTS public.operator_pending_appointments;
         CREATE VIEW public.operator_pending_appointments AS
@@ -169,7 +169,7 @@ BEGIN
       RAISE NOTICE 'Created view: operator_pending_appointments (urgency column missing, emergency metrics default to 0)';
     END IF;
 
-    RAISE NOTICE 'Created view: operator_pending_appointments';
+    RAISE NOTICE 'Created view: operator_pending_appointments (with urgency compatibility)';
   ELSE
     -- Clean up stale view if table is missing
     DROP VIEW IF EXISTS public.operator_pending_appointments;
