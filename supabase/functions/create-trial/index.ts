@@ -1538,11 +1538,31 @@ Deno.serve(async (req: Request) => {
       try {
         // Assign to outer var - Do not redeclare const
         // NOTE: test_mode field removed to prevent crash if column doesn't exist in DB
-        const { error } = await supabase.from("provisioning_jobs").insert({
+        const baseProvisioningJobInsert = {
           account_id: currentAccountId,
           user_id: currentUserId,
           status: "queued",
+        };
+
+        // Prefer explicit job_type for critical guardrails/invariants.
+        // Fallback keeps backward compatibility if a stale environment is missing this column.
+        let { error } = await supabase.from("provisioning_jobs").insert({
+          ...baseProvisioningJobInsert,
+          job_type: "provision_phone",
         });
+
+        if (error && /job_type|column/i.test(error.message || "")) {
+          stepError("enqueue_provisioning_with_job_type", baseStepContext(), error, {
+            phase: "vapi_provision_start",
+            fallback: "retry_without_job_type",
+          });
+
+          const fallbackResult = await supabase
+            .from("provisioning_jobs")
+            .insert(baseProvisioningJobInsert);
+          error = fallbackResult.error;
+        }
+
         jobError = error;
 
         stepEnd("enqueue_provisioning", baseStepContext(), {
