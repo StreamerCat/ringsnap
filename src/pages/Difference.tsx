@@ -7,6 +7,7 @@ import { RingSnapCallToCashInteractive } from "@/components/marketing/RingSnapCa
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Phone, PhoneCall, CheckCircle2, Clock, Star, Settings, Users, Briefcase, MessageSquare, ArrowRight, Shield } from "lucide-react";
+import { featureFlags } from "@/lib/featureFlags";
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({
     default: m.ContractorTestimonials
 })));
@@ -21,6 +22,56 @@ const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m
 })));
 const Difference = () => {
     const navigate = useNavigate();
+
+    const serviceSchema = {
+        "@context": "https://schema.org",
+        "@type": "Service",
+        "name": "RingSnap AI Receptionist for Home Service Businesses",
+        "serviceType": "AI answering service and booking assistant",
+        "provider": {
+            "@type": "Organization",
+            "name": "RingSnap",
+            "url": "https://getringsnap.com"
+        },
+        "areaServed": "US",
+        "audience": {
+            "@type": "BusinessAudience",
+            "audienceType": "Home service contractors"
+        },
+        "description": "RingSnap is an AI receptionist for plumbers, HVAC contractors, electricians, and roofers. It answers calls quickly, qualifies leads, books appointments, and routes urgent calls."
+    };
+
+    const differentiationFaqSchema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "What makes RingSnap different from voicemail or a basic answering service?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "RingSnap handles real conversations, qualifies callers, books jobs, and routes urgent requests based on your business rules instead of just taking messages."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Who is RingSnap built for?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "RingSnap is built for home service businesses, including plumbing, HVAC, electrical, and roofing contractors."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Can RingSnap help recover missed calls after hours?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. RingSnap provides 24/7 call handling so missed calls can be converted into booked appointments, including after-hours and weekend inquiries."
+                }
+            }
+        ]
+    };
+
     const scrollToDemo = () => {
         document.getElementById("mechanism-section")?.scrollIntoView({
             behavior: "smooth"
@@ -42,6 +93,17 @@ const Difference = () => {
             <meta name="twitter:title" content="The RingSnap Difference" />
             <meta name="twitter:description" content="The trained front desk that books jobs and gets sharper over time." />
             <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+
+            {featureFlags.enhancedMarketingSchema && (
+                <>
+                    <script type="application/ld+json">
+                        {JSON.stringify(serviceSchema)}
+                    </script>
+                    <script type="application/ld+json">
+                        {JSON.stringify(differentiationFaqSchema)}
+                    </script>
+                </>
+            )}
         </Helmet>
 
         <SiteHeader />

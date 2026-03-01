@@ -152,24 +152,6 @@ Disallow: /auth/
 Disallow: /api/
 Disallow: /settings/
 
-User-agent: Google-Extended
-Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /privacy
-Allow: /terms
-Disallow: /dashboard
-Disallow: /dashboard/
-Disallow: /admin
-Disallow: /admin/
-Disallow: /auth/
-Disallow: /api/
-Disallow: /settings/
-
 # Social crawlers - allow marketing pages
 User-agent: Twitterbot
 Allow: /
@@ -209,9 +191,6 @@ Disallow: /overview
 Disallow: /calendar
 Disallow: /appointments
 Disallow: /api/
-
-# AI-readable summary
-LLMs: https://getringsnap.com/llms.txt
 
 # Sitemap location
 Sitemap: https://getringsnap.com/sitemap.xml

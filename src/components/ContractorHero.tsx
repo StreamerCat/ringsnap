@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import logo from "@/assets/RS_logo_color.svg";
 export const ContractorHero = () => {
   const navigate = useNavigate();
   const scrollToVapiDemo = () => {
