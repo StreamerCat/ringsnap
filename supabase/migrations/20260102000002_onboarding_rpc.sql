@@ -117,6 +117,7 @@ $$;
 -- ==============================================================================
 -- 2. Helper RPC to track onboarding events safely
 -- ==============================================================================
+DROP FUNCTION IF EXISTS public.track_onboarding_event(TEXT, JSONB);
 CREATE OR REPLACE FUNCTION public.track_onboarding_event(
         p_event_name TEXT,
         p_metadata JSONB DEFAULT '{}'::jsonb

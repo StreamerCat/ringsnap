@@ -99,6 +99,11 @@
   [headers.values]
     Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
 
+[[headers]]
+  for = "/resources/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, stale-while-revalidate=86400"
+
 # Note: Redirects are handled in public/_redirects file
 # This keeps routing configuration in one place and is easier to maintain
 # Build trigger: Wed Jan 28 20:40:21 MST 2026

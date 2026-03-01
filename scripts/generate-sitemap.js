@@ -20,6 +20,24 @@ const routes = [
     { path: '/roofing', changefreq: 'monthly', priority: '0.8' },
     { path: '/privacy', changefreq: 'yearly', priority: '0.5' },
     { path: '/terms', changefreq: 'yearly', priority: '0.5' },
+    // Resource Center
+    { path: '/resources', changefreq: 'weekly', priority: '0.9' },
+    { path: '/resources/hvac-dispatcher-script-template', changefreq: 'monthly', priority: '0.8' },
+    { path: '/resources/plumbing-dispatcher-script-template', changefreq: 'monthly', priority: '0.8' },
+    { path: '/resources/electrician-call-answering-script', changefreq: 'monthly', priority: '0.8' },
+    { path: '/resources/hvac-after-hours-answering-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/hvac-price-shopper-phone-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/hvac-emergency-call-triage', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/burst-pipe-call-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/sewer-backup-call-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/drain-cleaning-upsell-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/electrical-safety-triage-questions', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/panel-upgrade-booking-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/power-outage-call-script', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/missed-call-revenue-calculator', changefreq: 'monthly', priority: '0.8' },
+    { path: '/resources/after-hours-call-calculator', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/service-pricing-calculator', changefreq: 'monthly', priority: '0.7' },
+    { path: '/resources/increase-average-ticket', changefreq: 'monthly', priority: '0.7' },
 ];
 
 const generateSitemap = () => {

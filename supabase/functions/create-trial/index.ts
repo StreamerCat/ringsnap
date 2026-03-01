@@ -39,6 +39,7 @@ import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
+import { sendSignupNotifications } from "../_shared/signup-notifications.ts";
 
 const FUNCTION_NAME = "create-trial";
 
@@ -1617,6 +1618,21 @@ Deno.serve(async (req: Request) => {
             }
           }).catch(err => {
             console.error("Failed to trigger send-welcome-email (background)", err);
+          });
+
+          // FIRE-AND-FORGET: Admin signup notification (email + Slack)
+          sendSignupNotifications({
+            email: data.email,
+            name: data.name,
+            companyName: data.companyName,
+            phone: data.phone,
+            trade: data.trade,
+            planType: data.planType,
+            source: data.source,
+            accountId: currentAccountId,
+            userId: currentUserId,
+          }).catch(err => {
+            console.error("Failed to send admin signup notifications (background)", err);
           });
         }
       } catch (err: any) {

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { SiteNavigation } from "@/components/SiteNavigation";
 import logo from "@/assets/RS_logo_color.svg";
 
 export const SiteHeader = () => {
@@ -16,18 +17,9 @@ export const SiteHeader = () => {
           />
         </Link>
         <nav className="flex items-center gap-4">
-          <Link
-            to="/pricing"
-            className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors hidden sm:block"
-          >
-            Pricing
-          </Link>
-          <Link
-            to="/difference"
-            className="text-sm font-medium text-foreground/70 hover:text-primary transition-colors hidden sm:block"
-          >
-            The Difference
-          </Link>
+          <div className="hidden md:block">
+            <SiteNavigation />
+          </div>
           <Button
             variant="outline"
             size="sm"

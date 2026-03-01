@@ -56,6 +56,22 @@ export const ContractorFooter = () => {
       label: "For Roofing",
       href: "/roofing"
     }],
+    resources: [{
+      label: "Resource Hub",
+      href: "/resources"
+    }, {
+      label: "HVAC Scripts",
+      href: "/resources/hvac-dispatcher-script-template"
+    }, {
+      label: "Plumbing Scripts",
+      href: "/resources/plumbing-dispatcher-script-template"
+    }, {
+      label: "Electrician Scripts",
+      href: "/resources/electrician-call-answering-script"
+    }, {
+      label: "Missed Call Calculator",
+      href: "/resources/missed-call-revenue-calculator"
+    }],
     company: [{
       label: "Privacy Policy",
       href: "/privacy"
@@ -114,7 +130,7 @@ export const ContractorFooter = () => {
     {/* Footer Links */}
     <div className="border-t">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid md:grid-cols-4 gap-8 mb-12">
+        <div className="grid md:grid-cols-5 gap-8 mb-12">
           {/* Brand Column */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -141,6 +157,14 @@ export const ContractorFooter = () => {
             <h3 className="font-semibold mb-4">For Contractors</h3>
             <ul className="space-y-2">
               {footerLinks.trades.map(renderLink)}
+            </ul>
+          </div>
+
+          {/* Resources */}
+          <div>
+            <h3 className="font-semibold mb-4">Resources</h3>
+            <ul className="space-y-2">
+              {footerLinks.resources.map(renderLink)}
             </ul>
           </div>
 
