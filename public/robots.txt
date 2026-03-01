@@ -211,7 +211,7 @@ Disallow: /appointments
 Disallow: /api/
 
 # AI-readable summary
-LLMs: https://getringsnap.com/llms.txt
+# LLMs: https://getringsnap.com/llms.txt
 
 # Sitemap location
 Sitemap: https://getringsnap.com/sitemap.xml
