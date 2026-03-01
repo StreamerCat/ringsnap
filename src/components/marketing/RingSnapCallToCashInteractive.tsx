@@ -324,13 +324,104 @@ const LEGACY_STEPS = [
   "Get Smarter"
 ] as const;
 
+type LegacyStepContent = {
+  callerSays: string;
+  ringSnapSays: string;
+  loggedOutcome: string;
+};
+
+const LEGACY_SCENARIO_CONTENT: Record<Scenario, Record<LegacyStep, LegacyStepContent>> = {
+  emergency: {
+    1: {
+      callerSays: "My basement is flooding and it keeps rising.",
+      ringSnapSays: "I can help right now. Is the water still running and are you safe?",
+      loggedOutcome: "Emergency intent and immediate safety context captured in seconds."
+    },
+    2: {
+      callerSays: "Yes, it's still active and I need someone now.",
+      ringSnapSays: "Got it. What's the service address so I can route the on-call team?",
+      loggedOutcome: "Service area, urgency, and address are qualified before escalation."
+    },
+    3: {
+      callerSays: "How fast can someone get here?",
+      ringSnapSays: "You're being prioritized as an active emergency. I'm connecting dispatch now.",
+      loggedOutcome: "Concern resolved with clear timing expectations and confidence-building language."
+    },
+    4: {
+      callerSays: "Okay, please send them.",
+      ringSnapSays: "Confirmed. I'm transferring you and sending your notes so you don't repeat anything.",
+      loggedOutcome: "Warm transfer triggered with full intake summary."
+    },
+    5: {
+      callerSays: "Thanks for moving so quickly.",
+      ringSnapSays: "You're all set. We'll text confirmation and keep this record attached to the job.",
+      loggedOutcome: "Call recording, transcript, and emergency disposition logged for follow-up learning."
+    }
+  },
+  "price-shopper": {
+    1: {
+      callerSays: "How much do you charge for a water heater install?",
+      ringSnapSays: "Great question—I'll get you a real number after two quick fit questions.",
+      loggedOutcome: "Price-only opener converted into a guided consultative script."
+    },
+    2: {
+      callerSays: "I'm comparing a few companies.",
+      ringSnapSays: "Totally fair. Is your current unit gas or electric, and how old is it?",
+      loggedOutcome: "Key qualifier details captured to avoid blind quoting."
+    },
+    3: {
+      callerSays: "Can you at least give me a ballpark?",
+      ringSnapSays: "Ballparks vary by venting and code, so the fastest path is a quick assessment visit.",
+      loggedOutcome: "Objection handled without discounting; value frame maintained."
+    },
+    4: {
+      callerSays: "Tomorrow morning might work.",
+      ringSnapSays: "Perfect—I'll lock in tomorrow morning and text confirmation now.",
+      loggedOutcome: "Appointment booked with service notes attached for dispatch."
+    },
+    5: {
+      callerSays: "Sounds good.",
+      ringSnapSays: "Done. We saved your preferences so the next quote call is even faster.",
+      loggedOutcome: "Outcome tagged as converted from price shopper for future optimization."
+    }
+  },
+  "repeat-customer": {
+    1: {
+      callerSays: "You worked on our AC last year.",
+      ringSnapSays: "Welcome back—are we talking about that same unit today?",
+      loggedOutcome: "Caller recognized as existing customer with prior service context."
+    },
+    2: {
+      callerSays: "Yes, and it's struggling again.",
+      ringSnapSays: "Is it fully down or still running so we can prioritize correctly?",
+      loggedOutcome: "Urgency and equipment details qualified using service history."
+    },
+    3: {
+      callerSays: "Can we get the same tech?",
+      ringSnapSays: "I'll request that tech and secure the fastest available window.",
+      loggedOutcome: "Loyalty concern addressed while preserving schedule momentum."
+    },
+    4: {
+      callerSays: "Thursday works best.",
+      ringSnapSays: "You're confirmed for Thursday and we'll send a reminder text.",
+      loggedOutcome: "Return-customer appointment booked with continuity notes."
+    },
+    5: {
+      callerSays: "Great, thank you.",
+      ringSnapSays: "Anytime—today's notes are saved to your profile for the next call.",
+      loggedOutcome: "Transcript and disposition logged to strengthen future repeat interactions."
+    }
+  }
+};
+
 const LegacyInteractive = () => {
   const [scenario, setScenario] = useState<Scenario>("emergency");
   const [selectedStep, setSelectedStep] = useState<LegacyStep>(1);
+  const activeStep = LEGACY_SCENARIO_CONTENT[scenario][selectedStep];
 
   return <div className="w-full">
-    <div className="text-center mb-6">
-      <h2 className="text-h2 mb-2">How RingSnap turns calls into booked jobs</h2>
+    <div className="text-center mb-4">
+      <h2 className="text-h2 mb-2">How RingSnap turns every inbound call into booked revenue</h2>
       <p className="text-body-default text-muted-foreground">Tap a scenario to see it in action.</p>
       <p className="text-xs text-muted-foreground mt-2">Legacy module enabled via VITE_USE_LEGACY_DIFFERENCE_INTERACTIVE=true.</p>
     </div>
@@ -339,7 +430,7 @@ const LegacyInteractive = () => {
       setScenario(value as Scenario);
       setSelectedStep(1);
     }} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-6">
+      <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-4">
         {Object.entries(SCENARIOS).map(([key, { label, icon: Icon }]) => <TabsTrigger key={key} value={key} className="flex items-center justify-center gap-2 py-3 px-2 rounded-lg text-sm font-medium">
           <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span className="truncate">{label}</span>
@@ -358,6 +449,23 @@ const LegacyInteractive = () => {
             </button>
           ))}
         </div>
+
+        <Card className="card-tier-2 mt-3 bg-white border-primary/10 shadow-sm">
+          <CardContent className="p-4 md:p-5 grid gap-3 md:gap-4 md:grid-cols-3">
+            <section className="space-y-2" aria-labelledby="legacy-caller-says-title">
+              <Badge variant="outline" id="legacy-caller-says-title" className="text-xs font-bold uppercase tracking-wider border-primary/20 text-primary">Caller says</Badge>
+              <p className="rounded-xl bg-muted/40 border border-muted px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.callerSays}</p>
+            </section>
+            <section className="space-y-2" aria-labelledby="legacy-ringsnap-says-title">
+              <Badge variant="default" id="legacy-ringsnap-says-title" className="text-xs font-bold uppercase tracking-wider">RingSnap says</Badge>
+              <p className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.ringSnapSays}</p>
+            </section>
+            <section className="space-y-2" aria-labelledby="legacy-logged-outcome-title">
+              <Badge variant="secondary" id="legacy-logged-outcome-title" className="text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">Logged outcome</Badge>
+              <p className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.loggedOutcome}</p>
+            </section>
+          </CardContent>
+        </Card>
       </TabsContent>
     </Tabs>
   </div>;
@@ -374,8 +482,8 @@ export const RingSnapCallToCashInteractive = () => {
   const activeStory = SCENARIO_STORIES[scenario][selectedPhase];
 
   return <div className="w-full">
-    <div className="text-center mb-6">
-      <h2 className="text-h2 mb-2">What happens when your phone rings</h2>
+    <div className="text-center mb-4">
+      <h2 className="text-h2 mb-2">How RingSnap turns every inbound call into booked revenue</h2>
       <p className="text-body-default text-muted-foreground">Pick a scenario. See the call, the decision, and the result.</p>
     </div>
 
@@ -387,7 +495,7 @@ export const RingSnapCallToCashInteractive = () => {
       }}
       className="w-full"
     >
-      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-6">
+      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-5">
         {Object.entries(SCENARIOS).map(([key, { label, icon: Icon }]) => <TabsTrigger key={key} value={key} className={cn("flex items-center justify-center gap-2 py-3 px-2 rounded-lg text-sm font-medium transition-all", "data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-primary", "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2")}>
           <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span className="truncate">{label}</span>
@@ -396,7 +504,7 @@ export const RingSnapCallToCashInteractive = () => {
 
       {Object.keys(SCENARIOS).map((scenarioKey) => (
         <TabsContent key={scenarioKey} value={scenarioKey} className="mt-0 focus-visible:outline-none">
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3 mb-6" role="group" aria-label="Call handling phases">
+          <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-3 mb-5" role="group" aria-label="Call handling phases">
             {PHASES.map((phase) => {
               const Icon = phase.icon;
               const isActive = selectedPhase === phase.id;
@@ -406,7 +514,7 @@ export const RingSnapCallToCashInteractive = () => {
                   onClick={() => setSelectedPhase(phase.id)}
                   aria-pressed={isActive}
                   className={cn(
-                    "flex items-center text-left p-4 rounded-xl border-2 transition-all",
+                    "flex items-center text-left p-3.5 rounded-xl border-2 transition-all",
                     "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none",
                     isActive ? "border-primary bg-primary/5 shadow-md" : "border-muted bg-white shadow-sm hover:border-primary/30"
                   )}
@@ -423,8 +531,8 @@ export const RingSnapCallToCashInteractive = () => {
             })}
           </div>
 
-          <Card className="card-tier-2 mb-6 bg-white border-primary/10 shadow-lg overflow-hidden">
-            <CardContent className="p-5 md:p-8 grid gap-6 md:grid-cols-3">
+          <Card className="card-tier-2 mb-4 bg-white border-primary/10 shadow-md overflow-hidden">
+            <CardContent className="p-4 md:p-6 grid gap-4 md:gap-5 md:grid-cols-3">
               <section className="space-y-3" aria-labelledby="caller-says-title">
                 <Badge variant="outline" id="caller-says-title" className="text-xs font-bold uppercase tracking-wider border-primary/20 text-primary">Caller says</Badge>
                 {activeStory.callerSays.length > 0 ? (
@@ -477,8 +585,8 @@ export const RingSnapCallToCashInteractive = () => {
             </CardContent>
           </Card>
 
-          <Card className="card-tier-2 mb-6 bg-white">
-            <CardContent className="p-5 md:p-6">
+          <Card className="card-tier-2 mb-4 bg-white">
+            <CardContent className="p-4 md:p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Badge variant="secondary" className="text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700">{activeStory.supportTitle}</Badge>
               </div>
@@ -496,12 +604,12 @@ export const RingSnapCallToCashInteractive = () => {
       ))}
     </Tabs>
 
-    <div className="flex flex-wrap justify-center gap-3">
+    <div className="flex flex-wrap justify-center gap-2 mt-1">
       {OUTCOME_LINKS.map((chip) => (
         <a
           key={chip.label}
           href={chip.href}
-          className="px-3 py-1.5 text-xs font-medium bg-white border border-primary/20 text-muted-foreground rounded-full hover:text-primary hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="px-2.5 py-1 text-xs font-medium bg-white border border-primary/20 text-muted-foreground rounded-full hover:text-primary hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           {chip.label}
         </a>
