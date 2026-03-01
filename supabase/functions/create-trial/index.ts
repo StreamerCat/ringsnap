@@ -564,7 +564,6 @@ async function withRetry<T>(
 }
 
 Deno.serve(async (req: Request) => {
-  console.log("FUNCTION VERSION: 2025-12-10-LOGGING-FIX-V3");
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
@@ -578,6 +577,11 @@ Deno.serve(async (req: Request) => {
     traceId: request_id,
     accountId: currentAccountId,
     userId: currentUserId,
+  });
+
+  logInfo("create-trial invocation started", {
+    ...baseLogOptions,
+    context: { version: "2025-12-10-LOGGING-FIX-V3" },
   });
 
   // Initialize Sentry for error tracking
@@ -1212,7 +1216,9 @@ Deno.serve(async (req: Request) => {
 
     if (memberError) {
       // Log but don't fail - link is critical but we have profile backup
-      console.warn("Failed to create account_member link:", memberError);
+      stepError("link_account_member", baseStepContext(), memberError, {
+        accountId: currentAccountId,
+      });
       logWarn("Failed to create account_member link", {
         ...baseLogOptions,
         error: memberError,
@@ -1237,15 +1243,12 @@ Deno.serve(async (req: Request) => {
     // accountTxError is already handled above (throws Error)
     const accountTxError = null;
 
-    // DETAILED LOGGING: After account creation
-    console.log("DB_RESULT", {
-      step: "create_account_transaction",
-      operation: "AFTER_CALL",
+    stepEnd("create_account_transaction", baseStepContext(), {
+      operation: "after_call",
       hasError: false,
       hasData: true,
-      error: null,
       result: accountTxResult,
-    });
+    }, Date.now());
 
     // (Removed old error handling block as it is now redundant)
 
@@ -1268,19 +1271,15 @@ Deno.serve(async (req: Request) => {
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     if (data.leadId) {
+      const leadLinkStart = Date.now();
 
-      // DETAILED LOGGING: Before lead update
-      console.log("DB_CALL", {
-        step: "link_lead",
-        operation: "BEFORE_UPDATE",
+      stepStart("link_lead", baseStepContext(), {
+        operation: "before_update",
         table: "signup_leads",
-        payload: {
-          auth_user_id: currentUserId,
-          account_id: currentAccountId,
-          profile_id: currentUserId,
-          completed_at: new Date().toISOString(),
-          leadId: data.leadId,
-        },
+        auth_user_id: currentUserId,
+        account_id: currentAccountId,
+        profile_id: currentUserId,
+        leadId: data.leadId,
       });
 
       try {
@@ -1294,20 +1293,12 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", data.leadId);
 
-        // DETAILED LOGGING: After lead update
-        console.log("DB_RESULT", {
-          step: "link_lead",
-          operation: "AFTER_UPDATE",
+        stepEnd("link_lead", baseStepContext(), {
+          operation: "after_update",
           table: "signup_leads",
           hasError: !!leadLinkError,
-          error: leadLinkError ? {
-            message: leadLinkError.message,
-            details: leadLinkError.details,
-            hint: leadLinkError.hint,
-            code: leadLinkError.code,
-            fullError: leadLinkError,
-          } : null,
-        });
+          errorCode: leadLinkError?.code ?? null,
+        }, leadLinkStart);
 
         if (leadLinkError) {
           console.log("[create-trial] Lead linking failed (non-critical)", {
