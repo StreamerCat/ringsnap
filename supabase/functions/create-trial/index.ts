@@ -34,7 +34,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
+import {
+  extractCorrelationId,
+  logError,
+  logInfo,
+  logWarn,
+  maskEmailForLogs,
+  maskPhoneForLogs,
+  stepEnd,
+  stepError,
+  stepStart,
+} from "../_shared/logging.ts";
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
@@ -562,6 +572,13 @@ Deno.serve(async (req: Request) => {
     correlationId,
     request_id,
   };
+
+  const baseStepContext = () => ({
+    functionName: FUNCTION_NAME,
+    traceId: request_id,
+    accountId: currentAccountId,
+    userId: currentUserId,
+  });
 
   // Initialize Sentry for error tracking
   initSentry(FUNCTION_NAME, { correlationId });
@@ -1318,18 +1335,15 @@ Deno.serve(async (req: Request) => {
         req.headers.get("cf-connecting-ip") ||
         "unknown";
 
-      // DETAILED LOGGING: Before signup_attempts insert
-      console.log("DB_CALL", {
-        step: "log_signup_success",
-        operation: "BEFORE_INSERT",
+      const signupAttemptStart = Date.now();
+      stepStart("log_signup_success", baseStepContext(), {
+        operation: "before_insert",
         table: "signup_attempts",
-        payload: {
-          email: data.email,
-          phone: data.phone,
-          ip_address: clientIP,
-          device_fingerprint: data.deviceFingerprint,
-          success: true,
-        },
+        email: maskEmailForLogs(data.email),
+        phone: maskPhoneForLogs(data.phone),
+        ip_address: clientIP,
+        has_device_fingerprint: !!data.deviceFingerprint,
+        success: true,
       });
 
       try {
@@ -1341,22 +1355,15 @@ Deno.serve(async (req: Request) => {
           success: true,
         });
 
-        // DETAILED LOGGING: After signup_attempts insert
-        console.log("DB_RESULT", {
-          step: "log_signup_success",
-          operation: "AFTER_INSERT",
+        stepEnd("log_signup_success", baseStepContext(), {
           table: "signup_attempts",
           hasError: !!signupAttemptError,
-          error: signupAttemptError ? {
-            message: signupAttemptError.message,
-            details: signupAttemptError.details,
-            hint: signupAttemptError.hint,
-            code: signupAttemptError.code,
-            fullError: signupAttemptError,
-          } : null,
-        });
+          errorCode: signupAttemptError?.code ?? null,
+        }, signupAttemptStart);
       } catch (err: any) {
-        console.error(JSON.stringify({ request_id, phase: "log_signup_success", message: err.message, stack: err.stack, raw: err }));
+        stepError("log_signup_success", baseStepContext(), err, {
+          phase: "log_signup_success",
+        });
         logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
       }
     }
@@ -1527,33 +1534,14 @@ Deno.serve(async (req: Request) => {
       // LIVE MODE: Real provisioning via job queue
       // ═══════════════════════════════════════════════════════════════
       // ... metadata build ...
-      const jobMetadata = {
-        company_name: data.companyName,
-        trade: data.trade,
-        service_area: data.serviceArea || "",
-        business_hours: data.businessHours || "Monday-Friday 8am-5pm",
-        emergency_policy: data.emergencyPolicy || "Available 24/7 for emergencies",
-        company_website: data.website || "",
-        assistant_gender: data.assistantGender,
-        wants_advanced_voice: data.wantsAdvancedVoice,
-        area_code: data.zipCode?.slice(0, 3) || "415",
-        fallback_phone: data.phone,
-        primary_goal: data.primaryGoal,
-      };
 
-      // DETAILED LOGGING: Before provisioning_jobs insert
-      console.log("DB_CALL", {
-        step: "enqueue_provisioning",
-        operation: "BEFORE_INSERT",
+      const enqueueProvisioningStart = Date.now();
+      stepStart("enqueue_provisioning", baseStepContext(), {
+        operation: "before_insert",
         table: "provisioning_jobs",
-        payload: {
-          account_id: currentAccountId,
-          user_id: currentUserId,
-          job_type: "provision_phone",
-          status: "queued",
-          metadata: jobMetadata,
-          correlation_id: correlationId,
-        },
+        account_id: currentAccountId,
+        user_id: currentUserId,
+        status: "queued",
       });
 
       try {
@@ -1566,20 +1554,11 @@ Deno.serve(async (req: Request) => {
         });
         jobError = error;
 
-        // DETAILED LOGGING: After provisioning_jobs insert
-        console.log("DB_RESULT", {
-          step: "enqueue_provisioning",
-          operation: "AFTER_INSERT",
+        stepEnd("enqueue_provisioning", baseStepContext(), {
           table: "provisioning_jobs",
           hasError: !!jobError,
-          error: jobError ? {
-            message: jobError.message,
-            details: jobError.details,
-            hint: jobError.hint,
-            code: jobError.code,
-            fullError: jobError,
-          } : null,
-        });
+          errorCode: jobError?.code ?? null,
+        }, enqueueProvisioningStart);
 
         if (jobError) {
           logError("Failed to enqueue provisioning job (non-critical)", {
@@ -1605,7 +1584,9 @@ Deno.serve(async (req: Request) => {
           supabase.functions.invoke("provision-vapi", {
             body: { triggered_by: "create-trial" }
           }).catch(err => {
-            console.error("Failed to trigger provision-vapi worker (background)", err);
+            stepError("trigger_provision_vapi_background", baseStepContext(), err, {
+              phase: "vapi_provision_start",
+            });
           });
 
           // FIRE-AND-FORGET: Send Welcome Email
@@ -1616,7 +1597,10 @@ Deno.serve(async (req: Request) => {
               userId: currentUserId
             }
           }).catch(err => {
-            console.error("Failed to trigger send-welcome-email (background)", err);
+            stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
+              phase: "vapi_provision_start",
+              email: maskEmailForLogs(data.email),
+            });
           });
         }
       } catch (err: any) {

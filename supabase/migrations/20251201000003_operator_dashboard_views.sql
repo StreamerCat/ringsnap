@@ -87,22 +87,49 @@ END $$;
 
 -- View: Pending appointments by account (created only if appointments exists)
 DO $$
+DECLARE
+  v_has_urgency_column BOOLEAN;
 BEGIN
   IF to_regclass('public.appointments') IS NOT NULL THEN
-    EXECUTE $view$
-      CREATE OR REPLACE VIEW public.operator_pending_appointments AS
-      SELECT
-        account_id,
-        COUNT(*) as pending_count,
-        COUNT(*) FILTER (WHERE urgency = 'emergency') as emergency_count,
-        COUNT(*) FILTER (WHERE urgency = 'high') as high_urgency_count,
-        MIN(created_at) as oldest_pending_at,
-        MAX(created_at) as newest_pending_at
-      FROM public.appointments
-      WHERE status = 'pending_confirmation'
-      GROUP BY account_id
-    $view$;
-    RAISE NOTICE 'Created view: operator_pending_appointments';
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'appointments'
+        AND column_name = 'urgency'
+    ) INTO v_has_urgency_column;
+
+    IF v_has_urgency_column THEN
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+        SELECT
+          account_id,
+          COUNT(*) as pending_count,
+          COUNT(*) FILTER (WHERE urgency = 'emergency') as emergency_count,
+          COUNT(*) FILTER (WHERE urgency = 'high') as high_urgency_count,
+          MIN(created_at) as oldest_pending_at,
+          MAX(created_at) as newest_pending_at
+        FROM public.appointments
+        WHERE status = 'pending_confirmation'
+        GROUP BY account_id
+      $view$;
+      RAISE NOTICE 'Created view: operator_pending_appointments (with urgency)';
+    ELSE
+      EXECUTE $view$
+        CREATE OR REPLACE VIEW public.operator_pending_appointments AS
+        SELECT
+          account_id,
+          COUNT(*) as pending_count,
+          0::bigint as emergency_count,
+          0::bigint as high_urgency_count,
+          MIN(created_at) as oldest_pending_at,
+          MAX(created_at) as newest_pending_at
+        FROM public.appointments
+        WHERE status = 'pending_confirmation'
+        GROUP BY account_id
+      $view$;
+      RAISE NOTICE 'Created view: operator_pending_appointments (urgency column missing; counts default to 0)';
+    END IF;
   ELSE
     -- Clean up stale view if table is missing
     DROP VIEW IF EXISTS public.operator_pending_appointments;
