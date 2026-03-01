@@ -1,7 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useLocation } from "react-router-dom";
-import Vapi from "@vapi-ai/web";
-import { VapiWidget } from "@vapi-ai/client-sdk-react";
 import * as Sentry from "@sentry/react";
 import { useVapiWidget } from "@/lib/VapiWidgetContext";
 import { featureFlags } from "@/lib/featureFlags";
@@ -51,9 +49,31 @@ const CUSTOMER_PREFIXES = [
     "/account"
 ];
 
+type VapiWidgetProps = {
+    key: string;
+    publicKey: string;
+    assistantId: string;
+    mode: "chat";
+    theme: "light";
+    position: "bottom-right";
+    size: "compact";
+    buttonColor: string;
+    title: string;
+    subtitle: string;
+    assistantOverrides: Record<string, unknown>;
+    onCallStart: () => void;
+    onCallEnd: () => void;
+    onError: (error: unknown) => void;
+    onMessage: (message: unknown) => void;
+    requireConsent: string;
+    termsContent: string;
+    localStorageKey: string;
+};
+
 export function VapiChatWidget() {
     const location = useLocation();
     const { widgetContext } = useVapiWidget();
+    const [VapiWidgetComponent, setVapiWidgetComponent] = useState<ComponentType<VapiWidgetProps> | null>(null);
 
     // Calculate visibility synchronously during render
     let path = location.pathname.toLowerCase();
@@ -70,17 +90,6 @@ export function VapiChatWidget() {
         HIDDEN_PREFIXES.some(prefix => path.startsWith(prefix));
 
     const shouldShow = !isHiddenRoute && !isStaffRoute;
-
-    // Debug log for troubleshooting
-    console.log(`[VapiWidget Debug] Init`, {
-        path,
-        isStaffRoute,
-        isHiddenRoute,
-        shouldShow,
-        hasPublicKey: !!PUBLIC_KEY,
-        hasAssistantId: !!ASSISTANT_ID,
-        publicKeyMasked: PUBLIC_KEY ? `${PUBLIC_KEY.slice(0, 4)}...` : 'missing'
-    });
 
     // Determine Widget Mode
     let widgetMode: 'marketing' | 'pricing' | 'customer' = 'marketing';
@@ -113,15 +122,11 @@ export function VapiChatWidget() {
     // Remount only on context change (Auth or Mode switch)
     const modeKey = `${widgetContext.accountId ? "in" : "out"}:${widgetMode}`;
 
-    // Check environment variables specifically
-    if (!PUBLIC_KEY) console.warn("[VapiWidget Debug] Missing VITE_VAPI_PUBLIC_KEY");
-    if (!ASSISTANT_ID) console.warn("[VapiWidget Debug] Missing VITE_VAPI_WIDGET_ASSISTANT_ID");
-
     // ORIGINAL WORKING STRUCTURE: assistantOverrides returns { variableValues } ONLY
     // The assistant's firstMessage should be set in the Vapi dashboard, not overridden here.
     const getAssistantOverrides = () => {
         // Basic context for all users
-        const variableValues: Record<string, any> = {
+        const variableValues: Record<string, unknown> = {
             pagePath: location.pathname,
             isLoggedIn: !!widgetContext.accountId,
             widgetMode,
@@ -134,17 +139,55 @@ export function VapiChatWidget() {
         if (searchParams.get('utm_medium')) variableValues.utmMedium = searchParams.get('utm_medium');
         if (searchParams.get('utm_campaign')) variableValues.utmCampaign = searchParams.get('utm_campaign');
 
-        // CRITICAL: Return ONLY variableValues. Do NOT include 'assistant' or 'firstMessage'.
-        // Those belong in the Vapi dashboard configuration, not runtime overrides.
         return {
             variableValues
         };
     };
 
-    if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID) {
-        console.log("[VapiWidget Debug] Widget hidden", {
-            reason: !shouldShow ? (isStaffRoute ? "Staff Route" : "Hidden Route") : "Missing Keys"
-        });
+    useEffect(() => {
+        if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID || VapiWidgetComponent) {
+            return;
+        }
+
+        let isCancelled = false;
+        let idleTimer: number | undefined;
+
+        const loadWidgetSdk = async () => {
+            try {
+                const sdk = await import("@vapi-ai/client-sdk-react");
+                if (!isCancelled) {
+                    setVapiWidgetComponent(() => sdk.VapiWidget as ComponentType<VapiWidgetProps>);
+                }
+            } catch (error) {
+                Sentry.captureException(error, { tags: { source: 'vapi-widget-sdk-load' } });
+            }
+        };
+
+        const startLoad = () => {
+            void loadWidgetSdk();
+        };
+
+        // Defer third-party widget until idle or first user intent.
+        const events = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as const;
+        events.forEach((eventName) => window.addEventListener(eventName, startLoad, { once: true, passive: true }));
+
+        if ('requestIdleCallback' in window) {
+            (window as Window & { requestIdleCallback: (callback: () => void, options?: { timeout: number }) => number })
+                .requestIdleCallback(startLoad, { timeout: 2500 });
+        } else {
+            idleTimer = window.setTimeout(startLoad, 2500);
+        }
+
+        return () => {
+            isCancelled = true;
+            events.forEach((eventName) => window.removeEventListener(eventName, startLoad));
+            if (idleTimer) {
+                window.clearTimeout(idleTimer);
+            }
+        };
+    }, [VapiWidgetComponent, shouldShow]);
+
+    if (!shouldShow || !PUBLIC_KEY || !ASSISTANT_ID || !VapiWidgetComponent) {
         return null;
     }
 
@@ -167,7 +210,7 @@ export function VapiChatWidget() {
     return (
         <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out`}>
             <Sentry.ErrorBoundary fallback={null}>
-                <VapiWidget
+                <VapiWidgetComponent
                     key={modeKey}
                     publicKey={PUBLIC_KEY}
                     assistantId={ASSISTANT_ID}
@@ -181,7 +224,6 @@ export function VapiChatWidget() {
                     title={config.title}
                     subtitle={config.subtitle}
 
-                    // ORIGINAL WORKING PATTERN: pass function result directly
                     assistantOverrides={getAssistantOverrides()}
 
                     // Events
@@ -191,12 +233,11 @@ export function VapiChatWidget() {
                     onCallEnd={() => {
                         Sentry.addBreadcrumb({ category: 'vapi', message: 'Call/Chat ended', level: 'info' });
                     }}
-                    onError={(error: any) => {
-                        console.error("Vapi Widget Error:", error);
+                    onError={(error: unknown) => {
                         Sentry.captureException(error, { tags: { source: 'vapi-widget' } });
                     }}
-                    onMessage={(message: any) => {
-                        // Log messages for debug but don't spam Sentry
+                    onMessage={() => {
+                        // Intentionally no-op to avoid noisy logs.
                     }}
 
                     // @ts-expect-error - web-component props

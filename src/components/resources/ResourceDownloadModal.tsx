@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { jsPDF } from "jspdf";
 import {
     Dialog,
     DialogContent,
@@ -96,7 +95,8 @@ export const ResourceDownloadModal = ({
     const [fullName, setFullName] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const generateAndDownloadPDF = (name: string) => {
+    const generateAndDownloadPDF = async (name: string) => {
+        const { jsPDF } = await import("jspdf");
         const normalized = name.toLowerCase();
         let resource = RESOURCE_CONTENT.general;
 
@@ -213,7 +213,7 @@ export const ResourceDownloadModal = ({
             });
 
             // 3. Trigger the PDF generation
-            generateAndDownloadPDF(resourceName);
+            await generateAndDownloadPDF(resourceName);
 
             onClose();
             setEmail("");
