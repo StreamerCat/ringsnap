@@ -30,7 +30,10 @@
     "test:smoke:ci": "playwright test --project=smoke --reporter=github",
     "test:provisioning:e2e": "node scripts/provisioning-e2e-agent.mjs",
     "test:full": "playwright test --project=full",
-    "test:signup-critical": "vitest run tests/signup-critical && node scripts/provisioning-e2e-agent.mjs"
+    "test:signup-critical": "vitest run tests/signup-critical && node scripts/provisioning-e2e-agent.mjs",
+    "test:go-live:integration": "vitest run tests/go-live",
+    "test:go-live:e2e": "playwright test --project=smoke tests/e2e/go-live/smoke.spec.ts",
+    "test:go-live": "node scripts/run-go-live-tests.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
