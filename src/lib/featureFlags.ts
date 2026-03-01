@@ -114,6 +114,13 @@ export interface FeatureFlags {
    * Enables "Skip for now" button in activation flow.
    * Set via: VITE_FEATURE_INTERNAL_SKIP_ONBOARDING=true
    */
+  /**
+   * Enable enhanced JSON-LD schema on marketing pages (/pricing, /difference).
+   * Kill switch for quick rollback if metadata regressions are detected.
+   * Set via: VITE_FEATURE_ENHANCED_MARKETING_SCHEMA=false
+   */
+  enhancedMarketingSchema: boolean;
+
   internalSkipOnboarding: boolean;
 }
 
@@ -219,6 +226,12 @@ export const featureFlags: FeatureFlags = {
     import.meta.env.VITE_FEATURE_INTERNAL_SKIP_ONBOARDING,
     import.meta.env.DEV
   ),
+
+  // Enhanced marketing schema: ENABLED by default, kill switch available
+  enhancedMarketingSchema: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_ENHANCED_MARKETING_SCHEMA,
+    true
+  ),
 };
 
 /**
@@ -237,4 +250,5 @@ if (import.meta.env.DEV) {
   console.log('[FeatureFlags] Upgrade modal:', featureFlags.upgradeModalEnabled ? 'ENABLED' : 'DISABLED');
   console.log('[FeatureFlags] Activation onboarding:', featureFlags.activationOnboardingEnabled ? 'ENABLED' : 'DISABLED');
   console.log('[FeatureFlags] Reporting wow:', featureFlags.reportingWowEnabled ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Enhanced marketing schema:', featureFlags.enhancedMarketingSchema ? 'ENABLED' : 'DISABLED');
 }

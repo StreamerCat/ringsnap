@@ -3,12 +3,77 @@ import { lazy, Suspense } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Shield, Clock, CreditCard } from "lucide-react";
+import { featureFlags } from "@/lib/featureFlags";
 
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Pricing = () => {
+    const softwareApplicationSchema = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "RingSnap",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://getringsnap.com/pricing",
+        "description": "AI receptionist and call answering software for contractors that captures missed calls, books jobs, and routes urgent requests 24/7.",
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "Starter Plan",
+                "price": "297",
+                "priceCurrency": "USD",
+                "url": "https://getringsnap.com/pricing"
+            },
+            {
+                "@type": "Offer",
+                "name": "Professional Plan",
+                "price": "797",
+                "priceCurrency": "USD",
+                "url": "https://getringsnap.com/pricing"
+            },
+            {
+                "@type": "Offer",
+                "name": "Growth Plan",
+                "price": "1497",
+                "priceCurrency": "USD",
+                "url": "https://getringsnap.com/pricing"
+            }
+        ]
+    };
+
+    const pricingFaqSchema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "How much does RingSnap cost?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "RingSnap pricing starts at $297 per month. Professional is $797 per month and Growth is $1,497 per month."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Is there a free trial?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. All RingSnap plans include a 3-day free trial so home service businesses can test AI call answering and booking before committing."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Are there setup fees or long-term contracts?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "No setup fees and no long-term contracts are required. You can cancel anytime."
+                }
+            }
+        ]
+    };
+
     return (
         <>
             <Helmet>
@@ -29,6 +94,17 @@ const Pricing = () => {
                 <meta name="twitter:title" content="Pricing | RingSnap" />
                 <meta name="twitter:description" content="Virtual receptionist pricing. No setup fees. Cancel anytime." />
                 <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+
+                {featureFlags.enhancedMarketingSchema && (
+                    <>
+                        <script type="application/ld+json">
+                            {JSON.stringify(softwareApplicationSchema)}
+                        </script>
+                        <script type="application/ld+json">
+                            {JSON.stringify(pricingFaqSchema)}
+                        </script>
+                    </>
+                )}
             </Helmet>
 
             <SiteHeader />
