@@ -137,7 +137,11 @@ export function VapiChatWidget() {
         // CRITICAL: Return ONLY variableValues. Do NOT include 'assistant' or 'firstMessage'.
         // Those belong in the Vapi dashboard configuration, not runtime overrides.
         return {
-            variableValues
+            variableValues,
+            metadata: {
+                source: 'web_chat',
+                widgetMode
+            }
         };
     };
 

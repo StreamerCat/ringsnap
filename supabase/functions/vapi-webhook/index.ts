@@ -16,6 +16,56 @@ interface MappingResult {
     method: string;
 }
 
+type CallSourceCategory = "pstn_customer" | "web_demo" | "web_chat" | "unknown";
+
+function redactPhone(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 4) return "***";
+    return `***${digits.slice(-4)}`;
+}
+
+function sanitizeWebhookShape(call: VapiCall, messageType: string): Record<string, unknown> {
+    return {
+        messageType,
+        callType: call.type ?? null,
+        phoneNumberId: call.phoneNumber?.id ?? call.phoneNumberId ?? null,
+        assistantId: call.assistant?.id ?? null,
+        transport: {
+            hasTransport: !!call.transport,
+            to: redactPhone(call.transport?.to),
+            from: redactPhone(call.transport?.from),
+        },
+        phoneNumber: {
+            hasPhoneNumberObject: !!call.phoneNumber,
+            number: redactPhone(call.phoneNumber?.number),
+        },
+        customer: {
+            hasCustomerObject: !!call.customer,
+            number: redactPhone(call.customer?.number),
+        },
+        assistantMetadataSource: (call.assistant?.metadata as Record<string, unknown> | undefined)?.source ?? null,
+    };
+}
+
+function classifyCallSource(call: VapiCall): CallSourceCategory {
+    const metadataSource = (call.assistant?.metadata as Record<string, unknown> | undefined)?.source;
+
+    if (metadataSource === "web_demo") return "web_demo";
+    if (metadataSource === "web_chat") return "web_chat";
+    if (metadataSource === "pstn_customer") return "pstn_customer";
+
+    const hasPhoneBinding = !!(call.phoneNumber?.id ?? call.phoneNumberId);
+    const hasPhoneTransport = !!(call.transport?.to || call.transport?.from || call.customer?.number);
+    const isInboundPhoneCall = call.type === "inboundPhoneCall";
+
+    if (hasPhoneBinding || hasPhoneTransport || isInboundPhoneCall) {
+        return "pstn_customer";
+    }
+
+    return "unknown";
+}
+
 Deno.serve(withSentryEdge(
     { functionName: "vapi-webhook" },
     async (req, ctx) => {
@@ -47,12 +97,22 @@ Deno.serve(withSentryEdge(
             providerCallId = call.id ?? null;
             providerPhoneNumberId = call.phoneNumber?.id ?? call.phoneNumberId ?? null;
 
+            const callSource = classifyCallSource(call);
+
             console.log(JSON.stringify({
                 event: "vapi_webhook_received",
                 type,
                 providerCallId,
                 providerPhoneNumberId,
+                callSource,
                 hasCall: !!call.id,
+            }));
+
+            console.log(JSON.stringify({
+                event: "vapi_webhook_payload_shape",
+                providerCallId,
+                callSource,
+                shape: sanitizeWebhookShape(call, type),
             }));
 
             // Validation
@@ -95,11 +155,12 @@ Deno.serve(withSentryEdge(
             console.log(JSON.stringify({
                 event: "webhook_phone_extraction",
                 providerCallId,
+                callSource,
                 vapiPhoneId,
-                calleeE164,
-                callPhoneNumber: call.phoneNumber,
+                calleeE164Masked: redactPhone(calleeE164),
                 callPhoneNumberId: call.phoneNumberId,
-                callTransport: call.transport
+                hasPhoneNumberObject: !!call.phoneNumber,
+                hasTransport: !!call.transport,
             }));
 
             let matchedPhone: { id: any; account_id: any; assigned_account_id: any; lifecycle_status: any; vapi_phone_id: any; e164_number: any; accounts: { subscription_status: string; account_status: string } | null } | null = null;

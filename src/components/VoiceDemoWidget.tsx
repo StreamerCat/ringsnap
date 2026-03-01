@@ -170,7 +170,11 @@ export const VoiceDemoWidget = () => {
     setDemoState('connecting');
     setErrorMessage(null);
     try {
-      await vapiRef.current.start(vapiConfig.assistantId);
+      await vapiRef.current.start(vapiConfig.assistantId, {
+        metadata: {
+          source: 'web_demo'
+        }
+      });
       console.log('[Voice Demo] Call start request sent');
     } catch (error) {
       console.error('[Voice Demo] Failed to start call:', error);
