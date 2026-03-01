@@ -158,7 +158,7 @@ I have availability [today/tomorrow]. Can I get your information?'"`}
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="electrical" />
+        <ResourceCTA variant="demo" trade="electrical" service="power outage" />
 
         <RelatedResources
             resources={[

@@ -117,7 +117,7 @@ Our plumber will call you about 15 minutes before arrival. Is there anything els
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="plumbing" />
+        <ResourceCTA variant="demo" trade="plumbing" service="sewer backup" />
 
         <RelatedResources
             resources={[

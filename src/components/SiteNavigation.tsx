@@ -96,7 +96,7 @@ export const SiteNavigation = () => {
                     </Link>
                 </NavigationMenuItem>
 
-                {/* RESOURCES */}
+                {/* FIELD GUIDES */}
                 <NavigationMenuItem>
                     <Link to="/resources">
                         <NavigationMenuLink
@@ -106,10 +106,11 @@ export const SiteNavigation = () => {
                                 location.pathname.startsWith("/resources") && "text-primary"
                             )}
                         >
-                            Resources
+                            Field Guides
                         </NavigationMenuLink>
                     </Link>
                 </NavigationMenuItem>
+
             </NavigationMenuList>
         </NavigationMenu>
     );

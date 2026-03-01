@@ -140,7 +140,7 @@ const ElectricalSafetyTriage = () => (
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="electrical" />
+        <ResourceCTA variant="demo" trade="electrical" service="electrical safety" />
 
         <RelatedResources
             resources={[

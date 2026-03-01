@@ -120,7 +120,7 @@ Our plumber will call you about 15 minutes before arrival. We'll get this taken 
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="plumbing" />
+        <ResourceCTA variant="demo" trade="plumbing" service="burst pipe" />
 
         <RelatedResources
             resources={[

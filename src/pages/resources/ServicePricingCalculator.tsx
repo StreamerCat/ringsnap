@@ -149,7 +149,7 @@ const ServicePricingCalculator = () => {
                 <FAQSection faqs={faqs} />
             </section>
 
-            <ResourceCTA variant="demo" />
+            <ResourceCTA variant="demo" trade="contractor" service="service" />
 
             <RelatedResources
                 resources={[

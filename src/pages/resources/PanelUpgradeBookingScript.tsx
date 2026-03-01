@@ -129,7 +129,7 @@ The evaluation is [$XX], and that fee applies toward the upgrade if you decide t
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="electrical" />
+        <ResourceCTA variant="demo" trade="electrical" service="panel upgrade" />
 
         <RelatedResources
             resources={[

@@ -170,7 +170,7 @@ I have availability [today/tomorrow]. Our diagnostic fee is [$XX], applied towar
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="HVAC" />
+        <ResourceCTA variant="demo" trade="HVAC" service="emergency HVAC" />
 
         <RelatedResources
             resources={[

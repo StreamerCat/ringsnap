@@ -113,7 +113,7 @@ export const ContractorFooter = () => {
 
   return <footer className="bg-gradient-to-br from-cream/30 to-off-white border-t border-charcoal/20">
     {/* FAQ Section */}
-    <div className="container mx-auto px-4 py-16">
+    <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-16">
       <h2 className="text-3xl font-bold text-center mb-8">Common Questions from Contractors</h2>
       <Accordion type="single" collapsible className="max-w-3xl mx-auto">
         {faqs.map((faq, index) => <AccordionItem key={index} value={`item-${index}`}>
@@ -129,7 +129,7 @@ export const ContractorFooter = () => {
 
     {/* Footer Links */}
     <div className="border-t">
-      <div className="container mx-auto px-4 py-12">
+      <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-5 gap-8 mb-12">
           {/* Brand Column */}
           <div className="space-y-4">

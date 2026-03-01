@@ -131,7 +131,7 @@ I have a spot open [today/tomorrow]. Can I get your name and address?"
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="HVAC" />
+        <ResourceCTA variant="demo" trade="HVAC" service="HVAC price shopper" />
 
         <RelatedResources
             resources={[

@@ -239,8 +239,8 @@ const ResourceHub = () => {
                             key={option.value}
                             onClick={() => setActiveFilter(option.value)}
                             className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${activeFilter === option.value
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 }`}
                         >
                             {option.label}
@@ -265,7 +265,7 @@ const ResourceHub = () => {
 
             {/* CTAs */}
             <ResourceCTA variant="download" />
-            <ResourceCTA variant="demo" />
+            <ResourceCTA variant="demo" trade="contractor" service="contractor" />
         </ResourceLayout>
     );
 };

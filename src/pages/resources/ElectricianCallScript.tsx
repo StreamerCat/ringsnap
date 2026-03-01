@@ -187,7 +187,7 @@ Perfect. You're scheduled for [day] between [time window]. Our electrician [Name
                 />
             </section>
 
-            <ResourceCTA variant="download" trade="electrical" />
+            <ResourceCTA variant="download" trade="electrical" service="electrical" />
 
             {/* Panel Upgrade */}
             <section id="panel-upgrade" className="mb-10">
@@ -339,7 +339,7 @@ It sounds like we should get an electrician out to diagnose this. I have availab
                 <FAQSection faqs={faqs} />
             </section>
 
-            <ResourceCTA variant="demo" trade="electrical" />
+            <ResourceCTA variant="demo" trade="electrical" service="electrical" />
 
             <RelatedResources
                 resources={[

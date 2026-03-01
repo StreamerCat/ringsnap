@@ -149,7 +149,7 @@ const AfterHoursCalculator = () => {
                 <FAQSection faqs={faqs} />
             </section>
 
-            <ResourceCTA variant="demo" />
+            <ResourceCTA variant="demo" trade="contractor" service="after-hours" />
 
             <RelatedResources
                 resources={[

@@ -211,7 +211,7 @@ Stay [warm/cool] — we'll take care of this for you."`}
             </section>
 
             {/* Mid-page CTA */}
-            <ResourceCTA variant="download" trade="HVAC" />
+            <ResourceCTA variant="download" trade="HVAC" service="HVAC" />
 
             {/* Price Shopper Script */}
             <section id="price-shopper" className="mb-10">
@@ -374,7 +374,7 @@ Thanks for calling [Company Name]. We appreciate your patience!"`}
             </section>
 
             {/* End CTA */}
-            <ResourceCTA variant="demo" trade="HVAC" />
+            <ResourceCTA variant="demo" trade="HVAC" service="HVAC" />
 
             {/* Related Resources */}
             <RelatedResources

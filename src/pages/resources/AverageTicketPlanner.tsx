@@ -186,7 +186,7 @@ If you'd like, I can take care of it right now — since I'm already set up, the
                 <FAQSection faqs={faqs} />
             </section>
 
-            <ResourceCTA variant="demo" />
+            <ResourceCTA variant="demo" trade="contractor" service="service" />
 
             <RelatedResources
                 resources={[

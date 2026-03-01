@@ -130,7 +130,7 @@ What would you like to do?"`}
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="plumbing" />
+        <ResourceCTA variant="demo" trade="plumbing" service="drain cleaning" />
 
         <RelatedResources
             resources={[

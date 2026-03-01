@@ -198,7 +198,7 @@ I have availability [today/tomorrow]. Our diagnostic fee is [$XX], which goes to
                 />
             </section>
 
-            <ResourceCTA variant="download" trade="plumbing" />
+            <ResourceCTA variant="download" trade="plumbing" service="plumbing" />
 
             {/* Drain Cleaning Booking Script */}
             <section id="drain-cleaning" className="mb-10">
@@ -336,7 +336,7 @@ Is there anything else I can help with while you wait? Hang in there — we'll g
                 <FAQSection faqs={faqs} />
             </section>
 
-            <ResourceCTA variant="demo" trade="plumbing" />
+            <ResourceCTA variant="demo" trade="plumbing" service="plumbing" />
 
             <RelatedResources
                 resources={[

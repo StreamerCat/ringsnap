@@ -237,7 +237,7 @@ const MissedCallCalculator = () => {
                 <FAQSection faqs={faqs} />
             </section>
 
-            <ResourceCTA variant="demo" />
+            <ResourceCTA variant="demo" trade="contractor" service="contractor" />
 
             <RelatedResources
                 resources={[

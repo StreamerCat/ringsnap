@@ -153,7 +153,7 @@ Thank you for calling [Company Name] — we'll talk to you tomorrow!'"`}
             <FAQSection faqs={faqs} />
         </section>
 
-        <ResourceCTA variant="demo" trade="HVAC" />
+        <ResourceCTA variant="demo" trade="HVAC" service="after-hours" />
 
         <RelatedResources
             resources={[

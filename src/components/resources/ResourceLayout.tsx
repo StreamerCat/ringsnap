@@ -122,31 +122,7 @@ export const ResourceLayout = ({
 
             <SiteHeader />
             <main className="pt-14 pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
-                {/* Breadcrumbs */}
-                <nav
-                    aria-label="Breadcrumb"
-                    className="container mx-auto px-4 py-4 border-b border-border/50"
-                >
-                    <ol className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
-                        {breadcrumbs.map((crumb, index) => (
-                            <li key={index} className="flex items-center gap-1.5">
-                                {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
-                                {crumb.href ? (
-                                    <Link
-                                        to={crumb.href}
-                                        className="hover:text-primary transition-colors"
-                                    >
-                                        {crumb.label}
-                                    </Link>
-                                ) : (
-                                    <span className="text-foreground font-medium">{crumb.label}</span>
-                                )}
-                            </li>
-                        ))}
-                    </ol>
-                </nav>
-
-                <div className="container mx-auto px-4 py-8">
+                <div className="site-container py-8">
                     <div className="flex gap-8">
                         {/* Sticky TOC — Desktop */}
                         {toc && toc.length > 0 && (
@@ -161,8 +137,8 @@ export const ResourceLayout = ({
                                                 key={item.id}
                                                 href={`#${item.id}`}
                                                 className={`block pl-4 py-1.5 text-sm transition-colors border-l -ml-px ${activeSection === item.id
-                                                        ? "text-primary border-primary font-medium"
-                                                        : "text-muted-foreground hover:text-foreground border-transparent"
+                                                    ? "text-primary border-primary font-medium"
+                                                    : "text-muted-foreground hover:text-foreground border-transparent"
                                                     }`}
                                                 onClick={() => setActiveSection(item.id)}
                                             >
