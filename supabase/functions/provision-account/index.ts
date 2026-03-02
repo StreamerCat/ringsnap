@@ -59,16 +59,24 @@ const provisionAccountSchema = z.object({
 });
 
 /**
- * Get Stripe price ID for plan type (default to starter for trials)
+ * Get Stripe price ID for plan key — supports new plan keys and legacy mapping
  */
-function getStripePriceId(planType: string = "starter"): string {
-  const priceIds = {
-    starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-    professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
-    premium: Deno.env.get("STRIPE_PRICE_PREMIUM"),
+function getStripePriceId(planType: string = "night_weekend"): string {
+  const legacyMap: Record<string, string> = {
+    starter: "night_weekend",
+    professional: "core",
+    premium: "pro",
+  };
+  const normalizedPlan = legacyMap[planType] || planType;
+
+  const newPriceIds: Record<string, string | undefined> = {
+    night_weekend: Deno.env.get("STRIPE_PRICE_ID_NIGHT_WEEKEND"),
+    lite: Deno.env.get("STRIPE_PRICE_ID_LITE"),
+    core: Deno.env.get("STRIPE_PRICE_ID_CORE"),
+    pro: Deno.env.get("STRIPE_PRICE_ID_PRO"),
   };
 
-  const priceId = priceIds[planType as keyof typeof priceIds];
+  const priceId = newPriceIds[normalizedPlan];
   if (!priceId) {
     throw new Error(`Stripe price ID not configured for plan: ${planType}`);
   }
@@ -335,9 +343,10 @@ serve(async (req: Request) => {
     let stripeSubscriptionId = account.stripe_subscription_id;
 
     if (!stripeSubscriptionId) {
-      // Create trial subscription
+      // Create trial subscription using the account's plan_key (default: night_weekend)
       try {
-        const priceId = getStripePriceId("starter"); // Default to starter plan
+        const accountPlanKey = account.plan_key || "night_weekend";
+        const priceId = getStripePriceId(accountPlanKey);
         const subscription = await stripe.subscriptions.create({
           customer: stripeCustomerId,
           items: [{ price: priceId }],
@@ -346,7 +355,8 @@ serve(async (req: Request) => {
           metadata: {
             account_id: account.id,
             source: data.source,
-            plan_type: "starter",
+            plan_key: accountPlanKey,
+            plan_type: accountPlanKey,
           },
         }, {
           idempotencyKey: `provision-${account.id}-subscription`,
@@ -359,15 +369,17 @@ serve(async (req: Request) => {
           context: {
             subscriptionId: subscription.id,
             status: subscription.status,
+            planKey: accountPlanKey,
           },
         });
 
-        // Save subscription ID to account
+        // Save subscription ID and plan_key to account
         await supabase
           .from("accounts")
           .update({
             stripe_subscription_id: subscription.id,
-            plan_type: "starter",
+            plan_type: accountPlanKey,
+            plan_key: accountPlanKey,
             subscription_status: "trial",
             trial_start_date: new Date().toISOString(),
             trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),

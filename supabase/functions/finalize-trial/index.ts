@@ -86,8 +86,9 @@ const finalizeTrialSchema = z.object({
     .enum(["book_appointments", "capture_leads", "answer_questions", "take_orders"])
     .optional(),
 
-  // Plan & payment
-  planType: z.enum(["starter", "professional", "premium"]).default("starter"),
+  // Plan & payment — accepts new plan keys and legacy keys
+  planType: z.enum(["night_weekend", "lite", "core", "pro", "starter", "professional", "premium"])
+    .default("night_weekend"),
   paymentMethodId: z.string().min(1, "Payment method required"),
 });
 
@@ -102,30 +103,26 @@ function generateSecurePassword(): string {
 }
 
 /**
- * Get Stripe price ID for plan type
+ * Get Stripe price ID for plan type — supports new plan keys and legacy mapping
  */
 function getStripePriceId(planType: string): string {
-  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
-  const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_");
+  // Map legacy plan keys to new plan keys
+  const legacyMap: Record<string, string> = {
+    starter: "night_weekend",
+    professional: "core",
+    premium: "pro",
+  };
+  const normalizedPlan = legacyMap[planType] || planType;
 
-  if (isLive) {
-    const livePriceIds = {
-      starter: "price_1SMav5IdevV48BnpEEIRKvk5",
-      professional: "price_1SMaw9IdevV48BnpJkUs1UY0",
-      premium: "price_1SMawyIdevV48BnpM9r2mk2g",
-    };
-
-    const liveId = livePriceIds[planType as keyof typeof livePriceIds];
-    if (liveId) return liveId;
-  }
-
-  const priceIds = {
-    starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-    professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
-    premium: Deno.env.get("STRIPE_PRICE_PREMIUM"),
+  // New plan env vars
+  const newPriceIds: Record<string, string | undefined> = {
+    night_weekend: Deno.env.get("STRIPE_PRICE_ID_NIGHT_WEEKEND"),
+    lite: Deno.env.get("STRIPE_PRICE_ID_LITE"),
+    core: Deno.env.get("STRIPE_PRICE_ID_CORE"),
+    pro: Deno.env.get("STRIPE_PRICE_ID_PRO"),
   };
 
-  const priceId = priceIds[planType as keyof typeof priceIds];
+  const priceId = newPriceIds[normalizedPlan];
   if (!priceId) {
     throw new Error(`Stripe price ID not configured for plan: ${planType}`);
   }
@@ -456,6 +453,14 @@ serve(async (req) => {
 
     phase = "stripe_subscription";
 
+    // Normalize legacy plan keys → new plan keys
+    const legacyPlanMap: Record<string, string> = {
+      starter: "night_weekend",
+      professional: "core",
+      premium: "pro",
+    };
+    const normalizedPlanKey = legacyPlanMap[data.planType] || data.planType;
+
     let subscription: Stripe.Subscription;
     try {
       const priceId = getStripePriceId(data.planType);
@@ -467,7 +472,8 @@ serve(async (req) => {
         metadata: {
           source: "website",
           signup_flow: "two-step-v2",
-          plan_type: data.planType,
+          plan_key: normalizedPlanKey,
+          plan_type: normalizedPlanKey,
           lead_id: data.lead_id,
         },
       }, {
@@ -516,7 +522,8 @@ serve(async (req) => {
       phone: data.phone,
       company_name: data.companyName,
       trade: data.trade,
-      plan_type: data.planType,
+      plan_type: normalizedPlanKey,
+      plan_key: normalizedPlanKey,
       phone_number_area_code: data.zipCode?.slice(0, 3) || null,
       zip_code: data.zipCode || null,
       business_hours: data.businessHours ? JSON.stringify(data.businessHours) : null,
