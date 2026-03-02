@@ -421,7 +421,7 @@ const LegacyInteractive = () => {
 
   return <div className="w-full">
     <div className="text-center mb-4">
-      <h2 className="text-h2 mb-2">From First Ring to Booked Job—Automatically</h2>
+      <h2 className="text-h2 mb-2">How RingSnap turns every inbound call into booked revenue</h2>
       <p className="text-body-default text-muted-foreground">Tap a scenario to see it in action.</p>
       <p className="text-xs text-muted-foreground mt-2">Legacy module enabled via VITE_USE_LEGACY_DIFFERENCE_INTERACTIVE=true.</p>
     </div>
@@ -483,7 +483,7 @@ export const RingSnapCallToCashInteractive = () => {
 
   return <div className="w-full">
     <div className="text-center mb-4">
-      <h2 className="text-h2 mb-2">From First Ring to Booked Job—Automatically</h2>
+      <h2 className="text-h2 mb-2">How RingSnap turns every inbound call into booked revenue</h2>
       <p className="text-body-default text-muted-foreground">Pick a scenario. See the call, the decision, and the result.</p>
     </div>
 

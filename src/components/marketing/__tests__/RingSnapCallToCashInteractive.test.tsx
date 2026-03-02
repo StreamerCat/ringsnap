@@ -13,7 +13,7 @@ describe("RingSnapCallToCashInteractive", () => {
   it("renders updated framing copy and default emergency messaging", () => {
     render(<RingSnapCallToCashInteractive />);
 
-    expect(screen.getByRole("heading", { name: "From First Ring to Booked Job—Automatically" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "How RingSnap turns every inbound call into booked revenue" })).toBeInTheDocument();
     expect(screen.getByText("Pick a scenario. See the call, the decision, and the result.")).toBeInTheDocument();
     expect(screen.getByText("What's happening behind the scenes")).toBeInTheDocument();
     expect(screen.getByText("The call is controlled immediately. No panic. No lost time.")).toBeInTheDocument();
