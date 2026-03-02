@@ -11,17 +11,18 @@
  *   pro            $399/mo  1200 min included $0.22/min overage
  *
  * Usage:
- *   STRIPE_SECRET_KEY=sk_test_... node scripts/stripe-setup-new-plans.js
+ *   STRIPE_SECRET_KEY=sk_live_... node scripts/stripe-setup-new-plans.js
  *
  * Output:
  *   scripts/stripe-plan-ids.json
  */
 
-"use strict";
+import Stripe from "stripe";
+import { writeFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
-const Stripe = require("stripe");
-const fs = require("fs");
-const path = require("path");
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -75,7 +76,7 @@ const PLANS = [
   },
 ];
 
-const OUTPUT_FILE = path.join(__dirname, "stripe-plan-ids.json");
+const OUTPUT_FILE = join(__dirname, "stripe-plan-ids.json");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ async function main() {
   }
 
   // 5. Write output JSON
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(result, null, 2));
+  writeFileSync(OUTPUT_FILE, JSON.stringify(result, null, 2));
   console.log(`\n✅ Done! IDs written to: ${OUTPUT_FILE}\n`);
   console.log(JSON.stringify(result, null, 2));
 
