@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import { parseTraceId, createObservabilityContext } from "../_shared/observability.ts";
@@ -634,12 +635,10 @@ serve(async (req) => {
       }
 
       case 'customer.subscription.deleted': {
+        // 1c: customer.subscription.deleted → mark subscription inactive in DB
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
-        // Hold phone number for 7 days AFTER the period end (or now if missing)
-        // Subscription deleted means access is revoked NOW, but we buffer 7 days.
-        // If it was cancel_at_period_end, this event fires at the end.
         const periodEnd = subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000)
           : new Date();
@@ -653,11 +652,11 @@ serve(async (req) => {
             account_status: 'cancelled',
             subscription_status: 'cancelled',
             phone_number_held_until: holdUntil.toISOString(),
-            unpaid_since: null, // Clear delinquency tracking as it is now cancelled
+            unpaid_since: null,
           })
           .eq('stripe_customer_id', customerId);
 
-        logInfo('Subscription cancelled for customer', {
+        logInfo('Subscription deleted — account marked inactive', {
           ...baseLogOptions,
           context: { customerId }
         });
@@ -666,31 +665,51 @@ serve(async (req) => {
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
+        // 1c: customer.subscription.updated → sync plan_key change to DB
         const subscription = event.data.object;
         const customerId = subscription.customer;
 
-        // Extract price ID to sync plan type
-        const priceId = subscription.items?.data?.[0]?.price?.id;
-        let planTypeUpdate = {};
+        // Map Stripe price ID → plan_key (check new env vars first, then legacy)
+        const priceEnvMap: Record<string, string> = {
+          [Deno.env.get('STRIPE_PRICE_ID_NIGHT_WEEKEND') || '']: 'night_weekend',
+          [Deno.env.get('STRIPE_PRICE_ID_LITE') || '']: 'lite',
+          [Deno.env.get('STRIPE_PRICE_ID_CORE') || '']: 'core',
+          [Deno.env.get('STRIPE_PRICE_ID_PRO') || '']: 'pro',
+          // Legacy plan keys
+          [Deno.env.get('STRIPE_PRICE_STARTER') || '']: 'lite',
+          [Deno.env.get('STRIPE_PRICE_PROFESSIONAL') || '']: 'core',
+          [Deno.env.get('STRIPE_PRICE_PREMIUM') || '']: 'pro',
+        };
+        delete priceEnvMap['']; // remove empty-key entries
 
-        if (priceId) {
-          // Map price ID back to plan key
-          const starterPrice = Deno.env.get('STRIPE_PRICE_STARTER')?.trim();
-          const professionalPrice = Deno.env.get('STRIPE_PRICE_PROFESSIONAL')?.trim();
-          const premiumPrice = Deno.env.get('STRIPE_PRICE_PREMIUM')?.trim();
+        // Find base (non-metered) price item
+        const baseItem = (subscription.items?.data || []).find(
+          (item: any) => item.price?.recurring?.usage_type !== 'metered'
+        );
+        const overageItem = (subscription.items?.data || []).find(
+          (item: any) => item.price?.recurring?.usage_type === 'metered'
+        );
 
-          let planKey = null;
-          if (priceId === starterPrice) planKey = 'starter';
-          else if (priceId === professionalPrice) planKey = 'professional';
-          else if (priceId === premiumPrice) planKey = 'premium';
+        const priceId = baseItem?.price?.id;
+        let planKeyFromPrice: string | null = priceId ? (priceEnvMap[priceId] || null) : null;
 
-          if (planKey) {
-            planTypeUpdate = { plan_type: planKey };
-            logInfo(`Syncing plan type from Stripe webhook: ${planKey}`, {
-              ...baseLogOptions,
-              context: { customerId, priceId }
-            });
-          }
+        // Also check subscription metadata for plan_key (set during checkout)
+        if (!planKeyFromPrice && subscription.metadata?.plan_key) {
+          planKeyFromPrice = subscription.metadata.plan_key;
+        }
+
+        let planTypeUpdate: Record<string, unknown> = {};
+        if (planKeyFromPrice) {
+          planTypeUpdate = { plan_key: planKeyFromPrice, plan_type: planKeyFromPrice };
+          logInfo(`Syncing plan_key from Stripe webhook: ${planKeyFromPrice}`, {
+            ...baseLogOptions,
+            context: { customerId, priceId }
+          });
+        }
+
+        // Track overage item ID for future usage reporting
+        if (overageItem?.id) {
+          planTypeUpdate.stripe_overage_item_id = overageItem.id;
         }
 
         // Sync subscription status and plan
@@ -754,10 +773,11 @@ serve(async (req) => {
       }
 
       case 'checkout.session.completed': {
-        // Handle completed checkout sessions (trial → paid conversion)
+        // 1c: checkout.session.completed → create/update subscription row in DB
         const session = event.data.object;
         const accountId = session.metadata?.account_id;
-        const planKey = session.metadata?.plan_key;
+        const planKey = session.metadata?.plan_key || session.metadata?.plan_type;
+        const trialMinutes = session.metadata?.trial_minutes;
         const customerId = session.customer;
         const subscriptionId = session.subscription;
 
@@ -767,59 +787,171 @@ serve(async (req) => {
             sessionId: session.id,
             accountId,
             planKey,
-            customerId: customerId?.substring?.(0, 15) + '...',
-            subscriptionId: subscriptionId?.substring?.(0, 15) + '...',
+            hasSubscription: !!subscriptionId,
           }
         });
 
-        if (accountId && planKey) {
-          // Update account with new subscription info
-          const updateData: Record<string, unknown> = {
-            plan_type: planKey,
-            subscription_status: 'active',
-            account_status: 'active',
-          };
+        // If subscription was created, fetch it to get trial dates and overage item
+        let trialStart: string | null = null;
+        let trialEnd: string | null = null;
+        let overageItemId: string | null = null;
+        let periodStart: string | null = null;
+        let periodEnd: string | null = null;
 
-          if (subscriptionId) {
-            updateData.stripe_subscription_id = subscriptionId;
-          }
-
-          const { error: updateError } = await supabase
-            .from('accounts')
-            .update(updateData)
-            .eq('id', accountId);
-
-          if (updateError) {
-            logError('Failed to update account after checkout', {
+        if (subscriptionId) {
+          try {
+            const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
+            if (stripeSecretKey) {
+              const stripe = new Stripe(stripeSecretKey, {
+                apiVersion: '2023-10-16',
+                httpClient: Stripe.createFetchHttpClient(),
+              });
+              const sub = await stripe.subscriptions.retrieve(subscriptionId as string);
+              trialStart = sub.trial_start ? new Date(sub.trial_start * 1000).toISOString() : null;
+              trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
+              periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null;
+              periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
+              // Find the metered overage subscription item
+              const overageItem = sub.items.data.find(
+                (item: any) => item.price?.recurring?.usage_type === 'metered'
+              );
+              overageItemId = overageItem?.id || null;
+            }
+          } catch (stripeErr) {
+            logError('Failed to retrieve subscription from Stripe', {
               ...baseLogOptions,
-              accountId,
-              error: updateError,
-            });
-          } else {
-            currentAccountId = accountId;
-            logInfo('Account updated from checkout session', {
-              ...baseLogOptions,
-              accountId,
-              context: { planKey, subscriptionId }
+              error: stripeErr,
             });
           }
-        } else if (customerId) {
-          // Fallback: find account by customer ID
-          const { data: account } = await supabase
+        }
+
+        const updateData: Record<string, unknown> = {
+          plan_key: planKey || 'night_weekend',
+          plan_type: planKey || 'night_weekend',
+          subscription_status: 'active',
+          account_status: 'active',
+          trial_active: false,
+        };
+
+        if (subscriptionId) updateData.stripe_subscription_id = subscriptionId;
+        if (trialStart) updateData.trial_start_date = trialStart;
+        if (trialEnd) updateData.trial_end_date = trialEnd;
+        if (overageItemId) updateData.stripe_overage_item_id = overageItemId;
+        if (periodStart) updateData.current_period_start = periodStart;
+        if (periodEnd) updateData.current_period_end = periodEnd;
+        if (trialMinutes) updateData.trial_minutes_limit = parseInt(trialMinutes, 10);
+
+        // Resolve account by metadata account_id first, then by stripe customer id
+        let resolvedAccountId: string | null = accountId || null;
+        if (!resolvedAccountId && customerId) {
+          const { data: acct } = await supabase
             .from('accounts')
             .select('id')
             .eq('stripe_customer_id', customerId)
             .maybeSingle();
+          resolvedAccountId = acct?.id || null;
+        }
 
-          if (account) {
-            currentAccountId = account.id;
-            logInfo('Checkout completed but missing metadata, account found by customer', {
+        if (resolvedAccountId) {
+          const { error: updateError } = await supabase
+            .from('accounts')
+            .update(updateData)
+            .eq('id', resolvedAccountId);
+
+          if (updateError) {
+            logError('Failed to update account after checkout', {
               ...baseLogOptions,
-              accountId: account.id,
-              context: { customerId }
+              accountId: resolvedAccountId,
+              error: updateError,
+            });
+          } else {
+            currentAccountId = resolvedAccountId;
+            logInfo('Account subscription row synced from checkout.session.completed', {
+              ...baseLogOptions,
+              accountId: resolvedAccountId,
+              context: { planKey, subscriptionId, overageItemId },
             });
           }
         }
+
+        break;
+      }
+
+      case 'invoice.upcoming': {
+        // 3d: Report overage minutes to Stripe before billing period renews
+        const invoice = event.data.object as any;
+        const customerId = invoice.customer;
+
+        if (!customerId) break;
+
+        const { data: account } = await supabase
+          .from('accounts')
+          .select('id, overage_minutes_current_period, stripe_overage_item_id, plan_key')
+          .eq('stripe_customer_id', customerId)
+          .maybeSingle();
+
+        if (!account) {
+          logInfo('No account found for invoice.upcoming', { ...baseLogOptions, context: { customerId } });
+          break;
+        }
+
+        currentAccountId = account.id;
+        const overageMinutes: number = account.overage_minutes_current_period || 0;
+
+        logInfo('invoice.upcoming: processing overage', {
+          ...baseLogOptions,
+          accountId: account.id,
+          context: { overageMinutes, overageItemId: account.stripe_overage_item_id },
+        });
+
+        // Report metered overage to Stripe
+        if (overageMinutes > 0 && account.stripe_overage_item_id) {
+          try {
+            const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
+            if (stripeSecretKey) {
+              const stripe = new Stripe(stripeSecretKey, {
+                apiVersion: '2023-10-16',
+                httpClient: Stripe.createFetchHttpClient(),
+              });
+              await stripe.subscriptionItems.createUsageRecord(
+                account.stripe_overage_item_id,
+                { quantity: overageMinutes, action: 'set' }
+              );
+              logInfo('Overage usage record reported to Stripe', {
+                ...baseLogOptions,
+                accountId: account.id,
+                context: { overageMinutes },
+              });
+            }
+          } catch (stripeErr) {
+            logError('Failed to report overage to Stripe', {
+              ...baseLogOptions,
+              accountId: account.id,
+              error: stripeErr,
+            });
+          }
+        }
+
+        // Reset period counters after reporting
+        await supabase
+          .from('accounts')
+          .update({
+            minutes_used_current_period: 0,
+            overage_minutes_current_period: 0,
+            monthly_minutes_used: 0,
+            overage_minutes_used: 0,
+            rejected_daytime_calls: 0,
+            ceiling_reject_sent: false,
+            alerts_sent: {},
+            last_usage_warning_level: null,
+            last_usage_warning_sent_at: null,
+          })
+          .eq('id', account.id);
+
+        logInfo('Period counters reset after invoice.upcoming', {
+          ...baseLogOptions,
+          accountId: account.id,
+        });
 
         break;
       }

@@ -4,6 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
 import type { LogOptions } from '../_shared/logging.ts';
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+// Usage alerts — sends SMS + email and dedupes via accounts.alerts_sent
+import { sendUsageAlert } from '../_shared/usage-alerts.ts';
 
 const FUNCTION_NAME = 'sync-usage';
 
@@ -53,10 +55,15 @@ serve(async (req) => {
       );
     }
 
-    // Get account details
+    // Get account details (supports both old plan_type and new plan_key schemas)
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('*, plan_definitions!inner(*)')
+      .select(
+        '*, ' +
+        'plan_key, trial_active, trial_minutes_used, trial_minutes_limit, ' +
+        'minutes_used_current_period, overage_minutes_current_period, ' +
+        'subscription_status, stripe_overage_item_id, alerts_sent'
+      )
       .eq('id', accountId)
       .single();
 
@@ -72,41 +79,74 @@ serve(async (req) => {
       );
     }
 
-    // Calculate call duration in minutes (round up)
+    // Calculate call duration in minutes (ceiling to next whole minute)
     const durationSeconds = call.duration || 0;
     const durationMinutes = Math.ceil(durationSeconds / 60);
 
-    // Determine if this is overage
+    // ── Determine plan context ────────────────────────────────────────────────
+    const planKey: string = account.plan_key || account.plan_type || 'night_weekend';
+    const isTrial = account.trial_active === true || account.subscription_status === 'trial';
+
+    // Fetch plan limits from plans table (new schema)
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('included_minutes')
+      .eq('plan_key', planKey)
+      .maybeSingle();
+
+    // Fallback: use old monthly_minutes_limit column if new plan table not yet populated
+    const includedMinutes: number =
+      plan?.included_minutes ?? account.monthly_minutes_limit ?? 600;
+
+    // ── Update trial minutes (3a: increment trial_minutes_used) ───────────────
+    if (isTrial) {
+      const newTrialUsed = (account.trial_minutes_used || 0) + durationMinutes;
+      await supabase
+        .from('accounts')
+        .update({ trial_minutes_used: newTrialUsed })
+        .eq('id', accountId);
+
+      logInfo('Trial minutes updated', {
+        ...baseLogOptions,
+        accountId,
+        context: { durationMinutes, newTrialUsed },
+      });
+
+      // Log usage record for trial call
+      await supabase.from('usage_logs').insert({
+        account_id: accountId,
+        duration_seconds: durationSeconds,
+        cost_cents: Math.round((call.cost || 0) * 100),
+        call_metadata: call,
+        is_overage: false,
+      }).select('id').maybeSingle();
+
+      return new Response(
+        JSON.stringify({ success: true, minutes_used: durationMinutes, is_trial: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    // ── Update plan period minutes ────────────────────────────────────────────
+    const currentPeriodUsed = account.minutes_used_current_period || 0;
+    const newPeriodUsed = currentPeriodUsed + durationMinutes;
+    const isOverage = currentPeriodUsed >= includedMinutes;
+    const newOverageMinutes = Math.max(0, newPeriodUsed - includedMinutes);
+
+    await supabase
+      .from('accounts')
+      .update({
+        minutes_used_current_period: newPeriodUsed,
+        overage_minutes_current_period: newOverageMinutes,
+        // Also keep legacy columns in sync for backwards compatibility
+        monthly_minutes_used: newPeriodUsed,
+        overage_minutes_used: newOverageMinutes,
+      })
+      .eq('id', accountId);
+
+    // Legacy: if was on trial and ran out, update subscription_status
     const currentMonthlyUsed = account.monthly_minutes_used || 0;
     const monthlyLimit = account.monthly_minutes_limit || 150;
-    const isOverage = currentMonthlyUsed >= monthlyLimit;
-
-    // Check for Trial Upgrade (Limit Reached)
-    if (isOverage && account.subscription_status === 'trial' && stripe && account.stripe_subscription_id) {
-      const ended = await endTrialNow(stripe, account.stripe_subscription_id, accountId, baseLogOptions);
-      if (ended) {
-        await supabase.from('accounts').update({ subscription_status: 'active' }).eq('id', accountId);
-        logInfo('Account upgraded from trial to active due to usage limit', { ...baseLogOptions, accountId });
-      }
-    }
-
-    // Update appropriate counter
-    if (isOverage) {
-      await supabase
-        .from('accounts')
-        .update({
-          overage_minutes_used: (account.overage_minutes_used || 0) + durationMinutes
-        })
-        .eq('id', accountId);
-    } else {
-      const newMonthlyUsed = currentMonthlyUsed + durationMinutes;
-      await supabase
-        .from('accounts')
-        .update({
-          monthly_minutes_used: newMonthlyUsed
-        })
-        .eq('id', accountId);
-    }
 
     // Log usage
     const { data: usageLog, error: usageLogError } = await supabase
@@ -143,64 +183,62 @@ serve(async (req) => {
       }
     }
 
-    // Check warning thresholds and send emails
-    const totalUsed = isOverage ? monthlyLimit : currentMonthlyUsed + durationMinutes;
-    const usagePercentage = (totalUsed / monthlyLimit) * 100;
+    // ── Post-call threshold alerts ────────────────────────────────────────────
+    // Fetch customer contact info for alert sending
+    let customerEmail: string | null = null;
+    let customerPhone: string | null = null;
+    const { data: alertProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('account_id', accountId)
+      .eq('is_primary', true)
+      .maybeSingle();
+
+    if (alertProfile?.id) {
+      const { data: authUser } = await supabase.auth.admin.getUserById(alertProfile.id);
+      customerEmail = authUser?.user?.email || null;
+      customerPhone = authUser?.user?.phone || null;
+    }
+
+    const alertCtx = {
+      accountId,
+      customerPhone,
+      customerEmail,
+      planKey,
+      minutesUsed: newPeriodUsed,
+      minutesLimit: includedMinutes,
+      functionName: FUNCTION_NAME,
+      correlationId,
+    };
+
+    const usagePercentage = includedMinutes > 0 ? (newPeriodUsed / includedMinutes) * 100 : 0;
 
     logInfo('Usage percentage calculated', {
       ...baseLogOptions,
       accountId,
-      context: { usagePercentage }
+      context: { usagePercentage, newPeriodUsed, includedMinutes }
     });
 
-    // 80% warning
-    if (usagePercentage >= 80 && usagePercentage < 95 && account.last_usage_warning_level !== '80') {
-      logInfo('Sending 80% usage warning', {
-        ...baseLogOptions,
-        accountId,
-        context: { usagePercentage }
-      });
-      await sendUsageWarning(account, '80', usagePercentage, totalUsed, monthlyLimit, baseLogOptions);
-      await supabase
-        .from('accounts')
-        .update({
-          last_usage_warning_sent_at: new Date().toISOString(),
-          last_usage_warning_level: '80'
-        })
-        .eq('id', accountId);
+    if (newPeriodUsed >= includedMinutes) {
+      await sendUsageAlert(supabase, 'plan_overage_started', alertCtx);
+    } else if (usagePercentage >= 90) {
+      await sendUsageAlert(supabase, 'plan_90_pct', alertCtx);
+    } else if (usagePercentage >= 70) {
+      await sendUsageAlert(supabase, 'plan_70_pct', alertCtx);
     }
 
-    // 95% warning
-    if (usagePercentage >= 95 && usagePercentage < 100 && account.last_usage_warning_level !== '95') {
-      logInfo('Sending 95% usage warning', {
-        ...baseLogOptions,
-        accountId,
-        context: { usagePercentage }
-      });
-      await sendUsageWarning(account, '95', usagePercentage, totalUsed, monthlyLimit, baseLogOptions);
-      await supabase
-        .from('accounts')
-        .update({
-          last_usage_warning_sent_at: new Date().toISOString(),
-          last_usage_warning_level: '95'
-        })
-        .eq('id', accountId);
-    }
+    // Also keep legacy warning_level in sync for backwards compat with UI
+    const legacyLevel =
+      usagePercentage >= 100 ? '100' :
+      usagePercentage >= 95  ? '95'  :
+      usagePercentage >= 80  ? '80'  : null;
 
-    // 100% overage notification
-    if (usagePercentage >= 100 && account.last_usage_warning_level !== '100') {
-      logInfo('Sending 100% overage notification', {
-        ...baseLogOptions,
-        accountId,
-        context: { usagePercentage }
-      });
-      const overageRate = account.plan_definitions?.overage_rate_cents || 0;
-      await sendOverageNotification(account, overageRate, baseLogOptions);
+    if (legacyLevel && account.last_usage_warning_level !== legacyLevel) {
       await supabase
         .from('accounts')
         .update({
           last_usage_warning_sent_at: new Date().toISOString(),
-          last_usage_warning_level: '100'
+          last_usage_warning_level: legacyLevel,
         })
         .eq('id', accountId);
     }
@@ -209,7 +247,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         minutes_used: durationMinutes,
-        is_overage: isOverage
+        is_overage: isOverage,
+        total_period_minutes: newPeriodUsed,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );

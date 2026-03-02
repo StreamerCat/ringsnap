@@ -1,12 +1,14 @@
 /**
  * create-upgrade-checkout Edge Function
- * 
- * Handles plan upgrades safely:
+ *
+ * Handles plan upgrades safely — supports new 4-plan pricing structure.
+ * Plans: night_weekend | lite | core | pro
+ *
  * 1. If stripe_subscription_id exists → Update existing subscription (no duplicate)
- * 2. If no subscription exists → Create Stripe Checkout Session
- * 
- * Request body: { account_id: string, planKey: "starter" | "professional" | "premium" }
- * 
+ *    - Updates base price item (proration)
+ *    - If upgrading from night_weekend → clears rejected_daytime_calls counter (3e)
+ * 2. If no subscription exists → Create Stripe Checkout Session with base + overage prices
+ *
  * CRITICAL: Never creates duplicate subscriptions!
  */
 
@@ -21,33 +23,38 @@ const corsHeaders = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Valid plan keys - must match exactly
-type PlanKey = "starter" | "professional" | "premium";
+// Valid plan keys — must match plans table plan_key values exactly
+type PlanKey = "night_weekend" | "lite" | "core" | "pro";
+const VALID_PLAN_KEYS: PlanKey[] = ["night_weekend", "lite", "core", "pro"];
 
-// Map planKey to Supabase secret name
-const PLAN_KEY_TO_SECRET: Record<PlanKey, string> = {
-    starter: "STRIPE_PRICE_STARTER",
-    professional: "STRIPE_PRICE_PROFESSIONAL",
-    premium: "STRIPE_PRICE_PREMIUM",
+// Env var name → plan_key mapping for base prices
+const PLAN_BASE_PRICE_ENV: Record<PlanKey, string> = {
+    night_weekend: "STRIPE_PRICE_ID_NIGHT_WEEKEND",
+    lite: "STRIPE_PRICE_ID_LITE",
+    core: "STRIPE_PRICE_ID_CORE",
+    pro: "STRIPE_PRICE_ID_PRO",
+};
+
+// Env var name → plan_key mapping for metered overage prices
+const PLAN_OVERAGE_PRICE_ENV: Record<PlanKey, string> = {
+    night_weekend: "STRIPE_OVERAGE_PRICE_ID_NIGHT_WEEKEND",
+    lite: "STRIPE_OVERAGE_PRICE_ID_LITE",
+    core: "STRIPE_OVERAGE_PRICE_ID_CORE",
+    pro: "STRIPE_OVERAGE_PRICE_ID_PRO",
 };
 
 serve(async (req) => {
-    // CORS preflight
     if (req.method === "OPTIONS") {
         return new Response(null, { headers: corsHeaders });
     }
 
     const requestId = crypto.randomUUID();
-
-    // Helper for structured logging
     const log = (msg: string, data: any = {}) => {
         console.log(JSON.stringify({ requestId, message: msg, ...data }));
     };
 
-    // Initialize Sentry for error tracking
     initSentry('create-upgrade-checkout', { correlationId: requestId });
 
-    // Helper for error responses
     const errorResponse = (status: number, message: string, code?: string) => {
         log(`Error: ${message}`, { status, code });
         return new Response(JSON.stringify({ error: message, code }), {
@@ -59,11 +66,9 @@ serve(async (req) => {
     try {
         log("Starting upgrade checkout request");
 
-        // 1. Auth Check
+        // 1. Auth
         const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
-        if (!authHeader) {
-            return errorResponse(401, "Missing Authorization header", "AUTH_MISSING");
-        }
+        if (!authHeader) return errorResponse(401, "Missing Authorization header", "AUTH_MISSING");
 
         const supabaseClient = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
@@ -72,38 +77,33 @@ serve(async (req) => {
         );
 
         const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-        if (authError || !user) {
-            return errorResponse(401, "Unauthorized: Invalid token", "AUTH_FAILED");
-        }
+        if (authError || !user) return errorResponse(401, "Unauthorized", "AUTH_FAILED");
 
-        log("User authenticated", { userId: user.id });
-
-        // 2. Parse Request Body
+        // 2. Parse body
         let account_id: string;
         let planKey: PlanKey;
 
         try {
             const body = await req.json();
             account_id = body.account_id;
-            planKey = body.planKey?.toLowerCase();
+            planKey = body.planKey?.toLowerCase() as PlanKey;
         } catch {
             return errorResponse(400, "Invalid JSON body", "INVALID_JSON");
         }
 
-        if (!account_id) {
-            return errorResponse(400, "Missing account_id", "MISSING_ACCOUNT_ID");
+        if (!account_id) return errorResponse(400, "Missing account_id", "MISSING_ACCOUNT_ID");
+
+        if (!planKey || !VALID_PLAN_KEYS.includes(planKey)) {
+            return errorResponse(400,
+                `Invalid planKey: ${planKey}. Must be one of: ${VALID_PLAN_KEYS.join(", ")}`,
+                "INVALID_PLAN_KEY"
+            );
         }
 
-        if (!planKey || !PLAN_KEY_TO_SECRET[planKey]) {
-            return errorResponse(400, `Invalid planKey: ${planKey}. Must be one of: starter, professional, premium`, "INVALID_PLAN_KEY");
-        }
-
-        log("Request parsed", { account_id, planKey });
-
-        // 3. Verify Account Access (RLS enforced)
+        // 3. Verify account access
         const { data: account, error: accountError } = await supabaseClient
             .from("accounts")
-            .select("id, stripe_customer_id, stripe_subscription_id, plan_type, company_name")
+            .select("id, stripe_customer_id, stripe_subscription_id, stripe_overage_item_id, plan_key, plan_type, company_name")
             .eq("id", account_id)
             .single();
 
@@ -111,141 +111,157 @@ serve(async (req) => {
             return errorResponse(403, "You do not have permission to upgrade this account", "ACCESS_DENIED");
         }
 
-        log("Account verified", {
-            account_id: account.id,
-            stripe_customer_id: account.stripe_customer_id?.substring(0, 10) + "...",
-            has_subscription: !!account.stripe_subscription_id
-        });
-
-        // 4. Validate Stripe prerequisites
         if (!account.stripe_customer_id) {
-            return errorResponse(400, "This account does not have a linked Stripe customer", "NO_STRIPE_CUSTOMER");
+            return errorResponse(400, "Account has no linked Stripe customer", "NO_STRIPE_CUSTOMER");
         }
 
         const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-        if (!stripeKey) {
-            return errorResponse(500, "Server configuration error: Missing Stripe key", "CONFIG_ERROR");
+        if (!stripeKey) return errorResponse(500, "Missing Stripe configuration", "CONFIG_ERROR");
+
+        // 4. Resolve price IDs
+        const basePriceId = Deno.env.get(PLAN_BASE_PRICE_ENV[planKey])?.trim();
+        const overagePriceId = Deno.env.get(PLAN_OVERAGE_PRICE_ENV[planKey])?.trim();
+
+        if (!basePriceId) {
+            log(`Missing base price env var: ${PLAN_BASE_PRICE_ENV[planKey]}`);
+            return errorResponse(500, `Base price not configured for ${planKey}`, "PRICE_NOT_CONFIGURED");
         }
-
-        // 5. Get Stripe Price ID from secrets
-        const priceSecretName = PLAN_KEY_TO_SECRET[planKey];
-        const priceId = Deno.env.get(priceSecretName)?.trim();
-
-        if (!priceId) {
-            log(`Missing Stripe price secret: ${priceSecretName}`);
-            return errorResponse(500, `Server configuration error: Missing price for ${planKey}`, "PRICE_NOT_CONFIGURED");
-        }
-
-        log("Price ID resolved", { planKey, priceSecretName, priceId: priceId.substring(0, 15) + "..." });
 
         const stripe = new Stripe(stripeKey, {
             apiVersion: "2023-10-16",
             httpClient: Stripe.createFetchHttpClient(),
         });
 
-        // 6. Decision: Update existing subscription OR create new checkout
+        const currentPlanKey = account.plan_key || account.plan_type;
+
+        // 5. Decision: update existing subscription OR create new checkout
         if (account.stripe_subscription_id) {
-            // ═══════════════════════════════════════════════════════════════════════
-            // EXISTING SUBSCRIPTION: Update in-place (no duplicate!)
-            // ═══════════════════════════════════════════════════════════════════════
             log("Updating existing subscription", {
-                subscriptionId: account.stripe_subscription_id.substring(0, 15) + "..."
+                subscriptionId: account.stripe_subscription_id.substring(0, 15) + "...",
             });
 
             try {
-                // Get current subscription to find the item to update
                 const subscription = await stripe.subscriptions.retrieve(account.stripe_subscription_id);
 
                 if (!subscription || subscription.status === "canceled") {
-                    // Subscription is canceled, create new checkout instead
-                    log("Subscription is canceled, falling through to checkout creation");
+                    log("Subscription canceled, will create checkout instead");
                 } else {
-                    // Get the first subscription item (assuming single-product subscription)
-                    const subscriptionItemId = subscription.items.data[0]?.id;
+                    // Find base (non-metered) subscription item to update
+                    const baseItem = subscription.items.data.find(
+                        (item: any) => item.price?.recurring?.usage_type !== "metered"
+                    );
 
-                    if (!subscriptionItemId) {
-                        return errorResponse(500, "Unable to find subscription item to update", "NO_SUBSCRIPTION_ITEM");
+                    if (!baseItem) {
+                        return errorResponse(500, "Cannot find base subscription item to update", "NO_SUBSCRIPTION_ITEM");
                     }
 
-                    // Update subscription with new price
-                    // proration_behavior: 'create_prorations' gives customer credit for unused time
+                    // Build update items: swap base price; add overage if not present
+                    const updateItems: any[] = [{
+                        id: baseItem.id,
+                        price: basePriceId,
+                    }];
+
+                    // Check if overage item exists; if not, add it
+                    const existingOverageItem = subscription.items.data.find(
+                        (item: any) => item.price?.recurring?.usage_type === "metered"
+                    );
+
+                    if (!existingOverageItem && overagePriceId) {
+                        updateItems.push({ price: overagePriceId });
+                    } else if (existingOverageItem && overagePriceId && existingOverageItem.price.id !== overagePriceId) {
+                        // Swap overage price too (different plan's overage rate)
+                        updateItems.push({ id: existingOverageItem.id, price: overagePriceId });
+                    }
+
                     const updatedSubscription = await stripe.subscriptions.update(
                         account.stripe_subscription_id,
                         {
-                            items: [{
-                                id: subscriptionItemId,
-                                price: priceId,
-                            }],
+                            items: updateItems,
                             proration_behavior: "create_prorations",
+                            metadata: { plan_key: planKey },
                         }
                     );
 
-                    log("Subscription updated successfully", {
-                        subscriptionId: updatedSubscription.id,
-                        newStatus: updatedSubscription.status,
-                    });
+                    log("Subscription updated", { subscriptionId: updatedSubscription.id });
 
-                    // Stripe webhook will update DB, but we can update plan_type immediately
-                    // for faster UI feedback (webhook is source of truth for status)
+                    // Update DB immediately for fast UI feedback (webhook is source of truth)
                     const serviceClient = createClient(
                         Deno.env.get("SUPABASE_URL") ?? "",
                         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
                     );
 
+                    const dbUpdate: Record<string, unknown> = {
+                        plan_key: planKey,
+                        plan_type: planKey,
+                        updated_at: new Date().toISOString(),
+                    };
+
+                    // 3e: If upgrading FROM night_weekend → clear rejected_daytime_calls
+                    if (currentPlanKey === "night_weekend" && planKey !== "night_weekend") {
+                        dbUpdate.rejected_daytime_calls = 0;
+                    }
+
+                    // Track new overage item ID if created
+                    const newOverageItem = updatedSubscription.items.data.find(
+                        (item: any) => item.price?.recurring?.usage_type === "metered"
+                    );
+                    if (newOverageItem) {
+                        dbUpdate.stripe_overage_item_id = newOverageItem.id;
+                    }
+
                     await serviceClient
                         .from("accounts")
-                        .update({
-                            plan_type: planKey,
-                            updated_at: new Date().toISOString(),
-                        })
+                        .update(dbUpdate)
                         .eq("id", account_id);
 
                     return new Response(
                         JSON.stringify({
                             success: true,
-                            message: `Plan upgraded to ${planKey}`,
+                            message: `Plan updated to ${planKey}`,
                             subscription_id: updatedSubscription.id,
                         }),
-                        {
-                            headers: { ...corsHeaders, "Content-Type": "application/json" },
-                            status: 200,
-                        }
+                        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
                     );
                 }
             } catch (stripeError: any) {
-                // If subscription retrieval/update fails, fall through to checkout
-                log("Failed to update subscription, will create checkout", {
-                    error: stripeError.message
+                log("Failed to update subscription, creating checkout session instead", {
+                    error: stripeError.message,
                 });
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // NO SUBSCRIPTION: Create Stripe Checkout Session
-        // ═══════════════════════════════════════════════════════════════════════
+        // 6. Create Stripe Checkout Session (new subscription)
         log("Creating new checkout session");
 
         const origin = req.headers.get("origin");
-        const siteUrl = Deno.env.get("SITE_URL") || "https://getringsnap.com";
+        const siteUrl = Deno.env.get("SITE_URL") || "https://ringsnap.ai";
         const baseUrl = origin && !origin.includes("localhost") ? origin : siteUrl;
         const successUrl = `${baseUrl}/dashboard?tab=billing&upgrade=success`;
         const cancelUrl = `${baseUrl}/dashboard?tab=billing&upgrade=canceled`;
 
+        // Include both base and metered overage price as line items (1b)
+        const lineItems: any[] = [{ price: basePriceId, quantity: 1 }];
+        if (overagePriceId) {
+            lineItems.push({ price: overagePriceId });
+        }
+
         const session = await stripe.checkout.sessions.create({
             customer: account.stripe_customer_id,
             mode: "subscription",
-            line_items: [
-                {
-                    price: priceId,
-                    quantity: 1,
+            line_items: lineItems,
+            subscription_data: {
+                trial_period_days: 3, // 1b: 3-day trial on all plans
+                metadata: {
+                    plan_key: planKey,
+                    trial_minutes: "50",
                 },
-            ],
+            },
             success_url: successUrl,
             cancel_url: cancelUrl,
             metadata: {
                 account_id: account_id,
                 plan_key: planKey,
-                upgrade_from: account.plan_type || "unknown",
+                upgrade_from: currentPlanKey || "unknown",
             },
         });
 
@@ -253,20 +269,17 @@ serve(async (req) => {
 
         return new Response(
             JSON.stringify({ url: session.url }),
-            {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            }
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
         );
 
     } catch (error: any) {
         console.error("Unhandled upgrade error:", error);
         await captureError(error, { phase: 'upgrade_checkout' });
-
         const isStripeError = error?.type?.startsWith("Stripe");
-        const statusCode = isStripeError ? 400 : 500;
-        const message = isStripeError ? error.message : "Internal Server Error";
-
-        return errorResponse(statusCode, message, isStripeError ? "STRIPE_ERROR" : "INTERNAL_ERROR");
+        return errorResponse(
+            isStripeError ? 400 : 500,
+            isStripeError ? error.message : "Internal Server Error",
+            isStripeError ? "STRIPE_ERROR" : "INTERNAL_ERROR"
+        );
     }
 });

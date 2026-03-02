@@ -11,10 +11,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
-import { Sparkles, Check, Loader2, Bell } from "lucide-react";
+import { Sparkles, Check, Loader2, Bell, PhoneCall, AlertTriangle } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { trackOnboardingEvent } from "@/lib/sentry-tracking";
 import { cn } from "@/lib/utils";
+import { getDashboardPlanByKey } from "@/lib/billing/dashboardPlans";
 
 // ToggleRow component for consistent layout
 interface ToggleRowProps {
@@ -70,6 +71,34 @@ const COMMON_TIMEZONES = [
 
 export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUpgradeModal }: SettingsTabProps) {
     const { toast } = useToast();
+
+    // 4e: Call Handling Preferences state
+    const currentPlan = getDashboardPlanByKey(account.plan_key || account.plan_type);
+    const [overflowBehavior, setOverflowBehavior] = useState<"always_answer" | "soft_cap" | "hard_cap">(
+        account.overflow_behavior || "always_answer"
+    );
+    const [softCapBuffer, setSoftCapBuffer] = useState<number>(account.soft_cap_overage_minutes ?? 100);
+    const [savingCallHandling, setSavingCallHandling] = useState(false);
+
+    const handleSaveCallHandling = async () => {
+        setSavingCallHandling(true);
+        try {
+            const { error } = await supabase
+                .from("accounts")
+                .update({
+                    overflow_behavior: overflowBehavior,
+                    soft_cap_overage_minutes: softCapBuffer,
+                })
+                .eq("id", account.id);
+            if (error) throw error;
+            onUpdateAccount({ ...account, overflow_behavior: overflowBehavior, soft_cap_overage_minutes: softCapBuffer });
+            toast({ title: "Call handling preference saved" });
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
+        } finally {
+            setSavingCallHandling(false);
+        }
+    };
 
     // Custom Instructions State
     const [customInstructions, setCustomInstructions] = useState(account.custom_instructions || "");
@@ -244,6 +273,130 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
 
     return (
         <div className="space-y-6">
+            {/* 4e: Call Handling Preferences */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <PhoneCall className="h-5 w-5 text-primary" />
+                        Call Handling Preferences
+                    </CardTitle>
+                    <CardDescription>
+                        What happens when you reach your monthly minutes?
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                        {/* Option 1: Always answer */}
+                        <label className={cn(
+                            "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                            overflowBehavior === "always_answer" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        )}>
+                            <input
+                                type="radio"
+                                name="overflow"
+                                value="always_answer"
+                                checked={overflowBehavior === "always_answer"}
+                                onChange={() => setOverflowBehavior("always_answer")}
+                                className="mt-1"
+                            />
+                            <div>
+                                <p className="font-medium text-sm">
+                                    Always answer <span className="text-xs text-muted-foreground ml-1">(recommended)</span>
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    We'll keep answering calls and bill overage at your plan's rate.
+                                    You'll never miss an emergency — we'll alert you so you can upgrade if needed.
+                                </p>
+                            </div>
+                        </label>
+
+                        {/* Option 2: Soft cap */}
+                        <label className={cn(
+                            "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                            overflowBehavior === "soft_cap" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        )}>
+                            <input
+                                type="radio"
+                                name="overflow"
+                                value="soft_cap"
+                                checked={overflowBehavior === "soft_cap"}
+                                onChange={() => setOverflowBehavior("soft_cap")}
+                                className="mt-1"
+                            />
+                            <div className="flex-1">
+                                <p className="font-medium text-sm">Answer up to extra minutes, then pause</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Set a buffer. We'll answer up to your limit, then route to voicemail.
+                                </p>
+                                {overflowBehavior === "soft_cap" && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <Label className="text-xs whitespace-nowrap">Buffer minutes:</Label>
+                                        <Input
+                                            type="number"
+                                            min={10}
+                                            max={currentPlan?.systemCeilingMinutes ?? 200}
+                                            value={softCapBuffer}
+                                            onChange={(e) => setSoftCapBuffer(Math.max(10, parseInt(e.target.value) || 10))}
+                                            className="h-7 w-24 text-sm"
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            ≈ ${((softCapBuffer) * (currentPlan?.overageRate ?? 0.28)).toFixed(2)} extra
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </label>
+
+                        {/* Option 3: Hard cap */}
+                        <label className={cn(
+                            "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                            overflowBehavior === "hard_cap" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        )}>
+                            <input
+                                type="radio"
+                                name="overflow"
+                                value="hard_cap"
+                                checked={overflowBehavior === "hard_cap"}
+                                onChange={() => setOverflowBehavior("hard_cap")}
+                                className="mt-1"
+                            />
+                            <div>
+                                <p className="font-medium text-sm">Stop at my included minutes</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Calls route to voicemail once your included minutes are used.
+                                    Not recommended for emergency-prone trades (HVAC, plumbing, electrical).
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Warning for non-default options */}
+                    {(overflowBehavior === "hard_cap" || overflowBehavior === "soft_cap") && (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-900 flex gap-2">
+                            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <span>
+                                Missed calls cost an average of $300–$1,200 each. We recommend <strong>Always Answer</strong> to ensure you never lose a job to a competitor.
+                            </span>
+                        </div>
+                    )}
+
+                    <Button onClick={handleSaveCallHandling} disabled={savingCallHandling}>
+                        {savingCallHandling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                        Save Preference
+                    </Button>
+
+                    {/* System ceiling disclosure */}
+                    {currentPlan && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                            As a safety guardrail, we pause calls if your overage reaches{" "}
+                            <strong>{currentPlan.systemCeilingMinutes} minutes</strong> above your plan (about{" "}
+                            <strong>${(currentPlan.systemCeilingMinutes * currentPlan.overageRate).toFixed(0)} extra</strong>).
+                            You'll be alerted immediately if this happens.
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
             {/* Custom Instructions */}
             <Card>
                 <CardHeader>
