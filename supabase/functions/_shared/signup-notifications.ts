@@ -35,6 +35,20 @@ export interface NotificationResult {
     errors: string[];
 }
 
+export interface SignupFailureNotificationData {
+    email?: string;
+    name?: string;
+    companyName?: string;
+    phone?: string;
+    trade?: string;
+    planType?: string;
+    source?: string;
+    phase?: string;
+    errorMessage: string;
+    correlationId?: string;
+    requestId?: string;
+}
+
 // ==============================================================================
 // Slack Notification
 // ==============================================================================
@@ -130,6 +144,99 @@ async function sendSlackNotification(
                             },
                             url: `https://supabase.com/dashboard/project/yizsrzzfxybphgxjmqbu/editor/accounts?filter=id:eq:${data.accountId}`,
                             style: "primary",
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            return { success: false, error: `Slack webhook failed: ${response.status} - ${errorText}` };
+        }
+
+        return { success: true };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown Slack error",
+        };
+    }
+}
+
+/**
+ * Send Slack notification for signup failures
+ */
+async function sendSlackFailureNotification(
+    webhookUrl: string,
+    data: SignupFailureNotificationData
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const timestamp = new Date().toLocaleString("en-US", {
+            timeZone: "America/Denver",
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        });
+
+        const payload = {
+            blocks: [
+                {
+                    type: "header",
+                    text: {
+                        type: "plain_text",
+                        text: "🚨 Signup Failed",
+                        emoji: true,
+                    },
+                },
+                {
+                    type: "section",
+                    fields: [
+                        {
+                            type: "mrkdwn",
+                            text: `*Email:*\n${data.email || "Unknown"}`,
+                        },
+                        {
+                            type: "mrkdwn",
+                            text: `*Company:*\n${data.companyName || "Unknown"}`,
+                        },
+                    ],
+                },
+                {
+                    type: "section",
+                    fields: [
+                        {
+                            type: "mrkdwn",
+                            text: `*Phase:*\n${data.phase || "unknown"}`,
+                        },
+                        {
+                            type: "mrkdwn",
+                            text: `*Source:*\n${data.source || "unknown"}`,
+                        },
+                    ],
+                },
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: `*Error:*\n\`${data.errorMessage}\``,
+                    },
+                },
+                {
+                    type: "context",
+                    elements: [
+                        {
+                            type: "mrkdwn",
+                            text: `🕐 ${timestamp} | correlationId: ${data.correlationId || "n/a"} | requestId: ${data.requestId || "n/a"}`,
                         },
                     ],
                 },
@@ -280,6 +387,90 @@ async function sendEmailNotification(
     }
 }
 
+/**
+ * Build admin email content for signup failures
+ */
+function buildFailureEmailContent(data: SignupFailureNotificationData): { html: string; text: string } {
+    const timestamp = new Date().toLocaleString("en-US", {
+        timeZone: "America/Denver",
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
+
+    const htmlContent = `
+    <p style="font-size: 16px; margin-bottom: 24px;">
+      A signup attempt failed in <strong>create-trial</strong>.
+    </p>
+
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b; width: 140px;">Email</td><td style="padding: 6px 0;">${data.email || "Unknown"}</td></tr>
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b;">Company</td><td style="padding: 6px 0;">${data.companyName || "Unknown"}</td></tr>
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b;">Plan</td><td style="padding: 6px 0;">${data.planType || "Unknown"}</td></tr>
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b;">Source</td><td style="padding: 6px 0;">${data.source || "Unknown"}</td></tr>
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b;">Phase</td><td style="padding: 6px 0;">${data.phase || "Unknown"}</td></tr>
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b;">Correlation ID</td><td style="padding: 6px 0; font-family: monospace;">${data.correlationId || "n/a"}</td></tr>
+        <tr><td style="padding: 6px 0; font-weight: 600; color: #64748b;">Request ID</td><td style="padding: 6px 0; font-family: monospace;">${data.requestId || "n/a"}</td></tr>
+      </table>
+    </div>
+
+    <p style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">Error details</p>
+    <pre style="background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 12px; white-space: pre-wrap;">${data.errorMessage}</pre>
+
+    <p style="font-size: 14px; color: #64748b; margin-top: 24px;">
+      Failed at ${timestamp} (Mountain Time)
+    </p>
+  `;
+
+    const textContent = `
+Signup failed in create-trial
+
+Email: ${data.email || "Unknown"}
+Company: ${data.companyName || "Unknown"}
+Plan: ${data.planType || "Unknown"}
+Source: ${data.source || "Unknown"}
+Phase: ${data.phase || "Unknown"}
+Correlation ID: ${data.correlationId || "n/a"}
+Request ID: ${data.requestId || "n/a"}
+
+Error:
+${data.errorMessage}
+
+Failed at ${timestamp} (Mountain Time)
+  `;
+
+    return { html: htmlContent, text: textContent };
+}
+
+async function sendFailureEmailNotification(
+    adminEmail: string,
+    resendApiKey: string,
+    data: SignupFailureNotificationData
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { html, text } = buildFailureEmailContent(data);
+        const fullHtml = buildEmailHtml("Signup failed in create-trial", html);
+
+        return await sendEmail(resendApiKey, {
+            to: adminEmail,
+            subject: `🚨 Signup failed: ${data.companyName || data.email || "unknown lead"}`,
+            html: fullHtml,
+            text: buildEmailText(text),
+            tags: [{ name: "type", value: "admin_signup_failure" }],
+        });
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown email error",
+        };
+    }
+}
+
 // ==============================================================================
 // Main Export
 // ==============================================================================
@@ -334,6 +525,47 @@ export async function sendSignupNotifications(
         }
     } else {
         console.log("[signup-notifications] Slack notification skipped - SLACK_SIGNUP_WEBHOOK_URL not configured");
+    }
+
+    return result;
+}
+
+/**
+ * Send signup failure notifications via configured channels.
+ */
+export async function sendSignupFailureNotifications(
+    data: SignupFailureNotificationData
+): Promise<NotificationResult> {
+    const result: NotificationResult = {
+        emailSent: false,
+        slackSent: false,
+        errors: [],
+    };
+
+    const adminEmail = Deno.env.get("ADMIN_NOTIFICATION_EMAIL");
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    const slackWebhookUrl = Deno.env.get("SLACK_SIGNUP_WEBHOOK_URL");
+
+    if (adminEmail && resendApiKey) {
+        const emailResult = await sendFailureEmailNotification(adminEmail, resendApiKey, data);
+        result.emailSent = emailResult.success;
+        if (!emailResult.success && emailResult.error) {
+            console.error(`[signup-notifications] Failure email failed: ${emailResult.error}`);
+            result.errors.push(`Email: ${emailResult.error}`);
+        }
+    } else {
+        console.log("[signup-notifications] Failure email skipped - ADMIN_NOTIFICATION_EMAIL or RESEND_API_KEY not configured");
+    }
+
+    if (slackWebhookUrl) {
+        const slackResult = await sendSlackFailureNotification(slackWebhookUrl, data);
+        result.slackSent = slackResult.success;
+        if (!slackResult.success && slackResult.error) {
+            console.error(`[signup-notifications] Failure Slack failed: ${slackResult.error}`);
+            result.errors.push(`Slack: ${slackResult.error}`);
+        }
+    } else {
+        console.log("[signup-notifications] Failure Slack skipped - SLACK_SIGNUP_WEBHOOK_URL not configured");
     }
 
     return result;

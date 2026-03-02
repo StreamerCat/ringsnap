@@ -49,7 +49,10 @@ import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
-import { sendSignupNotifications } from "../_shared/signup-notifications.ts";
+import {
+  sendSignupFailureNotifications,
+  sendSignupNotifications,
+} from "../_shared/signup-notifications.ts";
 
 const FUNCTION_NAME = "create-trial";
 
@@ -648,6 +651,15 @@ Deno.serve(async (req: Request) => {
   let subscription: any = null;
   let stripeCustomerId: string | null = null;
   let stripeSubscriptionId: string | null = null;
+  let attemptedSignupData: {
+    email?: string;
+    name?: string;
+    companyName?: string;
+    phone?: string;
+    trade?: string;
+    planType?: string;
+    source?: string;
+  } = {};
   let phase = "start";
 
   try {
@@ -747,6 +759,16 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    attemptedSignupData = {
+      email: data.email,
+      name: data.name,
+      companyName: data.companyName,
+      phone: data.phone,
+      trade: data.trade,
+      planType: data.planType,
+      source: data.source,
+    };
 
     logInfo("Creating trial account", {
       ...baseLogOptions,
@@ -1783,6 +1805,19 @@ Deno.serve(async (req: Request) => {
       setContext('userId', currentUserId);
     }
     await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
+
+    // FIRE-AND-FORGET: Admin signup failure notification (email + Slack)
+    sendSignupFailureNotifications({
+      ...attemptedSignupData,
+      phase,
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      correlationId,
+      requestId: request_id,
+    }).catch((err) => {
+      stepError("admin_signup_failure_notifications_background", baseStepContext(), err, {
+        phase: "background_failure_notification",
+      });
+    });
 
     // Track failure in Analytics (Critical for Dashboard visibility)
     // We try to access 'data' if it was parsed, otherwise we lose the email.
