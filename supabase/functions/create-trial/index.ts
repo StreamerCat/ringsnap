@@ -31,7 +31,7 @@
  */
 
 // import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
+import { createClient } from "supabase";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import {
@@ -135,9 +135,9 @@ const createTrialSchema = z.object({
   wantsAdvancedVoice: z.boolean().optional().default(false),
 
   // Plan & payment
-  planType: z.enum(["starter", "professional", "premium"], {
-    required_error: "Plan type required",
-  }),
+  // Accept new plan keys AND legacy keys (all new signups default to night_weekend)
+  planType: z.enum(["night_weekend", "lite", "core", "pro", "starter", "professional", "premium"])
+    .default("night_weekend"),
   paymentMethodId: z.string().min(1, "Payment method required"),
 
   // Source tracking (CRITICAL - differentiates flows)
@@ -308,33 +308,51 @@ function getStripePriceId(planType: string): string {
 
   console.log(`[getStripePriceId] Key prefix: ${stripeKey.substring(0, 8)}... isLive=${isLive} plan=${planType}`);
 
-  // Use hardcoded production IDs if we are in live mode
-  // This resolves an issue where environment variables were pointing to test IDs
+  // Normalize legacy plan keys to new plan keys
+  const legacyToNew: Record<string, string> = {
+    starter: "night_weekend",
+    professional: "core",
+    premium: "pro",
+  };
+  const normalizedPlan = legacyToNew[planType] || planType;
+
+  // New plan price IDs from environment variables (populated via stripe-setup-new-plans.js)
+  const newPlanPriceIds: Record<string, string | undefined> = {
+    night_weekend: Deno.env.get("STRIPE_PRICE_ID_NIGHT_WEEKEND"),
+    lite: Deno.env.get("STRIPE_PRICE_ID_LITE"),
+    core: Deno.env.get("STRIPE_PRICE_ID_CORE"),
+    pro: Deno.env.get("STRIPE_PRICE_ID_PRO"),
+  };
+
+  const newPriceId = newPlanPriceIds[normalizedPlan];
+  if (newPriceId) {
+    console.log(`[getStripePriceId] Using new plan price ID for ${normalizedPlan}: ${newPriceId}`);
+    return newPriceId;
+  }
+
+  // Fallback to legacy hardcoded live IDs (in case new IDs not yet configured)
   if (isLive) {
-    const livePriceIds = {
+    const livePriceIds: Record<string, string> = {
       starter: "price_1SMav5IdevV48BnpEEIRKvk5",
       professional: "price_1SMaw9IdevV48BnpJkUs1UY0",
       premium: "price_1SMawyIdevV48BnpM9r2mk2g",
     };
-
-    const liveId = livePriceIds[planType as keyof typeof livePriceIds];
+    const liveId = livePriceIds[planType];
     if (liveId) {
-      console.log(`[getStripePriceId] Using HARDCODED LIVE price ID: ${liveId}`);
+      console.log(`[getStripePriceId] Using legacy HARDCODED LIVE price ID: ${liveId}`);
       return liveId;
     }
   }
 
-  // Fallback to environment variables (Test Mode or missing config)
-  console.log("[getStripePriceId] Falling back to ENV VAR price IDs (Test Mode)");
-
-  // Fallback to environment variables (Test Mode)
-  const priceIds = {
+  // Fallback to legacy environment variables
+  console.log("[getStripePriceId] Falling back to legacy ENV VAR price IDs");
+  const legacyPriceIds: Record<string, string | undefined> = {
     starter: Deno.env.get("STRIPE_PRICE_STARTER"),
     professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
     premium: Deno.env.get("STRIPE_PRICE_PREMIUM"),
   };
 
-  const priceId = priceIds[planType as keyof typeof priceIds];
+  const priceId = legacyPriceIds[planType];
   if (!priceId) {
     throw new Error(`Stripe price ID not configured for plan: ${planType}`);
   }
@@ -1080,10 +1098,22 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const accountData = {
+    // Normalize plan to new plan_key values; all new signups start on night_weekend
+    const legacyPlanMap: Record<string, string> = {
+      starter: "night_weekend",
+      professional: "core",
+      premium: "pro",
+    };
+    const normalizedPlanKey = legacyPlanMap[data.planType] || data.planType || "night_weekend";
+
+    const accountData: Record<string, unknown> = {
       company_name: data.companyName,
       trade: data.trade,
-      plan_type: data.planType,
+      plan_type: normalizedPlanKey,        // keep legacy column in sync
+      plan_key: normalizedPlanKey,          // new column
+      trial_active: true,                   // marks trial period active
+      trial_minutes_used: 0,
+      trial_minutes_limit: 50,
       phone_number_area_code: data.zipCode?.slice(0, 3) || null,
       zip_code: data.zipCode || null,
       business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
@@ -1094,18 +1124,6 @@ Deno.serve(async (req: Request) => {
       emergency_policy: data.emergencyPolicy || null,
       billing_state: billingState,
     };
-
-    // Normalize plan_type to match SQL constraint (starter|professional|premium)
-    const rawPlan = (accountData.plan_type || "starter")
-      .toString()
-      .trim()
-      .toLowerCase();
-
-    accountData.plan_type =
-      rawPlan === "pro" ? "professional" :
-        rawPlan === "professional" ? "professional" :
-          rawPlan === "premium" ? "premium" :
-            "starter";
 
     // Normalize assistant_gender to match SQL constraint (male|female)
     const rawGender = (accountData.assistant_gender || "female")

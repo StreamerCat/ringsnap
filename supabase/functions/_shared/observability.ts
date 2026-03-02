@@ -15,7 +15,7 @@
  *   await obs.info("user_signup_started", { userId: "..." });
  */
 
-import { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { SupabaseClient } from "supabase";
 
 // Environment controls
 const OBS_EVENTS_ENABLED = Deno.env.get("OBS_EVENTS_ENABLED") !== "false"; // Default: enabled

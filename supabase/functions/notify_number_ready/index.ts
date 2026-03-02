@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "supabase";
 import { extractCorrelationId, logError, logInfo, logWarn, withLogContext } from "../_shared/logging.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 

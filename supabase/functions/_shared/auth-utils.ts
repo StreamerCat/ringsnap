@@ -25,7 +25,7 @@
  * - isValidEmail() - Email format validation
  */
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "supabase";
 
 export interface AuthToken {
   token: string;

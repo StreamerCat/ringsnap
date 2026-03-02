@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "supabase";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 

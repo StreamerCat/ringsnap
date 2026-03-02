@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "supabase";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 
 const FUNCTION_NAME = "send-onboarding-sms";

@@ -2,7 +2,6 @@ import { Helmet } from "react-helmet-async";
 import { lazy, Suspense } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Shield, Clock, CreditCard } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
@@ -16,29 +15,36 @@ const Pricing = () => {
         "name": "RingSnap",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
-        "url": "https://getringsnap.com/pricing",
-        "description": "AI receptionist and call answering software for contractors that captures missed calls, books jobs, and routes urgent requests 24/7.",
+        "url": "https://ringsnap.ai/pricing",
+        "description": "AI receptionist built exclusively for home service contractors — answers calls 24/7, books jobs, logs to CRM. Starting at $59/month.",
         "offers": [
             {
                 "@type": "Offer",
-                "name": "Starter Plan",
-                "price": "297",
+                "name": "Night & Weekend Plan",
+                "price": "59",
                 "priceCurrency": "USD",
-                "url": "https://getringsnap.com/pricing"
+                "url": "https://ringsnap.ai/pricing"
             },
             {
                 "@type": "Offer",
-                "name": "Professional Plan",
-                "price": "797",
+                "name": "Lite Plan",
+                "price": "129",
                 "priceCurrency": "USD",
-                "url": "https://getringsnap.com/pricing"
+                "url": "https://ringsnap.ai/pricing"
             },
             {
                 "@type": "Offer",
-                "name": "Growth Plan",
-                "price": "1497",
+                "name": "Core Plan",
+                "price": "229",
                 "priceCurrency": "USD",
-                "url": "https://getringsnap.com/pricing"
+                "url": "https://ringsnap.ai/pricing"
+            },
+            {
+                "@type": "Offer",
+                "name": "Pro Plan",
+                "price": "399",
+                "priceCurrency": "USD",
+                "url": "https://ringsnap.ai/pricing"
             }
         ]
     };
@@ -52,7 +58,7 @@ const Pricing = () => {
                 "name": "How much does RingSnap cost?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "RingSnap pricing starts at $297 per month. Professional is $797 per month and Growth is $1,497 per month."
+                    "text": "RingSnap starts at $59/month for the Night & Weekend plan (after-hours coverage). Lite is $129/month, Core is $229/month, and Pro is $399/month. All plans include a 3-day free trial."
                 }
             },
             {
@@ -60,7 +66,15 @@ const Pricing = () => {
                 "name": "Is there a free trial?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "Yes. All RingSnap plans include a 3-day free trial so home service businesses can test AI call answering and booking before committing."
+                    "text": "Yes. All RingSnap plans include a 3-day free trial. No credit card required upfront. Cancel anytime."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "What happens if I go over my included minutes?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "By default, RingSnap keeps answering every call and bills overage at your plan's per-minute rate. You're alerted at 70% and 90% usage. You can also set a buffer or hard stop in your dashboard."
                 }
             },
             {
@@ -68,7 +82,7 @@ const Pricing = () => {
                 "name": "Are there setup fees or long-term contracts?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "No setup fees and no long-term contracts are required. You can cancel anytime."
+                    "text": "No setup fees and no long-term contracts. Month-to-month. Cancel anytime."
                 }
             }
         ]
@@ -77,23 +91,23 @@ const Pricing = () => {
     return (
         <>
             <Helmet>
-                <title>Pricing | RingSnap Virtual Answering Service for Contractors</title>
+                <title>Pricing | RingSnap AI Receptionist for Home Service Contractors</title>
                 <meta
                     name="description"
-                    content="Simple, transparent pricing for RingSnap virtual answering service. Starting at $297/month. No setup fees. No per-agent fees. 3-day free trial. Cancel anytime."
+                    content="RingSnap AI receptionist pricing starts at $59/month. Built for HVAC, plumbing, electrical, handyman, and roofing contractors. CRM included on every plan. 3-day free trial."
                 />
                 <meta name="robots" content="index, follow" />
-                <link rel="canonical" href="https://getringsnap.com/pricing" />
-                <meta property="og:title" content="Pricing | RingSnap Virtual Answering Service" />
-                <meta property="og:description" content="Simple pricing. No per-agent fees. Starting at $297/month with a 3-day free trial." />
+                <link rel="canonical" href="https://ringsnap.ai/pricing" />
+                <meta property="og:title" content="Pricing | RingSnap AI Receptionist for Contractors" />
+                <meta property="og:description" content="Stop losing $4,200/month to missed calls. RingSnap starts at $59/mo. CRM included. 3-day free trial." />
                 <meta property="og:type" content="website" />
-                <meta property="og:url" content="https://getringsnap.com/pricing" />
-                <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+                <meta property="og:url" content="https://ringsnap.ai/pricing" />
+                <meta property="og:image" content="https://ringsnap.ai/android-chrome-512x512.png" />
                 <meta property="og:site_name" content="RingSnap" />
                 <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:title" content="Pricing | RingSnap" />
-                <meta name="twitter:description" content="Virtual receptionist pricing. No setup fees. Cancel anytime." />
-                <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+                <meta name="twitter:title" content="Pricing | RingSnap AI Receptionist" />
+                <meta name="twitter:description" content="AI receptionist for contractors. Starts at $59/mo. 3-day free trial. No contracts." />
+                <meta name="twitter:image" content="https://ringsnap.ai/android-chrome-512x512.png" />
 
                 {featureFlags.enhancedMarketingSchema && (
                     <>
@@ -116,43 +130,6 @@ const Pricing = () => {
                     Skip to main content
                 </a>
 
-                {/* Hero Section */}
-                <section
-                    aria-labelledby="pricing-hero-heading"
-                    className="section-spacer bg-gradient-to-br from-off-white to-cream/30"
-                >
-                    <div className="container mx-auto px-4 max-w-4xl text-center">
-                        <h1
-                            id="pricing-hero-heading"
-                            className="text-h1 mb-6"
-                            style={{ color: 'hsl(var(--charcoal))' }}
-                        >
-                            Pricing as simple as a{" "}
-                            <span style={{ color: 'hsl(var(--primary))' }}>handshake</span>
-                        </h1>
-                        <p className="text-body-default text-muted-foreground max-w-2xl mx-auto mb-8 text-lg leading-relaxed">
-                            Transparent pricing. No setup fees. Cancel anytime.
-                        </p>
-
-                        {/* Risk Reversal Trust Bar */}
-                        <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 text-sm">
-                            <div className="flex items-center justify-center gap-2">
-                                <Shield className="w-5 h-5 text-primary" aria-hidden="true" />
-                                <span className="font-medium">3-Day Free Trial</span>
-                            </div>
-                            <div className="flex items-center justify-center gap-2">
-                                <Clock className="w-5 h-5 text-primary" aria-hidden="true" />
-                                <span className="font-medium">Cancel Anytime</span>
-                            </div>
-                            <div className="flex items-center justify-center gap-2">
-                                <CreditCard className="w-5 h-5 text-primary" aria-hidden="true" />
-                                <span className="font-medium">No Setup Fees</span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* Pricing Section - Reuses existing ContractorPricing */}
                 <div id="main-content">
                     <ErrorBoundary>
                         <Suspense fallback={
@@ -160,7 +137,7 @@ const Pricing = () => {
                                 <div className="animate-pulse text-muted-foreground">Loading pricing...</div>
                             </div>
                         }>
-                            <ContractorPricing showHeading={false} className="pt-0 sm:pt-0 lg:pt-0" />
+                            <ContractorPricing showHeading={true} />
                             <ContractorFooter />
                         </Suspense>
                     </ErrorBoundary>

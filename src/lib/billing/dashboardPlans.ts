@@ -1,14 +1,14 @@
 /**
  * Dashboard Plan Definitions
- * 
- * This file is used ONLY by the customer dashboard Upgrade modal and dashboard plan display.
- * Do NOT import this into homepage pricing components.
- * 
- * Plan keys: starter | professional | premium
- * These must match database plan_type values exactly.
+ *
+ * Used by customer dashboard for plan display, upgrade modal, billing tab, and settings.
+ * Do NOT import this into marketing/homepage components.
+ *
+ * Plan keys: night_weekend | lite | core | pro
+ * These must match the `plans` table plan_key values exactly.
  */
 
-export type PlanKey = "starter" | "professional" | "premium";
+export type PlanKey = "night_weekend" | "lite" | "core" | "pro";
 
 export type PlanDef = {
     key: PlanKey;
@@ -17,122 +17,154 @@ export type PlanDef = {
     priceMonthly: number;
 
     includedMinutes: number;
-    aiReceptionists: number;
-    overageRate: number;
+    overageRate: number; // $/min
 
-    /** Environment variable name, NOT the actual price ID */
+    /** System-enforced hard ceiling for overage (non-user-configurable) */
+    systemCeilingMinutes: number;
+
+    /** Description of when calls are handled */
+    coverageHours: "after_hours_only" | "24_7";
+
+    /** Env variable name for base Stripe price ID */
     priceIdEnv: string;
+    /** Env variable name for overage Stripe price ID */
+    overagePriceIdEnv: string;
 
     features: string[];
     recommended?: boolean;
+    badgeText?: string;
     notes?: string;
 };
 
 export const DASHBOARD_PLANS: PlanDef[] = [
     {
-        key: "starter",
-        name: "Starter",
-        headline: "Solo Contractors & Small Crews",
-        priceMonthly: 297,
-        includedMinutes: 1500,
-        aiReceptionists: 1,
-        overageRate: 0.16,
-        priceIdEnv: "STRIPE_PRICE_STARTER",
+        key: "night_weekend",
+        name: "Night & Weekend",
+        headline: "After-hours and weekend coverage",
+        priceMonthly: 59,
+        includedMinutes: 150,
+        overageRate: 0.45,
+        systemCeilingMinutes: 100,
+        coverageHours: "after_hours_only",
+        priceIdEnv: "STRIPE_PRICE_ID_NIGHT_WEEKEND",
+        overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_NIGHT_WEEKEND",
         features: [
-            "Answer 95% of calls automatically",
-            "Books appointments automatically",
-            "Call recordings & transcripts",
-            "Google Calendar + Zapier",
-            "Basic analytics",
+            "Answers every after-hours and emergency call",
+            "Books appointments and captures job details",
+            "Urgent transfer to your phone with full context",
+            "Call recordings + transcripts",
+            "CRM included — every caller logged automatically",
         ],
-        notes: "Most customers use 1,000–1,400 min/month",
+        notes: "Active 6PM–8AM weekdays + all weekends",
     },
     {
-        key: "professional",
-        name: "Professional",
-        headline: "Growing Contractors with Multiple Crews",
-        priceMonthly: 547,
-        includedMinutes: 3500,
-        aiReceptionists: 3,
-        overageRate: 0.13,
-        priceIdEnv: "STRIPE_PRICE_PROFESSIONAL",
-        recommended: true,
+        key: "lite",
+        name: "Lite",
+        headline: "24/7 coverage for handymen, painters, and roofers",
+        priceMonthly: 129,
+        includedMinutes: 300,
+        overageRate: 0.38,
+        systemCeilingMinutes: 150,
+        coverageHours: "24_7",
+        priceIdEnv: "STRIPE_PRICE_ID_LITE",
+        overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_LITE",
         features: [
-            "Everything in Starter",
-            "Premium voice cloning",
-            "Smart call routing to crew",
-            "Multi-language (EN + ES)",
-            "Advanced analytics",
+            "24/7 call answering — never miss a job",
+            "Appointment booking with your calendar",
+            "Urgent call transfer with full call context",
+            "Call recordings + transcripts",
+            "CRM included — full caller history",
+            "Google Calendar + Zapier",
+        ],
+    },
+    {
+        key: "core",
+        name: "Core",
+        headline: "24/7 coverage for plumbers and HVAC contractors",
+        priceMonthly: 229,
+        includedMinutes: 600,
+        overageRate: 0.28,
+        systemCeilingMinutes: 200,
+        coverageHours: "24_7",
+        priceIdEnv: "STRIPE_PRICE_ID_CORE",
+        overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_CORE",
+        recommended: true,
+        badgeText: "Best Value",
+        features: [
+            "Everything in Lite, plus:",
+            "Branded voice options",
+            "Smart call routing by job type and urgency",
+            "Multi-language (English + Spanish)",
+            "Custom escalation rules",
             "Priority support",
         ],
-        notes: "Most customers stay within plan limits",
+        notes: "Most HVAC and plumbing teams choose Core",
     },
     {
-        key: "premium",
-        name: "Premium",
-        headline: "Multi-Location Contractors & Franchises",
-        priceMonthly: 947,
-        includedMinutes: 7000,
-        aiReceptionists: 5,
-        overageRate: 0.11,
-        priceIdEnv: "STRIPE_PRICE_PREMIUM",
+        key: "pro",
+        name: "Pro",
+        headline: "High-volume contractors and multi-truck operations",
+        priceMonthly: 399,
+        includedMinutes: 1200,
+        overageRate: 0.22,
+        systemCeilingMinutes: 300,
+        coverageHours: "24_7",
+        priceIdEnv: "STRIPE_PRICE_ID_PRO",
+        overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_PRO",
         features: [
-            "Everything in Professional",
-            "Custom brand voice cloning",
-            "Dedicated success manager",
-            "API + custom webhooks",
+            "Everything in Core, plus:",
+            "Custom brand voice",
             "Multi-location dashboard",
+            "API + custom webhooks",
+            "Dedicated success manager",
             "Priority phone support",
         ],
-        notes: "Rarely needs additional minutes",
     },
 ];
 
-/**
- * Get a plan by its key
- */
-export function getDashboardPlanByKey(key: PlanKey): PlanDef | undefined {
-    return DASHBOARD_PLANS.find((p) => p.key === key);
+export function getDashboardPlanByKey(key: string | null | undefined): PlanDef | undefined {
+    if (!key) return DASHBOARD_PLANS[0];
+    // Normalize legacy plan_type keys to new plan_key values
+    const normalizedKey = normalizeLegacyPlanKey(key);
+    return DASHBOARD_PLANS.find((p) => p.key === normalizedKey);
 }
 
-/**
- * Get all plans except the current one (for upgrade options)
- */
-export function getUpgradeOptions(currentPlanKey: PlanKey): PlanDef[] {
-    const currentIndex = DASHBOARD_PLANS.findIndex((p) => p.key === currentPlanKey);
-    // Return plans at higher tiers than current
-    return DASHBOARD_PLANS.filter((_, index) => index > currentIndex);
+/** Map old plan_type → new plan_key for backwards compatibility */
+export function normalizeLegacyPlanKey(key: string): PlanKey {
+    switch (key.toLowerCase()) {
+        case "starter": return "lite";
+        case "professional": return "core";
+        case "premium": return "pro";
+        case "trial": return "night_weekend";
+        default: return (DASHBOARD_PLANS.find(p => p.key === key)?.key) || "night_weekend";
+    }
 }
 
-/**
- * Helper to check if provisioning is complete
- * Provisioning status values: pending | processing | completed | failed
- */
+export function getNextPlan(currentKey: PlanKey): PlanDef | undefined {
+    const currentIndex = DASHBOARD_PLANS.findIndex((p) => p.key === currentKey);
+    return currentIndex < DASHBOARD_PLANS.length - 1
+        ? DASHBOARD_PLANS[currentIndex + 1]
+        : undefined;
+}
+
+export function getUpgradeOptions(currentPlanKey: PlanKey | string): PlanDef[] {
+    const normalized = normalizeLegacyPlanKey(currentPlanKey);
+    const currentIndex = DASHBOARD_PLANS.findIndex((p) => p.key === normalized);
+    return DASHBOARD_PLANS.filter((_, i) => i > currentIndex);
+}
+
+/** Check if provisioning is complete */
 export function isProvisioned(
     account: { provisioning_status?: string | null; vapi_phone_number?: string | null },
     phoneNumbers?: { phone_number?: string }[]
 ): boolean {
-    // Check account-level status
-    if (account.provisioning_status === "completed") {
-        return true;
-    }
-
-    // Also check if we have a phone number (fallback for edge cases)
-    if (account.vapi_phone_number) {
-        return true;
-    }
-
-    // Check phone_numbers array if provided
-    if (phoneNumbers && phoneNumbers.length > 0 && phoneNumbers[0]?.phone_number) {
-        return true;
-    }
-
+    if (account.provisioning_status === "completed") return true;
+    if (account.vapi_phone_number) return true;
+    if (phoneNumbers && phoneNumbers.length > 0 && phoneNumbers[0]?.phone_number) return true;
     return false;
 }
 
-/**
- * Check if provisioning is in progress (should poll)
- */
+/** Check if provisioning is in progress (should poll) */
 export function isProvisioningInProgress(
     account: { provisioning_status?: string | null }
 ): boolean {
@@ -140,9 +172,7 @@ export function isProvisioningInProgress(
     return status === "pending" || status === "processing";
 }
 
-/**
- * Check if provisioning failed
- */
+/** Check if provisioning failed */
 export function isProvisioningFailed(
     account: { provisioning_status?: string | null }
 ): boolean {

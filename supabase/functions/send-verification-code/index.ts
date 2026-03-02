@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "supabase";
 import { isValidPhoneNumber, formatPhoneE164, generateVerificationCode } from "../_shared/validators.ts";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 

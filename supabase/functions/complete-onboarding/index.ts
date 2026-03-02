@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "supabase";
 import { isValidZipCode } from "../_shared/validators.ts";
 import { getAreaCodeFromZip } from "../_shared/area-code-lookup.ts";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";

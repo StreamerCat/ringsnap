@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
+import { createClient } from "supabase";
 import { extractCorrelationId, logError, logInfo, logWarn } from '../_shared/logging.ts';
 import { POOL_CONFIG } from '../_shared/pool-config.ts';
 
