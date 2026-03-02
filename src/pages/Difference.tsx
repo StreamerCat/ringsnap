@@ -230,15 +230,14 @@ const Difference = () => {
             {/* SECTION 4: It Learns Three Things */}
             <section id="learning-section" className="section-spacer bg-muted/30">
                 <div className="container mx-auto px-4 max-w-6xl">
-                    <div className="text-center mb-10">
-                        <h2 className="text-h2 mb-4">It learns the instincts that great
-                            businesses rely on</h2>
+                    <div className="text-center mb-10 max-w-4xl mx-auto">
+                        <h2 className="text-h2 mb-4">It learns the instincts that great businesses rely on</h2>
                     </div>
 
                     {/* Bento Cards */}
                     <div className="grid md:grid-cols-3 gap-6 mb-10">
                         <Card className="card-tier-2">
-                            <CardContent className="p-6">
+                            <CardContent className="p-6 sm:p-7">
                                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                                     <Briefcase className="w-6 h-6 text-primary" />
                                 </div>
@@ -251,7 +250,7 @@ const Difference = () => {
                         </Card>
 
                         <Card className="card-tier-2">
-                            <CardContent className="p-6">
+                            <CardContent className="p-6 sm:p-7">
                                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                                     <Settings className="w-6 h-6 text-primary" />
                                 </div>
@@ -264,7 +263,7 @@ const Difference = () => {
                         </Card>
 
                         <Card className="card-tier-2">
-                            <CardContent className="p-6">
+                            <CardContent className="p-6 sm:p-7">
                                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                                     <Users className="w-6 h-6 text-primary" />
                                 </div>
