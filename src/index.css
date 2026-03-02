@@ -153,6 +153,20 @@ All colors MUST be HSL.
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.2;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  p,
+  li,
+  dt,
+  dd,
+  blockquote,
+  small,
+  label {
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
   }
 
   .text-body-secondary {
@@ -162,7 +176,7 @@ All colors MUST be HSL.
 
 @layer utilities {
   .site-container {
-    @apply mx-auto w-full max-w-screen-xl px-4;
+    @apply mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8;
   }
 
   /* Fluid Typography */
@@ -522,20 +536,24 @@ All colors MUST be HSL.
     @apply text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold;
     color: hsl(var(--charcoal));
     letter-spacing: -0.03em;
-    line-height: 1.1;
+    line-height: 1.08;
+    text-wrap: balance;
   }
 
   .text-h2 {
     @apply text-3xl sm:text-4xl md:text-5xl font-bold;
     color: hsl(var(--charcoal));
     letter-spacing: -0.02em;
-    line-height: 1.2;
+    line-height: 1.15;
+    text-wrap: balance;
   }
 
   .text-h3 {
     @apply text-2xl sm:text-3xl font-bold;
     color: hsl(var(--charcoal));
     letter-spacing: -0.01em;
+    line-height: 1.2;
+    text-wrap: balance;
   }
 
   .text-body-default {
