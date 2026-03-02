@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "supabase";
 import { JobberClient } from "../_shared/jobber-client.ts";
 import { JobberAdapter } from "../_shared/jobber-adapter.ts";
 import { CallOutcomeEvent } from "../_shared/integration-types.ts";

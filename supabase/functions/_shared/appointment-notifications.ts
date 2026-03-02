@@ -1,5 +1,5 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient } from "supabase";
 import { sendSMS } from "./sms.ts";
 import { sendEmail, buildEmailHtml } from "./resend-client.ts";
 import { logInfo, logError } from "./logging.ts";

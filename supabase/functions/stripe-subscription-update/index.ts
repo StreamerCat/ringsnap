@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const PLAN_KEY_TO_SECRET: Record<string, string> = {

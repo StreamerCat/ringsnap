@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
 import { extractCallDetails, VapiCall, VapiMessage } from "./call_parser.ts";
 import { withSentryEdge } from "../_shared/sentry.ts";

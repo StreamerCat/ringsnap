@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "supabase";
 import { getAreaCodeFromZip } from "../_shared/area-code-lookup.ts";
 import { buildVapiPrompt } from "../_shared/template-builder.ts";
 import { generateReferralCode } from "../_shared/validators.ts";

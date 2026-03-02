@@ -1,5 +1,5 @@
 import { assertEquals, assertExists, assert } from "https://deno.land/std@0.192.0/testing/asserts.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient } from "supabase";
 
 // ============================================================================
 // HELPER FUNCTIONS

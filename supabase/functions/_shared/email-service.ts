@@ -9,7 +9,7 @@
  * Uses Supabase Auth for magic link generation.
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "supabase";
 
 // ==============================================================================
 // Types

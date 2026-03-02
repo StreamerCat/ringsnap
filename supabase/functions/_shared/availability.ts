@@ -14,7 +14,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { SupabaseClient } from "supabase";
 import { logInfo, logWarn, logError } from "./logging.ts";
 
 const FUNCTION_NAME = "availability-service";
