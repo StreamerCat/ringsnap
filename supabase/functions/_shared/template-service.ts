@@ -1,5 +1,5 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
+import { SupabaseClient } from "supabase";
 
 /**
  * Get the effective template for an account and trade.

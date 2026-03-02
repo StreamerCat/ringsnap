@@ -1,6 +1,6 @@
 import { CallOutcomeEvent } from "./integration-types.ts";
 import { JobberClient } from "./jobber-client.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "supabase";
 
 export class JobberAdapter {
     constructor(

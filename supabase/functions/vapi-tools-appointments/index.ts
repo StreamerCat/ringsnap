@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient } from "supabase";
 import { withSentryEdge } from "../_shared/sentry.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { logInfo, logError, logWarn, extractTraceId, stepStart, stepEnd, stepError } from "../_shared/logging.ts";

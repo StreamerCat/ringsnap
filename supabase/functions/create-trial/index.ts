@@ -31,7 +31,7 @@
  */
 
 // import { serve } from "https://deno.land/std@0.168.0/http/server.ts"; // Removed: Causes event loop issues in new runtime
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
+import { createClient } from "supabase";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import {

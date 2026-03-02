@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "supabase";
 
 // For callback, we might return HTML or Redirect, so standard CORS might differ, 
 // but usually callbacks are GET requests from the browser.

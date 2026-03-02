@@ -1,5 +1,5 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient } from "supabase";
 import { withSentryEdge } from "../_shared/sentry.ts";
 import { logInfo, logError } from "../_shared/logging.ts";
 import { sendAppointmentNotifications, Appointment, AccountSettings } from "../_shared/appointment-notifications.ts";

@@ -115,7 +115,7 @@ export async function cleanupTestAccount(
   email: string,
   context: TestContext
 ): Promise<void> {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const { createClient } = await import("supabase");
   const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
   try {

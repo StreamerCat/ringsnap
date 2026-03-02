@@ -60,7 +60,7 @@ Deno.test("create-trial-v2: happy path self-service signup", async () => {
     );
 
     // Verify in database
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const { createClient } = await import("supabase");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: account } = await supabase
@@ -193,7 +193,7 @@ Deno.test("create-trial-v2: payment method attach fails with rollback", async ()
     assertExists(data.error, "Should return error message");
 
     // Verify no account created in database
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const { createClient } = await import("supabase");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: accounts } = await supabase
@@ -254,7 +254,7 @@ Deno.test("create-trial-v2: subscription creation fails with rollback", async ()
     assertExists(data.error, "Should return error message");
 
     // Verify no account in database
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const { createClient } = await import("supabase");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: accountCheck } = await supabase.rpc("get_account_by_email", {
@@ -320,7 +320,7 @@ Deno.test("create-trial-v2: sales-guided signup with sales_rep_id", async () => 
     assertExists(data.password, "Sales-guided should return temp password");
 
     // Verify account has sales_rep_id
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const { createClient } = await import("supabase");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: account } = await supabase
@@ -473,7 +473,7 @@ Deno.test("create-trial-v2: correlation ID tracking", async () => {
     );
 
     // Verify correlation ID in database
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const { createClient } = await import("supabase");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: transitions } = await supabase

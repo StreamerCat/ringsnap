@@ -35,7 +35,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?target=deno";
+import { createClient } from "supabase";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { logError, logInfo, logWarn, extractTraceId, stepStart, stepEnd, stepError, maskEmailForLogs, maskPhoneForLogs, type BaseLogContext } from "../_shared/logging.ts";
 import { sendSMS } from "../_shared/sms.ts";
