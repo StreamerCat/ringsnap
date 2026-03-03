@@ -27,17 +27,17 @@ interface ResourceCardProps {
 const ResourceCard = ({ title, description, href, tags, icon: Icon }: ResourceCardProps) => (
     <Link
         to={href}
-        className="group block rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all"
+        className="group block rounded-xl border border-border bg-card p-5 md:p-6 hover:border-primary/40 hover:shadow-md transition-all"
     >
         <div className="flex items-start gap-3 mb-3">
             <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Icon className="h-4.5 w-4.5 text-primary" />
             </div>
-            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-sm leading-tight pt-1">
+            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-sm md:text-base leading-tight pt-1">
                 {title}
             </h3>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed mb-3">{description}</p>
+        <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-3">{description}</p>
         <div className="flex flex-wrap gap-1.5 mb-3">
             {tags.map((tag) => (
                 <span key={tag} className="text-[10px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5">
@@ -220,20 +220,21 @@ const ResourceHub = () => {
                 { label: "Home", href: "/" },
                 { label: "Resources" },
             ]}
+            contentClassName="max-w-6xl"
         >
             {/* Hero */}
-            <div className="mb-10">
-                <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4 leading-tight">
+            <div className="pt-4 md:pt-6 mb-10 text-center lg:text-left max-w-4xl mx-auto lg:mx-0">
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
                     Contractor Phone Scripts, Call Intake, and After-Hours Answering Resources
                 </h1>
-                <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
+                <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-3xl mx-auto lg:mx-0">
                     Practical scripts, intake checklists, benchmarks, and calculators built for HVAC, plumbing, and electrical shops. Copy, paste, and start booking more jobs today.
                 </p>
             </div>
 
             {/* Filters */}
             <div className="mb-8">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
                     {filterOptions.map((option) => (
                         <button
                             key={option.value}
@@ -250,7 +251,7 @@ const ResourceHub = () => {
             </div>
 
             {/* Resource Grid */}
-            <div className="grid md:grid-cols-2 gap-4 mb-12">
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5 mb-12">
                 {filtered.map((resource) => (
                     <ResourceCard
                         key={resource.href}

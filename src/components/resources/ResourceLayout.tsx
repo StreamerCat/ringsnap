@@ -33,6 +33,7 @@ interface ResourceLayoutProps {
     schema?: object;
     ogTitle?: string;
     ogDescription?: string;
+    contentClassName?: string;
 }
 
 export const ResourceLayout = ({
@@ -46,7 +47,9 @@ export const ResourceLayout = ({
     schema,
     ogTitle,
     ogDescription,
+    contentClassName,
 }: ResourceLayoutProps) => {
+    const hasToc = Boolean(toc && toc.length > 0);
     const [activeSection, setActiveSection] = useState<string>("");
     const [tocOpen, setTocOpen] = useState(false);
     const observerRef = useRef<IntersectionObserver | null>(null);
@@ -125,7 +128,7 @@ export const ResourceLayout = ({
                 <div className="site-container py-8">
                     <div className="flex gap-8">
                         {/* Sticky TOC — Desktop */}
-                        {toc && toc.length > 0 && (
+                        {hasToc && (
                             <aside className="hidden lg:block w-64 flex-shrink-0">
                                 <div className="sticky top-20">
                                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
@@ -151,7 +154,7 @@ export const ResourceLayout = ({
                         )}
 
                         {/* Main Content */}
-                        <article className="flex-1 min-w-0 max-w-3xl mx-auto lg:mx-0">
+                        <article className={`flex-1 min-w-0 ${contentClassName ?? "max-w-3xl"} mx-auto ${hasToc ? "lg:mx-0" : ""}`}>
                             {children}
                         </article>
                     </div>
