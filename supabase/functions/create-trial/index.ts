@@ -1031,17 +1031,15 @@ Deno.serve(async (req: Request) => {
           }
         });
 
-        // Return structured error if flag enabled, otherwise preserve legacy behavior
-        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        } else {
-          // Legacy behavior - throw error as before
-          throw new Error(`Stripe Payment Method Attach Failed: ${e.message}`);
-        }
+        // Always return a response directly for payment errors so the frontend can read
+        // result.error/result.message. Throwing causes a 500 where the SDK returns
+        // data:null, making the actual Stripe error inaccessible to the frontend.
+        const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+        const status = ENABLE_STRUCTURED_TRIAL_ERRORS ? 400 : 200;
+        return new Response(JSON.stringify(errorResponse), {
+          status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
 
       // Subscription
@@ -1074,17 +1072,15 @@ Deno.serve(async (req: Request) => {
           context: { phase, customerId: customer.id }
         });
 
-        // Return structured error if flag enabled, otherwise preserve legacy behavior
-        if (ENABLE_STRUCTURED_TRIAL_ERRORS) {
-          const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
-          return new Response(JSON.stringify(errorResponse), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        } else {
-          // Legacy behavior - throw error as before
-          throw new Error(`Stripe Subscription Create Failed: ${e.message}`);
-        }
+        // Always return a response directly for payment errors so the frontend can read
+        // result.error/result.message. Throwing causes a 500 where the SDK returns
+        // data:null, making the actual Stripe error inaccessible to the frontend.
+        const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+        const status = ENABLE_STRUCTURED_TRIAL_ERRORS ? 400 : 200;
+        return new Response(JSON.stringify(errorResponse), {
+          status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
     }
 
