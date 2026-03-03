@@ -646,7 +646,12 @@ Deno.serve(async (req: Request) => {
   // Validate required environment variables
   try {
     const requiredVars = getRequiredEnv(['SUPABASE', 'STRIPE', 'VAPI']);
-    requiredVars.push('STRIPE_PRICE_STARTER_OLD', 'STRIPE_PRICE_PROFESSIONAL_OLD', 'STRIPE_PRICE_PREMIUM_OLD');
+    requiredVars.push(
+      'STRIPE_PRICE_ID_NIGHT_WEEKEND',
+      'STRIPE_PRICE_ID_LITE',
+      'STRIPE_PRICE_ID_CORE',
+      'STRIPE_PRICE_ID_PRO',
+    );
     assertEnv(requiredVars, FUNCTION_NAME);
   } catch (envError: any) {
     return new Response(
