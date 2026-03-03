@@ -18,6 +18,7 @@ interface VoiceSelectorProps {
   showSamples?: boolean;
   layout?: "horizontal" | "vertical";
   disabled?: boolean;
+  onAutoAdvance?: () => void;
 }
 
 /**
@@ -43,7 +44,17 @@ export function VoiceSelector({
   showSamples = true,
   layout = "horizontal",
   disabled = false,
+  onAutoAdvance,
 }: VoiceSelectorProps) {
+  const handleVoiceClick = (
+    gender: "male" | "female",
+    onChange: (value: "male" | "female") => void,
+  ) => {
+    if (disabled) return;
+    onChange(gender);
+    onAutoAdvance?.();
+  };
+
   const handlePlaySample = (gender: "male" | "female") => {
     // TODO: Implement audio sample playback
     // For now, just show a toast
@@ -76,7 +87,7 @@ export function VoiceSelector({
                   "cursor-pointer transition-all hover:border-primary",
                   field.value === "female" && "border-primary ring-2 ring-primary"
                 )}
-                onClick={() => !disabled && field.onChange("female")}
+                onClick={() => handleVoiceClick("female", field.onChange)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start space-x-3">
@@ -118,7 +129,7 @@ export function VoiceSelector({
                   "cursor-pointer transition-all hover:border-primary",
                   field.value === "male" && "border-primary ring-2 ring-primary"
                 )}
-                onClick={() => !disabled && field.onChange("male")}
+                onClick={() => handleVoiceClick("male", field.onChange)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start space-x-3">

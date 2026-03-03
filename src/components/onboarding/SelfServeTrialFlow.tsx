@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,14 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
-import { Progress } from "@/components/ui/progress";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Send, Bot, User, RotateCcw } from "lucide-react";
 
 // Import enhanced atomic components
 import { EnhancedUserInfoForm } from "./shared/EnhancedUserInfoForm";
@@ -74,20 +72,6 @@ interface SelfServeTrialFlowProps {
   onSuccess?: () => void;
 }
 
-/**
- * Self-Serve Trial Flow Orchestrator
- * 8-step conversion-optimized flow for website users
- *
- * Steps:
- * 1. User Info (name, email, phone)
- * 2. Business Basics (company, trade, website)
- * 3. Business Advanced (primary goal, hours)
- * 4. Voice Selection
- * 5. Plan Selection
- * 6. Payment
- * 7. Provisioning (async)
- * 8. Phone Ready
- */
 export function SelfServeTrialFlow({
   open,
   onOpenChange,
@@ -96,8 +80,10 @@ export function SelfServeTrialFlow({
   const navigate = useNavigate();
   const stripe = useStripe();
   const elements = useElements();
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardComplete, setCardComplete] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
@@ -106,6 +92,7 @@ export function SelfServeTrialFlow({
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [leadCaptured, setLeadCaptured] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
+  const [useClassicLayout, setUseClassicLayout] = useState(false);
 
   const form = useForm<SelfServeFormData>({
     resolver: zodResolver(selfServeSchema),
@@ -124,12 +111,16 @@ export function SelfServeTrialFlow({
     },
   });
 
-  const totalSteps = 8;
-  const progressPercent = (currentStep / totalSteps) * 100;
+  // Auto-scroll to bottom of "chat" when step changes
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [currentStepIndex]);
 
-  // Capture lead after Step 1 (even if they abandon)
+  // Capture lead after Step 1
   const captureLead = async () => {
-    if (leadCaptured) return; // Already captured
+    if (leadCaptured) return;
 
     const { name, email, phone } = form.getValues();
 
@@ -147,90 +138,131 @@ export function SelfServeTrialFlow({
       console.log("[self-serve trial] Inserting into signup_leads", { payload: leadPayload });
 
       // TEMPORARY FIX (go-green): Disable direct client-side inserts
-      // All writes MUST flow through edge functions only until backend is green
       console.warn("[go-green] Direct insert to signup_leads disabled. Backend writes only.");
       const lead = null;
       const error = null;
 
-      // const { data: lead, error } = await supabase
-      //   .from("signup_leads")
-      //   .insert(leadPayload)
-      //   .select()
-      //   .single();
-
       if (error) {
-        console.error("[self-serve trial] signup_leads insert failed", {
-          error: error,
-          payload: leadPayload
-        });
-        // Don't block the user - lead capture is optional
+        console.error("[self-serve trial] signup_leads insert failed", { error: error, payload: leadPayload });
         console.warn("[self-serve trial] Continuing without lead tracking");
       } else if (lead) {
         setLeadCaptured(true);
+        // @ts-expect-error - Assuming lead has id based on original query shape
         setLeadId(lead.id);
-        console.log("[self-serve trial] signup_leads created successfully", {
-          leadId: lead.id,
-          email: lead.email
-        });
+        // @ts-expect-error - Assuming lead has email based on original query shape
+        console.log("[self-serve trial] signup_leads created successfully", { leadId: lead?.id, email: lead?.email });
       }
     } catch (error) {
-      // Don't block the user if lead capture fails
       console.error("[self-serve trial] Unexpected error during lead capture:", error);
       console.warn("[self-serve trial] Continuing without lead tracking");
     }
   };
 
+  const FLOW_STEPS = [
+    {
+      id: "user-info",
+      botMessage: "Welcome to Ringsnap! 👋 Let's get you set up with a 3-day free trial. What's your contact info?",
+      fieldsToValidate: ["name", "email", "phone"] as (keyof SelfServeFormData)[],
+      onSuccess: async () => await captureLead(),
+      render: (triggerNext: () => Promise<void>) => (
+        <EnhancedUserInfoForm form={form} requiredFields={["name", "email", "phone"]} showLabels={false} enableSmartEmail={true} />
+      ),
+    },
+    {
+      id: "business-basics",
+      botMessage: "Nice to meet you! Tell me a bit about your business so I can customize your Agent.",
+      fieldsToValidate: ["companyName", "trade", "website", "zipCode"] as (keyof SelfServeFormData)[],
+      render: (triggerNext: () => Promise<void>) => (
+        <EnhancedBusinessBasicsForm form={form} requiredFields={["companyName", "trade", "website", "zipCode"]} showOptionalBadges={true} />
+      ),
+    },
+    {
+      id: "business-advanced",
+      botMessage: "Got it. How should your Agent handle calls?",
+      fieldsToValidate: [] as (keyof SelfServeFormData)[],
+      render: (triggerNext: () => Promise<void>) => (
+        <BusinessAdvancedForm form={form} fields={["primaryGoal", "businessHours"]} />
+      ),
+    },
+    {
+      id: "voice-selection",
+      botMessage: "Awesome. Now, select the voice your customers will hear.",
+      fieldsToValidate: ["assistantGender"] as (keyof SelfServeFormData)[],
+      render: (triggerNext: () => Promise<void>) => (
+        <VoiceSelector form={form} showSamples={true} layout="horizontal" onAutoAdvance={triggerNext} />
+      ),
+    },
+    {
+      id: "plan-selection",
+      botMessage: "Great choice! Which plan fits you best? (3-day free trial, cancel anytime).",
+      fieldsToValidate: ["planType"] as (keyof SelfServeFormData)[],
+      render: (triggerNext: () => Promise<void>) => (
+        <PlanSelector form={form} variant="detailed" highlight="professional" onAutoAdvance={triggerNext} />
+      ),
+    },
+    {
+      id: "payment",
+      botMessage: "Almost done! Secure your trial below. You won't be charged today.",
+      fieldsToValidate: [] as (keyof SelfServeFormData)[],
+      customValidation: () => {
+        if (!cardComplete) return "Please complete your card information";
+        if (!termsAccepted) return "Please accept the terms and conditions";
+        return null;
+      },
+      render: (triggerNext: () => Promise<void>) => (
+        <PaymentForm
+          onCardChange={(complete, error) => {
+            setCardComplete(complete);
+            setCardError(error);
+          }}
+          showTerms={true}
+          termsAccepted={termsAccepted}
+          onTermsChange={setTermsAccepted}
+        />
+      ),
+    },
+  ];
+
   const handleNext = async () => {
-    let fieldsToValidate: (keyof SelfServeFormData)[] = [];
+    if (isTransitioning || isSubmitting) return;
+    setIsTransitioning(true);
 
-    switch (currentStep) {
-      case 1:
-        fieldsToValidate = ["name", "email", "phone"];
-        break;
-      case 2:
-        fieldsToValidate = ["companyName", "trade", "zipCode"];
-        break;
-      case 3:
-        // Optional fields, can skip validation
-        setCurrentStep(4);
-        return;
-      case 4:
-        fieldsToValidate = ["assistantGender"];
-        break;
-      case 5:
-        fieldsToValidate = ["planType"];
-        break;
-      case 6:
-        // Payment validation handled separately
-        if (!cardComplete) {
-          setCardError("Please complete your card information");
+    try {
+      const currentConfig = FLOW_STEPS[currentStepIndex];
+
+      if (currentConfig.fieldsToValidate.length > 0) {
+        const isValid = await form.trigger(currentConfig.fieldsToValidate);
+        if (!isValid) {
+          toast.error("Please complete all required fields");
+          setIsTransitioning(false);
           return;
         }
-        if (!termsAccepted) {
-          toast.error("Please accept the terms and conditions");
-          return;
-        }
-        handleSubmit();
-        return;
-      default:
-        return;
-    }
-
-    const isValid = await form.trigger(fieldsToValidate);
-    if (isValid) {
-      // Capture lead after Step 1 (contact info)
-      if (currentStep === 1) {
-        await captureLead();
       }
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      toast.error("Please complete all required fields");
+
+      if (currentConfig.customValidation) {
+        const errorMsg = currentConfig.customValidation();
+        if (errorMsg) {
+          toast.error(errorMsg);
+          setIsTransitioning(false);
+          return;
+        }
+      }
+
+      if (currentConfig.onSuccess) {
+        await currentConfig.onSuccess();
+      }
+
+      if (currentStepIndex === FLOW_STEPS.length - 1) {
+        await handleSubmit();
+      } else {
+        setCurrentStepIndex((prev) => prev + 1);
+      }
+    } finally {
+      setIsTransitioning(false);
     }
   };
 
-  const handleBack = () => {
-    setCurrentStep((prev) => Math.max(1, prev - 1));
-  };
+  const handleBack = () => setCurrentStepIndex((prev) => Math.max(0, prev - 1));
 
   const handleSubmit = async () => {
     if (!stripe || !elements) {
@@ -244,7 +276,6 @@ export function SelfServeTrialFlow({
       const cardElement = elements.getElement("card");
       if (!cardElement) throw new Error("Card element not found");
 
-      // Create payment method
       const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
         type: "card",
         card: cardElement,
@@ -262,7 +293,6 @@ export function SelfServeTrialFlow({
         return;
       }
 
-      // Call unified create-trial endpoint
       const formData = form.getValues();
       const { data, error } = await supabase.functions.invoke("create-trial", {
         body: {
@@ -279,242 +309,193 @@ export function SelfServeTrialFlow({
         throw new Error(data.error || "Trial creation failed");
       }
 
-      // Success - move to provisioning step
       setAccountId(data.account_id);
-      setCurrentStep(7);
       toast.success("Trial started! Setting up your Agent...");
     } catch (error) {
       console.error("Trial signup error:", error);
       toast.error(error instanceof Error ? error.message : "Signup failed");
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleTestCall = () => {
-    if (phoneNumber) {
-      window.open(`tel:${phoneNumber}`, "_self");
-    }
-  };
+  if (accountId && !phoneNumber) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md py-8">
+          <DialogTitle className="sr-only">Provisioning your account</DialogTitle>
+          <DialogDescription className="sr-only">We are creating your assistant and phone number now.</DialogDescription>
+          <ProvisioningStatus
+            accountId={accountId}
+            onComplete={setPhoneNumber}
+            showProgress={true}
+            pollingInterval={3000}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-  const handleViewDashboard = () => {
-    onOpenChange(false);
-    navigate("/dashboard");
-    onSuccess?.();
-  };
+  if (phoneNumber) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md py-4">
+          <DialogTitle className="sr-only">Your trial phone number is ready</DialogTitle>
+          <DialogDescription className="sr-only">Review your new number and next steps.</DialogDescription>
+          <PhoneReadyPanel
+            phoneNumber={phoneNumber}
+            onTestCall={() => window.open(`tel:${phoneNumber}`, "_self")}
+            onViewDashboard={() => {
+              onOpenChange(false);
+              navigate("/dashboard");
+              onSuccess?.();
+            }}
+            showForwardingInstructions={true}
+            variant="full"
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const currentStep = FLOW_STEPS[currentStepIndex];
+
+  if (useClassicLayout) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Self-Serve Trial Setup</DialogTitle>
+          <DialogDescription className="sr-only">Classic onboarding rollback layout for trial setup.</DialogDescription>
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex items-center justify-between gap-2">
+            <span>Rollback mode enabled: classic onboarding layout active.</span>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setUseClassicLayout(false)}>
+              Switch to new chat
+            </Button>
+          </div>
+
+          <Form {...form}>
+            <div className="space-y-6 py-2">
+              <div>
+                <h2 className="text-lg font-semibold">Step {currentStepIndex + 1} of {FLOW_STEPS.length}</h2>
+                <p className="text-sm text-muted-foreground mt-1">{currentStep.botMessage}</p>
+              </div>
+
+              {currentStep.render(handleNext)}
+
+              {currentStep.id === "payment" && cardError && (
+                <p className="text-sm text-destructive font-medium">{cardError}</p>
+              )}
+
+              <div className="flex justify-between gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  disabled={currentStepIndex === 0 || isSubmitting || isTransitioning}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={isSubmitting || isTransitioning}
+                >
+                  {isSubmitting || isTransitioning
+                    ? "Processing..."
+                    : currentStepIndex === FLOW_STEPS.length - 1
+                      ? "Start Free Trial"
+                      : "Continue"}
+                </Button>
+              </div>
+            </div>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Progress Bar */}
-        {currentStep < 7 && (
-          <div className="mb-4">
-            <Progress value={progressPercent} className="h-2" />
-            <p className="text-xs text-muted-foreground mt-1 text-center">
-              Step {currentStep} of {totalSteps}
+      <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden flex flex-col bg-slate-50/50">
+        <DialogTitle className="sr-only">Self-Serve Trial Setup</DialogTitle>
+        <DialogDescription className="sr-only">Complete setup for your Ringsnap trial in a chat-style flow.</DialogDescription>
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-xs text-emerald-800 flex items-center justify-between">
+          <span>New chat onboarding experience enabled.</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setUseClassicLayout(true)}>
+            <RotateCcw className="mr-1 h-3.5 w-3.5" />
+            Roll back to classic
+          </Button>
+        </div>
+
+        <div className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm z-10">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Agent Setup</h2>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              Ringsnap Assistant is online
             </p>
           </div>
-        )}
+          <div className="text-xs font-medium text-slate-400">
+            Step {currentStepIndex + 1} of {FLOW_STEPS.length}
+          </div>
+        </div>
 
         <Form {...form}>
-          {/* Step 1: User Info */}
-          {currentStep === 1 && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Let's get started</DialogTitle>
-                <DialogDescription>
-                  Tell us about yourself to begin your 3-day free trial
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <EnhancedUserInfoForm
-                  form={form}
-                  requiredFields={["name", "email", "phone"]}
-                  showLabels={true}
-                  enableSmartEmail={true}
-                />
+          <div
+            ref={chatScrollRef}
+            className="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth"
+          >
+            <div className="flex gap-4 max-w-[85%]">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                <Bot className="w-4 h-4 text-primary-foreground" />
               </div>
-              <div className="flex justify-end gap-2">
-                <Button onClick={handleNext}>Continue</Button>
+              <div className="bg-white border shadow-sm rounded-2xl rounded-tl-sm px-5 py-3 text-sm leading-relaxed text-slate-700">
+                {currentStep.botMessage}
               </div>
-            </>
-          )}
+            </div>
 
-          {/* Step 2: Business Basics */}
-          {currentStep === 2 && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Your Business</DialogTitle>
-                <DialogDescription>
-                  Help us understand your business
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <EnhancedBusinessBasicsForm
-                  form={form}
-                  requiredFields={["companyName", "trade", "website", "zipCode"]}
-                  showOptionalBadges={true}
-                />
-              </div>
-              <div className="flex justify-between gap-2">
-                <Button variant="outline" onClick={handleBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={handleNext}>Continue</Button>
-              </div>
-            </>
-          )}
+            <div className="flex gap-4 justify-end">
+              <div className="bg-white border shadow-md rounded-2xl rounded-tr-sm p-5 w-full max-w-[90%]">
+                {currentStep.render(handleNext)}
 
-          {/* Step 3: Business Advanced */}
-          {currentStep === 3 && (
-            <>
-              <DialogHeader>
-                <DialogTitle>How should your Agent operate?</DialogTitle>
-                <DialogDescription>
-                  Customize your Agent's behavior
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <BusinessAdvancedForm
-                  form={form}
-                  fields={["primaryGoal", "businessHours"]}
-                />
-              </div>
-              <div className="flex justify-between gap-2">
-                <Button variant="outline" onClick={handleBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={handleNext}>Continue</Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 4: Voice Selection */}
-          {currentStep === 4 && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Choose your voice</DialogTitle>
-                <DialogDescription>
-                  Select the voice your customers will hear
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <VoiceSelector
-                  form={form}
-                  showSamples={true}
-                  layout="horizontal"
-                />
-              </div>
-              <div className="flex justify-between gap-2">
-                <Button variant="outline" onClick={handleBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={handleNext}>Continue</Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 5: Plan Selection */}
-          {currentStep === 5 && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Choose your plan</DialogTitle>
-                <DialogDescription>
-                  3-day free trial, then billed monthly. Cancel anytime.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <PlanSelector
-                  form={form}
-                  variant="detailed"
-                  highlight="professional"
-                />
-              </div>
-              <div className="flex justify-between gap-2">
-                <Button variant="outline" onClick={handleBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={handleNext}>Continue</Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 6: Payment */}
-          {currentStep === 6 && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Payment Information</DialogTitle>
-                <DialogDescription>
-                  Start your 3-day free trial. No charge today.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <PaymentForm
-                  onCardChange={(complete, error) => {
-                    setCardComplete(complete);
-                    setCardError(error);
-                  }}
-                  showTerms={true}
-                  termsAccepted={termsAccepted}
-                  onTermsChange={setTermsAccepted}
-                />
-                {cardError && (
-                  <p className="text-sm text-destructive mt-2">{cardError}</p>
+                {currentStep.id === "payment" && cardError && (
+                  <p className="text-sm text-destructive mt-3 font-medium">{cardError}</p>
                 )}
               </div>
-              <div className="flex justify-between gap-2">
-                <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button
-                  onClick={handleNext}
-                  disabled={!cardComplete || !termsAccepted || isSubmitting}
-                >
-                  {isSubmitting ? "Processing..." : "Start Free Trial"}
-                </Button>
+              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                <User className="w-4 h-4 text-slate-600" />
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
-          {/* Step 7: Provisioning */}
-          {currentStep === 7 && accountId && (
-            <>
-              <div className="py-8">
-                <ProvisioningStatus
-                  accountId={accountId}
-                  onComplete={(phone) => {
-                    setPhoneNumber(phone);
-                    setCurrentStep(8);
-                  }}
-                  showProgress={true}
-                  pollingInterval={3000}
-                />
-              </div>
-            </>
-          )}
+          <div className="bg-white border-t p-4 flex justify-between items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleBack}
+              disabled={currentStepIndex === 0 || isSubmitting || isTransitioning}
+              className="text-slate-500 hover:text-slate-800"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
 
-          {/* Step 8: Phone Ready */}
-          {currentStep === 8 && phoneNumber && (
-            <>
-              <DialogHeader>
-                <DialogTitle>You're All Set!</DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <PhoneReadyPanel
-                  phoneNumber={phoneNumber}
-                  onTestCall={handleTestCall}
-                  onViewDashboard={handleViewDashboard}
-                  showForwardingInstructions={true}
-                  variant="full"
-                />
-              </div>
-            </>
-          )}
+            <Button
+              type="button"
+              onClick={handleNext}
+              disabled={isSubmitting || isTransitioning}
+              className="w-full sm:w-auto px-8 rounded-full transition-all shadow-md hover:shadow-lg"
+            >
+              {isSubmitting || isTransitioning ? (
+                "Processing..."
+              ) : currentStepIndex === FLOW_STEPS.length - 1 ? (
+                "Start Free Trial"
+              ) : (
+                <>Continue <Send className="ml-2 h-4 w-4" /></>
+              )}
+            </Button>
+          </div>
         </Form>
       </DialogContent>
     </Dialog>
