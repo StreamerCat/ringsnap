@@ -134,9 +134,9 @@ function generateSecurePassword(): string {
  */
 function getStripePriceId(planType: string): string {
   const priceIds = {
-    starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-    professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
-    premium: Deno.env.get("STRIPE_PRICE_PREMIUM"),
+    starter: Deno.env.get("STRIPE_PRICE_STARTER_OLD"),
+    professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL_OLD"),
+    premium: Deno.env.get("STRIPE_PRICE_PREMIUM_OLD"),
   };
 
   const priceId = priceIds[planType as keyof typeof priceIds];

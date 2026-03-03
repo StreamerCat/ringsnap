@@ -4,9 +4,9 @@ import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const PLAN_KEY_TO_SECRET: Record<string, string> = {
-    starter: "STRIPE_PRICE_STARTER",
-    professional: "STRIPE_PRICE_PROFESSIONAL",
-    premium: "STRIPE_PRICE_PREMIUM",
+    starter: "STRIPE_PRICE_STARTER_OLD",
+    professional: "STRIPE_PRICE_PROFESSIONAL_OLD",
+    premium: "STRIPE_PRICE_PREMIUM_OLD",
 };
 
 serve(async (req) => {

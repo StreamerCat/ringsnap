@@ -363,9 +363,9 @@ serve(async (req) => {
     });
 
     const priceIds = {
-      starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-      professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
-      premium: Deno.env.get("STRIPE_PRICE_PREMIUM"),
+      starter: Deno.env.get("STRIPE_PRICE_STARTER_OLD"),
+      professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL_OLD"),
+      premium: Deno.env.get("STRIPE_PRICE_PREMIUM_OLD"),
     };
 
     const selectedPriceId = priceIds[validatedData.planType];
