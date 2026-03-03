@@ -23,9 +23,25 @@ if [ ! -f .env ] && [ -f .env.example ]; then
   sed -i 's/price_professional_plan_id/price_test_prof/g'            .env
   sed -i 's/price_premium_plan_id/price_test_prem/g'                 .env
   sed -i 's/your-vapi-api-key/dummy_vapi_key/g'                      .env
+
+  # Point SUPABASE_URL / VITE_ vars at the invariant local Supabase address so
+  # unit tests and the dev server connect to the local stack without manual edits.
+  # Keys below are the well-known Supabase CLI local-dev defaults (safe to commit).
+  LOCAL_URL="http://127.0.0.1:54321"
+  LOCAL_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRFA0NiK7W9oq4n5p92iqUHHRTFnICRnQimMn4sPJIM"
+  LOCAL_SRK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hj04zWl196z2-SBc0"
+
+  sed -i "s|SUPABASE_URL=.*|SUPABASE_URL=\"$LOCAL_URL\"|"                   .env
+  sed -i "s|VITE_SUPABASE_URL=.*|VITE_SUPABASE_URL=\"$LOCAL_URL\"|"         .env
+  sed -i "s|VITE_SUPABASE_PUBLISHABLE_KEY=.*|VITE_SUPABASE_PUBLISHABLE_KEY=\"$LOCAL_ANON\"|" .env
+  sed -i "s|SUPABASE_SERVICE_ROLE_KEY=.*|SUPABASE_SERVICE_ROLE_KEY=\"$LOCAL_SRK\"|" .env
 fi
 
-# ── 3. Install Playwright browsers (chromium only, for smoke tests) ───────────
+# ── 3. Lint migrations (fast, no network — catches SQL errors before dev work) ─
+echo "[session-start] Linting migrations..."
+bash .github/scripts/lint-migrations.sh
+
+# ── 4. Install Playwright browsers (chromium only, for smoke tests) ───────────
 echo "[session-start] Installing Playwright chromium browser..."
 npx playwright install chromium || true
 
