@@ -684,6 +684,8 @@ Deno.serve(async (req: Request) => {
     source?: string;
   } = {};
   let phase = "start";
+  // Declare supabase in outer scope so catch block can access it for error tracking
+  let supabase: any = null;
 
   try {
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
@@ -695,7 +697,7 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing Supabase environment variables");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
     // Only init stripe if key exists to avoid crash, though assertEnv checks it later
