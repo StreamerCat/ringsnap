@@ -347,9 +347,9 @@ function getStripePriceId(planType: string): string {
   // Fallback to legacy environment variables
   console.log("[getStripePriceId] Falling back to legacy ENV VAR price IDs");
   const legacyPriceIds: Record<string, string | undefined> = {
-    starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-    professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL"),
-    premium: Deno.env.get("STRIPE_PRICE_PREMIUM"),
+    starter: Deno.env.get("STRIPE_PRICE_STARTER_OLD"),
+    professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL_OLD"),
+    premium: Deno.env.get("STRIPE_PRICE_PREMIUM_OLD"),
   };
 
   const priceId = legacyPriceIds[planType];
@@ -646,7 +646,7 @@ Deno.serve(async (req: Request) => {
   // Validate required environment variables
   try {
     const requiredVars = getRequiredEnv(['SUPABASE', 'STRIPE', 'VAPI']);
-    requiredVars.push('STRIPE_PRICE_STARTER', 'STRIPE_PRICE_PROFESSIONAL', 'STRIPE_PRICE_PREMIUM');
+    requiredVars.push('STRIPE_PRICE_STARTER_OLD', 'STRIPE_PRICE_PROFESSIONAL_OLD', 'STRIPE_PRICE_PREMIUM_OLD');
     assertEnv(requiredVars, FUNCTION_NAME);
   } catch (envError: any) {
     return new Response(

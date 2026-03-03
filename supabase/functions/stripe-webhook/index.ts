@@ -676,9 +676,9 @@ serve(async (req) => {
           [Deno.env.get('STRIPE_PRICE_ID_CORE') || '']: 'core',
           [Deno.env.get('STRIPE_PRICE_ID_PRO') || '']: 'pro',
           // Legacy plan keys
-          [Deno.env.get('STRIPE_PRICE_STARTER') || '']: 'lite',
-          [Deno.env.get('STRIPE_PRICE_PROFESSIONAL') || '']: 'core',
-          [Deno.env.get('STRIPE_PRICE_PREMIUM') || '']: 'pro',
+          [Deno.env.get('STRIPE_PRICE_STARTER_OLD') || '']: 'lite',
+          [Deno.env.get('STRIPE_PRICE_PROFESSIONAL_OLD') || '']: 'core',
+          [Deno.env.get('STRIPE_PRICE_PREMIUM_OLD') || '']: 'pro',
         };
         delete priceEnvMap['']; // remove empty-key entries
 
