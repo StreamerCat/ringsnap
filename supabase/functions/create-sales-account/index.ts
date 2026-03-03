@@ -748,9 +748,9 @@ function getPriceIdForPlan(planType: string): string {
   }
 
   const priceMap: Record<string, string> = {
-    'starter': Deno.env.get('STRIPE_PRICE_STARTER') || 'price_starter_placeholder',
-    'professional': Deno.env.get('STRIPE_PRICE_PROFESSIONAL') || 'price_professional_placeholder',
-    'premium': Deno.env.get('STRIPE_PRICE_PREMIUM') || 'price_premium_placeholder'
+    'starter': Deno.env.get('STRIPE_PRICE_STARTER_OLD') || 'price_starter_placeholder',
+    'professional': Deno.env.get('STRIPE_PRICE_PROFESSIONAL_OLD') || 'price_professional_placeholder',
+    'premium': Deno.env.get('STRIPE_PRICE_PREMIUM_OLD') || 'price_premium_placeholder'
   };
   return priceMap[planType] || priceMap['starter'];
 }

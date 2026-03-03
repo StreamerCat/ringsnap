@@ -96,9 +96,9 @@ Go to: Supabase Dashboard → Settings → Edge Functions → Secrets
 
 You MUST have these set:
   • STRIPE_SECRET_KEY
-  • STRIPE_PRICE_STARTER
-  • STRIPE_PRICE_PROFESSIONAL
-  • STRIPE_PRICE_PREMIUM
+  • STRIPE_PRICE_STARTER_OLD
+  • STRIPE_PRICE_PROFESSIONAL_OLD
+  • STRIPE_PRICE_PREMIUM_OLD
 
 If they're missing, the signup will fail with "Price ID not configured".
 

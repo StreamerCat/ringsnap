@@ -112,10 +112,10 @@ export function getPlanName(planType: PlanType): string {
  */
 export function getStripePriceId(planType: PlanType): string {
   const priceIds: Record<PlanType, string> = {
-    starter: import.meta.env.VITE_STRIPE_PRICE_STARTER || "price_starter",
+    starter: import.meta.env.VITE_STRIPE_PRICE_STARTER_OLD || "price_starter",
     professional:
-      import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL || "price_professional",
-    premium: import.meta.env.VITE_STRIPE_PRICE_PREMIUM || "price_premium",
+      import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL_OLD || "price_professional",
+    premium: import.meta.env.VITE_STRIPE_PRICE_PREMIUM_OLD || "price_premium",
   };
   return priceIds[planType];
 }

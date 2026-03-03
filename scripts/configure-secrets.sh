@@ -58,9 +58,9 @@ if [[ $REPLY == "2" ]]; then
     [ ! -z "$SUPABASE_URL" ] && supabase secrets set SUPABASE_URL="$SUPABASE_URL"
     [ ! -z "$SUPABASE_SERVICE_ROLE_KEY" ] && supabase secrets set SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
     [ ! -z "$STRIPE_SECRET_KEY" ] && supabase secrets set STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY"
-    [ ! -z "$STRIPE_PRICE_STARTER" ] && supabase secrets set STRIPE_PRICE_STARTER="$STRIPE_PRICE_STARTER"
-    [ ! -z "$STRIPE_PRICE_PROFESSIONAL" ] && supabase secrets set STRIPE_PRICE_PROFESSIONAL="$STRIPE_PRICE_PROFESSIONAL"
-    [ ! -z "$STRIPE_PRICE_PREMIUM" ] && supabase secrets set STRIPE_PRICE_PREMIUM="$STRIPE_PRICE_PREMIUM"
+    [ ! -z "$STRIPE_PRICE_STARTER_OLD" ] && supabase secrets set STRIPE_PRICE_STARTER_OLD="$STRIPE_PRICE_STARTER_OLD"
+    [ ! -z "$STRIPE_PRICE_PROFESSIONAL_OLD" ] && supabase secrets set STRIPE_PRICE_PROFESSIONAL_OLD="$STRIPE_PRICE_PROFESSIONAL_OLD"
+    [ ! -z "$STRIPE_PRICE_PREMIUM_OLD" ] && supabase secrets set STRIPE_PRICE_PREMIUM_OLD="$STRIPE_PRICE_PREMIUM_OLD"
     [ ! -z "$VAPI_API_KEY" ] && supabase secrets set VAPI_API_KEY="$VAPI_API_KEY"
     [ ! -z "$VAPI_BASE_URL" ] && supabase secrets set VAPI_BASE_URL="$VAPI_BASE_URL"
     [ ! -z "$RESEND_PROD_KEY" ] && supabase secrets set RESEND_PROD_KEY="$RESEND_PROD_KEY"
@@ -94,9 +94,9 @@ else
 
     read -sp "STRIPE_SECRET_KEY (sk_test_... or sk_live_...): " STRIPE_SECRET_KEY
     echo ""
-    read -p "STRIPE_PRICE_STARTER (price_...): " STRIPE_PRICE_STARTER
-    read -p "STRIPE_PRICE_PROFESSIONAL (price_...): " STRIPE_PRICE_PROFESSIONAL
-    read -p "STRIPE_PRICE_PREMIUM (price_...): " STRIPE_PRICE_PREMIUM
+    read -p "STRIPE_PRICE_STARTER_OLD (price_...): " STRIPE_PRICE_STARTER_OLD
+    read -p "STRIPE_PRICE_PROFESSIONAL_OLD (price_...): " STRIPE_PRICE_PROFESSIONAL_OLD
+    read -p "STRIPE_PRICE_PREMIUM_OLD (price_...): " STRIPE_PRICE_PREMIUM_OLD
     echo ""
 
     echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
@@ -156,9 +156,9 @@ else
     supabase secrets set SUPABASE_URL="$SUPABASE_URL"
     supabase secrets set SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
     supabase secrets set STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY"
-    supabase secrets set STRIPE_PRICE_STARTER="$STRIPE_PRICE_STARTER"
-    supabase secrets set STRIPE_PRICE_PROFESSIONAL="$STRIPE_PRICE_PROFESSIONAL"
-    supabase secrets set STRIPE_PRICE_PREMIUM="$STRIPE_PRICE_PREMIUM"
+    supabase secrets set STRIPE_PRICE_STARTER_OLD="$STRIPE_PRICE_STARTER_OLD"
+    supabase secrets set STRIPE_PRICE_PROFESSIONAL_OLD="$STRIPE_PRICE_PROFESSIONAL_OLD"
+    supabase secrets set STRIPE_PRICE_PREMIUM_OLD="$STRIPE_PRICE_PREMIUM_OLD"
     supabase secrets set VAPI_API_KEY="$VAPI_API_KEY"
     supabase secrets set VAPI_BASE_URL="$VAPI_BASE_URL"
 
