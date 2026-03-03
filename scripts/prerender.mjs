@@ -166,6 +166,14 @@ async function main() {
     // Check if we're in CI or an environment where Puppeteer won't work
     const isCI = process.env.CI === 'true' || process.env.VERCEL === '1' || process.env.NETLIFY === 'true';
 
+    // Skip entirely on Netlify/CI — Chrome launches fine there but hangs on
+    // networkidle0 because Supabase realtime opens persistent WebSocket connections
+    // that never settle. Use SKIP_PRERENDER=false to force prerendering locally.
+    if (isCI && process.env.SKIP_PRERENDER !== 'false') {
+        console.log('⏭️  Skipping prerender (Netlify/CI detected). Build continues normally.');
+        process.exit(0);
+    }
+
     // Try to import Puppeteer
     let puppeteer;
     try {
