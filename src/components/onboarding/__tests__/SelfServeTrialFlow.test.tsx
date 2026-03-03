@@ -16,6 +16,6 @@ describe("SelfServeTrialFlow", () => {
         <SelfServeTrialFlow open={true} onOpenChange={() => {}} />
       </BrowserRouter>
     );
-    expect(screen.getByText("Let's get started")).toBeInTheDocument();
+    expect(screen.getByText("Agent Setup")).toBeInTheDocument();
   });
 });

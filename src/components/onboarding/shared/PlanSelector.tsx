@@ -18,6 +18,7 @@ interface PlanSelectorProps {
   variant?: "detailed" | "compact";
   highlight?: "starter" | "professional" | "premium";
   disabled?: boolean;
+  onAutoAdvance?: () => void;
 }
 
 const PLANS = [
@@ -87,7 +88,17 @@ export function PlanSelector({
   variant = "detailed",
   highlight = "professional",
   disabled = false,
+  onAutoAdvance,
 }: PlanSelectorProps) {
+  const handlePlanClick = (
+    planValue: "starter" | "professional" | "premium",
+    onChange: (value: "starter" | "professional" | "premium") => void,
+  ) => {
+    if (disabled) return;
+    onChange(planValue);
+    onAutoAdvance?.();
+  };
+
   return (
     <FormField
       control={form.control}
@@ -117,7 +128,7 @@ export function PlanSelector({
                       isSelected && "border-primary ring-2 ring-primary",
                       isHighlighted && !isSelected && "border-primary/50"
                     )}
-                    onClick={() => !disabled && field.onChange(plan.value)}
+                    onClick={() => handlePlanClick(plan.value, field.onChange)}
                   >
                     {isHighlighted && (
                       <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
