@@ -601,7 +601,7 @@ export function sanitizeCallReason(text: string | null | undefined): string {
 export function sanitizeCallSummary(text: string | null | undefined): string {
     if (!text) return '';
 
-    let cleaned = sanitizeCallText(text);
+    const cleaned = sanitizeCallText(text);
 
     // Limit to 2 sentences
     const sentences = cleaned.split(/([.!?])\s+/).reduce((acc: string[], part, i, arr) => {
