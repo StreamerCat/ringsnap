@@ -7,8 +7,8 @@ export const CompetitorComparison = () => {
     { name: "RingSnap", highlight: true },
     { name: "CallRail", highlight: false },
     { name: "Hatch", highlight: false },
-    { name: "Call Center", highlight: false },
-    { name: "Voicemail", highlight: false },
+    { name: "Live Answering Service", highlight: false },
+    { name: "Voicemail / Missed Call", highlight: false },
   ];
 
   const criteria = [
@@ -36,6 +36,10 @@ export const CompetitorComparison = () => {
       name: "Emergency routing",
       values: ["Smart", "Basic", "Basic", "Basic", "x"],
     },
+    {
+      name: "Cost of a missed call",
+      values: ["$0", "Unknown", "Unknown", "~$800 avg job", "~$800 avg job"],
+    },
   ];
 
   const getIcon = (value: string) => {
@@ -51,9 +55,9 @@ export const CompetitorComparison = () => {
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-6xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-          <h2 className="text-h2 mb-4">Compare RingSnap vs. the old way</h2>
+          <h2 className="text-h2 mb-4">Why contractors switch from call centers and voicemail</h2>
           <p className="text-body-default text-muted-foreground">
-            You just saw the wins—here’s how we stack up against call centers, voicemail, and pieced-together tools.
+            Side-by-side against every option contractors actually use.
           </p>
         </div>
 
