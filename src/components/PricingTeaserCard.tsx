@@ -22,13 +22,13 @@ export const PricingTeaserCard = ({ headingLevel }: PricingTeaserCardProps) => {
         <Card className="card-tier-2 max-w-md mx-auto">
             <CardContent className="p-6 text-center">
                 <HeadingTag className="text-h3 font-bold mb-2" style={{ color: 'hsl(var(--charcoal))' }}>
-                    Simple pricing, no per agent fees
+                    One receptionist. Every call. 24/7.
                 </HeadingTag>
                 <p className="text-muted-foreground mb-4">
-                    Starting at <span className="font-bold text-2xl text-foreground">$297/month</span>
+                    Starting at <span className="font-bold text-2xl text-foreground">$297/month</span> — includes ~100 calls
                 </p>
                 <p className="text-sm text-muted-foreground mb-6">
-                    Transparent pricing. No setup fees. Cancel anytime.
+                    No setup fees. No per-call surprises. 3-day free trial included.
                 </p>
                 <Button
                     variant="gradient"
