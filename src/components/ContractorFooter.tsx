@@ -4,19 +4,19 @@ import { Link } from "react-router-dom";
 
 export const ContractorFooter = () => {
   const faqs = [{
-    question: "Will it sound like a robot?",
+    question: "Will my customers know it's not a real person?",
     answer: "No. Our Voice Agent uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
   }, {
-    question: "What if it's a gas leak or electrical fire?",
+    question: "What happens when there's a real emergency at 2am?",
     answer: "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The Agent provides full context of the situation before transfer so you know exactly what you're walking into."
   }, {
-    question: "Can it handle Spanish-speaking customers?",
+    question: "My customers speak Spanish. Will that be a problem?",
     answer: "Yes. Professional and Premium plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference, ensuring you never lose a job due to language barriers."
   }, {
     question: "What if I'm already on a call?",
     answer: "The Agent books the appointment automatically and sends you an SMS/email notification. You can configure it to transfer to voicemail, send to a crew member, or schedule for your next available slot. No calls get missed."
   }, {
-    question: "Do I need to change my phone number?",
+    question: "Do I have to change anything about how I currently answer calls?",
     answer: "No. You keep your existing phone number. Setup takes about 10 minutes—just forward your number to your RingSnap Agent. Your customers will never know anything changed except that you suddenly answer every call."
   }, {
     question: "What about existing customers who want me personally?",

@@ -115,7 +115,7 @@ const Index = () => {
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "Will it sound like a robot?",
+        "name": "Will my customers know it's not a real person?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "No. Our system uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
@@ -123,7 +123,7 @@ const Index = () => {
       },
       {
         "@type": "Question",
-        "name": "What if it's a gas leak or electrical fire?",
+        "name": "What happens when there's a real emergency at 2am?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The system provides full context of the situation before transfer so you know exactly what you're walking into."
@@ -131,7 +131,7 @@ const Index = () => {
       },
       {
         "@type": "Question",
-        "name": "Can it handle Spanish-speaking customers?",
+        "name": "My customers speak Spanish. Will that be a problem?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "Yes. Professional and Growth plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference."
@@ -139,7 +139,7 @@ const Index = () => {
       },
       {
         "@type": "Question",
-        "name": "Do I need to change my phone number?",
+        "name": "Do I have to change anything about how I currently answer calls?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "No. You keep your existing phone number. Setup takes about 10 minutes—just forward your number to your RingSnap Agent."
