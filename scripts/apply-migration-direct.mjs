@@ -8,14 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
-const projectRef = (() => {
-  try {
-    const host = new URL(SUPABASE_URL).hostname;
-    return host.endsWith('.supabase.co') ? host.replace('.supabase.co', '') : 'YOUR_PROJECT';
-  } catch {
-    return 'YOUR_PROJECT';
-  }
-})();
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!SERVICE_ROLE_KEY) {
+  console.error('❌ Missing SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
 
 console.log('════════════════════════════════════════════════════════');
 console.log('  RINGSNAP DIRECT MIGRATION');
