@@ -1,9 +1,9 @@
 import { Star } from "lucide-react";
 
 const metricChips = [
-  { value: "4.9", label: "out of 5", helper: "247 contractors reviewed" },
-  { value: "<1s", label: "Answer time", helper: "Average speed to pickup" },
-  { value: "95%", label: "Capture rate", helper: "Calls secured vs. voicemail" },
+  { value: "980+", label: "Contractors served", helper: "Plumbing, HVAC, electrical & roofing" },
+  { value: "<1s", label: "Answer speed", helper: "Average time to pickup" },
+  { value: "95%", label: "Call capture rate", helper: "vs. 40% industry average" },
 ];
 
 export const TestimonialMetricsStrip = () => (
@@ -15,9 +15,9 @@ export const TestimonialMetricsStrip = () => (
             <Star className="w-6 h-6 text-primary fill-primary" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-primary">Proven with contractors</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-primary">Trusted by 980+ Pros</p>
             <h2 className="text-2xl sm:text-3xl font-bold text-charcoal">
-              "RingSnap feels like our best receptionist—on every call."
+              "We stopped missing calls the first night. Paid for itself in 3 days."
             </h2>
           </div>
         </div>
