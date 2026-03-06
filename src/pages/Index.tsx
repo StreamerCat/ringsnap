@@ -213,6 +213,16 @@ const Index = () => {
               <SolutionDemo />
               <NextStepsStrip />
               <CallValueCalculator />
+              <section className="section-spacer-compact bg-charcoal/5 border-y border-charcoal/10">
+                <div className="site-container max-w-3xl text-center">
+                  <p className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
+                    Your competitor just answered the call you missed.
+                  </p>
+                  <p className="text-lg text-muted-foreground">
+                    The average contractor misses 6 calls on a busy Saturday. At $800 per job, that's $4,800 walking out the door — every weekend.
+                  </p>
+                </div>
+              </section>
               <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
                 <div className="site-container max-w-4xl text-center">
                   <PricingTeaserCard headingLevel="h2" />
