@@ -131,7 +131,7 @@ const REDACTED_KEYS = [
 **Example:**
 ```typescript
 // Input
-{ stripe_secret_key: "sk_live_abc123" }
+{ stripe_secret_key: process.env.STRIPE_SECRET_KEY }
 
 // Output
 { stripe_secret_key: "[REDACTED]" }

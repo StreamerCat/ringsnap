@@ -8,8 +8,13 @@ import https from 'https';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SUPABASE_URL = 'https://rmyvvbqnccpfeyowidrq.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteXZ2YnFuY2NwZmV5b3dpZHJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mjc4NDQ2MywiZXhwIjoyMDc4MzYwNDYzfQ.js8G1sw5IDjeO1QuYpx8y-FGuMd1Udzen9Gwpkl-HDo';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!SERVICE_ROLE_KEY) {
+  console.error('❌ Missing SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
 
 console.log('════════════════════════════════════════════════════════');
 console.log('  RINGSNAP DIRECT MIGRATION');

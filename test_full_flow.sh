@@ -4,7 +4,7 @@
 set -e
 
 SUPABASE_URL="https://rmyvvbqnccpfeyowidrq.supabase.co"
-SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteXZ2YnFuY2NwZmV5b3dpZHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA3NTQzMzIsImV4cCI6MjA0NjMzMDMzMn0.XqtopqHACBOMJE9E1MoBesp-tw9FjDWC0slMcXqDwtk'
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}"
 
 echo "🚀 Starting Full Flow Signup Test"
 echo "--------------------------------"
