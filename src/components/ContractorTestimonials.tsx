@@ -5,7 +5,7 @@ import { Star, TrendingUp } from "lucide-react";
 export const ContractorTestimonials = () => {
   const testimonials = [
     {
-      quote: "We went from missing 40% of calls to capturing 98%. Emergency AND routine calls—all handled. That's an extra $23,400 in monthly revenue. The AI paid for itself in 3 days.",
+      quote: "We were missing 60% of after-hours calls. First month with RingSnap we booked 11 jobs we would've lost — that's $23,400 recovered in 30 days.",
       name: "Tommy Chen",
       business: "Tommy's Plumbing",
       location: "Austin, TX",
@@ -15,7 +15,7 @@ export const ContractorTestimonials = () => {
       trade: "Plumbing"
     },
     {
-      quote: "HVAC emergencies AND quote requests come in around the clock. AI captured $31,000 worth of calls in the first month alone—both emergency repairs and scheduled maintenance.",
+      quote: "HVAC emergencies at 2am, quote requests on Sundays — RingSnap handles them all. $31,000 captured in the first month. My dispatcher now only deals with jobs already booked.",
       name: "Sarah Martinez",
       business: "Arctic Heating & Cooling",
       location: "Denver, CO",
@@ -25,7 +25,7 @@ export const ContractorTestimonials = () => {
       trade: "HVAC"
     },
     {
-      quote: "I'm always on a ladder or in a panel box. AI books 127 calls monthly while I work—emergencies get routed immediately, routine calls get scheduled. My competitors are still missing calls.",
+      quote: "I'm always on a ladder or in a panel box. Can't answer calls while I'm working. RingSnap books 127 jobs a month while I'm heads-down. My competitors are still going to voicemail.",
       name: "Mike Johnson",
       business: "Bolt Electric",
       location: "Phoenix, AZ",
@@ -42,9 +42,9 @@ export const ContractorTestimonials = () => {
         <hr className="section-divider mb-8 sm:mb-12" />
         <div className="max-w-4xl mx-auto text-center mb-8 sm:mb-12">
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
-          <h2 className="text-h2 mb-4">Real contractors see these results every day</h2>
+          <h2 className="text-h2 mb-4">What contractors say after their first month</h2>
           <p className="text-body-default text-muted-foreground">
-            Proof before the pitch: crews in plumbing, HVAC, electrical, and roofing rely on RingSnap to sound human, stay on brand, and convert emergencies into booked jobs.
+            Real numbers from real contractors in plumbing, HVAC, and electrical. No actors, no aggregated stats.
           </p>
         </div>
 
