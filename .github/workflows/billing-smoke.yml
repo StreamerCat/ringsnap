@@ -1,0 +1,55 @@
+name: Billing Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 13 * * *"   # daily at 13:00 UTC
+  push:
+    branches: [main]
+
+jobs:
+  billing-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # Billing smoke runner inputs
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+      STRIPE_PRICE_ID_NIGHT_WEEKEND: ${{ secrets.STRIPE_PRICE_ID_NIGHT_WEEKEND }}
+      STRIPE_PRICE_ID_LITE: ${{ secrets.STRIPE_PRICE_ID_LITE }}
+      STRIPE_PRICE_ID_CORE: ${{ secrets.STRIPE_PRICE_ID_CORE }}
+      STRIPE_PRICE_ID_PRO: ${{ secrets.STRIPE_PRICE_ID_PRO }}
+      STRIPE_OVERAGE_PRICE_ID_NIGHT_WEEKEND: ${{ secrets.STRIPE_OVERAGE_PRICE_ID_NIGHT_WEEKEND }}
+      STRIPE_OVERAGE_PRICE_ID_LITE: ${{ secrets.STRIPE_OVERAGE_PRICE_ID_LITE }}
+      STRIPE_OVERAGE_PRICE_ID_CORE: ${{ secrets.STRIPE_OVERAGE_PRICE_ID_CORE }}
+      STRIPE_OVERAGE_PRICE_ID_PRO: ${{ secrets.STRIPE_OVERAGE_PRICE_ID_PRO }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BILLING_SMOKE_ACCOUNT_ID: ${{ secrets.BILLING_SMOKE_ACCOUNT_ID }}
+
+      # Billing Playwright creds
+      BILLING_E2E_EMAIL: ${{ secrets.BILLING_E2E_EMAIL }}
+      BILLING_E2E_PASSWORD: ${{ secrets.BILLING_E2E_PASSWORD }}
+
+      # Point Playwright to deployed app URL in CI
+      PLAYWRIGHT_BASE_URL: ${{ secrets.BILLING_TEST_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      # Required for billing Playwright run path
+      - run: npx playwright install --with-deps chromium
+
+      # Optional but recommended prechecks
+      - run: npm run lint
+      - run: npm run typecheck
+
+      # Main billing suite
+      - run: npm run test:billing
