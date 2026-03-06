@@ -94,7 +94,7 @@ function sanitizeValue(value: unknown): unknown {
     }
 
     // Mask phone patterns (basic detection)
-    if (/^[\d\s\-\+\(\)]{10,}$/.test(value)) {
+    if (/^[\d\s\-+()]{10,}$/.test(value)) {
       return maskPhoneForLogs(value);
     }
 
