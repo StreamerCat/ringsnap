@@ -234,9 +234,9 @@ const Index = () => {
                 <div className="site-container">
                   <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-cream/30 to-off-white border border-border/10 shadow-sm">
                     <div className="max-w-2xl text-center md:text-left">
-                      <h2 className="text-3xl font-bold mb-4">Contractor Resource Center</h2>
+                      <h2 className="text-3xl font-bold mb-4">Free Tools Built for Home Service Crews</h2>
                       <p className="text-lg text-muted-foreground mb-0">
-                        Free dispatcher scripts, phone intake checklists, and profit calculators designed specifically for home service trades.
+                        Dispatcher scripts, after-hours call templates, missed revenue calculators, and emergency triage guides — all free, all built for HVAC, plumbing, and electrical.
                       </p>
                     </div>
                     <Button
