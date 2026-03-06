@@ -6,6 +6,7 @@ import { sendAppointmentNotifications, Appointment, AccountSettings } from "../_
 import { checkSlotConflict } from "../_shared/availability.ts";
 
 const FUNCTION_NAME = "vapi-tools-appointments";
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
 // Feature flag for conflict enforcement (default ON)
 const CONFLICT_ENFORCEMENT_ENABLED =
@@ -31,7 +32,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
         // Allow if no secret configured (dev) or if matches
         if (expectedSecret && authHeader !== expectedSecret) {
             logError("Unauthorized tool request", { functionName: FUNCTION_NAME, correlationId, context: { error: "Invalid secret" } });
-            return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders });
         }
 
         // 3. Parse Request
@@ -190,7 +191,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
                         }
                     ]
                 }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" }
+                    headers: jsonHeaders
                 });
             }
         }
@@ -300,7 +301,7 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
                 }
             ]
         }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+            headers: jsonHeaders
         });
 
     } catch (err: any) {
@@ -320,12 +321,12 @@ Deno.serve(withSentryEdge({ functionName: FUNCTION_NAME }, async (req, ctx) => {
                     }
                 ]
             }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
+                headers: jsonHeaders
             });
         }
 
         return new Response(JSON.stringify({
             error: "Internal Server Error", // Fallback
-        }), { status: 500, headers: corsHeaders });
+        }), { status: 500, headers: jsonHeaders });
     }
 }));

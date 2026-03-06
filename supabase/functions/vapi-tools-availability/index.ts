@@ -31,6 +31,7 @@ import { logInfo, logError, logWarn } from "../_shared/logging.ts";
 import { getAvailableSlots, TimeSlot } from "../_shared/availability.ts";
 
 const FUNCTION_NAME = "vapi-tools-availability";
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
 // Feature flag for enforcement
 const CONFLICT_ENFORCEMENT_ENABLED =
@@ -58,7 +59,7 @@ Deno.serve(
                 });
                 return new Response(JSON.stringify({ error: "Unauthorized" }), {
                     status: 401,
-                    headers: corsHeaders,
+                    headers: jsonHeaders,
                 });
             }
 
@@ -206,7 +207,7 @@ Deno.serve(
                         ],
                     }),
                     {
-                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                        headers: jsonHeaders,
                     }
                 );
             }
@@ -275,7 +276,7 @@ Deno.serve(
                     ],
                 }),
                 {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    headers: jsonHeaders,
                 }
             );
         } catch (err: any) {
@@ -289,7 +290,7 @@ Deno.serve(
                 JSON.stringify({
                     error: "Internal Server Error",
                 }),
-                { status: 500, headers: corsHeaders }
+                { status: 500, headers: jsonHeaders }
             );
         }
     })
