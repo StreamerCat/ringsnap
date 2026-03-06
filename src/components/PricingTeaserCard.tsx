@@ -25,10 +25,10 @@ export const PricingTeaserCard = ({ headingLevel }: PricingTeaserCardProps) => {
                     One receptionist. Every call. 24/7.
                 </HeadingTag>
                 <p className="text-muted-foreground mb-4">
-                    Starting at <span className="font-bold text-2xl text-foreground">$297/month</span> — includes ~100 calls
+                    Starting at <span className="font-bold text-2xl text-foreground">$59/month</span> — scales with your call volume
                 </p>
                 <p className="text-sm text-muted-foreground mb-6">
-                    No setup fees. No per-call surprises. 3-day free trial included.
+                    Night & Weekend from $59. Full 24/7 coverage from $129. 3-day free trial on every plan.
                 </p>
                 <Button
                     variant="gradient"
