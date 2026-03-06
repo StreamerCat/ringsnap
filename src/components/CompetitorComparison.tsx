@@ -22,7 +22,7 @@ export const CompetitorComparison = () => {
     },
     {
       name: "Monthly cost",
-      values: ["$297+", "$500+", "$600+", "$1500+", "Free"],
+      values: ["$59+", "$500+", "$600+", "$1500+", "Free"],
     },
     {
       name: "24/7 coverage",
