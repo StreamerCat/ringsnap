@@ -8,10 +8,16 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SUPABASE_URL = 'https://rmyvvbqnccpfeyowidrq.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteXZ2YnFuY2NwZmV5b3dpZHJxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mjc4NDQ2MywiZXhwIjoyMDc4MzYwNDYzfQ.js8G1sw5IDjeO1QuYpx8y-FGuMd1Udzen9Gwpkl-HDo';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 console.log('🚀 Starting automated Supabase migration...\n');
+
+if (!SERVICE_ROLE_KEY) {
+  console.error('❌ Missing SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
+
 
 // Create Supabase client with service role
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -122,7 +128,7 @@ async function main() {
   console.log('════════════════════════════════════════════════════════');
   console.log('  RINGSNAP AUTOMATED SUPABASE MIGRATION');
   console.log('════════════════════════════════════════════════════════\n');
-  console.log(`  Project: rmyvvbqnccpfeyowidrq`);
+  console.log(`  Project: ${new URL(SUPABASE_URL).hostname.split('.')[0]}`);
   console.log(`  URL: ${SUPABASE_URL}\n`);
   console.log('════════════════════════════════════════════════════════\n');
 

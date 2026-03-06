@@ -28,8 +28,8 @@ if [ ! -f .env ] && [ -f .env.example ]; then
   # unit tests and the dev server connect to the local stack without manual edits.
   # Keys below are the well-known Supabase CLI local-dev defaults (safe to commit).
   LOCAL_URL="http://127.0.0.1:54321"
-  LOCAL_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRFA0NiK7W9oq4n5p92iqUHHRTFnICRnQimMn4sPJIM"
-  LOCAL_SRK="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hj04zWl196z2-SBc0"
+  LOCAL_ANON="${VITE_SUPABASE_PUBLISHABLE_KEY:-local-anon-key}"
+  LOCAL_SRK="${SUPABASE_SERVICE_ROLE_KEY:-local-service-role-key}"
 
   sed -i "s|SUPABASE_URL=.*|SUPABASE_URL=\"$LOCAL_URL\"|"                   .env
   sed -i "s|VITE_SUPABASE_URL=.*|VITE_SUPABASE_URL=\"$LOCAL_URL\"|"         .env

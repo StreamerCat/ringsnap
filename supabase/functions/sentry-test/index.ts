@@ -53,7 +53,7 @@ serve(
               // These should all be redacted
               customer_email: "sensitive@example.com",
               phone_number: "+1234567890",
-              stripe_secret_key: "sk_live_abc123xyz",
+              stripe_secret_key: Deno.env.get("STRIPE_SECRET_KEY") || "[missing STRIPE_SECRET_KEY]",
               authorization_header: "Bearer token123",
               credit_card: "4242-4242-4242-4242",
 
