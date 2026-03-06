@@ -33,7 +33,8 @@
     "test:signup-critical": "vitest run tests/signup-critical && node scripts/provisioning-e2e-agent.mjs",
     "check:robots": "node scripts/check-robots.mjs",
     "check:sitemap": "node scripts/check-sitemap-coverage.mjs",
-    "check:seo": "npm run check:robots && npm run check:sitemap"
+    "check:seo": "npm run check:robots && npm run check:sitemap",
+    "test:billing": "node scripts/billing-smoke/run.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
