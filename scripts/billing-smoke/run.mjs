@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const TEST_RUN_ID = process.env.TEST_RUN_ID || `billing_smoke_${new Date().toISOString().replace(/[:.]/g, '-')}`;
@@ -135,16 +135,29 @@ if (!process.env.BILLING_E2E_EMAIL || !process.env.BILLING_E2E_PASSWORD) {
   push('G1', 'GAP', 'Set BILLING_E2E_EMAIL and BILLING_E2E_PASSWORD to run dashboard cancellation E2E.');
   push('H4+H7', 'GAP', 'Set BILLING_E2E_EMAIL and BILLING_E2E_PASSWORD to run billing UI E2E.');
 } else {
-  try {
-    execSync('npx playwright test tests/e2e/billing-go-live.spec.ts --project=chromium', {
-      stdio: 'inherit',
-      env: { ...process.env },
-    });
+  const pw = spawnSync('npx', ['playwright', 'test', 'tests/e2e/billing-go-live.spec.ts', '--project=chromium'], {
+    env: { ...process.env },
+    encoding: 'utf8',
+  });
+
+  const combinedOutput = `${pw.stdout || ''}
+${pw.stderr || ''}`;
+  if (pw.stdout) process.stdout.write(pw.stdout);
+  if (pw.stderr) process.stderr.write(pw.stderr);
+
+  if (pw.status === 0) {
     push('G1', 'PASS', 'Dashboard cancellation flow executed in E2E harness.');
     push('H4+H7', 'PASS', 'Billing invoice list and 4-plan upgrade modal rendered in E2E harness.');
-  } catch {
-    push('G1', 'GAP', 'Playwright billing E2E could not run in this environment (browser unavailable or blocked).');
-    push('H4+H7', 'GAP', 'Playwright billing E2E could not run in this environment (browser unavailable or blocked).');
+  } else {
+    const envBlocked = /Executable doesn't exist|Failed to install browsers|download.*403|Please run the following command to download new browsers/i.test(combinedOutput);
+
+    if (envBlocked) {
+      push('G1', 'GAP', 'Playwright billing E2E could not run in this environment (browser unavailable or blocked).');
+      push('H4+H7', 'GAP', 'Playwright billing E2E could not run in this environment (browser unavailable or blocked).');
+    } else {
+      push('G1', 'FAIL', `Playwright billing E2E failed (exit=${pw.status ?? 'n/a'}).`);
+      push('H4+H7', 'FAIL', `Playwright billing E2E failed (exit=${pw.status ?? 'n/a'}).`);
+    }
   }
 }
 
