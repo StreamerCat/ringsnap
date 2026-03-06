@@ -33,13 +33,8 @@ export const ContractorHero = () => {
               <h2 className="text-h3" style={{
                 color: 'hsl(var(--charcoal) / 0.9)'
               }}>
-                24/7 Call Coverage for Home Service Teams
+                Your AI receptionist answers 24/7, books the job, and handles emergencies — so you never lose revenue to voicemail.
               </h2>
-              <p className="text-body-default text-lg sm:text-xl" style={{
-                color: 'hsl(var(--charcoal) / 0.7)'
-              }}>
-                Answers fast, qualifies the caller, books the appointment, or escalates urgent jobs. You control the rules and see exactly what happened on every call.
-              </p>
             </div>
 
             {/* Gradient CTAs */}
@@ -53,12 +48,6 @@ export const ContractorHero = () => {
                 color: 'hsl(var(--charcoal))'
               }} onClick={scrollToVapiDemo}>
                 Hear it Live
-              </Button>
-              <Button size="lg" variant="outline" className="text-lg h-14 px-8 font-semibold rounded-full border-2 transition-all hover:shadow-md" style={{
-                borderColor: 'hsl(var(--charcoal) / 0.3)',
-                color: 'hsl(var(--charcoal))'
-              }} onClick={() => navigate('/pricing')}>
-                See pricing
               </Button>
             </div>
 
