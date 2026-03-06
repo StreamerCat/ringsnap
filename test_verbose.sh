@@ -8,10 +8,10 @@ echo "Testing create-trial function..."
 echo "Email: $RANDOM_EMAIL"
 echo ""
 
-curl -v -X POST "https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/create-trial" \
+curl -v -X POST "${SUPABASE_URL}/functions/v1/create-trial" \
   -H "Content-Type: application/json" \
-  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteXZ2YnFuY2NwZmV5b3dpZHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA3NTQzMzIsImV4cCI6MjA0NjMzMDMzMn0.XqtopqHACBOMJE9E1MoBesp-tw9FjDWC0slMcXqDwtk" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJteXZ2YnFuY2NwZmV5b3dpZHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA3NTQzMzIsImV4cCI6MjA0NjMzMDMzMn0.XqtopqHACBOMJE9E1MoBesp-tw9FjDWC0slMcXqDwtk" \
+  -H "apikey: ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}" \
+  -H "Authorization: Bearer ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}" \
   -d "{
     \"name\": \"Test User\",
     \"email\": \"${RANDOM_EMAIL}\",
