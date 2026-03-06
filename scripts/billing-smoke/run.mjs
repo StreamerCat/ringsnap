@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const TEST_RUN_ID = process.env.TEST_RUN_ID || `billing_smoke_${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const PURPOSE = 'billing_smoke';
+const TEST_METADATA = { test_run_id: TEST_RUN_ID, purpose: PURPOSE };
 
 function parseEnvExample() {
   const map = new Map();
@@ -130,19 +131,25 @@ if (missingSupa.length > 0) {
 }
 
 // Playwright checks: G1 + H4/H7
-try {
-  execSync('npx playwright test tests/e2e/billing-go-live.spec.ts --project=chromium', {
-    stdio: 'inherit',
-    env: { ...process.env, NODE_ENV: 'test' },
-  });
-  push('G1', 'PASS', 'Dashboard cancellation flow executed in E2E harness.');
-  push('H4+H7', 'PASS', 'Billing invoice list and 4-plan upgrade modal rendered in E2E harness.');
-} catch {
-  push('G1', 'GAP', 'Playwright billing E2E could not run in this environment (missing browser binary / download blocked).');
-  push('H4+H7', 'GAP', 'Playwright billing E2E could not run in this environment (missing browser binary / download blocked).');
+if (!process.env.BILLING_E2E_EMAIL || !process.env.BILLING_E2E_PASSWORD) {
+  push('G1', 'GAP', 'Set BILLING_E2E_EMAIL and BILLING_E2E_PASSWORD to run dashboard cancellation E2E.');
+  push('H4+H7', 'GAP', 'Set BILLING_E2E_EMAIL and BILLING_E2E_PASSWORD to run billing UI E2E.');
+} else {
+  try {
+    execSync('npx playwright test tests/e2e/billing-go-live.spec.ts --project=chromium', {
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
+    push('G1', 'PASS', 'Dashboard cancellation flow executed in E2E harness.');
+    push('H4+H7', 'PASS', 'Billing invoice list and 4-plan upgrade modal rendered in E2E harness.');
+  } catch {
+    push('G1', 'GAP', 'Playwright billing E2E could not run in this environment (browser unavailable or blocked).');
+    push('H4+H7', 'GAP', 'Playwright billing E2E could not run in this environment (browser unavailable or blocked).');
+  }
 }
 
-console.log('\n=== BILLING GO-LIVE TOP-10 SUMMARY ===');
+console.log(`\n=== BILLING GO-LIVE TOP-10 SUMMARY (${TEST_RUN_ID}) ===`);
+console.log(`metadata=${JSON.stringify(TEST_METADATA)}`);
 for (const r of results) {
   console.log(`${r.id}: ${r.status} - ${r.reason}`);
 }

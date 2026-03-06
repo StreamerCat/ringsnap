@@ -102,14 +102,6 @@ export const withAuthGuard = <P extends object>(
       return next || "/";
     }, [location.hash, location.pathname, location.search]);
 
-    const isBillingE2EBypass =
-      process.env.NODE_ENV === "test" &&
-      new URLSearchParams(location.search).get("billingE2E") === "1";
-
-    if (isBillingE2EBypass) {
-      return <Component {...props} />;
-    }
-
     useEffect(() => {
       if (isLoading || user) {
         return;

@@ -54,7 +54,6 @@ export default function CustomerDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "inbox");
-  const isBillingE2E = process.env.NODE_ENV === "test" && searchParams.get("billingE2E") === "1";
   const [account, setAccount] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([]);
@@ -73,28 +72,6 @@ export default function CustomerDashboard() {
   useEffect(() => {
     // Auth is handled by withAuthGuard wrapper in App.tsx
     const initData = async () => {
-      if (isBillingE2E) {
-        setProfile({ id: "test-profile", name: "Billing E2E" });
-        setAccount({
-          id: "acc_billing_e2e",
-          company_name: "Billing E2E Account",
-          subscription_status: "trial",
-          plan_key: "night_weekend",
-          plan_type: "night_weekend",
-          trial_active: true,
-          trial_end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          monthly_minutes_limit: 150,
-          monthly_minutes_used: 45,
-          minutes_used_current_period: 45,
-          current_period_end: Math.floor(Date.now() / 1000) + (14 * 24 * 60 * 60),
-          provisioning_status: "completed",
-          vapi_phone_number: "+15555550123",
-          is_test_account: true,
-        });
-        setLoading(false);
-        return;
-      }
-
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await loadDashboardData(user.id);
@@ -142,7 +119,7 @@ export default function CustomerDashboard() {
         supabase.removeChannel(subscription);
       }
     };
-  }, [account?.id, isBillingE2E]);
+  }, [account?.id]);
 
   // Polling for provisioning status
   useEffect(() => {
