@@ -3,7 +3,6 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import https from 'https';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -32,7 +31,7 @@ console.log('  MANUAL MIGRATION INSTRUCTIONS');
 console.log('════════════════════════════════════════════════════════\n');
 
 console.log('✅ Quick Manual Migration (5 minutes):\n');
-console.log('1. Open: https://supabase.com/dashboard/project/rmyvvbqnccpfeyowidrq/sql/new\n');
+console.log(`1. Open: https://supabase.com/dashboard/project/${projectRef}/sql/new\n`);
 console.log('2. Open file: scripts/consolidated-migration.sql');
 console.log('3. Copy ALL contents (Ctrl+A, Ctrl+C)');
 console.log('4. Paste into SQL Editor');

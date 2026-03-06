@@ -8,7 +8,7 @@ echo "Testing create-trial function..."
 echo "Email: $RANDOM_EMAIL"
 echo ""
 
-curl -v -X POST "https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/create-trial" \
+curl -v -X POST "${SUPABASE_URL}/functions/v1/create-trial" \
   -H "Content-Type: application/json" \
   -H "apikey: ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}" \
   -H "Authorization: Bearer ${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}" \
