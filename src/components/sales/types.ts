@@ -36,41 +36,41 @@ export interface PlanConfig {
 export const PLANS: PlanConfig[] = [
   {
     value: 'starter',
-    name: 'Starter',
-    price: 297,
-    calls: '≤80',
+    name: 'Night & Weekend',
+    price: 59,
+    calls: '150 min included',
     features: [
-      'AI phone answering 24/7',
-      'Lead capture & qualification',
-      'Email support',
-      'Basic call analytics'
+      'After-hours + weekend call answering',
+      'Urgent transfer with full context',
+      'Call recordings + transcripts',
+      'CRM included'
     ]
   },
   {
     value: 'professional',
-    name: 'Professional',
-    price: 797,
-    calls: '≤160',
+    name: 'Lite',
+    price: 129,
+    calls: '300 min included',
     features: [
-      'Everything in Starter',
-      'Priority call routing',
-      'Advanced analytics',
-      'Phone support',
-      'CRM integrations'
+      'Everything in Night & Weekend, plus',
+      '24/7 call answering',
+      'Appointment booking with your calendar',
+      'Google Calendar + Zapier',
+      'CRM included — full caller history'
     ],
     recommended: true
   },
   {
     value: 'premium',
-    name: 'Premium',
-    price: 1497,
-    calls: '>160',
+    name: 'Core',
+    price: 229,
+    calls: '600 min included',
     features: [
-      'Everything in Professional',
-      'Custom voice cloning',
-      'Dedicated account manager',
-      'Custom integrations',
-      'White-glove onboarding'
+      'Everything in Lite, plus',
+      'Branded voice options',
+      'Priority support',
+      'Custom escalation rules',
+      'Multi-language (English + Spanish)'
     ]
   }
 ];

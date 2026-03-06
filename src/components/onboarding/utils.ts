@@ -87,9 +87,9 @@ export function isValidZipCode(zip: string): boolean {
  */
 export function getPlanPrice(planType: PlanType): number {
   const prices: Record<PlanType, number> = {
-    starter: 297,
-    professional: 497,
-    premium: 797,
+    starter: 59,
+    professional: 129,
+    premium: 229,
   };
   return prices[planType];
 }
@@ -99,9 +99,9 @@ export function getPlanPrice(planType: PlanType): number {
  */
 export function getPlanName(planType: PlanType): string {
   const names: Record<PlanType, string> = {
-    starter: "Starter",
-    professional: "Professional",
-    premium: "Premium",
+    starter: "Night & Weekend",
+    professional: "Lite",
+    premium: "Core",
   };
   return names[planType];
 }

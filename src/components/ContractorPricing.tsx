@@ -144,7 +144,7 @@ const FAQS = [
   },
   {
     q: "What if I go over my minutes?",
-    a: "By default, we keep answering every call and bill overage at your plan's per-minute rate. We alert you at 70% and 90% so you're never surprised. You can also set a buffer or a hard stop in your dashboard under Call Handling Preferences.",
+    a: "By default, we keep answering every call and bill overage at your plan's per-minute rate (Night & Weekend $0.45/min, Lite $0.38/min, Core $0.28/min, Pro $0.22/min). We alert you at 70% and 90% so you're never surprised. You can also set a buffer or a hard stop in your dashboard under Call Handling Preferences.",
   },
   {
     q: "Will my calls ever get cut off?",

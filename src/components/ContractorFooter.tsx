@@ -5,13 +5,13 @@ import { Link } from "react-router-dom";
 export const ContractorFooter = () => {
   const faqs = [{
     question: "Will my customers know it's not a real person?",
-    answer: "No. Our Voice Agent uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
+    answer: "No. Our Voice Agent uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Core and Pro plans."
   }, {
     question: "What happens when there's a real emergency at 2am?",
     answer: "Life-threatening emergencies are always transferred to you immediately (typically in under 5 seconds). The Agent provides full context of the situation before transfer so you know exactly what you're walking into."
   }, {
     question: "My customers speak Spanish. Will that be a problem?",
-    answer: "Yes. Professional and Premium plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference, ensuring you never lose a job due to language barriers."
+    answer: "Yes. Core and Pro plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference, ensuring you never lose a job due to language barriers."
   }, {
     question: "What if I'm already on a call?",
     answer: "The Agent books the appointment automatically and sends you an SMS/email notification. You can configure it to transfer to voicemail, send to a crew member, or schedule for your next available slot. No calls get missed."
@@ -26,7 +26,16 @@ export const ContractorFooter = () => {
     answer: "Your 3-day trial includes 150 minutes (approximately 40+ test calls) to fully test RingSnap with real scenarios—emergency calls, appointments, after-hours coverage, everything. No credit card required to start.\n\nIf you use all 150 minutes during the trial, your service simply pauses and you can upgrade instantly to continue. After 3 days, your selected plan begins automatically unless you cancel. You're in complete control and can cancel anytime with zero hassle."
   }, {
     question: "What if I go over my included minutes?",
-    answer: "No problem! We never cut off your service mid-month. If you exceed your included minutes, additional minutes are billed at:\n\n• Starter: $0.16/minute\n• Professional: $0.13/minute\n• Premium: $0.11/minute\n\nYou'll receive email notifications at 75% and 90% usage so you're never surprised. Most customers stay within their plan limits, but busy months happen—we've got you covered.\n\nIf you consistently exceed your limit, we'll proactively suggest upgrading to the next tier, which usually saves you money compared to paying for additional minutes each month."
+    answer: `No problem. We never cut off your service mid-month. If you exceed your included minutes, overage is billed at your plan's per-minute rate:
+
+• Night & Weekend: $0.45/minute
+• Lite: $0.38/minute
+• Core: $0.28/minute
+• Pro: $0.22/minute
+
+You'll receive usage notifications at 70% and 90% so you're never surprised. Most customers stay within plan limits, but busy months happen—we've got you covered.
+
+If you consistently exceed your limit, we'll proactively suggest upgrading to the next tier, which usually saves money vs paying overage every month.`
   }];
 
   const footerLinks = {
