@@ -121,25 +121,25 @@ interface LeadData {
 const PLANS = [
   {
     value: "starter" as const,
-    name: "Starter",
-    price: 297,
-    calls: "~80 calls/mo",
+    name: "Night & Weekend",
+    price: 59,
+    calls: "150 min included/mo",
     features: ["Virtual receptionist", "Call forwarding", "24/7 availability", "Email support"],
   },
   {
     value: "professional" as const,
-    name: "Professional",
-    price: 797,
-    calls: "~160 calls/mo",
-    features: ["Everything in Starter", "Priority routing", "SMS notifications", "Phone support"],
+    name: "Lite",
+    price: 129,
+    calls: "300 min included/mo",
+    features: ["Everything in Night & Weekend, plus", "24/7 call answering", "Appointment booking", "Google Calendar + Zapier"],
     popular: true,
   },
   {
     value: "premium" as const,
-    name: "Premium",
-    price: 1497,
-    calls: "160+ calls/mo",
-    features: ["Everything in Professional", "Voice cloning", "Dedicated support", "Custom integrations"],
+    name: "Core",
+    price: 229,
+    calls: "600 min included/mo",
+    features: ["Everything in Lite, plus", "Branded voice options", "Multi-language (EN + ES)", "Priority support"],
   },
 ];
 
@@ -464,7 +464,7 @@ function OnboardingChatInner() {
     if (value === "faq_pricing") {
       addMessage("user", "How much does it cost?");
       await showTypingDelay();
-      addMessage("assistant", "We have a simple Starter plan at $297/mo which includes ~80 calls. You get a 3-day free trial to test it out completely risk-free!");
+      addMessage("assistant", "Our plans start at $59/mo (Night & Weekend) and include 150 minutes. Lite is $129/mo, Core is $229/mo, and Pro is $399/mo. You still get a 3-day free trial to test it risk-free!");
       return;
     }
 
@@ -697,7 +697,7 @@ function OnboardingChatInner() {
     await showTypingDelay();
     addMessage(
       "assistant",
-      "Excellent! You're almost done. We'll set you up on our standard Starter Plan ($297/mo) with a 3-day free trial."
+      "Excellent! You're almost done. We'll set you up on Night & Weekend ($59/mo) with a 3-day free trial. You can upgrade to Lite, Core, or Pro anytime."
     );
 
     // Skip plan selection, go straight to payment

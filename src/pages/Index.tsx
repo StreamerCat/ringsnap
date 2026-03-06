@@ -37,24 +37,32 @@ const Index = () => {
     "offers": [
       {
         "@type": "Offer",
-        "name": "Starter Plan",
-        "price": "297",
+        "name": "Night & Weekend Plan",
+        "price": "59",
         "priceCurrency": "USD",
         "priceValidUntil": "2025-12-31",
         "availability": "https://schema.org/InStock"
       },
       {
         "@type": "Offer",
-        "name": "Professional Plan",
-        "price": "797",
+        "name": "Lite Plan",
+        "price": "129",
         "priceCurrency": "USD",
         "priceValidUntil": "2025-12-31",
         "availability": "https://schema.org/InStock"
       },
       {
         "@type": "Offer",
-        "name": "Growth Plan",
-        "price": "1497",
+        "name": "Core Plan",
+        "price": "229",
+        "priceCurrency": "USD",
+        "priceValidUntil": "2025-12-31",
+        "availability": "https://schema.org/InStock"
+      },
+      {
+        "@type": "Offer",
+        "name": "Pro Plan",
+        "price": "399",
         "priceCurrency": "USD",
         "priceValidUntil": "2025-12-31",
         "availability": "https://schema.org/InStock"
@@ -118,7 +126,7 @@ const Index = () => {
         "name": "Will my customers know it's not a real person?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. Our system uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Professional and Premium plans."
+          "text": "No. Our system uses advanced voice technology that sounds professional and natural. Callers get a fast, helpful answer every time. We offer branded voice options on Core and Pro plans."
         }
       },
       {
@@ -134,7 +142,7 @@ const Index = () => {
         "name": "My customers speak Spanish. Will that be a problem?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Professional and Growth plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference."
+          "text": "Yes. Core and Pro plans include multi-language support. The Agent seamlessly switches between English and Spanish based on the customer's preference."
         }
       },
       {

@@ -374,10 +374,10 @@ const Difference = () => {
                     <Card className="card-tier-2 max-w-md mx-auto">
                         <CardContent className="p-6 text-center">
                             <p className="text-muted-foreground mb-4">
-                                Starting at <span className="font-bold text-2xl text-foreground">$297/month</span>
+                                Starting at <span className="font-bold text-2xl text-foreground">$59/month</span>
                             </p>
                             <p className="text-sm text-muted-foreground mb-6">
-                                Transparent pricing. No setup fees. Cancel anytime.
+                                Night & Weekend from $59. Full 24/7 coverage from $129. No setup fees. Cancel anytime.
                             </p>
                             <Button variant="gradient" className="rounded-full px-8" onClick={() => navigate('/pricing')}>
                                 See Pricing <ArrowRight className="ml-2 w-4 h-4" />

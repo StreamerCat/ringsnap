@@ -82,25 +82,25 @@ export interface WizardFormData {
 export const PLANS = [
   {
     value: 'starter' as const,
-    name: 'Starter',
-    price: 297,
-    calls: '≤80',
-    features: ['Basic AI voice', '24/7 coverage', 'Email support', 'Call recording', 'Basic analytics']
+    name: 'Night & Weekend',
+    price: 59,
+    calls: '150 min included',
+    features: ['After-hours + weekend coverage', 'Urgent call transfer', 'Call recordings + transcripts', 'CRM included', 'Appointment booking']
   },
   {
     value: 'professional' as const,
-    name: 'Professional',
-    price: 797,
-    calls: '≤160',
-    features: ['Advanced AI voice', 'Priority routing', 'Phone support', 'CRM integration', 'Advanced analytics'],
+    name: 'Lite',
+    price: 129,
+    calls: '300 min included',
+    features: ['24/7 answering', 'Appointment booking', 'Urgent transfer with context', 'Google Calendar + Zapier', 'CRM included'],
     popular: true
   },
   {
     value: 'premium' as const,
-    name: 'Premium',
-    price: 1497,
-    calls: '>160',
-    features: ['Voice cloning', 'Dedicated support', 'Custom integrations', 'Priority provisioning', 'Custom reporting']
+    name: 'Core',
+    price: 229,
+    calls: '600 min included',
+    features: ['Branded voice options', 'Smart call routing', 'Multi-language (EN + ES)', 'Custom escalation rules', 'Priority support']
   }
 ];
 

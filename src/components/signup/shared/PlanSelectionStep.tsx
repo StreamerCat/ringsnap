@@ -14,38 +14,38 @@ interface Plan {
 const PLANS: Plan[] = [
   {
     id: 'starter',
-    name: 'Starter',
-    price: 297,
+    name: 'Night & Weekend',
+    price: 59,
     features: [
-      'Up to 80 calls/month',
+      '150 minutes included/month',
       '24/7 AI answering',
-      'SMS notifications',
-      'Basic analytics'
+      'Urgent transfer to your phone',
+      'CRM included'
     ]
   },
   {
     id: 'professional',
-    name: 'Professional',
-    price: 797,
+    name: 'Lite',
+    price: 129,
     features: [
-      'Up to 160 calls/month',
-      'Priority support',
-      'Advanced analytics',
-      'Call recording',
-      'Custom branding'
+      '300 minutes included/month',
+      'Google Calendar + Zapier',
+      'Urgent call transfer with context',
+      'Call recordings + transcripts',
+      '24/7 call answering'
     ],
     popular: true
   },
   {
     id: 'premium',
-    name: 'Premium',
-    price: 1497,
+    name: 'Core',
+    price: 229,
     features: [
-      'Unlimited calls',
-      'Dedicated account manager',
-      'White-label option',
-      'API access',
-      'Custom integrations'
+      '600 minutes included/month',
+      'Priority support',
+      'Branded voice options',
+      'Smart call routing by urgency',
+      'Multi-language (English + Spanish)'
     ]
   }
 ];
