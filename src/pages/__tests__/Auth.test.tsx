@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import AuthLogin from "../AuthLogin";
 import PasswordReset from "../PasswordReset";
 import * as redirects from "@/lib/auth/redirects";
@@ -11,9 +12,11 @@ vi.mock("@/lib/auth/redirects", () => ({
 describe("AuthLogin", () => {
   it("renders the login form", async () => {
     render(
-      <MemoryRouter>
-        <AuthLogin />
-      </MemoryRouter>
+      <HelmetProvider>
+        <MemoryRouter>
+          <AuthLogin />
+        </MemoryRouter>
+      </HelmetProvider>
     );
 
     expect(await screen.findByText("Welcome Back")).toBeInTheDocument();
@@ -25,9 +28,11 @@ describe("AuthLogin", () => {
 describe("PasswordReset", () => {
   it("renders the password reset form", () => {
     render(
-      <MemoryRouter>
-        <PasswordReset />
-      </MemoryRouter>
+      <HelmetProvider>
+        <MemoryRouter>
+          <PasswordReset />
+        </MemoryRouter>
+      </HelmetProvider>
     );
 
     expect(screen.getByText("Reset Your Password")).toBeInTheDocument();

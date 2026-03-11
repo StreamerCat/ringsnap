@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 
 // Mock navigate
 const mockNavigate = vi.fn();
@@ -25,8 +26,8 @@ const mockSupabaseFrom = vi.fn(() => ({
 vi.mock('@/integrations/supabase/client', () => ({
     supabase: {
         auth: {
-            getSession: vi.fn().mockResolvedValue({
-                data: { session: { user: { id: 'test-user' } } },
+            getUser: vi.fn().mockResolvedValue({
+                data: { user: { id: 'test-user' } },
                 error: null,
             }),
         },
@@ -70,9 +71,10 @@ function mockAccount(data: Record<string, unknown>) {
             };
         }
         if (fields.includes('activated_at')) {
-            // Phone numbers query
+            // Phone numbers query (legacy fallback)
+            // Component uses .or().eq().single()
             return {
-                eq: () => ({
+                or: () => ({
                     eq: () => ({
                         single: () => Promise.resolve({
                             data: data.phoneRecord || null,
@@ -104,19 +106,22 @@ describe('ProvisioningStatus redirect logic', () => {
         });
 
         // Import component after mocks are set up
-        const { ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
+        const { default: ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
         render(
-            <BrowserRouter>
-                <ProvisioningStatus />
-            </BrowserRouter>
+            <HelmetProvider>
+                <BrowserRouter>
+                    <ProvisioningStatus />
+                </BrowserRouter>
+            </HelmetProvider>
         );
 
-        await waitFor(() => {
-            expect(mockNavigate).toHaveBeenCalledWith(
-                expect.stringMatching(/\/(activation|dashboard)/),
-                expect.objectContaining({ replace: true })
-            );
-        });
+        // Advance fake timers past the 800ms setTimeout in the component
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(mockNavigate).toHaveBeenCalledWith(
+            expect.stringMatching(/\/(activation|dashboard)/),
+            expect.objectContaining({ replace: true })
+        );
     });
 
     it('does NOT redirect when only vapi_phone_number exists (status still pending)', async () => {
@@ -126,11 +131,13 @@ describe('ProvisioningStatus redirect logic', () => {
             vapi_assistant_id: 'asst_123',
         });
 
-        const { ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
+        const { default: ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
         render(
-            <BrowserRouter>
-                <ProvisioningStatus />
-            </BrowserRouter>
+            <HelmetProvider>
+                <BrowserRouter>
+                    <ProvisioningStatus />
+                </BrowserRouter>
+            </HelmetProvider>
         );
 
         // Wait for polling to happen
@@ -151,16 +158,19 @@ describe('ProvisioningStatus redirect logic', () => {
             },
         });
 
-        const { ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
+        const { default: ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
         render(
-            <BrowserRouter>
-                <ProvisioningStatus />
-            </BrowserRouter>
+            <HelmetProvider>
+                <BrowserRouter>
+                    <ProvisioningStatus />
+                </BrowserRouter>
+            </HelmetProvider>
         );
 
-        await waitFor(() => {
-            expect(mockNavigate).toHaveBeenCalled();
-        });
+        // Advance fake timers past the 800ms setTimeout in the component
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(mockNavigate).toHaveBeenCalled();
     });
 
     it('does NOT redirect when phone_numbers is active but activated_at is null', async () => {
@@ -175,11 +185,13 @@ describe('ProvisioningStatus redirect logic', () => {
             },
         });
 
-        const { ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
+        const { default: ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
         render(
-            <BrowserRouter>
-                <ProvisioningStatus />
-            </BrowserRouter>
+            <HelmetProvider>
+                <BrowserRouter>
+                    <ProvisioningStatus />
+                </BrowserRouter>
+            </HelmetProvider>
         );
 
         // Wait for polling

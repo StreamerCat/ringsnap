@@ -35,17 +35,17 @@ describe("PlanSelector", () => {
   it("renders all three plans", () => {
     render(<TestWrapper />);
 
-    expect(screen.getByText("Starter")).toBeInTheDocument();
-    expect(screen.getByText("Professional")).toBeInTheDocument();
-    expect(screen.getByText("Premium")).toBeInTheDocument();
+    expect(screen.getByText("Night & Weekend")).toBeInTheDocument();
+    expect(screen.getByText("Lite")).toBeInTheDocument();
+    expect(screen.getByText("Core")).toBeInTheDocument();
   });
 
   it("shows pricing for all plans", () => {
     render(<TestWrapper />);
 
-    expect(screen.getByText(/297/)).toBeInTheDocument();
-    expect(screen.getByText(/797/)).toBeInTheDocument();
-    expect(screen.getByText(/1497/)).toBeInTheDocument();
+    expect(screen.getByText(/59/)).toBeInTheDocument();
+    expect(screen.getByText(/129/)).toBeInTheDocument();
+    expect(screen.getByText(/229/)).toBeInTheDocument();
   });
 
   // it("shows detailed features in detailed variant", () => {
