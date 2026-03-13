@@ -34,7 +34,8 @@
     "check:robots": "node scripts/check-robots.mjs",
     "check:sitemap": "node scripts/check-sitemap-coverage.mjs",
     "check:seo": "npm run check:robots && npm run check:sitemap",
-    "test:billing": "node scripts/billing-smoke/run.mjs"
+    "test:billing": "node scripts/billing-smoke/run.mjs",
+    "stripe:list-price-env": "bash scripts/stripe-list-price-env-vars.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
