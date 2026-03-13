@@ -31,6 +31,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const CustomerDashboard = lazy(() => import("./pages/CustomerDashboard"));
 const AdminMonitoring = lazy(() => import("./pages/AdminMonitoring"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminControl = lazy(() => import("./pages/AdminControl"));
 const TeamManagement = lazy(() => import("./pages/TeamManagement"));
 const TrialConfirmation = lazy(() => import("./pages/TrialConfirmation"));
 const AuthLogin = lazy(() => import("./pages/AuthLogin"));
@@ -146,8 +147,11 @@ const App = () => (
                 <Route path="/dashboard" element={<ProtectedCustomerDashboard />} />
                 <Route path="/dashboard/team" element={<TeamManagement />} />
                 <Route path="/trial-confirmation" element={<TrialConfirmation />} />
-                <Route path="/admin/monitoring" element={<AdminMonitoring />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
+                {/* Unified admin control center */}
+                <Route path="/admin" element={<AdminControl />} />
+                {/* Legacy admin routes — redirect to new control center */}
+                <Route path="/admin/monitoring" element={<Navigate to="/admin?tab=overview" replace />} />
+                <Route path="/admin/users" element={<Navigate to="/admin?tab=staff" replace />} />
                 {/* Dashboard tab redirects */}
                 <Route path="/today" element={<Navigate to="/dashboard?tab=inbox" replace />} />
                 <Route path="/overview" element={<Navigate to="/dashboard?tab=inbox" replace />} />
