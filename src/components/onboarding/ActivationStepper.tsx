@@ -11,6 +11,7 @@ import { CarrierForwardingInstructions } from "@/components/CarrierForwardingIns
 import { useNavigate } from "react-router-dom";
 import { featureFlags } from "@/lib/featureFlags";
 import { trackOnboardingEvent } from "@/lib/sentry-tracking";
+import { capture } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 
 
@@ -86,8 +87,16 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
             trackOnboardingEvent('activation.test_call_detected', {
                 phoneNumberId: state?.primary_phone_number_id || null
             });
+            // PostHog: first_value_reached — the activation moment
+            capture('first_value_reached', {
+                call_id: state?.primary_phone_number_id || undefined,
+                hours_since_activation: callAttemptedAt
+                    ? Math.round((Date.now() - callAttemptedAt.getTime()) / 3600000 * 10) / 10
+                    : undefined,
+            });
+            capture('activation_milestone_reached', { milestone_name: 'test_call_detected' });
         }
-    }, [state?.test_call_detected, state?.primary_phone_number_id]);
+    }, [state?.test_call_detected, state?.primary_phone_number_id, callAttemptedAt]);
 
     // Handle Call Now click with tracking
     const handleCallNowClick = useCallback(async () => {
@@ -121,6 +130,7 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
 
     const markForwardingConfigured = async () => {
         await trackEvent('onboarding.forwarding_confirmed');
+        capture('onboarding_step_completed', { step_name: 'forwarding_configured', step_index: 3 });
         // Optimistically update UI or just refresh
         refreshState();
         setActiveStep(4);
@@ -137,6 +147,7 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
     };
 
     const handleContinue = () => {
+        capture('activation_milestone_reached', { milestone_name: 'activation_complete' });
         navigate('/dashboard');
     };
 

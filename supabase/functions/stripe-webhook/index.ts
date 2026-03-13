@@ -5,6 +5,39 @@ import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import { parseTraceId, createObservabilityContext } from "../_shared/observability.ts";
 
+/**
+ * PostHog server-side capture — best-effort, never throws.
+ * Fires checkout_completed from Stripe's authoritative checkout.session.completed event.
+ */
+async function capturePostHog(
+  event: string,
+  distinctId: string,
+  props: Record<string, unknown>
+): Promise<void> {
+  const key = Deno.env.get('POSTHOG_API_KEY');
+  if (!key) return;
+  try {
+    await fetch('https://us.i.posthog.com/capture/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        event,
+        distinct_id: distinctId,
+        properties: {
+          ...props,
+          $lib: 'edge-function',
+          $lib_version: '1.0.0',
+          environment: 'production',
+        },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch {
+    // Best-effort — do not affect webhook processing
+  }
+}
+
 type BaseLogContext = {
   functionName: string;
   correlationId: string;
@@ -870,6 +903,17 @@ serve(async (req) => {
               ...baseLogOptions,
               accountId: resolvedAccountId,
               context: { planKey, subscriptionId, overageItemId },
+            });
+
+            // PostHog: server-side checkout_completed (authoritative signal)
+            // Uses resolvedAccountId as distinct_id; stripe customer as fallback
+            await capturePostHog('checkout_completed', resolvedAccountId || customerId as string, {
+              plan_key: planKey || 'night_weekend',
+              amount: (session.amount_total || 0) / 100,
+              trial: !!trialStart,
+              account_id: resolvedAccountId,
+              stripe_session_id: session.id,
+              source: 'stripe_webhook',
             });
           }
         }

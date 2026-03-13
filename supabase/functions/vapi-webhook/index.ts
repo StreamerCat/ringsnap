@@ -5,10 +5,43 @@ import { withSentryEdge } from "../_shared/sentry.ts";
 
 /**
  * Vapi Webhook Handler
- * 
+ *
  * Processes Vapi server events (call-started, end-of-call-report, status-update)
  * and upserts call data into call_logs table.
  */
+
+/**
+ * PostHog server-side capture — best-effort, never throws.
+ * Uses accountId (or callId as fallback) as PostHog distinct_id for join key consistency.
+ */
+async function capturePostHog(
+    event: string,
+    distinctId: string,
+    props: Record<string, unknown>
+): Promise<void> {
+    const key = Deno.env.get('POSTHOG_API_KEY');
+    if (!key) return; // no-op if not configured
+    try {
+        await fetch('https://us.i.posthog.com/capture/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                api_key: key,
+                event,
+                distinct_id: distinctId,
+                properties: {
+                    ...props,
+                    $lib: 'edge-function',
+                    $lib_version: '1.0.0',
+                    environment: 'production',
+                },
+                timestamp: new Date().toISOString(),
+            }),
+        });
+    } catch {
+        // Best-effort — do not let PostHog failures affect webhook processing
+    }
+}
 
 interface MappingResult {
     accountId: string | null;
@@ -362,6 +395,44 @@ Deno.serve(withSentryEdge(
             // Create appointment if call was booked (only on end-of-call-report)
             if (type === 'end-of-call-report' && callRecord.booked && mappingResult.accountId) {
                 await createAppointmentFromCall(supabase, callRecord, mappingResult.accountId, providerPhoneNumberId);
+            }
+
+            // PostHog: voice observability events (server-side, best-effort)
+            // Uses accountId as distinct_id for warehouse join key consistency
+            const phDistinctId = mappingResult.accountId || providerCallId || 'unknown';
+
+            if (type === 'call-started') {
+                await capturePostHog('call_received', phDistinctId, {
+                    call_id: providerCallId,
+                    phone_number: calleeE164,
+                    account_id: mappingResult.accountId,
+                });
+                await capturePostHog('call_connected', phDistinctId, {
+                    call_id: providerCallId,
+                    account_id: mappingResult.accountId,
+                });
+            }
+
+            if (type === 'end-of-call-report') {
+                const durationSeconds = (callRecord as any).duration_seconds ?? 0;
+                const cogsBucket = durationSeconds < 60 ? 'short' : durationSeconds < 180 ? 'medium' : 'long';
+
+                await capturePostHog('call_ended', phDistinctId, {
+                    call_id: providerCallId,
+                    duration_seconds: durationSeconds,
+                    outcome: (callRecord as any).outcome ?? null,
+                    cogs_bucket: cogsBucket,
+                    account_id: mappingResult.accountId,
+                });
+
+                // lead_qualified: when call is booked (Vapi qualified the lead)
+                if (callRecord.booked) {
+                    await capturePostHog('lead_qualified', phDistinctId, {
+                        call_id: providerCallId,
+                        qualification_reason: 'booked',
+                        account_id: mappingResult.accountId,
+                    });
+                }
             }
 
             console.log(JSON.stringify({

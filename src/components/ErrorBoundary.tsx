@@ -8,6 +8,7 @@ import {
   getDebugInstructions,
   type DebugBundle,
 } from '@/lib/debugBundle';
+import { capture } from '@/lib/analytics';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -44,6 +45,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     });
 
     this.setState({ debugBundle: bundle });
+
+    // PostHog: capture error_encountered for funnel error visibility
+    capture('error_encountered', {
+      flow: 'app_error_boundary',
+      failure_reason: error.message,
+      error_code: error.name,
+    });
   }
 
   handleCopyDebugBundle = async () => {

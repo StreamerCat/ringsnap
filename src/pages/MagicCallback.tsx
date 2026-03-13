@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 import { getOrCreateDeviceNonce } from "@/lib/auth/deviceNonce";
+import { identify } from "@/lib/analytics";
 
 export default function MagicCallback() {
   const navigate = useNavigate();
@@ -73,6 +74,12 @@ export default function MagicCallback() {
         }
 
         setStatus("success");
+
+        // Re-identify with confirmed Supabase user_id
+        identify(user.id, {
+          email: user.email,
+          last_active_at: new Date().toISOString(),
+        });
 
         // Determine redirect URL based on role
         const redirectUrl = customRedirect || await redirectToRoleDashboard(user.id);

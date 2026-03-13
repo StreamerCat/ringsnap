@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { capture } from "@/lib/analytics";
 export const ContractorHero = () => {
   const navigate = useNavigate();
   const scrollToVapiDemo = () => {
@@ -39,7 +40,10 @@ export const ContractorHero = () => {
 
             {/* Gradient CTAs */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={() => navigate('/start')}>
+              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={() => {
+                capture('cta_clicked', { cta_location: 'hero', cta_text: 'Start Free', destination: '/start' });
+                navigate('/start');
+              }}>
                 <PhoneCall className="mr-2" />
                 Start Free
               </Button>
