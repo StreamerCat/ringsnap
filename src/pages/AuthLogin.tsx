@@ -24,8 +24,22 @@ export default function AuthLogin() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // Always resolve the role-based destination first.  Staff users must
+        // always land on their staff dashboard — never let a stale ?redirect
+        // param (e.g. ?redirect=/dashboard set by withAuthGuard on
+        // CustomerDashboard) override a staff route and trap them in a loop.
+        const roleDest = await redirectToRoleDashboard(user.id);
+        const isStaffRoute = roleDest === '/admin' || roleDest === '/salesdash';
         const customRedirect = searchParams.get("redirect");
-        const finalRedirect = customRedirect || await redirectToRoleDashboard(user.id);
+        // Staff: always use role destination.
+        // Customers: honour ?redirect unless it points at a staff-only page.
+        const finalRedirect = isStaffRoute
+          ? roleDest
+          : (customRedirect &&
+             !customRedirect.startsWith('/admin') &&
+             !customRedirect.startsWith('/salesdash'))
+            ? customRedirect
+            : roleDest;
         navigate(finalRedirect);
       }
     } catch (error) {
@@ -68,8 +82,16 @@ export default function AuthLogin() {
 
       toast.success("Logged in successfully!");
 
+      const roleDest = await redirectToRoleDashboard(data.user.id);
+      const isStaffRoute = roleDest === '/admin' || roleDest === '/salesdash';
       const customRedirect = searchParams.get("redirect");
-      const finalRedirect = customRedirect || await redirectToRoleDashboard(data.user.id);
+      const finalRedirect = isStaffRoute
+        ? roleDest
+        : (customRedirect &&
+           !customRedirect.startsWith('/admin') &&
+           !customRedirect.startsWith('/salesdash'))
+          ? customRedirect
+          : roleDest;
 
       navigate(finalRedirect);
     } catch (error: any) {
