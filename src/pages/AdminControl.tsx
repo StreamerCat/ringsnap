@@ -46,6 +46,7 @@ export default function AdminControl() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [authLoading, setAuthLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const rawTab = searchParams.get("tab") as AdminTab | null;
@@ -58,37 +59,41 @@ export default function AdminControl() {
   useEffect(() => {
     const verifyAccess = async () => {
       setAuthLoading(true);
+      setAuthError(null);
       try {
         const {
           data: { user },
+          error: userError,
         } = await supabase.auth.getUser();
 
-        if (!user) {
-          navigate("/auth/login");
+        if (userError || !user) {
+          // Not authenticated — redirect to login with return path
+          navigate("/auth/login?redirect=/admin", { replace: true });
           return;
         }
 
         const { data: staffRole, error } = await supabase
-          .from("staff_roles" as "accounts")
+          .from("staff_roles")
           .select("role")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
-        if (error && error.code !== "PGRST116") {
-          throw error;
-        }
-
-        const role = (staffRole as { role?: string } | null)?.role;
-        const hasAccess = role === "platform_owner" || role === "platform_admin";
-
-        if (!hasAccess) {
+        if (error) {
+          // Permission or query error — show error state, don't redirect to login
+          // (redirecting would cause a loop since the user IS authenticated)
+          console.error("Admin role check error:", error);
+          setAuthError(`Role check failed: ${error.message}`);
           setIsAuthorized(false);
-        } else {
-          setIsAuthorized(true);
+          return;
         }
+
+        const role = staffRole?.role;
+        const hasAccess = role === "platform_owner" || role === "platform_admin";
+        setIsAuthorized(hasAccess);
       } catch (err) {
         console.error("Admin auth error", err);
-        navigate("/auth/login");
+        setAuthError("Unexpected error checking admin access.");
+        setIsAuthorized(false);
       } finally {
         setAuthLoading(false);
       }
@@ -120,11 +125,15 @@ export default function AdminControl() {
             <span className="text-2xl">🔒</span>
           </div>
           <h2 className="text-lg font-semibold text-gray-100 mb-2">Access Denied</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            You need <code className="text-gray-300 bg-gray-800 px-1 rounded">platform_owner</code> or{" "}
-            <code className="text-gray-300 bg-gray-800 px-1 rounded">platform_admin</code> role to access
-            the admin control center.
-          </p>
+          {authError ? (
+            <p className="text-sm text-red-400 mb-6">{authError}</p>
+          ) : (
+            <p className="text-sm text-gray-500 mb-6">
+              You need <code className="text-gray-300 bg-gray-800 px-1 rounded">platform_owner</code> or{" "}
+              <code className="text-gray-300 bg-gray-800 px-1 rounded">platform_admin</code> role to access
+              the admin control center.
+            </p>
+          )}
           <button
             onClick={() => navigate("/")}
             className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm transition-colors"
