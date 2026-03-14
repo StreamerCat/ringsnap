@@ -185,9 +185,14 @@ export default function CustomerDashboard() {
 
       if (profileError) throw new Error(`Failed to load profile: ${profileError.message}`);
 
-      // If profile doesn't exist, they need to finish onboarding
+      // If profile doesn't exist, stop here and let the "Account Setup in
+      // Progress" UI state render.  Do NOT navigate to /onboarding — that
+      // causes an infinite loop for users (e.g. staff) who land on /dashboard
+      // without a customer profile.  Legitimate new customers are redirected
+      // to onboarding by redirectToRoleDashboard() before they ever reach this
+      // component.
       if (!profileData) {
-        navigate("/onboarding");
+        setLoading(false);
         return;
       }
 

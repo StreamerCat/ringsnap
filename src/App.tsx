@@ -96,6 +96,7 @@ const HashScrollHandler = () => {
 };
 
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
+const ProtectedAdminControl = withAuthGuard(AdminControl);
 // OnboardingChat handles its own auth logic - supports both authenticated users
 // and unauthenticated users with lead_id (two-step signup flow)
 
@@ -148,7 +149,7 @@ const App = () => (
                 <Route path="/dashboard/team" element={<TeamManagement />} />
                 <Route path="/trial-confirmation" element={<TrialConfirmation />} />
                 {/* Unified admin control center */}
-                <Route path="/admin" element={<AdminControl />} />
+                <Route path="/admin" element={<ProtectedAdminControl />} />
                 {/* Legacy admin routes — redirect to new control center */}
                 <Route path="/admin/monitoring" element={<Navigate to="/admin?tab=overview" replace />} />
                 <Route path="/admin/users" element={<Navigate to="/admin?tab=staff" replace />} />

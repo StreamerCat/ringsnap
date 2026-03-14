@@ -61,14 +61,15 @@ export default function AdminControl() {
       setAuthLoading(true);
       setAuthError(null);
       try {
+        // Auth is guaranteed by the withAuthGuard HOC in App.tsx.
+        // We only need to verify the staff role here.
         const {
           data: { user },
-          error: userError,
         } = await supabase.auth.getUser();
 
-        if (userError || !user) {
-          // Not authenticated — redirect to login with return path
-          navigate("/auth/login?redirect=/admin", { replace: true });
+        if (!user) {
+          // Should not happen given withAuthGuard, but be safe.
+          setIsAuthorized(false);
           return;
         }
 
