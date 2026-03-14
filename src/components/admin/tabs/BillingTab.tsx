@@ -69,10 +69,13 @@ export function BillingTab() {
     return { mrr, trialMrr, active, pastDue, trials, planDist, upcomingRenewals };
   }, [accounts, planLookup]);
 
-  // MRR trend: approximate using cumulative signups over time
-  // NOTE: True MRR trend requires historical subscription data.
-  // This shows cumulative active accounts per week as a proxy.
-  // TODO: Connect to Stripe subscription created/cancelled events for accurate MRR trend.
+  // MRR trend: approximate using cumulative signups over time.
+  // This is a proxy — it counts cumulative active accounts per week and multiplies
+  // by an assumed average plan price ($229). It does not account for churn or upgrades.
+  //
+  // Post-launch: replace with real Stripe MRR by consuming `customer.subscription.created`
+  // and `customer.subscription.deleted` events from the stripe_events table and tracking
+  // a running mrr_cents column in a separate revenue_snapshots table.
   const mrrTrendData = useMemo(() => {
     // Group active accounts by signup week for approximation
     const activeAccounts = accounts.filter((a) =>
@@ -101,8 +104,6 @@ export function BillingTab() {
       return {
         week: new Date(weekStart).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         newAccounts: weekMap[weekStart] ?? 0,
-        // Approximate MRR — for each "active" account assume average $229 (core plan)
-        // TODO: Replace with actual Stripe MRR events
         approxMrr: Math.round(cumulative * 229),
       };
     });

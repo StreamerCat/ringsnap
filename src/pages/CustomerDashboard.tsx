@@ -20,16 +20,12 @@ import * as Sentry from "@sentry/react";
 import { useVapiWidget } from "@/lib/VapiWidgetContext";
 
 // Tab Components
-import { TodayTab } from "@/components/dashboard/TodayTab";
-import { OverviewTab } from "@/components/dashboard/OverviewTab";
 import { PhoneNumbersTab } from "@/components/dashboard/PhoneNumbersTab";
 import { AssistantsTab } from "@/components/dashboard/AssistantsTab";
 import { TeamTab } from "@/components/dashboard/TeamTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
-import { CalendarTab } from "@/components/dashboard/CalendarTab";
-import { AppointmentsTab } from "@/components/dashboard/AppointmentsTab";
 import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
 import { InboxTab } from "@/components/dashboard/InboxTab";
 import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
