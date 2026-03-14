@@ -113,6 +113,10 @@ class OpsSettings(BaseSettings):
     # Internal webhook secret for Supabase → ops service calls
     ops_webhook_secret: str = Field(default="", alias="OPS_WEBHOOK_SECRET")
 
+    # PostHog — server-side event analytics
+    posthog_api_key: str = Field(default="", alias="POSTHOG_API_KEY")
+    posthog_host: str = Field(default="https://us.i.posthog.com", alias="POSTHOG_HOST")
+
     # Feature flag: set to "false" to disable all ops flow processing
     ops_flow_enabled: bool = Field(default=True, alias="OPS_FLOW_ENABLED")
 

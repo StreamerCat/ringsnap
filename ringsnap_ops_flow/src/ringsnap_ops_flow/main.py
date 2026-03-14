@@ -24,6 +24,7 @@ from typing import Any, Optional
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from .adapters.posthog_client import capture as ph_capture
 from .config import settings
 from .event_gate import EVENT_TO_MODULE, get_gate
 from .state import OpsEvent, OpsEventType, OpsFlowState
@@ -120,6 +121,17 @@ async def _process_event(event: OpsEvent) -> None:
             module,
             elapsed,
         )
+        ph_capture(
+            event.entity_id or event.account_id or "ringsnap-ops-flow",
+            "ops_event_processed",
+            {
+                "event_type": event.event_type.value,
+                "module": module,
+                "elapsed_s": round(elapsed, 2),
+                "source": event.source,
+                "environment": settings.environment,
+            },
+        )
 
     except Exception as e:
         elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
@@ -129,6 +141,17 @@ async def _process_event(event: OpsEvent) -> None:
             module,
             elapsed,
             e,
+        )
+        ph_capture(
+            event.entity_id or event.account_id or "ringsnap-ops-flow",
+            "ops_event_failed",
+            {
+                "event_type": event.event_type.value,
+                "module": module,
+                "elapsed_s": round(elapsed, 2),
+                "error": str(e)[:200],
+                "environment": settings.environment,
+            },
         )
 
 

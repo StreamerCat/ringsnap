@@ -14,6 +14,7 @@ import logging
 
 from crewai.flow.flow import Flow, listen, start
 
+from ..adapters.posthog_client import capture as ph_capture
 from ..config import settings
 from ..deterministic.onboarding_handler import OnboardingHandler
 from ..deterministic.provisioning_handler import ProvisioningHandler, pause_stage2
@@ -49,6 +50,15 @@ class RecoveryFlow(Flow[OpsFlowState]):
         else:
             logger.warning("recovery_flow.unknown_event_type event_type=%s", event_type)
 
+        ph_capture(
+            account_id or "ringsnap-ops-flow",
+            "ops_recovery_started",
+            {
+                "event_type": event_type.value if hasattr(event_type, "value") else str(event_type),
+                "account_id": account_id,
+                "environment": settings.environment,
+            },
+        )
         return self.state
 
     @listen(route_failure)
@@ -82,6 +92,15 @@ class RecoveryFlow(Flow[OpsFlowState]):
                     max_attempts=2,  # Reduced cap for recovery path
                 )
                 logger.info("recovery_flow.stage1_retry_succeeded account_id=%s", account_id)
+                ph_capture(
+                    account_id,
+                    "ops_recovery_auto_fixed",
+                    {
+                        "account_id": account_id,
+                        "recovery_action": recovery_action,
+                        "environment": settings.environment,
+                    },
+                )
             except RetryCappedError:
                 handler.mark_for_manual_review(account_id, "stage1_recovery_capped")
                 self.state.alerts.add(

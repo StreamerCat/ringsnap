@@ -20,6 +20,7 @@ from typing import Any, Optional
 
 from crewai.flow.flow import Flow, listen, start
 
+from ..adapters.posthog_client import capture as ph_capture
 from ..config import settings, thresholds
 from ..deterministic.onboarding_handler import OnboardingHandler
 from ..deterministic.payment_handler import PaymentHandler, PaymentMethodMissingError
@@ -70,6 +71,20 @@ class SalesActivationFlow(Flow[OpsFlowState]):
             self.state.pending_signup.lead_score,
             self.state.pending_signup.is_high_intent,
             self.state.pending_signup.is_high_fit,
+        )
+        entity_id = self.state.event.entity_id if self.state.event else None
+        ph_capture(
+            entity_id or "ringsnap-ops-flow",
+            "ops_lead_scored",
+            {
+                "lead_score": self.state.pending_signup.lead_score,
+                "is_high_intent": self.state.pending_signup.is_high_intent,
+                "is_high_fit": self.state.pending_signup.is_high_fit,
+                "selected_plan": self.state.pending_signup.selected_plan,
+                "trade": self.state.pending_signup.trade,
+                "stub_mode": settings.is_stub_mode,
+                "environment": settings.environment,
+            },
         )
         return self.state
 
@@ -144,10 +159,31 @@ class SalesActivationFlow(Flow[OpsFlowState]):
                 "sales_activation_flow.link_sent id=%s",
                 self.state.pending_signup.id,
             )
+            ph_capture(
+                self.state.pending_signup.id or "ringsnap-ops-flow",
+                "ops_checkout_link_sent",
+                {
+                    "pending_signup_id": self.state.pending_signup.id,
+                    "selected_plan": self.state.pending_signup.selected_plan,
+                    "lead_score": self.state.pending_signup.lead_score,
+                    "is_high_intent": self.state.pending_signup.is_high_intent,
+                    "channel": "sms+email",
+                    "environment": settings.environment,
+                },
+            )
         else:
             logger.error(
                 "sales_activation_flow.link_send_failed id=%s",
                 self.state.pending_signup.id,
+            )
+            ph_capture(
+                self.state.pending_signup.id or "ringsnap-ops-flow",
+                "ops_checkout_link_failed",
+                {
+                    "pending_signup_id": self.state.pending_signup.id,
+                    "selected_plan": self.state.pending_signup.selected_plan,
+                    "environment": settings.environment,
+                },
             )
             self.state.alerts.add(
                 severity="warning",  # type: ignore
@@ -224,5 +260,16 @@ class SalesActivationFlow(Flow[OpsFlowState]):
             self.state.onboarding = onboarding_state
             self.state.pending_signup.status = PendingSignupStatus.ACTIVATED
             logger.info("sales_activation_flow.activated account_id=%s", account_id)
+            ph_capture(
+                account_id or "ringsnap-ops-flow",
+                "ops_account_activated",
+                {
+                    "account_id": account_id,
+                    "stripe_session_id": stripe_session_id,
+                    "selected_plan": self.state.pending_signup.selected_plan,
+                    "lead_score": self.state.pending_signup.lead_score,
+                    "environment": settings.environment,
+                },
+            )
 
         return self.state

@@ -17,6 +17,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+from .adapters.posthog_client import capture as ph_capture
 from .config import cost as cost_cfg
 from .config import crews as crews_cfg
 from .config import execution as exec_cfg
@@ -97,6 +98,16 @@ class EventGate:
                     module,
                     reason,
                 )
+                ph_capture(
+                    entity_id or "ringsnap-ops-flow",
+                    "ops_event_dropped",
+                    {
+                        "event_type": event_type,
+                        "module": module,
+                        "drop_reason": reason,
+                        "environment": settings.environment,
+                    },
+                )
                 return False, reason
 
         logger.info(
@@ -104,6 +115,15 @@ class EventGate:
             event_type,
             entity_id,
             module,
+        )
+        ph_capture(
+            entity_id or "ringsnap-ops-flow",
+            "ops_event_accepted",
+            {
+                "event_type": event_type,
+                "module": module,
+                "environment": settings.environment,
+            },
         )
         return True, ""
 
@@ -126,14 +146,37 @@ class EventGate:
                     self._daily_cost_usd,
                     cost_cfg.daily_llm_budget_usd,
                 )
+                ph_capture(
+                    "ringsnap-ops-flow",
+                    "ops_budget_alert",
+                    {
+                        "daily_cost_usd": round(self._daily_cost_usd, 4),
+                        "budget_usd": cost_cfg.daily_llm_budget_usd,
+                        "pct_used": round(self._daily_cost_usd / cost_cfg.daily_llm_budget_usd, 2),
+                        "environment": settings.environment,
+                    },
+                )
 
     def activate_safe_mode(self) -> None:
         self._safe_mode_active = True
         logger.warning("event_gate.safe_mode_activated")
+        ph_capture(
+            "ringsnap-ops-flow",
+            "ops_safe_mode_activated",
+            {
+                "daily_cost_usd": round(self._daily_cost_usd, 4),
+                "environment": settings.environment,
+            },
+        )
 
     def deactivate_safe_mode(self) -> None:
         self._safe_mode_active = False
         logger.info("event_gate.safe_mode_deactivated")
+        ph_capture(
+            "ringsnap-ops-flow",
+            "ops_safe_mode_deactivated",
+            {"environment": settings.environment},
+        )
 
     def is_safe_mode(self) -> bool:
         return self._safe_mode_active
