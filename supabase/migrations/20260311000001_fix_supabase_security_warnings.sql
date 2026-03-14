@@ -170,6 +170,20 @@ ALTER TABLE public.call_outcome_events ENABLE ROW LEVEL SECURITY;
 -- This is the correct model: each user sees only what their own permissions allow.
 -- =============================================================================
 
+-- Drop views first to allow column renames/restructuring
+DROP VIEW IF EXISTS public.operator_dashboard_summary;
+DROP VIEW IF EXISTS public.operator_calls_today;
+DROP VIEW IF EXISTS public.operator_leads_today;
+DROP VIEW IF EXISTS public.operator_pending_appointments;
+DROP VIEW IF EXISTS public.admin_provisioning_status_counts;
+DROP VIEW IF EXISTS public.admin_provisioning_failures;
+DROP VIEW IF EXISTS public.admin_daily_call_stats;
+DROP VIEW IF EXISTS public.admin_edge_function_error_feed;
+DROP VIEW IF EXISTS public.admin_flagged_accounts;
+DROP VIEW IF EXISTS public.account_service_hours;
+DROP VIEW IF EXISTS public.daily_account_usage;
+DROP VIEW IF EXISTS public.phone_number_identity;
+
 -- Admin monitoring views (read from accounts, call_pattern_alerts, usage_logs)
 CREATE OR REPLACE VIEW public.admin_provisioning_status_counts
   WITH (security_invoker = on)
