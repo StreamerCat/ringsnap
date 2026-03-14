@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Moon, ChevronDown, ChevronUp, X, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { capture } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -187,7 +188,8 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
   const [searchParams] = useSearchParams();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const handleSignup = () => {
+  const handleSignup = (ctaLocation = 'pricing') => {
+    capture('cta_clicked', { cta_location: ctaLocation, cta_text: 'Start Free', destination: '/start' });
     navigate({ pathname: "/start", search: searchParams.toString() });
   };
 

@@ -1,14 +1,19 @@
 import { Helmet } from "react-helmet-async";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { featureFlags } from "@/lib/featureFlags";
+import { capture } from "@/lib/analytics";
 
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Pricing = () => {
+    useEffect(() => {
+        capture('pricing_page_viewed', {}, { dedupKey: 'pricing_page_viewed', dedupWindowMs: 10000 });
+    }, []);
+
     const softwareApplicationSchema = {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",

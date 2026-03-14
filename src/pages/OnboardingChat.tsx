@@ -55,6 +55,7 @@ import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { extractUserError, logClientError } from "@/lib/errors";
 import { trackFunnelEvent, trackCheckpoint, trackConversion, trackFormEvent, trackTiming } from "@/lib/sentry-tracking";
+import { capture, identify } from "@/lib/analytics";
 import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
 
@@ -702,6 +703,8 @@ function OnboardingChatInner() {
 
     // Skip plan selection, go straight to payment
     setData((prev) => ({ ...prev, planType: "starter" }));
+    // PostHog: checkout_started when user reaches payment step
+    capture('checkout_started', { plan_key: 'starter', source_channel: 'onboarding_chat' });
     setStep("payment");
   };
 
@@ -879,9 +882,27 @@ function OnboardingChatInner() {
         }
       }
 
-      // Track completion
+      // Track completion (Sentry)
       trackFunnelEvent("signup_completed", { account_id: result.accountId, email: result.email });
       trackConversion("signup", { value: 0 }); // Trial has 0 upfront value
+
+      // PostHog: checkout_completed, trial_activated, onboarding_started
+      capture('checkout_completed', { plan_key: data.planType, amount: 0, trial: true });
+      capture('trial_activated', { plan_key: data.planType, signup_source: 'onboarding_chat' });
+      capture('onboarding_started', { plan_key: data.planType });
+
+      // Re-identify with Supabase user_id now that account is created
+      if (result.userId || result.accountId) {
+        identify(
+          result.userId || result.accountId,
+          {
+            plan_key: data.planType,
+            billing_status: 'trial',
+            account_id: result.accountId,
+            last_active_at: new Date().toISOString(),
+          }
+        );
+      }
 
       // Redirect immediately to the new Provisioning Status page
       // This handles the "wait" time gracefully instead of hanging in the chat

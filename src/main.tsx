@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
+import { initAnalytics } from "./lib/analytics";
 import App from "./App.tsx";
 import "./index.css";
 
@@ -146,6 +147,10 @@ Sentry.init({
     /^moz-extension:\/\//i,
   ],
 });
+
+// Initialize PostHog analytics (non-blocking, additive alongside Sentry)
+// No-op if VITE_POSTHOG_KEY is not set
+initAnalytics();
 
 // Global error handler to catch any unhandled errors
 window.addEventListener('error', (event) => {

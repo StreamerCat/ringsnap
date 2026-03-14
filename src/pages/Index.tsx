@@ -7,6 +7,7 @@ import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteHeader } from "@/components/SiteHeader";
 import { trackFunnelEvent, trackPageLoad } from "@/lib/sentry-tracking";
+import { capture } from "@/lib/analytics";
 import * as Sentry from "@sentry/react";
 import { Button } from "@/components/ui/button";
 
@@ -21,10 +22,12 @@ const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m
 
 const Index = () => {
   const navigate = useNavigate();
-  // Track landing page view for funnel analytics
+  // Track landing page view for funnel analytics (Sentry + PostHog)
   useEffect(() => {
     trackPageLoad('Index');
     trackFunnelEvent('landing_page_view');
+    // PostHog: page_viewed fired by RouteTracker; capture landing-specific event
+    capture('page_viewed', { page_title: 'Home', page_path: '/', page_type: 'homepage' });
   }, []);
 
   const structuredData = {
