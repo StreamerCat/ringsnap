@@ -57,9 +57,9 @@ export async function getUserRole(userId: string): Promise<UserRole> {
  * Get the appropriate dashboard URL based on user role
  */
 export function getRoleDashboardUrl(role: UserRole): string {
-  // Platform owners/admins go to admin monitoring
+  // Platform owners/admins go to admin control center
   if (role.isPlatformOwner || role.isPlatformAdmin) {
-    return '/admin/monitoring';
+    return '/admin';
   }
 
   // Sales goes to sales dashboard
@@ -67,9 +67,9 @@ export function getRoleDashboardUrl(role: UserRole): string {
     return '/salesdash';
   }
 
-  // Staff (support, viewer, etc.) goes to admin monitoring
+  // Staff (support, viewer, etc.) go to admin control center
   if (role.isStaff) {
-    return '/admin/monitoring';
+    return '/admin';
   }
 
   // Customers go to customer dashboard
