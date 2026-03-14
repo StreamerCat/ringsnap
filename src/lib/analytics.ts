@@ -10,7 +10,7 @@
  *
  * Cost guardrails enforced here:
  *   - autocapture: false (targeted events only)
- *   - capture_pageview: false (manual page_viewed via RouteTracker in App.tsx)
+ *   - (manual page_viewed via RouteTracker in App.tsx)
  *   - Session replay: 10% sampling, only on /start, /onboarding-chat, /activation
  *   - No network capture, no console log capture
  *   - All calls are no-ops if VITE_POSTHOG_KEY is not set (safe in CI and local dev)
@@ -88,8 +88,6 @@ export function initAnalytics(): void {
     autocapture: false,
 
     // Manual page_viewed fired by RouteTracker in App.tsx — no automatic pageviews
-    capture_pageview: false,
-
     persistence: 'localStorage+cookie',
   });
 }
@@ -285,11 +283,10 @@ export function useRouteTracking(pathname: string): void {
     // Update session replay first (so it's accurate for the new page)
     updateReplayForPath(pathname);
 
-    // Fire page_viewed — central pageview tracking
-    capture('page_viewed', {
-      page_title: document.title,
-      page_path: pathname,
-    });
+    // Fire $pageview — central pageview tracking
+    capture('$pageview', { $current_url: window.location.href, pathname: location.pathname, search: location.search });
+
+
   }, [pathname]);
 }
 

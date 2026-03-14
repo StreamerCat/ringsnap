@@ -525,7 +525,7 @@ export default function CustomerDashboard() {
         {/* Main Tabs - horizontal scroll on mobile */}
         <Tabs value={activeTab} onValueChange={(tab) => {
           setActiveTab(tab);
-          capture('dashboard_viewed', { dashboard_section: tab });
+          capture('dashboard_tab_viewed', { dashboard_section: tab });
         }}>
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-8">
             <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-6 gap-1">

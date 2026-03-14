@@ -27,7 +27,6 @@ const Index = () => {
     trackPageLoad('Index');
     trackFunnelEvent('landing_page_view');
     // PostHog: page_viewed fired by RouteTracker; capture landing-specific event
-    capture('page_viewed', { page_title: 'Home', page_path: '/', page_type: 'homepage' });
   }, []);
 
   const structuredData = {
