@@ -13,44 +13,41 @@ export interface UserRole {
  * Get the user's role information
  */
 export async function getUserRole(userId: string): Promise<UserRole> {
-  try {
-    // Check if user has a staff role
-    const { data: staffRole } = await supabase
-      .from('staff_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single();
+  // Use maybeSingle() so a missing row returns {data: null, error: null}
+  // rather than a PGRST116 error — we only want to throw on real DB errors
+  // (e.g. infinite recursion 42P17) so the caller can handle them explicitly
+  // instead of silently falling back to the customer role.
+  const { data: staffRole, error } = await supabase
+    .from('staff_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
 
-    if (staffRole) {
-      return {
-        isCustomer: false,
-        isStaff: true,
-        isSales: staffRole.role === 'sales',
-        isPlatformAdmin: staffRole.role === 'platform_admin',
-        isPlatformOwner: staffRole.role === 'platform_owner',
-        staffRole: staffRole.role
-      };
-    }
+  if (error) {
+    // Real query error (RLS recursion, permission denied, etc.) — propagate so
+    // the caller can decide what to do rather than silently misidentifying the user.
+    throw error;
+  }
 
-    // Default to customer
+  if (staffRole) {
     return {
-      isCustomer: true,
-      isStaff: false,
-      isSales: false,
-      isPlatformAdmin: false,
-      isPlatformOwner: false
-    };
-  } catch (error) {
-    console.error('Error getting user role:', error);
-    // Default to customer on error
-    return {
-      isCustomer: true,
-      isStaff: false,
-      isSales: false,
-      isPlatformAdmin: false,
-      isPlatformOwner: false
+      isCustomer: false,
+      isStaff: true,
+      isSales: staffRole.role === 'sales',
+      isPlatformAdmin: staffRole.role === 'platform_admin',
+      isPlatformOwner: staffRole.role === 'platform_owner',
+      staffRole: staffRole.role
     };
   }
+
+  // No staff row found — this user is a customer.
+  return {
+    isCustomer: true,
+    isStaff: false,
+    isSales: false,
+    isPlatformAdmin: false,
+    isPlatformOwner: false
+  };
 }
 
 /**
@@ -80,7 +77,16 @@ export function getRoleDashboardUrl(role: UserRole): string {
  * Redirect user to appropriate dashboard based on their role and onboarding status
  */
 export async function redirectToRoleDashboard(userId: string): Promise<string> {
-  const role = await getUserRole(userId);
+  let role: UserRole;
+  try {
+    role = await getUserRole(userId);
+  } catch (error) {
+    // The staff_roles query failed (likely RLS recursion in the database).
+    // We cannot safely determine the user's role, so send them to the home
+    // page rather than silently mis-routing them to the customer dashboard.
+    console.error('[redirectToRoleDashboard] Role check failed — cannot determine dashboard:', error);
+    return '/';
+  }
 
   // For customers, check onboarding status
   if (role.isCustomer) {

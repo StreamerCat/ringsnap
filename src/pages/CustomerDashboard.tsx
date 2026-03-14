@@ -12,6 +12,7 @@ import {
   Calendar, Loader2, Bot, UsersRound, CalendarCheck, CalendarRange, Inbox
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
+import { getRoleDashboardUrl } from "@/lib/auth/redirects";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
@@ -70,11 +71,33 @@ export default function CustomerDashboard() {
     // Auth is handled by withAuthGuard wrapper in App.tsx
     const initData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await loadDashboardData(user.id);
-        // Track page load after data is ready
-        trackPageLoad('CustomerDashboard');
+      if (!user) return;
+
+      // Staff guard: if this user has a staff role they should not be on the
+      // customer dashboard. Redirect them to the correct staff dashboard before
+      // attempting to load any customer data (which would fail for staff users
+      // who have no customer profile/account row).
+      const { data: staffRole } = await supabase
+        .from('staff_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (staffRole) {
+        navigate(getRoleDashboardUrl({
+          isStaff: true,
+          isSales: staffRole.role === 'sales',
+          isPlatformAdmin: staffRole.role === 'platform_admin',
+          isPlatformOwner: staffRole.role === 'platform_owner',
+          isCustomer: false,
+          staffRole: staffRole.role,
+        }), { replace: true });
+        return;
       }
+
+      await loadDashboardData(user.id);
+      // Track page load after data is ready
+      trackPageLoad('CustomerDashboard');
     };
     initData();
 
