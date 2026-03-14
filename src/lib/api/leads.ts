@@ -32,58 +32,25 @@ export async function captureSignupLead(
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    // 1. Check for existing lead manually (since unique constraint might be missing)
-    // Using 'as any' to bypass missing type definitions
-    const { data: existingLeads } = await (supabase as any)
-      .from('signup_leads')
-      .select('*')
-      .eq('email', normalizedEmail)
-      .order('created_at', { ascending: false })
-      .limit(1);
+    // Use the SECURITY DEFINER RPC which bypasses RLS and handles upsert atomically.
+    // Direct client-side INSERT/UPDATE on signup_leads is unreliable: anon has no
+    // UPDATE policy and the SELECT used to detect duplicates is also blocked for anon.
+    const { data, error } = await (supabase as any).rpc('capture_signup_lead', {
+      p_email: normalizedEmail,
+      p_full_name: full_name?.trim() ?? null,
+      p_phone: phone?.trim() ?? null,
+      p_source: source ?? 'website',
+      p_signup_flow: signup_flow ?? 'two-step-v2',
+      p_metadata: extraFields.metadata ?? extraFields,
+    });
 
-    const existingLead = existingLeads?.[0];
+    if (error) throw error;
 
-    const dbPayload = {
-      email: normalizedEmail,
-      full_name: full_name?.trim(),
-      phone: phone?.trim(),
-      source: source ?? 'website',
-      signup_flow: signup_flow ?? 'two-step-v2',
-      metadata: extraFields.metadata || extraFields,
-    };
-
-    let resultData;
-
-    if (existingLead) {
-      // 2a. Update existing lead
-      console.log("[captureSignupLead] Updating existing lead:", existingLead.id);
-      const { data: updated, error: updateError } = await (supabase as any)
-        .from('signup_leads')
-        .update(dbPayload)
-        .eq('id', existingLead.id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-      resultData = updated;
-    } else {
-      // 2b. Insert new lead
-      console.log("[captureSignupLead] Creating new lead");
-      const { data: inserted, error: insertError } = await (supabase as any)
-        .from('signup_leads')
-        .insert(dbPayload)
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      resultData = inserted;
-    }
-
-    if (!resultData) {
+    if (!data) {
       throw new Error("Operation completed but no data returned.");
     }
 
-    return resultData as SignupLeadRow;
+    return data as SignupLeadRow;
 
   } catch (error: any) {
     console.error("[captureSignupLead] error", error);
