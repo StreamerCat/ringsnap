@@ -37,7 +37,9 @@ jobs:
             VAPI_BASE_URL="${{ secrets.VAPI_BASE_URL }}" \
             RESEND_PROD_KEY="${{ secrets.RESEND_PROD_KEY }}" \
             APP_URL="${{ secrets.APP_URL }}" \
-            NOTIFY_EMAIL_FROM="${{ secrets.NOTIFY_EMAIL_FROM }}"
+            NOTIFY_EMAIL_FROM="${{ secrets.NOTIFY_EMAIL_FROM }}" \
+            POSTHOG_API_KEY="${{ secrets.POSTHOG_API_KEY }}" \
+            POSTHOG_SIGNAL_SECRET="${{ secrets.POSTHOG_SIGNAL_SECRET }}"
 
           # Deploy all functions
           supabase functions deploy
