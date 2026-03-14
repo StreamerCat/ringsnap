@@ -41,9 +41,15 @@ CREATE INDEX IF NOT EXISTS idx_posthog_signals_signal_type ON public.posthog_sig
 
 -- FK from crew_events.signal_id → posthog_signals.id
 -- Added here since posthog_signals now exists
-ALTER TABLE public.crew_events
-  ADD CONSTRAINT IF NOT EXISTS fk_crew_events_signal_id
-  FOREIGN KEY (signal_id) REFERENCES public.posthog_signals(id);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_crew_events_signal_id'
+  ) THEN
+    ALTER TABLE public.crew_events
+      ADD CONSTRAINT fk_crew_events_signal_id
+      FOREIGN KEY (signal_id) REFERENCES public.posthog_signals(id);
+  END IF;
+END $$;
 
 -- RLS: service role INSERT/UPDATE from Edge Function and signal consumer
 --      No direct authenticated user access needed (admin uses service role)
