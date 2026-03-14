@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 
 // Mock dependencies
 vi.mock("@/lib/supabase", () => ({
@@ -60,9 +61,11 @@ import { captureSignupLead } from "@/lib/api/leads";
 // Wrapper component for testing
 function TestWrapper() {
   return (
-    <BrowserRouter>
-      <Start />
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <Start />
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }
 

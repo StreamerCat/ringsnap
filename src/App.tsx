@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
+import { useRouteTracking } from "@/lib/analytics";
 import { Loader2 } from "lucide-react";
 import * as Sentry from "@sentry/react";
 
@@ -95,6 +96,13 @@ const HashScrollHandler = () => {
   return null;
 };
 
+// Tracks route changes for PostHog page_viewed events and session replay path management
+const RouteTracker = () => {
+  const { pathname } = useLocation();
+  useRouteTracking(pathname);
+  return null;
+};
+
 const ProtectedCustomerDashboard = withAuthGuard(CustomerDashboard);
 // OnboardingChat handles its own auth logic - supports both authenticated users
 // and unauthenticated users with lead_id (two-step signup flow)
@@ -108,6 +116,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <HashScrollHandler />
+            <RouteTracker />
             <VapiChatWidget />
             <Suspense fallback={
               <div className="flex h-screen w-full items-center justify-center bg-background">

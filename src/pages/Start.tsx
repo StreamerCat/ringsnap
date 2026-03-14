@@ -27,6 +27,7 @@ import { supabase } from '@/lib/supabase';
 import { captureSignupLead } from '@/lib/api/leads';
 import { useUser } from '@/lib/auth/useUser';
 import { trackFunnelEvent, trackFormEvent, trackPageLoad } from '@/lib/sentry-tracking';
+import { capture, identify } from '@/lib/analytics';
 
 // Store lead_id in localStorage for persistence
 const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
@@ -65,6 +66,14 @@ export default function Start() {
 
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // PostHog: fire form_started only once per session
+  const [formStartTracked, setFormStartTracked] = useState(false);
+  const handleFormStart = () => {
+    if (formStartTracked) return;
+    setFormStartTracked(true);
+    capture('form_started', { form_id: 'signup_step1', funnel_step: 'step1_lead_capture' });
+  };
 
   // Get existing lead_id from URL or localStorage
   const existingLeadId = normalizeLeadId(searchParams.get('lead_id')) || getStoredLeadId();
@@ -139,10 +148,11 @@ export default function Start() {
     };
   }, [user, isAuthLoading, navigate, existingLeadId]);
 
-  // Track page load for funnel analytics
+  // Track page load for funnel analytics (Sentry + PostHog)
   useEffect(() => {
     trackPageLoad('Start');
     trackFunnelEvent('signup_started', { source: searchParams.get('utm_source') || 'direct' });
+    // PostHog: page_viewed is also fired by RouteTracker in App.tsx; no duplicate needed here
   }, [searchParams]);
 
   const validateEmail = (email: string): boolean => {
@@ -219,8 +229,29 @@ export default function Start() {
       // Store lead_id for persistence
       storeLeadId(leadId);
 
-      // Track successful lead capture
+      // Track successful lead capture (Sentry)
       trackFunnelEvent('lead_captured', { lead_id: leadId });
+
+      // PostHog: form submitted + first identity assignment (pending_signup_id = leadId)
+      capture('form_submitted', { form_id: 'signup_step1', funnel_step: 'step1_lead_capture' });
+      identify(
+        leadId,
+        // $set properties (update on re-identify)
+        {
+          email: trimmedEmail,
+          signup_source: utmSource || 'direct',
+          app_surface: 'signup',
+        },
+        // $set_once properties (never overwritten after first set)
+        {
+          first_seen_at: new Date().toISOString(),
+          signup_source: utmSource || 'direct',
+          first_utm_source: utmSource,
+          first_utm_campaign: utmCampaign,
+          first_utm_medium: utmMedium,
+          first_page_path: document.referrer ? new URL(document.referrer).pathname : '/',
+        }
+      );
 
       // Show success feedback
       toast.success('Great! Loading your setup...');
@@ -308,6 +339,7 @@ export default function Start() {
                       placeholder="John Smith"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      onFocus={handleFormStart}
                       disabled={isSubmitting}
                       className="h-12 text-base"
                       autoComplete="name"
@@ -323,6 +355,7 @@ export default function Start() {
                       placeholder="john@acmeplumbing.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onFocus={handleFormStart}
                       disabled={isSubmitting}
                       className="h-12 text-base"
                       autoComplete="email"

@@ -35,7 +35,10 @@
     "check:sitemap": "node scripts/check-sitemap-coverage.mjs",
     "check:seo": "npm run check:robots && npm run check:sitemap",
     "test:billing": "node scripts/billing-smoke/run.mjs",
-    "stripe:list-price-env": "bash scripts/stripe-list-price-env-vars.sh"
+    "stripe:list-price-env": "bash scripts/stripe-list-price-env-vars.sh",
+    "test:go-live:integration": "vitest run tests/go-live",
+    "test:go-live:e2e": "playwright test --project=smoke tests/e2e/go-live/smoke.spec.ts",
+    "test:go-live": "node scripts/run-go-live-tests.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -82,6 +85,7 @@
     "jspdf": "^3.0.3",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
+    "posthog-js": "^1.360.1",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

@@ -15,20 +15,17 @@ import { featureFlags } from "@/lib/featureFlags";
 import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
+import { capture, identify, group, resetAnalytics } from "@/lib/analytics";
 import * as Sentry from "@sentry/react";
 import { useVapiWidget } from "@/lib/VapiWidgetContext";
 
 // Tab Components
-import { TodayTab } from "@/components/dashboard/TodayTab";
-import { OverviewTab } from "@/components/dashboard/OverviewTab";
 import { PhoneNumbersTab } from "@/components/dashboard/PhoneNumbersTab";
 import { AssistantsTab } from "@/components/dashboard/AssistantsTab";
 import { TeamTab } from "@/components/dashboard/TeamTab";
 import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
-import { CalendarTab } from "@/components/dashboard/CalendarTab";
-import { AppointmentsTab } from "@/components/dashboard/AppointmentsTab";
 import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
 import { InboxTab } from "@/components/dashboard/InboxTab";
 import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
@@ -181,6 +178,20 @@ export default function CustomerDashboard() {
         accountId: profileData.account_id,
         plan: profileData.accounts.plan_type,
       });
+
+      // PostHog: re-identify with full context + group by account
+      identify(userId, {
+        plan_key: profileData.accounts.plan_key || profileData.accounts.plan_type,
+        billing_status: profileData.accounts.subscription_status,
+        account_id: profileData.account_id,
+        last_active_at: new Date().toISOString(),
+      });
+      if (profileData.account_id) {
+        group('account', profileData.account_id, {
+          plan_key: profileData.accounts.plan_key || profileData.accounts.plan_type,
+        });
+      }
+      capture('dashboard_viewed', { dashboard_section: activeTab });
 
       // Update Vapi Widget Context
       setWidgetContext({
@@ -457,6 +468,7 @@ export default function CustomerDashboard() {
             <Button variant="outline" size="sm" className="h-9" onClick={async () => {
               try {
                 await signOutUser();
+                resetAnalytics(); // PostHog: reset identity on signout
               } finally {
                 navigate("/signin");
               }
@@ -483,7 +495,10 @@ export default function CustomerDashboard() {
         )}
 
         {/* Main Tabs - horizontal scroll on mobile */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(tab) => {
+          setActiveTab(tab);
+          capture('dashboard_viewed', { dashboard_section: tab });
+        }}>
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-8">
             <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-6 gap-1">
               <TabsTrigger value="inbox" className="flex-shrink-0 px-3">

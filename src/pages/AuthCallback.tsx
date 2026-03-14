@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
+import { identify } from "@/lib/analytics";
 
 const ERROR_REDIRECT = "/signin";
 const EXCHANGE_TIMEOUT_MS = 10000; // 10 second timeout
@@ -77,6 +78,12 @@ export default function AuthCallback() {
         if (!user) {
           throw new Error("User not found after OAuth exchange");
         }
+
+        // Re-identify with confirmed Supabase user_id
+        identify(user.id, {
+          email: user.email,
+          last_active_at: new Date().toISOString(),
+        });
 
         // Use custom redirect if provided, otherwise use role-based redirect
         const normalizedNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;

@@ -1,5 +1,5 @@
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useOnboardingGuard } from '../../src/hooks/useOnboardingGuard';
 import { supabase } from '../../src/integrations/supabase/client';
 import { featureFlags } from '../../src/lib/featureFlags';
@@ -64,13 +64,13 @@ describe('useOnboardingGuard', () => {
         // Mock incomplete account
         singleAccountMock.mockResolvedValue({ data: { onboarding_completed_at: null } });
 
-        const { waitForNextUpdate } = renderHook(() =>
+        const { result } = renderHook(() =>
             useOnboardingGuard({ redirectToActivation: true })
         );
 
-        await waitForNextUpdate();
-
-        expect(navigateMock).toHaveBeenCalledWith('/activation', { replace: true });
+        await waitFor(() => {
+            expect(navigateMock).toHaveBeenCalledWith('/activation', { replace: true });
+        });
     });
 
     it('should NOT redirect if guard is disabled', async () => {
@@ -107,12 +107,12 @@ describe('useOnboardingGuard', () => {
             return {};
         });
 
-        const { waitForNextUpdate } = renderHook(() =>
+        const { result } = renderHook(() =>
             useOnboardingGuard({ redirectToDashboard: true })
         );
 
-        await waitForNextUpdate();
-
-        expect(navigateMock).toHaveBeenCalledWith('/dashboard', { replace: true });
+        await waitFor(() => {
+            expect(navigateMock).toHaveBeenCalledWith('/dashboard', { replace: true });
+        });
     });
 });
