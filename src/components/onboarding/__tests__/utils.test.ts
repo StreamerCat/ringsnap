@@ -97,17 +97,17 @@ describe("Validation utilities", () => {
 describe("Plan utilities", () => {
   describe("getPlanPrice", () => {
     it("returns correct prices", () => {
-      expect(getPlanPrice("starter")).toBe(297);
-      expect(getPlanPrice("professional")).toBe(497);
-      expect(getPlanPrice("premium")).toBe(797);
+      expect(getPlanPrice("starter")).toBe(59);
+      expect(getPlanPrice("professional")).toBe(129);
+      expect(getPlanPrice("premium")).toBe(229);
     });
   });
 
   describe("getPlanName", () => {
     it("returns correct names", () => {
-      expect(getPlanName("starter")).toBe("Starter");
-      expect(getPlanName("professional")).toBe("Professional");
-      expect(getPlanName("premium")).toBe("Premium");
+      expect(getPlanName("starter")).toBe("Night & Weekend");
+      expect(getPlanName("professional")).toBe("Lite");
+      expect(getPlanName("premium")).toBe("Core");
     });
   });
 });
