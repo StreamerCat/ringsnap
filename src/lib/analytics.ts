@@ -153,6 +153,7 @@ export function capture(
     return;
   }
 
+  console.log('[PH capture]', event, { ...getStandardProps(), ...props });
   posthog.capture(event, { ...getStandardProps(), ...props });
 }
 
