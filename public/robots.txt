@@ -1,5 +1,5 @@
 # RingSnap Robots.txt
-# Last updated: 2026-01-28
+# Last updated: 2026-03-15
 # https://getringsnap.com
 
 # Allow all major search engines full access to marketing pages
@@ -70,6 +70,8 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /resources
+Allow: /resources/
 Allow: /privacy
 Allow: /terms
 Disallow: /dashboard
@@ -88,6 +90,8 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /resources
+Allow: /resources/
 Allow: /privacy
 Allow: /terms
 Disallow: /dashboard
@@ -106,6 +110,8 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /resources
+Allow: /resources/
 Allow: /privacy
 Allow: /terms
 Disallow: /dashboard
@@ -124,6 +130,8 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /resources
+Allow: /resources/
 Allow: /privacy
 Allow: /terms
 Disallow: /dashboard
@@ -142,6 +150,8 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /resources
+Allow: /resources/
 Allow: /privacy
 Allow: /terms
 Disallow: /dashboard
@@ -160,6 +170,8 @@ Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
 Allow: /roofing
+Allow: /resources
+Allow: /resources/
 Allow: /privacy
 Allow: /terms
 Disallow: /dashboard
