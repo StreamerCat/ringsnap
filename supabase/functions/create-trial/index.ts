@@ -1180,8 +1180,12 @@ Deno.serve(async (req: Request) => {
         password: tempPassword,
         email_confirm: true,
         user_metadata: {
+          name: data.name,
           full_name: data.name,
+          phone: data.phone,
           company_name: data.companyName,
+          trade: data.trade,
+          source: data.source,
         }
       });
 
@@ -1299,9 +1303,29 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5. Link Account to User Metadata (Updating existing block)
+    // 5. Link Account to User Metadata
+    // IMPORTANT: Merge with existing metadata so we don't clobber unrelated keys
+    // (e.g., internal flags, analytics tags, future auth metadata fields).
+    const { data: authUserLookup, error: authUserLookupError } = await supabase.auth.admin.getUserById(currentUserId);
+
+    if (authUserLookupError) {
+      throw new Error(`Auth user lookup failed before metadata update: ${authUserLookupError.message}`);
+    }
+
+    const existingUserMetadata =
+      authUserLookup?.user?.user_metadata && typeof authUserLookup.user.user_metadata === "object"
+        ? authUserLookup.user.user_metadata
+        : {};
+
     await supabase.auth.admin.updateUserById(currentUserId, {
       user_metadata: {
+        ...existingUserMetadata,
+        name: data.name,
+        full_name: data.name,
+        phone: data.phone,
+        company_name: data.companyName,
+        trade: data.trade,
+        source: data.source,
         account_id: currentAccountId,
         account_created_at: new Date().toISOString()
       }
