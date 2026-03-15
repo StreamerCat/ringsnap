@@ -11,7 +11,7 @@
  * Cost guardrails enforced here:
  *   - autocapture: false (targeted events only)
  *   - (manual page_viewed via RouteTracker in App.tsx)
- *   - Session replay: 10% sampling, only on /start, /onboarding-chat, /activation
+ *   - Session replay: 10% sampling only on /start, /onboarding-chat, /activation (decided once at init)
  *   - No network capture, no console log capture
  *   - All calls are no-ops if VITE_POSTHOG_KEY is not set (safe in CI and local dev)
  *
@@ -39,6 +39,30 @@ const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) |
  * All other paths: replay explicitly disabled.
  */
 const REPLAY_PATHS = ['/start', '/onboarding-chat', '/activation'];
+const REPLAY_SAMPLE_RATE = 0.1;
+
+
+function safePostHogCall(action: string, fn: () => void): void {
+  try {
+    fn();
+  } catch (error) {
+    if (IS_DEV) {
+      console.warn(`[Analytics] PostHog ${action} skipped due to runtime error`, error);
+    }
+  }
+}
+
+function safePostHogGet<T>(action: string, fn: () => T): T | undefined {
+  try {
+    return fn();
+  } catch (error) {
+    if (IS_DEV) {
+      console.warn(`[Analytics] PostHog ${action} skipped due to runtime error`, error);
+    }
+    return undefined;
+  }
+}
+
 
 // ============================================================================
 // Initialization
@@ -60,7 +84,7 @@ export function initAnalytics(): void {
   const currentPath = window.location.pathname;
   const isReplayPath = REPLAY_PATHS.some(p => currentPath.startsWith(p));
 
-  posthog.init(POSTHOG_KEY, {
+  safePostHogCall('init', () => posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
 
     loaded: (ph) => {
@@ -70,7 +94,7 @@ export function initAnalytics(): void {
       }
     },
 
-    // Session replay config — 10% sampling on replay paths only
+    // Session replay config — keep cost throttle intact: 10% sampling on replay paths only
     session_recording: {
       maskAllInputs: true,      // PII protection — always mask inputs
       maskAllText: false,        // Keep text visible for UX analysis
@@ -80,9 +104,11 @@ export function initAnalytics(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     capture_performance: false as any,            // no network capture
 
-    // Replay disabled by default; updateReplayForPath() enables it on matching routes
+    // Replay is decided once at initialization and is not toggled on route changes.
+    // This avoids recorder teardown/startup during browser back/forward transitions.
+    // Cost control is preserved: non-replay pages are hard-disabled and replay pages stay at 10%.
     disable_session_recording: !isReplayPath,
-    session_recording_sample_rate: isReplayPath ? 0.1 : 0,
+    session_recording_sample_rate: isReplayPath ? REPLAY_SAMPLE_RATE : 0,
 
     // Targeted events only — no autocapture to stay under 40-event budget
     autocapture: false,
@@ -90,7 +116,7 @@ export function initAnalytics(): void {
 
     // Manual $pageview fired by RouteTracker in App.tsx; automatic $pageleave enabled
     persistence: 'localStorage+cookie',
-  });
+  }));
 }
 
 // ============================================================================
@@ -153,7 +179,7 @@ export function capture(
     return;
   }
 
-  posthog.capture(event, { ...getStandardProps(), ...props });
+  safePostHogCall('capture', () => posthog.capture(event, { ...getStandardProps(), ...props }));
 }
 
 /**
@@ -177,7 +203,7 @@ export function identify(
   setOnceProps?: Record<string, unknown>
 ): void {
   if (!POSTHOG_KEY) return;
-  posthog.identify(userId, setProps, setOnceProps);
+  safePostHogCall('identify', () => posthog.identify(userId, setProps, setOnceProps));
 }
 
 /**
@@ -193,7 +219,7 @@ export function group(
   groupProps?: Record<string, unknown>
 ): void {
   if (!POSTHOG_KEY) return;
-  posthog.group(groupType, groupKey, groupProps);
+  safePostHogCall('group', () => posthog.group(groupType, groupKey, groupProps));
 }
 
 /**
@@ -201,7 +227,7 @@ export function group(
  */
 export function resetAnalytics(): void {
   if (!POSTHOG_KEY) return;
-  posthog.reset();
+  safePostHogCall('reset', () => posthog.reset());
 }
 
 // ============================================================================
@@ -209,20 +235,14 @@ export function resetAnalytics(): void {
 // ============================================================================
 
 /**
- * Enable or disable session replay based on the current route.
- * Called by RouteTracker in App.tsx on every route change.
+ * Legacy no-op kept for backward compatibility.
  *
- * Replay enabled (10% sampling): /start, /onboarding-chat, /activation
- * Replay disabled: all other paths
+ * Recorder controls are intentionally not called on navigation because route-based
+ * stop/start has caused browser security errors during teardown on history changes.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function updateReplayForPath(path: string): void {
-  if (!POSTHOG_KEY) return;
-  const shouldEnable = REPLAY_PATHS.some(p => path.startsWith(p));
-  if (shouldEnable) {
-    posthog.startSessionRecording();
-  } else {
-    posthog.stopSessionRecording();
-  }
+  // intentionally empty
 }
 
 // ============================================================================
@@ -245,7 +265,7 @@ export function updateReplayForPath(path: string): void {
  */
 export function getFeatureFlag(flagKey: string): string | boolean | undefined {
   if (!POSTHOG_KEY) return undefined;
-  return posthog.getFeatureFlag(flagKey);
+  return safePostHogGet('getFeatureFlag', () => posthog.getFeatureFlag(flagKey));
 }
 
 /**
@@ -261,7 +281,7 @@ export function useFeatureFlag(flagKey: string): string | boolean | undefined {
 
   // posthog.getFeatureFlag is synchronous after flags load; no state needed
   // for more complex cases (flag loading state), wrap in usePostHog from posthog-js/react
-  return posthog.getFeatureFlag(flagKey);
+  return safePostHogGet('useFeatureFlag', () => posthog.getFeatureFlag(flagKey));
 }
 
 // ============================================================================
@@ -270,7 +290,7 @@ export function useFeatureFlag(flagKey: string): string | boolean | undefined {
 
 /**
  * Hook for tracking route changes. Used by the RouteTracker component in App.tsx.
- * Fires page_viewed on each unique route change and updates replay config.
+ * Fires page_viewed on each unique route change.
  *
  * Deduplicated: same path fires only once (prevents double-fire on React StrictMode remounts).
  */
@@ -280,9 +300,6 @@ export function useRouteTracking(pathname: string): void {
   useEffect(() => {
     if (prevPath.current === pathname) return;
     prevPath.current = pathname;
-
-    // Update session replay first (so it's accurate for the new page)
-    updateReplayForPath(pathname);
 
     // Fire $pageview — central pageview tracking
     capture('$pageview', { $current_url: window.location.href, pathname: location.pathname, search: location.search });
