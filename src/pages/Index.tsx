@@ -78,7 +78,7 @@ const Index = () => {
       "worstRating": "1"
     },
 
-    "image": "https://getringsnap.com/assets/social/ringsnap-og.jpg",
+    "image": "https://getringsnap.com/android-chrome-512x512.png",
     "featureList": [
       "Answers in under 1 second",
       "Books appointments automatically",
@@ -97,7 +97,7 @@ const Index = () => {
     "alternateName": "RingSnap Answering Service",
     "description": "Virtual answering service built for contractors. Never miss a call, book more jobs.",
     "url": "https://getringsnap.com",
-    "logo": "https://getringsnap.com/assets/RS_logo_color.svg",
+    "logo": "https://getringsnap.com/RS_logo_color.svg",
     "slogan": "Built to book jobs",
     "contactPoint": {
       "@type": "ContactPoint",
@@ -179,6 +179,9 @@ const Index = () => {
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://getringsnap.com/" />
         <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta property="og:image:width" content="512" />
+        <meta property="og:image:height" content="512" />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
         {/* Twitter Card */}

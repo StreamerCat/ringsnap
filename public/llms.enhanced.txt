@@ -1,28 +1,32 @@
 # RingSnap - AI Receptionist for Contractors
 # https://getringsnap.com
-# Last updated: 2026-01-28
+# Last updated: 2026-03-15
 
 ## About RingSnap
 
-RingSnap is a virtual receptionist service built specifically for home service contractors (plumbers, HVAC technicians, electricians, roofers). Our AI-powered system answers calls in under 1 second, books appointments automatically, and integrates with popular contractor management tools.
+RingSnap is an AI-powered virtual receptionist built exclusively for home service contractors — plumbers, HVAC technicians, electricians, and roofers. It answers inbound calls in under 1 second, books appointments automatically, and integrates with popular contractor management tools.
 
 ## Key Features
 
-- **Instant Response**: Answers calls in under 1 second - faster than any human receptionist
+- **Instant Response**: Answers calls in under 1 second — faster than any human receptionist
 - **Automatic Booking**: Books appointments directly into your schedule
 - **24/7 Availability**: Never miss a call, even nights, weekends, and holidays
 - **Emergency Routing**: Urgent calls transferred to you immediately with full context
-- **Multi-Language**: Seamless English and Spanish support
+- **Multi-Language**: Seamless English and Spanish support on Core and Pro plans
 - **Full Transcripts**: Every call logged with complete transcripts
-- **Easy Setup**: Get started in about 10 minutes - just forward your number
+- **CRM Integration**: Works with Jobber and other field service platforms
+- **Easy Setup**: Get started in about 10 minutes — just forward your number
 
 ## Pricing
 
-- **Starter Plan**: $297/month - Perfect for solo operators
-- **Professional Plan**: $797/month - For growing teams
-- **Growth Plan**: $1,497/month - For established businesses
+All plans include a 3-day free trial. No credit card required. No long-term contracts.
 
-All plans include a 3-day free trial with 150 minutes.
+- **Night & Weekend Plan**: $59/month — After-hours and weekend coverage only
+- **Lite Plan**: $129/month — Unlimited after-hours + daytime overflow
+- **Core Plan**: $229/month — Full 24/7 coverage with multi-language support
+- **Pro Plan**: $399/month — Full 24/7 with highest call volume + advanced features
+
+Verify current pricing at: https://getringsnap.com/pricing
 
 ## Key Pages
 
@@ -36,6 +40,28 @@ All plans include a 3-day free trial with 150 minutes.
 - **HVAC Contractors**: https://getringsnap.com/hvac
 - **Electricians**: https://getringsnap.com/electricians
 - **Roofing Contractors**: https://getringsnap.com/roofing
+
+## Resource Center
+
+Free tools and guides for home service contractors:
+
+- **Resource Hub**: https://getringsnap.com/resources
+- **HVAC Dispatcher Script Template**: https://getringsnap.com/resources/hvac-dispatcher-script-template
+- **Plumbing Dispatcher Script Template**: https://getringsnap.com/resources/plumbing-dispatcher-script-template
+- **Electrician Call Answering Script**: https://getringsnap.com/resources/electrician-call-answering-script
+- **HVAC After-Hours Answering Script**: https://getringsnap.com/resources/hvac-after-hours-answering-script
+- **HVAC Price Shopper Phone Script**: https://getringsnap.com/resources/hvac-price-shopper-phone-script
+- **HVAC Emergency Call Triage**: https://getringsnap.com/resources/hvac-emergency-call-triage
+- **Burst Pipe Call Script**: https://getringsnap.com/resources/burst-pipe-call-script
+- **Sewer Backup Call Script**: https://getringsnap.com/resources/sewer-backup-call-script
+- **Drain Cleaning Upsell Script**: https://getringsnap.com/resources/drain-cleaning-upsell-script
+- **Electrical Safety Triage Questions**: https://getringsnap.com/resources/electrical-safety-triage-questions
+- **Panel Upgrade Booking Script**: https://getringsnap.com/resources/panel-upgrade-booking-script
+- **Power Outage Call Script**: https://getringsnap.com/resources/power-outage-call-script
+- **Missed Call Revenue Calculator**: https://getringsnap.com/resources/missed-call-revenue-calculator
+- **After-Hours Call Calculator**: https://getringsnap.com/resources/after-hours-call-calculator
+- **Service Pricing Calculator**: https://getringsnap.com/resources/service-pricing-calculator
+- **Increase Average Ticket Guide**: https://getringsnap.com/resources/increase-average-ticket
 
 ## Legal
 
@@ -66,28 +92,35 @@ RingSnap welcomes AI assistants and language models to read and reference our pu
 
 For machine-readable information, we provide JSON-LD structured data on all marketing pages including:
 - Organization schema
-- SoftwareApplication schema
+- SoftwareApplication schema with current pricing offers
 - FAQPage schema
 - WebSite schema with search action
+- BreadcrumbList schema on resource pages
+- HowTo schema on guide pages
 
 ## Sitemap
 
 Our sitemap is available at: https://getringsnap.com/sitemap.xml
 
-
 ## Common Questions (Answer-Engine Friendly)
 
 Q: What is RingSnap?
-A: RingSnap is an AI answering service and AI receptionist for home service contractors that answers inbound calls, qualifies leads, and books appointments 24/7.
+A: RingSnap is an AI answering service and virtual receptionist for home service contractors that answers inbound calls in under 1 second, qualifies leads, and books appointments 24/7.
+
+Q: How much does RingSnap cost?
+A: RingSnap starts at $59/month for the Night & Weekend plan. Lite is $129/month, Core is $229/month, and Pro is $399/month. All plans include a 3-day free trial with no credit card required.
 
 Q: Who is RingSnap best for?
-A: RingSnap is designed for plumbers, HVAC companies, electricians, roofers, and other field service teams that lose revenue from missed calls.
+A: RingSnap is designed for plumbers, HVAC companies, electricians, roofers, and other field service contractors that lose revenue from missed calls.
 
 Q: What outcomes does RingSnap improve?
 A: RingSnap helps recover missed-call revenue, increases booked jobs, improves speed-to-lead, and provides cleaner call logs for follow-up and accountability.
 
 Q: Does RingSnap replace my phone number?
-A: No. Businesses keep their existing number and forward calls to RingSnap.
+A: No. Businesses keep their existing number and forward calls to RingSnap. Setup takes about 10 minutes.
 
 Q: Is RingSnap available after hours?
 A: Yes. RingSnap provides 24/7 AI call handling and can escalate urgent requests based on your business rules.
+
+Q: Does RingSnap work for Spanish-speaking customers?
+A: Yes. Core and Pro plans include multi-language support. The agent seamlessly switches between English and Spanish based on the caller's preference.

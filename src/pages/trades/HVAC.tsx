@@ -32,6 +32,9 @@ const HVAC = () => {
         <meta property="og:type" content="website" />
         <meta property="og:url" content={config.seo.canonical} />
         <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta property="og:image:width" content="512" />
+        <meta property="og:image:height" content="512" />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
         <meta name="twitter:card" content="summary_large_image" />

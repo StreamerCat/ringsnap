@@ -1,6 +1,6 @@
 # ai.txt for RingSnap
 # https://getringsnap.com
-# Last updated: 2026-01-28
+# Last updated: 2026-03-15
 
 # This file provides guidance for AI crawlers and language models
 
@@ -20,6 +20,8 @@ Allow: /electricians
 Allow: /roofing
 Allow: /privacy
 Allow: /terms
+Allow: /resources
+Allow: /resources/
 
 # Private/Authenticated Areas - Not for indexing or training
 Disallow: /dashboard
@@ -58,10 +60,11 @@ Disallow: /onboarding
 #   - Emergency call routing
 #   - Full call logs and transcripts
 
-# Pricing (approximate, verify on /pricing):
-#   - Starter: $297/month
-#   - Professional: $797/month
-#   - Growth: $1497/month
+# Pricing (verify on /pricing):
+#   - Night & Weekend: $59/month (after-hours only)
+#   - Lite: $129/month (after-hours + overflow)
+#   - Core: $229/month (full 24/7)
+#   - Pro: $399/month (full 24/7, highest volume)
 
 # Contact
 # Website: https://getringsnap.com

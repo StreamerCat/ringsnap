@@ -148,10 +148,6 @@ Sentry.init({
   ],
 });
 
-// Initialize PostHog analytics (non-blocking, additive alongside Sentry)
-// No-op if VITE_POSTHOG_KEY is not set
-initAnalytics();
-
 // Global error handler to catch any unhandled errors
 window.addEventListener('error', (event) => {
   console.error('Global error caught:', event.error);
@@ -176,6 +172,20 @@ try {
       </HelmetProvider>
     </StrictMode>
   );
+
+  // Initialize PostHog after React renders — deferred to keep analytics off the
+  // critical rendering path. Uses requestIdleCallback so the browser processes
+  // the first paint before PostHog initializes. Falls back to setTimeout(200)
+  // for Safari/older browsers that don't support requestIdleCallback.
+  // No-op if VITE_POSTHOG_KEY is not set.
+  if ('requestIdleCallback' in window) {
+    (window as Window & typeof globalThis).requestIdleCallback(
+      () => initAnalytics(),
+      { timeout: 3000 }
+    );
+  } else {
+    setTimeout(() => initAnalytics(), 200);
+  }
 } catch (error) {
   console.error("Failed to render app:", error);
   // Show a visible error message in the DOM
