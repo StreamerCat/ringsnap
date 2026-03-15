@@ -86,8 +86,9 @@ export function initAnalytics(): void {
 
     // Targeted events only — no autocapture to stay under 40-event budget
     autocapture: false,
+    capture_pageleave: true,
 
-    // Manual page_viewed fired by RouteTracker in App.tsx — no automatic pageviews
+    // Manual $pageview fired by RouteTracker in App.tsx; automatic $pageleave enabled
     persistence: 'localStorage+cookie',
   });
 }
