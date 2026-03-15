@@ -88,9 +88,13 @@ export const ResourceLayout = ({
         })),
     };
 
-    const fullCanonical = canonical.startsWith("http")
-        ? canonical
-        : `https://getringsnap.com${canonical}`;
+    // Normalize: strip trailing slash (except bare "/") then prepend domain
+    const normalizedPath = canonical.endsWith("/") && canonical.length > 1
+        ? canonical.slice(0, -1)
+        : canonical;
+    const fullCanonical = normalizedPath.startsWith("http")
+        ? normalizedPath
+        : `https://getringsnap.com${normalizedPath}`;
 
     return (
         <>

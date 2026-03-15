@@ -20,7 +20,7 @@ const Pricing = () => {
         "name": "RingSnap",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
-        "url": "https://ringsnap.ai/pricing",
+        "url": "https://getringsnap.com/pricing",
         "description": "AI receptionist built exclusively for home service contractors — answers calls 24/7, books jobs, logs to CRM. Starting at $59/month.",
         "offers": [
             {
@@ -28,28 +28,28 @@ const Pricing = () => {
                 "name": "Night & Weekend Plan",
                 "price": "59",
                 "priceCurrency": "USD",
-                "url": "https://ringsnap.ai/pricing"
+                "url": "https://getringsnap.com/pricing"
             },
             {
                 "@type": "Offer",
                 "name": "Lite Plan",
                 "price": "129",
                 "priceCurrency": "USD",
-                "url": "https://ringsnap.ai/pricing"
+                "url": "https://getringsnap.com/pricing"
             },
             {
                 "@type": "Offer",
                 "name": "Core Plan",
                 "price": "229",
                 "priceCurrency": "USD",
-                "url": "https://ringsnap.ai/pricing"
+                "url": "https://getringsnap.com/pricing"
             },
             {
                 "@type": "Offer",
                 "name": "Pro Plan",
                 "price": "399",
                 "priceCurrency": "USD",
-                "url": "https://ringsnap.ai/pricing"
+                "url": "https://getringsnap.com/pricing"
             }
         ]
     };
@@ -102,17 +102,17 @@ const Pricing = () => {
                     content="RingSnap AI receptionist pricing starts at $59/month. Built for HVAC, plumbing, electrical, handyman, and roofing contractors. CRM included on every plan. 3-day free trial."
                 />
                 <meta name="robots" content="index, follow" />
-                <link rel="canonical" href="https://ringsnap.ai/pricing" />
+                <link rel="canonical" href="https://getringsnap.com/pricing" />
                 <meta property="og:title" content="Pricing | RingSnap AI Receptionist for Contractors" />
                 <meta property="og:description" content="Stop losing $4,200/month to missed calls. RingSnap starts at $59/mo. CRM included. 3-day free trial." />
                 <meta property="og:type" content="website" />
-                <meta property="og:url" content="https://ringsnap.ai/pricing" />
-                <meta property="og:image" content="https://ringsnap.ai/android-chrome-512x512.png" />
+                <meta property="og:url" content="https://getringsnap.com/pricing" />
+                <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
                 <meta property="og:site_name" content="RingSnap" />
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content="Pricing | RingSnap AI Receptionist" />
                 <meta name="twitter:description" content="AI receptionist for contractors. Starts at $59/mo. 3-day free trial. No contracts." />
-                <meta name="twitter:image" content="https://ringsnap.ai/android-chrome-512x512.png" />
+                <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
                 {featureFlags.enhancedMarketingSchema && (
                     <>

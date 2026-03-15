@@ -42,7 +42,7 @@ const Index = () => {
         "name": "Night & Weekend Plan",
         "price": "59",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": "2026-12-31",
         "availability": "https://schema.org/InStock"
       },
       {
@@ -50,7 +50,7 @@ const Index = () => {
         "name": "Lite Plan",
         "price": "129",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": "2026-12-31",
         "availability": "https://schema.org/InStock"
       },
       {
@@ -58,7 +58,7 @@ const Index = () => {
         "name": "Core Plan",
         "price": "229",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": "2026-12-31",
         "availability": "https://schema.org/InStock"
       },
       {
@@ -66,7 +66,7 @@ const Index = () => {
         "name": "Pro Plan",
         "price": "399",
         "priceCurrency": "USD",
-        "priceValidUntil": "2025-12-31",
+        "priceValidUntil": "2026-12-31",
         "availability": "https://schema.org/InStock"
       }
     ],
