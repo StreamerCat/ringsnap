@@ -1,3 +1,4 @@
+import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type MessageRole = "assistant" | "user";
@@ -19,8 +20,8 @@ export function ChatMessage({ role, content, timestamp }: ChatMessageProps) {
       )}
     >
       {isAssistant && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
-          AI
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+          <Phone className="h-4 w-4" />
         </div>
       )}
       <div

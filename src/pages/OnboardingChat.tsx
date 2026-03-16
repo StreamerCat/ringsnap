@@ -28,10 +28,7 @@ import { Elements, useStripe, useElements, CardElement } from "@stripe/react-str
 import {
   Loader2,
   Phone,
-  Building2,
-  Globe,
   Clock,
-  Mic,
   Target,
   CreditCard,
   CheckCircle2,
@@ -63,16 +60,13 @@ import * as Sentry from "@sentry/react";
 // Chat step types
 type ChatStep =
   | "loading"
-  | "welcome"
   | "phone"
   | "company"
   | "trade"
   | "website"
   | "hours"
   | "hours_custom"
-  | "voice"
   | "goal"
-  | "plan"
   | "payment"
   | "processing"
   | "provisioning"
@@ -117,32 +111,6 @@ interface LeadData {
   email: string;
   full_name: string | null;
 }
-
-// Plan definitions
-const PLANS = [
-  {
-    value: "starter" as const,
-    name: "Night & Weekend",
-    price: 59,
-    calls: "150 min included/mo",
-    features: ["Virtual receptionist", "Call forwarding", "24/7 availability", "Email support"],
-  },
-  {
-    value: "professional" as const,
-    name: "Lite",
-    price: 129,
-    calls: "300 min included/mo",
-    features: ["Everything in Night & Weekend, plus", "24/7 call answering", "Appointment booking", "Google Calendar + Zapier"],
-    popular: true,
-  },
-  {
-    value: "premium" as const,
-    name: "Core",
-    price: 229,
-    calls: "600 min included/mo",
-    features: ["Everything in Lite, plus", "Branded voice options", "Multi-language (EN + ES)", "Priority support"],
-  },
-];
 
 // Trade options
 const TRADE_OPTIONS: ChatButtonOption[] = [
@@ -313,19 +281,16 @@ function OnboardingChatInner() {
   useEffect(() => {
     const stepProgress: Record<ChatStep, number> = {
       loading: 0,
-      welcome: 5,
-      phone: 15,
-      company: 25,
-      trade: 35,
-      website: 45,
-      hours: 55,
-      hours_custom: 55,
-      voice: 65,
-      goal: 75,
-      plan: 82,
-      payment: 90,
-      processing: 95,
-      provisioning: 97,
+      phone: 14,
+      company: 28,
+      trade: 43,
+      website: 57,
+      hours: 71,
+      hours_custom: 71,
+      goal: 85,
+      payment: 95,
+      processing: 98,
+      provisioning: 99,
       complete: 100,
       error: 0,
     };
@@ -404,26 +369,14 @@ function OnboardingChatInner() {
         });
 
         // Start the chat
-        // Start the chat
         setStep("phone");
         trackFunnelEvent("onboarding_started", { lead_id: lead.id, email: lead.email });
 
-        await showTypingDelay(800);
+        await showTypingDelay(500);
         const userName = lead.full_name?.split(" ")[0] || "there";
         addMessage(
           "assistant",
-          `Hi ${userName}! I'm here to get your RingSnap Agent set up in just a few minutes. Ready to never miss another call?`
-        );
-
-        await showTypingDelay(1000);
-        addMessage(
-          "assistant",
-          <div className="space-y-2">
-            <p>Perfect! First, what's the best phone number to reach you?</p>
-            <p className="text-sm text-muted-foreground">
-              We'll give you a dedicated RingSnap number, and you'll forward your business line to it. When needed, calls can be forwarded back to this number.
-            </p>
-          </div>
+          `Hi ${userName}! Let's get your RingSnap receptionist set up. What's the best phone number for call forwarding?`
         );
       } catch (error) {
         console.error("Init error:", error);
@@ -438,64 +391,6 @@ function OnboardingChatInner() {
   // Poll provisioning status - MOVED TO /setup/assistant page
   // useEffect(() => { ... }) removed
 
-
-  // Handle welcome response
-  const handleWelcome = async (value: string) => {
-    if (value === "questions") {
-      addMessage("user", "I have some questions first");
-      await showTypingDelay();
-      addMessage(
-        "assistant",
-        "No problem! I'll walk you through everything step by step. You'll have a dedicated business line that answers calls 24/7, books appointments, and never misses a lead. Ready to get started?"
-      );
-    }
-
-    // Second click - show FAQ
-    if (value === "questions_2") {
-      addMessage("user", "I still have questions");
-      await showTypingDelay();
-      addMessage(
-        "assistant",
-        "I understand. Here are some quick answers to common questions:"
-      );
-      return;
-    }
-
-    // Handle specific FAQ questions
-    if (value === "faq_pricing") {
-      addMessage("user", "How much does it cost?");
-      await showTypingDelay();
-      addMessage("assistant", "Our plans start at $59/mo (Night & Weekend) and include 150 minutes. Lite is $129/mo, Core is $229/mo, and Pro is $399/mo. You still get a 3-day free trial to test it risk-free!");
-      return;
-    }
-
-    if (value === "faq_human") {
-      addMessage("user", "Is it a real person?");
-      await showTypingDelay();
-      addMessage("assistant", "It's an advanced Voice Agent that sounds just like a human! It can handle multiple calls at once, never sleeps, and follows your instructions perfectly.");
-      return;
-    }
-
-    if (value === "faq_contract") {
-      addMessage("user", "Is there a contract?");
-      await showTypingDelay();
-      addMessage("assistant", "No long-term contracts! You can cancel anytime. We want you to stay because you love the service, not because you're locked in.");
-      return;
-    }
-
-    addMessage("user", "Let's do it!");
-    setStep("phone");
-    await showTypingDelay();
-    addMessage(
-      "assistant",
-      <div className="space-y-2">
-        <p>Perfect! First, what's the best phone number to reach you?</p>
-        <p className="text-sm text-muted-foreground">
-          We'll give you a dedicated RingSnap number, and you'll forward your business line to it. When needed, calls can be forwarded back to this number.
-        </p>
-      </div>
-    );
-  };
 
   // Handle phone input
   const handlePhone = async (value: string) => {
@@ -515,7 +410,11 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, phone: value }));
     setStep("company");
     trackCheckpoint("onboarding_phone_collected");
-    await showTypingDelay();
+    // Save phone to lead record (fire-and-forget)
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ phone: normalizePhone(cleanPhone), last_step: 1 }).eq("id", leadData.id).then(() => {});
+    }
+    await showTypingDelay(600);
     addMessage("assistant", "Got it. What's the name of your business?");
   };
 
@@ -531,8 +430,12 @@ function OnboardingChatInner() {
 
     setStep("trade");
     trackCheckpoint("onboarding_company_collected", { company_name: value.trim() });
-    await showTypingDelay();
-    addMessage("assistant", "What type of service do you provide?");
+    // Track step progression
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ last_step: 2 }).eq("id", leadData.id).then(() => {});
+    }
+    await showTypingDelay(600);
+    addMessage("assistant", "What type of work do you do?");
   };
 
   // Handle trade selection
@@ -548,10 +451,14 @@ function OnboardingChatInner() {
 
     setStep("website");
     trackCheckpoint("onboarding_trade_collected", { trade: value });
-    await showTypingDelay();
+    // Track step progression
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ last_step: 3 }).eq("id", leadData.id).then(() => {});
+    }
+    await showTypingDelay(600);
     addMessage(
       "assistant",
-      "Do you have a website? (This helps me personalize your Agent - you can skip if you don't have one)"
+      "Do you have a website? Your receptionist will use it to learn about your business and answer caller questions accurately."
     );
   };
 
@@ -567,10 +474,14 @@ function OnboardingChatInner() {
     setData((prev) => ({ ...prev, trade: value.trim() }));
 
     setStep("website");
-    await showTypingDelay();
+    // Track step progression
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ last_step: 3 }).eq("id", leadData.id).then(() => {});
+    }
+    await showTypingDelay(600);
     addMessage(
       "assistant",
-      "Do you have a website? (This helps me personalize your Agent - you can skip if you don't have one)"
+      "Do you have a website? Your receptionist will use it to learn about your business and answer caller questions accurately."
     );
   };
 
@@ -590,16 +501,15 @@ function OnboardingChatInner() {
 
     setStep("hours");
     trackCheckpoint("onboarding_website_collected", { skipped });
-    await showTypingDelay();
-    addMessage("assistant", "When is your business typically available to take calls?");
+    await showTypingDelay(600);
+    addMessage("assistant", "When should your receptionist answer calls?");
   };
 
-  // Handle hours selection
   // Handle hours selection
   const handleHoursChoice = async (value: string) => {
     if (value === "custom") {
       setStep("hours_custom");
-      await showTypingDelay(500);
+      await showTypingDelay(300);
       addMessage("assistant", "Let's set your custom hours:");
       return;
     }
@@ -653,10 +563,14 @@ function OnboardingChatInner() {
     addMessage("user", hoursText);
     setData((prev) => ({ ...prev, businessHours: hoursData }));
 
-    setStep("voice");
+    setStep("goal");
     trackCheckpoint("onboarding_hours_collected", { type: value });
-    await showTypingDelay();
-    addMessage("assistant", "What voice would you like your RingSnap Agent to have?");
+    // Track step progression
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ last_step: 4 }).eq("id", leadData.id).then(() => {});
+    }
+    await showTypingDelay(600);
+    addMessage("assistant", "What's the main job for your receptionist?");
   };
 
   // Handle custom hours
@@ -670,70 +584,27 @@ function OnboardingChatInner() {
     addMessage("user", `Custom hours: ${daysText}`);
     setData((prev) => ({ ...prev, businessHours: hours }));
 
-    setStep("voice");
-    await showTypingDelay();
-    addMessage("assistant", "What voice would you like your RingSnap Agent to have?");
-  };
-
-  // Handle voice selection
-  const handleVoice = async (value: string) => {
-    const gender = value as "male" | "female";
-    addMessage("user", gender === "male" ? "Male voice" : "Female voice");
-    setData((prev) => ({ ...prev, assistantGender: gender }));
-
     setStep("goal");
-    trackCheckpoint("onboarding_voice_collected", { gender });
-    await showTypingDelay();
-    addMessage("assistant", "What's the main thing you want your RingSnap Agent to do?");
+    // Track step progression
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ last_step: 4 }).eq("id", leadData.id).then(() => {});
+    }
+    await showTypingDelay(600);
+    addMessage("assistant", "What's the main job for your receptionist?");
   };
 
   // Handle goal selection
   const handleGoal = async (value: string) => {
     const goalLabel = GOAL_OPTIONS.find((g) => g.value === value)?.label || value;
     addMessage("user", goalLabel);
-    setData((prev) => ({ ...prev, primaryGoal: value }));
+    setData((prev) => ({ ...prev, primaryGoal: value, planType: "starter" }));
 
-    setStep("plan");
+    setStep("payment");
     trackCheckpoint("onboarding_goal_collected", { goal: value });
-    await showTypingDelay();
-    addMessage(
-      "assistant",
-      "Excellent! You're almost done. We'll set you up on Night & Weekend ($59/mo) with a 3-day free trial. You can upgrade to Lite, Core, or Pro anytime."
-    );
-
-    // Skip plan selection, go straight to payment
-    setData((prev) => ({ ...prev, planType: "starter" }));
-    // PostHog: checkout_started when user reaches payment step
     capture('checkout_started', { plan_key: 'starter', source_channel: 'onboarding_chat' });
-    setStep("payment");
+    await showTypingDelay(600);
+    addMessage("assistant", "Almost done — start free for 3 days, cancel anytime.");
   };
-
-  /* 
-  // Plan selection removed for trial simplification
-  // Handle plan selection
-  const handlePlan = async (value: string) => {
-    const plan = PLANS.find((p) => p.value === value);
-    if (!plan) return;
-
-    addMessage("user", `${plan.name} - $${plan.price}/mo`);
-    setData((prev) => ({ ...prev, planType: plan.value }));
-
-    setStep("payment");
-    await showTypingDelay();
-    addMessage(
-      "assistant",
-      <div className="space-y-2">
-        <p>
-          Great choice! Your <strong>{plan.name}</strong> plan includes a 3-day free trial with 150
-          minutes to try it out.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Your card won't be charged until after the trial ends.
-        </p>
-      </div>
-    );
-  };
-  */
 
   // Handle payment submission
   const handlePayment = async () => {
@@ -991,7 +862,7 @@ function OnboardingChatInner() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              Step {Math.min(Math.ceil(progress / 10), 10)} of 10
+              Step {Math.min(Math.ceil(progress / 14.3), 7)} of 7
             </span>
             <div className="w-24">
               <Progress value={progress} className="h-2" />
@@ -1012,33 +883,6 @@ function OnboardingChatInner() {
               {isTyping && <TypingIndicator />}
 
               {/* Interactive elements based on step */}
-              {step === "welcome" && !isTyping && (
-                <div className="space-y-2">
-                  <ChatButtons
-                    options={[
-                      { label: "Let's do it!", value: "start" },
-                      { label: "I have questions", value: messages.filter(m => m.role === 'user' && m.content === "I have some questions first").length > 0 ? "questions_2" : "questions" },
-                    ]}
-                    onSelect={handleWelcome}
-                  />
-                  {/* Show FAQ options if "I still have questions" was triggered */}
-                  {messages.some(m => m.content === "I still have questions") && (
-                    <div className="pt-2">
-                      <p className="text-sm text-muted-foreground mb-2 text-center">Common questions:</p>
-                      <ChatButtons
-                        options={[
-                          { label: "Pricing?", value: "faq_pricing" },
-                          { label: "Is it a real person?", value: "faq_human" },
-                          { label: "Any contracts?", value: "faq_contract" },
-                        ]}
-                        onSelect={handleWelcome}
-                        layout="grid"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
               {step === "phone" && !isTyping && (
                 <ChatInput
                   onSubmit={handlePhone}
@@ -1109,63 +953,12 @@ function OnboardingChatInner() {
                 <ServiceHoursEditor onSubmit={handleCustomHours} />
               )}
 
-              {step === "voice" && !isTyping && (
-                <ChatButtons
-                  options={[
-                    { label: "Female", value: "female", icon: <Mic className="h-4 w-4" />, description: "Friendly, clear tone" },
-                    { label: "Male", value: "male", icon: <Mic className="h-4 w-4" />, description: "Professional, warm tone" },
-                  ]}
-                  onSelect={handleVoice}
-                  layout="grid"
-                />
-              )}
-
               {step === "goal" && !isTyping && (
                 <ChatButtons
                   options={GOAL_OPTIONS}
                   onSelect={handleGoal}
                   layout="vertical"
                 />
-              )}
-
-              {step === "plan" && !isTyping && (
-                <div className="space-y-3">
-                  {PLANS.map((plan) => (
-                    <div
-                      key={plan.value}
-                      className={`border rounded-lg p-4 cursor-pointer transition-all hover:border-primary ${plan.popular ? "border-primary bg-primary/5" : ""
-                        }`}
-                    // onClick={() => handlePlan(plan.value)} // This was commented out in the original, keeping it commented
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{plan.name}</h3>
-                            {plan.popular && (
-                              <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
-                                Popular
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-2xl font-bold mt-1">
-                            ${plan.price}
-                            <span className="text-sm font-normal text-muted-foreground">/mo</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{plan.calls}</p>
-                        </div>
-                        <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <ul className="mt-3 space-y-1">
-                        {plan.features.slice(0, 3).map((f, i) => (
-                          <li key={i} className="text-sm flex items-center gap-2">
-                            <CheckCircle2 className="h-3 w-3 text-green-600" />
-                            {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
               )}
 
               {step === "payment" && !isTyping && (
@@ -1245,28 +1038,8 @@ function OnboardingChatInner() {
                   <Button
                     className="w-full"
                     size="lg"
-                    onClick={() => {
-                      console.log("Button clicked! isProcessing:", isProcessing);
-                      // Assuming handlePayment function exists and contains the fetch call
-                      // This is a placeholder for where the body would be constructed
-                      // if handlePayment were defined in this scope.
-                      // The actual change needs to be made inside the handlePayment function.
-                      // For demonstration, if handlePayment were here:
-                      /*
-                      const body = JSON.stringify({
-                        ...data,
-                        paymentMethodId: paymentMethod.id,
-                        planType: selectedPlan,
-                        leadId: leadId,
-                        bypassStripe: isBypassMode // Explicit flag
-                      });
-                      // Then this body would be used in a fetch call:
-                      // fetch('/api/payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-                      */
-                      handlePayment();
-                    }}
+                    onClick={handlePayment}
                     disabled={isProcessing}
-                    data-debug-processing={isProcessing.toString()}
                   >
                     {isProcessing ? (
                       <>
