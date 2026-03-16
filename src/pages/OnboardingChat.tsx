@@ -335,38 +335,41 @@ function OnboardingChatInner() {
   // Initialize - load lead data
   useEffect(() => {
     const init = async () => {
-      // Check for lead_id
-      if (!lead_id) {
-        // Check if user is already authenticated
-        try {
-          const { data, error } = await supabase.auth.getUser();
+      // Always check authentication status first.
+      // A previously signed-in user may still have a stale lead_id in localStorage,
+      // and we must not route them back through the new-signup flow.
+      try {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
 
-          if (error && error.name !== "AuthSessionMissingError") {
-            console.log("[OnboardingChat] auth lookup error", error);
-          }
-
-          if (data?.user) {
-            const { user } = data;
-            // Existing authenticated user - check their status
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("onboarding_status")
-              .eq("id", user.id)
-              .single();
-
-            if (profile?.onboarding_status === "active") {
-              navigate("/dashboard", { replace: true });
-              return;
-            }
-            // For authenticated users in legacy flow, redirect to old flow behavior
-            // This would need the old OnboardingChat logic - for now redirect to dashboard
-            navigate("/dashboard", { replace: true });
-            return;
-          }
-        } catch (error) {
-          console.log("[OnboardingChat] auth lookup skipped", error);
+        if (authError && authError.name !== "AuthSessionMissingError") {
+          console.log("[OnboardingChat] auth lookup error", authError);
         }
 
+        if (authData?.user) {
+          // User is already authenticated — clear any stale lead_id and send them
+          // to the appropriate destination so they never re-enter the signup funnel.
+          try { localStorage.removeItem(LEAD_ID_KEY); } catch { /* ignore */ }
+
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarding_status")
+            .eq("id", authData.user.id)
+            .maybeSingle();
+
+          if (profile?.onboarding_status === "active") {
+            navigate("/dashboard", { replace: true });
+          } else {
+            // Account exists but onboarding not complete — send to activation
+            navigate("/activation", { replace: true });
+          }
+          return;
+        }
+      } catch (err) {
+        console.log("[OnboardingChat] auth check skipped", err);
+      }
+
+      // Check for lead_id
+      if (!lead_id) {
         // No lead_id and not authenticated - go back to start
         console.log("[OnboardingChat] Resume lookup skipped - no lead id");
         toast.error("Please start the signup process first");
@@ -385,13 +388,16 @@ function OnboardingChatInner() {
 
         if (error || !lead) {
           console.log("[OnboardingChat] Resume lookup failed - not found", { leadId: lead_id, error });
+          // Clear the bad lead_id so the user gets a clean start form
+          try { localStorage.removeItem(LEAD_ID_KEY); } catch { /* ignore */ }
           toast.error("Could not find your signup. Please start again.");
           navigate("/start", { replace: true });
           return;
         }
 
         if (lead.completed_at) {
-          // Lead already converted
+          // Lead already converted — clear stale storage and send to login
+          try { localStorage.removeItem(LEAD_ID_KEY); } catch { /* ignore */ }
           toast.info("Your account has already been created. Please sign in.");
           navigate("/auth/login", { replace: true });
           return;
@@ -903,6 +909,11 @@ function OnboardingChatInner() {
           }
         );
       }
+
+      // Clear the stored lead_id now that signup is complete.
+      // This prevents stale resumption logic from firing on future visits
+      // (e.g. a previously-signed-in user coming back and hitting the free trial page).
+      try { localStorage.removeItem(LEAD_ID_KEY); } catch { /* ignore */ }
 
       // Redirect immediately to the new Provisioning Status page
       // This handles the "wait" time gracefully instead of hanging in the chat

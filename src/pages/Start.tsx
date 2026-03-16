@@ -54,6 +54,14 @@ function storeLeadId(leadId: string): void {
   }
 }
 
+function clearStoredLeadId(): void {
+  try {
+    localStorage.removeItem(LEAD_ID_KEY);
+  } catch {
+    // localStorage not available
+  }
+}
+
 export default function Start() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -96,11 +104,15 @@ export default function Start() {
           if (error) throw error;
 
           if (mounted) {
+            // Clear any stale lead_id — this user already has an account,
+            // so resumption logic should never fire for them again.
+            clearStoredLeadId();
+
             if (profile?.onboarding_status === 'active') {
               navigate('/dashboard', { replace: true });
             } else {
-              // No profile or not active -> go to onboarding chat
-              navigate('/onboarding-chat', { replace: true });
+              // No profile or not active -> go to activation
+              navigate('/activation', { replace: true });
             }
           }
           return;
@@ -128,8 +140,15 @@ export default function Start() {
             .maybeSingle();
 
           if (lead && !(lead as any).completed_at && mounted) {
+            // Lead exists and is not yet complete — resume onboarding
             navigate(`/onboarding-chat?lead_id=${existingLeadId}&email=${encodeURIComponent((lead as any).email)}`, { replace: true });
             return;
+          }
+
+          // Lead exists but is already completed (or not found) — clear the stale
+          // entry so this user gets a fresh form on their next visit.
+          if (!lead || (lead as any).completed_at) {
+            clearStoredLeadId();
           }
         } catch (err) {
           console.log('[Start] Resume lookup skipped', err);
