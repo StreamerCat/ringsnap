@@ -57,10 +57,11 @@ type VapiWidgetProps = {
     theme: "light";
     position: "bottom-right";
     size: "tiny" | "compact" | "full";
-    buttonBaseColor: string;
-    buttonAccentColor: string;
+    baseBgColor: string;
+    ctaButtonColor: string;
+    ctaButtonTextColor: string;
     accentColor: string;
-    radius: "none" | "small" | "medium" | "large" | "full";
+    borderRadius: "none" | "small" | "medium" | "large";
     title: string;
     subtitle: string;
     assistantOverrides: Record<string, unknown>;
@@ -105,17 +106,17 @@ export function VapiChatWidget() {
     // Config for "Riley" Persona
     const RILEY_CONFIG = {
         marketing: {
-            title: "RingSnap Concierge",
+            title: "Help",
             subtitle: "Pricing, setup, answers",
             initialMessage: "Hi, I'm Riley. What can I help with today? Pricing, setup, or how RingSnap handles calls?"
         },
         pricing: {
-            title: "RingSnap Concierge",
+            title: "Help",
             subtitle: "Pricing, setup, answers",
             initialMessage: "Hi, I'm Riley. Want help choosing the right plan based on your call volume?"
         },
         customer: {
-            title: "RingSnap Support",
+            title: "Help",
             subtitle: "Support and onboarding",
             initialMessage: "Hi, I'm Riley. What are you working on right now? Setup, call logs, booking, or billing?"
         }
@@ -221,12 +222,13 @@ export function VapiChatWidget() {
                     theme="light"
                     position="bottom-right"
                     size="tiny"
-                    radius="large"
+                    borderRadius="large"
 
                     // Customization — Terracotta brand palette
-                    buttonBaseColor="#C96442" // Terracotta dark (hover tone)
-                    buttonAccentColor="#FAF9F6" // Off-white icon for contrast
-                    accentColor="#D67256"     // Terracotta primary
+                    baseBgColor="#FAF9F6"        // Off-white chat panel (matches site background)
+                    ctaButtonColor="#C96442"     // Terracotta dark for the floating button
+                    ctaButtonTextColor="#FAF9F6" // Off-white icon on button
+                    accentColor="#D67256"        // Terracotta primary
                     title={config.title}
                     subtitle={config.subtitle}
 
