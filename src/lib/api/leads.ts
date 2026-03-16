@@ -20,6 +20,11 @@ export type SignupLeadRow = {
   [key: string]: any;
 };
 
+function isSchemaError(error: any): boolean {
+  const msg: string = error?.message ?? "";
+  return msg.includes("schema cache") || msg.includes("Could not find the function");
+}
+
 export async function captureSignupLead(
   payload: SignupLeadPayload,
 ): Promise<SignupLeadRow> {
@@ -32,9 +37,7 @@ export async function captureSignupLead(
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    // Use the SECURITY DEFINER RPC which bypasses RLS and handles upsert atomically.
-    // Direct client-side INSERT/UPDATE on signup_leads is unreliable: anon has no
-    // UPDATE policy and the SELECT used to detect duplicates is also blocked for anon.
+    // Prefer the SECURITY DEFINER RPC which handles upsert atomically.
     const { data, error } = await (supabase as any).rpc('capture_signup_lead', {
       p_email: normalizedEmail,
       p_full_name: full_name?.trim() ?? null,
@@ -43,6 +46,30 @@ export async function captureSignupLead(
       p_signup_flow: signup_flow ?? 'two-step-v2',
       p_metadata: extraFields.metadata ?? extraFields,
     });
+
+    // If the RPC is missing from the schema cache (deploy/cache issue), fall back to
+    // a direct upsert. This works because anon has INSERT+UPDATE+SELECT via RLS
+    // policies added in migration 20260314000006.
+    if (error && isSchemaError(error)) {
+      console.warn("[captureSignupLead] RPC unavailable, using direct upsert fallback", error.message);
+      const { data: fallback, error: fallbackError } = await (supabase as any)
+        .from('signup_leads')
+        .upsert(
+          {
+            email: normalizedEmail,
+            full_name: full_name?.trim() ?? null,
+            phone: phone?.trim() ?? null,
+            source: source ?? 'website',
+            signup_flow: signup_flow ?? 'two-step-v2',
+          },
+          { onConflict: 'email' }
+        )
+        .select('id, email, full_name')
+        .single();
+
+      if (fallbackError) throw fallbackError;
+      return fallback as SignupLeadRow;
+    }
 
     if (error) throw error;
 
