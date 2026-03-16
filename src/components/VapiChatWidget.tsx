@@ -56,8 +56,11 @@ type VapiWidgetProps = {
     mode: "chat";
     theme: "light";
     position: "bottom-right";
-    size: "compact";
-    buttonColor: string;
+    size: "tiny" | "compact" | "full";
+    buttonBaseColor: string;
+    buttonAccentColor: string;
+    accentColor: string;
+    radius: "none" | "small" | "medium" | "large" | "full";
     title: string;
     subtitle: string;
     assistantOverrides: Record<string, unknown>;
@@ -208,7 +211,7 @@ export function VapiChatWidget() {
     const mobileBottomClass = getMobileBottomClass();
 
     return (
-        <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out`}>
+        <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-6 right-4 z-[90] transition-all duration-300 ease-in-out`}>
             <Sentry.ErrorBoundary fallback={null}>
                 <VapiWidgetComponent
                     key={modeKey}
@@ -217,10 +220,13 @@ export function VapiChatWidget() {
                     mode="chat"
                     theme="light"
                     position="bottom-right"
-                    size="compact"
+                    size="tiny"
+                    radius="large"
 
-                    // Customization
-                    buttonColor="#D67256" // Terracotta
+                    // Customization — Terracotta brand palette
+                    buttonBaseColor="#C96442" // Terracotta dark (hover tone)
+                    buttonAccentColor="#FAF9F6" // Off-white icon for contrast
+                    accentColor="#D67256"     // Terracotta primary
                     title={config.title}
                     subtitle={config.subtitle}
 
