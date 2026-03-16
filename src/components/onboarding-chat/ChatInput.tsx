@@ -14,6 +14,13 @@ export interface ChatInputProps {
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
 }
 
+function formatPhoneNumber(value: string): string {
+  const cleaned = value.replace(/\D/g, "");
+  if (cleaned.length <= 3) return cleaned;
+  if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+}
+
 export function ChatInput({
   onSubmit,
   placeholder = "Type your answer...",
@@ -24,6 +31,14 @@ export function ChatInput({
   ...props
 }: ChatInputProps) {
   const [value, setValue] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (type === "tel") {
+      setValue(formatPhoneNumber(e.target.value));
+    } else {
+      setValue(e.target.value);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +53,7 @@ export function ChatInput({
       <Input
         type={type}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleChange}
         placeholder={placeholder}
         disabled={disabled}
         autoFocus={autoFocus}
