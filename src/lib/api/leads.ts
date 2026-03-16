@@ -25,6 +25,10 @@ function isSchemaError(error: any): boolean {
   return msg.includes("schema cache") || msg.includes("Could not find the function");
 }
 
+function isDuplicateKeyError(error: any): boolean {
+  return error?.code === "23505" || (error?.message ?? "").includes("duplicate key");
+}
+
 export async function captureSignupLead(
   payload: SignupLeadPayload,
 ): Promise<SignupLeadRow> {
@@ -47,28 +51,11 @@ export async function captureSignupLead(
       p_metadata: extraFields.metadata ?? extraFields,
     });
 
-    // If the RPC is missing from the schema cache (deploy/cache issue), fall back to
-    // a direct upsert. This works because anon has INSERT+UPDATE+SELECT via RLS
-    // policies added in migration 20260314000006.
+    // If the RPC is missing from the schema cache, fall back to direct INSERT.
+    // This requires no DB constraints and works even if migrations are behind.
     if (error && isSchemaError(error)) {
-      console.warn("[captureSignupLead] RPC unavailable, using direct upsert fallback", error.message);
-      const { data: fallback, error: fallbackError } = await (supabase as any)
-        .from('signup_leads')
-        .upsert(
-          {
-            email: normalizedEmail,
-            full_name: full_name?.trim() ?? null,
-            phone: phone?.trim() ?? null,
-            source: source ?? 'website',
-            signup_flow: signup_flow ?? 'two-step-v2',
-          },
-          { onConflict: 'email' }
-        )
-        .select('id, email, full_name')
-        .single();
-
-      if (fallbackError) throw fallbackError;
-      return fallback as SignupLeadRow;
+      console.warn("[captureSignupLead] RPC unavailable, using direct INSERT fallback", error.message);
+      return await directInsertFallback(normalizedEmail, full_name, phone, source, signup_flow);
     }
 
     if (error) throw error;
@@ -83,4 +70,47 @@ export async function captureSignupLead(
     console.error("[captureSignupLead] error", error);
     throw new Error(`Failed to save your information: ${error.message}`);
   }
+}
+
+async function directInsertFallback(
+  email: string,
+  full_name?: string,
+  phone?: string,
+  source?: string,
+  signup_flow?: string,
+): Promise<SignupLeadRow> {
+  // Try a plain INSERT first (no ON CONFLICT clause — no constraint required)
+  const { data: inserted, error: insertError } = await (supabase as any)
+    .from('signup_leads')
+    .insert({
+      email,
+      full_name: full_name?.trim() ?? null,
+      phone: phone?.trim() ?? null,
+      source: source ?? 'website',
+      signup_flow: signup_flow ?? 'two-step-v2',
+    })
+    .select('id, email, full_name')
+    .single();
+
+  if (!insertError) {
+    return inserted as SignupLeadRow;
+  }
+
+  // If the email already exists (duplicate key), fetch and return the existing row
+  if (isDuplicateKeyError(insertError)) {
+    console.warn("[captureSignupLead] duplicate email, returning existing lead");
+    const { data: existing, error: selectError } = await (supabase as any)
+      .from('signup_leads')
+      .select('id, email, full_name')
+      .eq('email', email)
+      .is('completed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (selectError) throw selectError;
+    return existing as SignupLeadRow;
+  }
+
+  throw insertError;
 }
