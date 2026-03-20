@@ -37,7 +37,7 @@ serve(async (req) => {
         }
 
         // Determine Dashboard URL (can be from env or hardcoded fallback)
-        const siteUrl = Deno.env.get("SITE_URL") || Deno.env.get("VITE_SUPABASE_URL") || "https://app.ringsnap.ai";
+        const siteUrl = Deno.env.get("SITE_URL") || "https://app.getringsnap.com";
         const dashboardLink = `${siteUrl}/dashboard`;
 
         const emailContent = buildWelcomeEmail(recipientName, dashboardLink);

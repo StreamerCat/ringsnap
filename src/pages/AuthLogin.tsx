@@ -121,15 +121,13 @@ export default function AuthLogin() {
 
     setIsLoading(true);
     try {
-      // Use Supabase native password reset
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.toLowerCase().trim(),
-        {
-          redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`
-        }
-      );
+      // Use custom edge function to send password reset via Resend
+      const { data, error } = await supabase.functions.invoke("send-password-reset", {
+        body: { email: email.toLowerCase().trim() }
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       setResetEmailSent(true);
       toast.success("Password reset link sent! Check your email.");

@@ -5,6 +5,61 @@ import { createAdminClient } from '../_shared/auth-utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const RESEND_WEBHOOK_SECRET = Deno.env.get('RESEND_WEBHOOK_SECRET');
+
+/**
+ * Verify Resend webhook signature using Svix.
+ * Resend signs webhooks with svix-id, svix-timestamp, and svix-signature headers.
+ * Signed content: "{svix-id}.{svix-timestamp}.{raw-body}"
+ * The secret is prefixed with "whsec_" and is base64-encoded.
+ */
+async function verifyResendSignature(req: Request, rawBody: string): Promise<boolean> {
+  if (!RESEND_WEBHOOK_SECRET) {
+    console.warn('[resend-webhook] RESEND_WEBHOOK_SECRET not set — skipping signature verification');
+    return true;
+  }
+
+  const svixId = req.headers.get('svix-id');
+  const svixTimestamp = req.headers.get('svix-timestamp');
+  const svixSignature = req.headers.get('svix-signature');
+
+  if (!svixId || !svixTimestamp || !svixSignature) {
+    console.error('[resend-webhook] Missing svix signature headers');
+    return false;
+  }
+
+  // Reject timestamps older than 5 minutes to prevent replay attacks
+  const timestampMs = parseInt(svixTimestamp) * 1000;
+  if (Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
+    console.error('[resend-webhook] Timestamp too old — possible replay attack');
+    return false;
+  }
+
+  try {
+    // Strip the "whsec_" prefix and decode the base64 secret
+    const secretBase64 = RESEND_WEBHOOK_SECRET.replace(/^whsec_/, '');
+    const secretBytes = Uint8Array.from(atob(secretBase64), c => c.charCodeAt(0));
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      secretBytes,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
+    const signatureBytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signedContent));
+    const computedSignature = btoa(String.fromCharCode(...new Uint8Array(signatureBytes)));
+
+    // svix-signature may contain multiple space-separated "v1,<sig>" values
+    const signatures = svixSignature.split(' ').map(s => s.replace(/^v1,/, ''));
+    return signatures.some(sig => sig === computedSignature);
+  } catch (err) {
+    console.error('[resend-webhook] Signature verification error:', err);
+    return false;
+  }
+}
 
 interface ResendWebhookEvent {
   type: string;
@@ -28,11 +83,16 @@ serve(async (req) => {
   try {
     const supabase = createAdminClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Verify webhook signature (if configured)
-    // const signature = req.headers.get('resend-signature');
-    // TODO: Implement signature verification for production
+    // Read raw body first so we can verify the signature before parsing
+    const rawBody = await req.text();
 
-    const event: ResendWebhookEvent = await req.json();
+    const isValid = await verifyResendSignature(req, rawBody);
+    if (!isValid) {
+      console.error('[resend-webhook] Invalid signature — rejecting request');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 });
+    }
+
+    const event: ResendWebhookEvent = JSON.parse(rawBody);
 
     console.log('Resend webhook event:', event.type, event.data.email_id);
 
