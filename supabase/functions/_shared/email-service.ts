@@ -42,47 +42,20 @@ export interface EmailResult {
 // ==============================================================================
 
 /**
- * Send magic link email for password setup
+ * @deprecated Do not use. This calls supabase.auth.signInWithOtp() which bypasses Resend
+ * and goes through Supabase's default email provider.
  *
- * This replaces manual password handoff. User clicks link to set their own password.
- *
- * @param supabase - Supabase client with admin privileges
- * @param params - Email parameters
- * @returns Result with success status
+ * Use the `send-magic-link` edge function directly instead:
+ *   supabase.functions.invoke("send-magic-link", { body: { email } })
  */
 export async function sendMagicLinkEmail(
-  supabase: ReturnType<typeof createClient>,
-  params: MagicLinkEmailParams
+  _supabase: ReturnType<typeof createClient>,
+  _params: MagicLinkEmailParams
 ): Promise<EmailResult> {
-  try {
-    const { data, error } = await supabase.auth.signInWithOtp({
-      email: params.email,
-      options: {
-        emailRedirectTo: params.redirectTo || `${Deno.env.get("PUBLIC_APP_URL")}/auth/callback`,
-        shouldCreateUser: false, // User already created by create_account_transaction()
-      },
-    });
-
-    if (error) {
-      console.error("[email-service] Magic link send failed:", error);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    console.log(`[email-service] Magic link sent to ${params.email}`);
-    return {
-      success: true,
-      messageId: data?.messageId ?? undefined,
-    };
-  } catch (err) {
-    console.error("[email-service] Unexpected error sending magic link:", err);
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
+  throw new Error(
+    "sendMagicLinkEmail is deprecated — it bypasses Resend. " +
+    "Invoke the send-magic-link edge function directly instead."
+  );
 }
 
 // ==============================================================================
