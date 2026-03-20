@@ -3,7 +3,6 @@
  * Tests idempotency, rollback, atomic transactions, and error handling
  */
 
-import { assertEquals, assertExists } from "https://deno.land/std@0.192.0/testing/asserts.ts";
 import {
   loadTestEnv,
   generateTestEmail,
@@ -17,7 +16,7 @@ import {
   STRIPE_TEST_CARDS,
 } from "./test-utils.ts";
 
-const FUNCTION_NAME = "create-trial-v2";
+const FUNCTION_NAME = "create-trial";
 
 // ==============================================================================
 // Test 1: Happy Path (Self-Service Signup)
@@ -60,7 +59,7 @@ Deno.test("create-trial-v2: happy path self-service signup", async () => {
     );
 
     // Verify in database
-    const { createClient } = await import("supabase");
+    const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: account } = await supabase
@@ -150,7 +149,7 @@ Deno.test("create-trial-v2: idempotency with duplicate email", async () => {
     );
 
     // Verify only one Stripe customer created
-    const Stripe = (await import("https://esm.sh/stripe@14.21.0?target=deno")).default;
+    const Stripe = (await import("npm:stripe@14.21.0")).default;
     const stripe = new Stripe(context.stripeSecretKey, {
       apiVersion: "2023-10-16",
     });
@@ -193,7 +192,7 @@ Deno.test("create-trial-v2: payment method attach fails with rollback", async ()
     assertExists(data.error, "Should return error message");
 
     // Verify no account created in database
-    const { createClient } = await import("supabase");
+    const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: accounts } = await supabase
@@ -207,7 +206,7 @@ Deno.test("create-trial-v2: payment method attach fails with rollback", async ()
     });
 
     // Verify Stripe customer was rolled back (deleted)
-    const Stripe = (await import("https://esm.sh/stripe@14.21.0?target=deno")).default;
+    const Stripe = (await import("npm:stripe@14.21.0")).default;
     const stripe = new Stripe(context.stripeSecretKey, {
       apiVersion: "2023-10-16",
     });
@@ -254,7 +253,7 @@ Deno.test("create-trial-v2: subscription creation fails with rollback", async ()
     assertExists(data.error, "Should return error message");
 
     // Verify no account in database
-    const { createClient } = await import("supabase");
+    const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: accountCheck } = await supabase.rpc("get_account_by_email", {
@@ -268,7 +267,7 @@ Deno.test("create-trial-v2: subscription creation fails with rollback", async ()
     );
 
     // Verify Stripe customer was rolled back
-    const Stripe = (await import("https://esm.sh/stripe@14.21.0?target=deno")).default;
+    const Stripe = (await import("npm:stripe@14.21.0")).default;
     const stripe = new Stripe(context.stripeSecretKey, {
       apiVersion: "2023-10-16",
     });
@@ -320,7 +319,7 @@ Deno.test("create-trial-v2: sales-guided signup with sales_rep_id", async () => 
     assertExists(data.password, "Sales-guided should return temp password");
 
     // Verify account has sales_rep_id
-    const { createClient } = await import("supabase");
+    const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: account } = await supabase
@@ -473,7 +472,7 @@ Deno.test("create-trial-v2: correlation ID tracking", async () => {
     );
 
     // Verify correlation ID in database
-    const { createClient } = await import("supabase");
+    const { createClient } = await import("npm:@supabase/supabase-js@2");
     const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
     const { data: transitions } = await supabase
