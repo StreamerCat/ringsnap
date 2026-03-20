@@ -54,6 +54,59 @@ import {
   sendSignupNotifications,
 } from "../_shared/signup-notifications.ts";
 
+/** PostHog server-side capture — best-effort, never throws. */
+async function capturePostHogEvent(
+  event: string,
+  distinctId: string,
+  props: Record<string, unknown>
+): Promise<void> {
+  const key = Deno.env.get('POSTHOG_API_KEY');
+  if (!key) return;
+  try {
+    await fetch('https://us.i.posthog.com/capture/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        event,
+        distinct_id: distinctId,
+        properties: { ...props, $lib: 'edge-function' },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch { /* best-effort */ }
+}
+
+/** PostHog server-side exception capture — best-effort, never throws. */
+async function capturePostHogException(
+  err: unknown,
+  tags: Record<string, unknown>,
+  distinctId: string
+): Promise<void> {
+  const key = Deno.env.get('POSTHOG_API_KEY');
+  if (!key) return;
+  const e = err instanceof Error ? err : new Error(String(err));
+  try {
+    await fetch('https://us.i.posthog.com/capture/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        event: '$exception',
+        distinct_id: distinctId,
+        properties: {
+          $exception_type: e.name,
+          $exception_message: e.message,
+          $exception_stack_trace_raw: e.stack ?? '',
+          $lib: 'edge-function',
+          ...tags,
+        },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch { /* best-effort */ }
+}
+
 const FUNCTION_NAME = "create-trial";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1852,6 +1905,15 @@ Deno.serve(async (req: Request) => {
       setContext('userId', currentUserId);
     }
     await captureError(error, { phase, stripeErrorType: (error as any)?.type || 'unknown' });
+
+    // PostHog error tracking — fire-and-forget
+    const _phDistinctId = currentUserId ?? attemptedSignupData.email ?? 'anonymous';
+    capturePostHogEvent('signup_failed', _phDistinctId, {
+      error_message: error?.message ?? String(error),
+      error_source: 'create_trial',
+      step: 'create_trial',
+    });
+    capturePostHogException(error, { source: 'create_trial' }, _phDistinctId);
 
     // FIRE-AND-FORGET: Admin signup failure notification (email + Slack)
     sendSignupFailureNotifications({
