@@ -1,10 +1,12 @@
 {
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
-    "supabase": "npm:@supabase/supabase-js@2"
+    "supabase": "npm:@supabase/supabase-js@2",
+    "stripe": "npm:stripe@14.21.0"
   },
   "compilerOptions": {
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
-  }
+  },
+  "nodeModulesDir": "auto"
 }

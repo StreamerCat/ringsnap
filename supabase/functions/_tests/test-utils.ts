@@ -3,7 +3,18 @@
  * Provides helpers for testing Supabase edge functions with Deno
  */
 
-import { assertEquals, assertExists, assert } from "https://deno.land/std@0.192.0/testing/asserts.ts";
+import nodeAssert from "node:assert/strict";
+
+// Compatibility shim using node:assert (avoids deno.land dependency)
+function assertEquals(actual: unknown, expected: unknown, msg?: string): void {
+  nodeAssert.deepStrictEqual(actual, expected, msg);
+}
+function assertExists(actual: unknown, msg?: string): void {
+  nodeAssert.ok(actual != null, msg ?? `Expected value to exist, got ${actual}`);
+}
+function assert(condition: unknown, msg?: string): void {
+  nodeAssert.ok(condition, msg);
+}
 
 export interface TestContext {
   supabaseUrl: string;
@@ -115,7 +126,7 @@ export async function cleanupTestAccount(
   email: string,
   context: TestContext
 ): Promise<void> {
-  const { createClient } = await import("supabase");
+  const { createClient } = await import("npm:@supabase/supabase-js@2");
   const supabase = createClient(context.supabaseUrl, context.supabaseServiceRoleKey);
 
   try {
@@ -153,7 +164,7 @@ export async function cleanupStripeResources(
   email: string,
   context: TestContext
 ): Promise<void> {
-  const Stripe = (await import("https://esm.sh/stripe@14.21.0?target=deno")).default;
+  const Stripe = (await import("npm:stripe@14.21.0")).default;
   const stripe = new Stripe(context.stripeSecretKey, {
     apiVersion: "2023-10-16",
   });
