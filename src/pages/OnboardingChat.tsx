@@ -99,7 +99,6 @@ interface OnboardingData {
   website: string;
   businessHours: ServiceHoursData | null; // Changed to match component
   assistantGender: "male" | "female";
-  assistantTone: "professional" | "friendly" | "empathetic"; // Updated tones
   primaryGoal: string;
   planType: "starter" | "professional" | "premium";
   zipCode?: string;
@@ -209,7 +208,6 @@ function OnboardingChatInner() {
     website: "",
     businessHours: null,
     assistantGender: "female",
-    assistantTone: "friendly",
     primaryGoal: "",
     planType: "starter",
   });
@@ -707,7 +705,6 @@ function OnboardingChatInner() {
             businessHours: businessHoursStr,
             // Agent configuration
             assistantGender: data.assistantGender,
-            assistantTone: data.assistantTone, // Ensure assistantTone is passed
             primaryGoal: data.primaryGoal || undefined,
             // Plan & payment
             planType: data.planType,
