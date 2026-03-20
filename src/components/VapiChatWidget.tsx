@@ -212,7 +212,7 @@ export function VapiChatWidget() {
     const mobileBottomClass = getMobileBottomClass();
 
     return (
-        <div className={`vapi-widget-container fixed ${mobileBottomClass} md:bottom-6 right-4 z-[90] transition-all duration-300 ease-in-out`}>
+        <div className={`vapi-widget-container fixed md:bottom-6 right-4 z-[90] transition-all duration-300 ease-in-out hidden md:block`}>
             <Sentry.ErrorBoundary fallback={null}>
                 <VapiWidgetComponent
                     key={modeKey}
@@ -221,7 +221,7 @@ export function VapiChatWidget() {
                     mode="chat"
                     theme="light"
                     position="bottom-right"
-                    size="tiny"
+                    size="compact"
                     borderRadius="large"
 
                     // Customization — Terracotta brand palette
