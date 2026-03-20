@@ -101,7 +101,8 @@ type ErrorCode =
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key, sentry-trace, baggage",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, PATCH, DELETE",
 };
 
 /**
@@ -1180,8 +1181,12 @@ Deno.serve(async (req: Request) => {
         password: tempPassword,
         email_confirm: true,
         user_metadata: {
+          name: data.name,
           full_name: data.name,
+          phone: data.phone,
           company_name: data.companyName,
+          trade: data.trade,
+          source: data.source,
         }
       });
 
@@ -1299,11 +1304,32 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5. Link Account to User Metadata (Updating existing block)
+    // 5. Link Account to User Metadata
+    // Merge with existing metadata so we don't clobber keys set during createUser
+    // (full_name, phone, etc.) or any auth-level flags set externally.
+    const { data: authUserLookup, error: authUserLookupError } = await supabase.auth.admin.getUserById(currentUserId);
+    if (authUserLookupError) {
+      logWarn("Could not fetch existing user_metadata before update — proceeding with empty base", {
+        ...baseLogOptions,
+        error: authUserLookupError,
+      });
+    }
+    const existingUserMetadata =
+      authUserLookup?.user?.user_metadata && typeof authUserLookup.user.user_metadata === "object"
+        ? authUserLookup.user.user_metadata
+        : {};
+
     await supabase.auth.admin.updateUserById(currentUserId, {
       user_metadata: {
+        ...existingUserMetadata,
+        name: data.name,
+        full_name: data.name,
+        phone: data.phone,
+        company_name: data.companyName,
+        trade: data.trade,
+        source: data.source,
         account_id: currentAccountId,
-        account_created_at: new Date().toISOString()
+        account_created_at: new Date().toISOString(),
       }
     });
 
