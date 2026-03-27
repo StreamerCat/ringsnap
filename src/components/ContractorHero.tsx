@@ -1,15 +1,79 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PhoneCall, CheckCircle, Shield, Star } from "lucide-react";
+import { PhoneCall, CheckCircle, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { capture } from "@/lib/analytics";
+import { useCopyExperiment } from "@/hooks/useCopyExperiment";
+import { setExperimentAttribution } from "@/lib/experimentAttribution";
+
+type HeroCopyPayload = {
+  headline: string;
+  subheadline: string;
+  cta: string;
+};
+
+const HOMEPAGE_HERO_EXPERIMENT_KEY = 'exp_homepage_hero_copy_v1';
+const CONTROL_VARIANT = 'control';
+const CONTROL_PAYLOAD: HeroCopyPayload = {
+  headline: 'AI that Answers Like a Human',
+  subheadline: 'Answers calls in under 2 rings. Try free for 3 days.',
+  cta: 'Try free for 3 days',
+};
+
 export const ContractorHero = () => {
   const navigate = useNavigate();
+  const experiment = useCopyExperiment<HeroCopyPayload>(
+    HOMEPAGE_HERO_EXPERIMENT_KEY,
+    CONTROL_PAYLOAD,
+    { defaultVariant: CONTROL_VARIANT },
+  );
+
+  useEffect(() => {
+    if (!experiment.isReady) return;
+
+    capture(
+      'hero_viewed',
+      {
+        experiment_key: HOMEPAGE_HERO_EXPERIMENT_KEY,
+        variant: experiment.variant,
+        page: 'homepage',
+        section: 'hero',
+      },
+      { dedupKey: 'homepage_hero_viewed', dedupWindowMs: 60_000 },
+    );
+  }, [experiment.isReady, experiment.variant]);
+
   const scrollToVapiDemo = () => {
     document.getElementById('live-demo')?.scrollIntoView({
       behavior: 'smooth'
     });
   };
+
+  const handleHeroCtaClick = () => {
+    const ctaText = experiment.payload.cta;
+
+    setExperimentAttribution({
+      experimentKey: HOMEPAGE_HERO_EXPERIMENT_KEY,
+      variant: experiment.variant,
+      page: 'homepage',
+      section: 'hero',
+      ctaText,
+    });
+
+    capture('cta_clicked', {
+      cta_location: 'hero',
+      cta_text: ctaText,
+      destination: '/start',
+      experiment_key: HOMEPAGE_HERO_EXPERIMENT_KEY,
+      variant: experiment.variant,
+      page: 'homepage',
+      section: 'hero',
+    });
+
+    navigate('/start');
+  };
+
   return <section className="relative min-h-screen-safe flex items-center overflow-hidden section-spacer">
     {/* Gradient Aura Background */}
     <div className="absolute inset-0 -z-10">
@@ -27,25 +91,22 @@ export const ContractorHero = () => {
 
           <div className="space-y-8">
             <h1 className="text-h1">
-              Stop Missing Calls. Start Booking Jobs.
+              {experiment.payload.headline}
             </h1>
 
             <div className="space-y-4">
               <h2 className="text-h3" style={{
                 color: 'hsl(var(--charcoal) / 0.9)'
               }}>
-                Your AI receptionist answers 24/7, books the job, and handles emergencies — so you never lose revenue to voicemail.
+                {experiment.payload.subheadline}
               </h2>
             </div>
 
             {/* Gradient CTAs */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={() => {
-                capture('cta_clicked', { cta_location: 'hero', cta_text: 'Start Free', destination: '/start' });
-                navigate('/start');
-              }}>
+              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={handleHeroCtaClick}>
                 <PhoneCall className="mr-2" />
-                Start Free
+                {experiment.payload.cta}
               </Button>
               <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md" style={{
                 borderColor: 'hsl(var(--charcoal) / 0.3)',
