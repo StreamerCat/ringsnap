@@ -38,6 +38,44 @@ async function capturePostHog(
   }
 }
 
+type PostHogIdentityContext = {
+  accountId: string | null;
+  distinctId: string | null;
+  planKey: string | null;
+};
+
+async function getPostHogIdentityContext(
+  supabase: ReturnType<typeof createClient>,
+  stripeCustomerId: string | null | undefined,
+): Promise<PostHogIdentityContext> {
+  if (!stripeCustomerId) {
+    return { accountId: null, distinctId: null, planKey: null };
+  }
+
+  const { data: account } = await supabase
+    .from('accounts')
+    .select('id, plan_key')
+    .eq('stripe_customer_id', stripeCustomerId)
+    .maybeSingle();
+
+  if (!account?.id) {
+    return { accountId: null, distinctId: null, planKey: null };
+  }
+
+  const { data: primaryProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('account_id', account.id)
+    .eq('is_primary', true)
+    .maybeSingle();
+
+  return {
+    accountId: account.id,
+    distinctId: primaryProfile?.id ?? null,
+    planKey: account.plan_key ?? null,
+  };
+}
+
 type BaseLogContext = {
   functionName: string;
   correlationId: string;
@@ -693,6 +731,24 @@ serve(async (req) => {
           ...baseLogOptions,
           context: { customerId }
         });
+
+        const identity = await getPostHogIdentityContext(supabase, customerId);
+        const canceledAtIso = subscription.canceled_at
+          ? new Date(subscription.canceled_at * 1000).toISOString()
+          : new Date().toISOString();
+        const planKey = subscription.metadata?.plan_key || identity.planKey || null;
+
+        if (identity.distinctId && identity.accountId) {
+          await capturePostHog('subscription_canceled', identity.distinctId, {
+            plan_key: planKey,
+            canceled_at: canceledAtIso,
+            account_id: identity.accountId,
+            $set: {
+              billing_status: 'cancelled',
+            },
+            source: 'stripe_webhook',
+          });
+        }
         break;
       }
 
@@ -701,6 +757,7 @@ serve(async (req) => {
         // 1c: customer.subscription.updated → sync plan_key change to DB
         const subscription = event.data.object;
         const customerId = subscription.customer;
+        const previousStatus = event.data?.previous_attributes?.status;
 
         // Map Stripe price ID → plan_key (check new env vars first, then legacy)
         const priceEnvMap: Record<string, string> = {
@@ -798,6 +855,45 @@ serve(async (req) => {
               ...baseLogOptions,
               accountId: account.id,
               context: { customerId }
+            });
+          }
+        }
+
+        if (event.type === 'customer.subscription.updated') {
+          const identity = await getPostHogIdentityContext(supabase, customerId);
+          const planKey = planKeyFromPrice || identity.planKey || null;
+
+          if (previousStatus === 'trialing' && subscription.status === 'active' && identity.distinctId && identity.accountId) {
+            const trialEndDate = subscription.trial_end
+              ? new Date(subscription.trial_end * 1000).toISOString()
+              : null;
+
+            await capturePostHog('subscription_activated', identity.distinctId, {
+              plan_key: planKey,
+              trial_end_date: trialEndDate,
+              billing_status: 'active',
+              account_id: identity.accountId,
+              $set: {
+                billing_status: 'active',
+                plan_key: planKey,
+              },
+              source: 'stripe_webhook',
+            });
+          }
+
+          if (subscription.status === 'canceled' && previousStatus !== 'canceled' && identity.distinctId && identity.accountId) {
+            const canceledAtIso = subscription.canceled_at
+              ? new Date(subscription.canceled_at * 1000).toISOString()
+              : new Date().toISOString();
+
+            await capturePostHog('subscription_canceled', identity.distinctId, {
+              plan_key: planKey,
+              canceled_at: canceledAtIso,
+              account_id: identity.accountId,
+              $set: {
+                billing_status: 'cancelled',
+              },
+              source: 'stripe_webhook',
             });
           }
         }
