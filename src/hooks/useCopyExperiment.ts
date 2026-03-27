@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { getFeatureFlag, posthog } from '@/lib/analytics';
+import { useEffect, useState } from 'react';
+import { posthog } from '@/lib/analytics';
 
 type ExperimentState<TPayload> = {
   isReady: boolean;
@@ -13,6 +13,30 @@ type UseCopyExperimentOptions = {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function deepMerge<TPayload extends Record<string, unknown>>(
+  fallbackPayload: TPayload,
+  payloadOverride: Partial<TPayload>,
+): TPayload {
+  const merged: Record<string, unknown> = { ...fallbackPayload };
+
+  for (const [key, value] of Object.entries(payloadOverride)) {
+    if (value === undefined) continue;
+
+    const currentValue = merged[key];
+    if (isObject(currentValue) && isObject(value)) {
+      merged[key] = deepMerge(
+        currentValue as Record<string, unknown>,
+        value as Record<string, unknown>,
+      );
+      continue;
+    }
+
+    merged[key] = value;
+  }
+
+  return merged as TPayload;
 }
 
 export function useCopyExperiment<TPayload extends Record<string, unknown>>(
@@ -29,40 +53,28 @@ export function useCopyExperiment<TPayload extends Record<string, unknown>>(
     variant: defaultVariant,
   });
 
-  const resolveExperiment = useMemo(
-    () => () => {
-      const featureFlag = getFeatureFlag(flagKey);
-      const variant = typeof featureFlag === 'string' && featureFlag.trim().length > 0
-        ? featureFlag
-        : defaultVariant;
-
-      const payload = posthog.getFeatureFlagPayload(flagKey);
-      const nextPayload = isObject(payload)
-        ? { ...fallbackPayload, ...(payload as Partial<TPayload>) }
-        : fallbackPayload;
-
-      setState({
-        isReady: true,
-        payload: nextPayload,
-        variant,
-      });
-    },
-    [defaultVariant, fallbackPayload, flagKey],
-  );
-
   useEffect(() => {
     if (!hasPosthogKey) return;
 
-    resolveExperiment();
-
+    // Feature flags are fetched asynchronously after posthog.init();
+    // synchronous getFeatureFlag/getFeatureFlagPayload reads can be undefined before this callback runs.
     const unsubscribe = posthog.onFeatureFlags(() => {
-      resolveExperiment();
+      const featureFlag = posthog.getFeatureFlag(flagKey);
+      const variant = typeof featureFlag === 'string' ? featureFlag : defaultVariant;
+      const rawPayload = posthog.getFeatureFlagPayload(flagKey);
+      const payloadOverride = isObject(rawPayload) ? rawPayload as Partial<TPayload> : {};
+
+      setState({
+        isReady: true,
+        payload: deepMerge(fallbackPayload, payloadOverride),
+        variant,
+      });
     });
 
     return () => {
-      unsubscribe();
+      unsubscribe?.();
     };
-  }, [hasPosthogKey, resolveExperiment]);
+  }, [defaultVariant, fallbackPayload, flagKey, hasPosthogKey]);
 
   return state;
 }
