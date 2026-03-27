@@ -4,10 +4,11 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import * as Sentry from "@sentry/react";
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
-import { identify } from "@/lib/analytics";
+import { identify, capture } from "@/lib/analytics";
 
 const ERROR_REDIRECT = "/signin";
 const EXCHANGE_TIMEOUT_MS = 10000; // 10 second timeout
@@ -93,6 +94,8 @@ export default function AuthCallback() {
         navigate(redirectUrl, { replace: true });
       } catch (error: unknown) {
         console.error("Supabase OAuth callback failed:", error);
+        Sentry.captureException(error, { tags: { flow: 'auth', step: 'oauth_callback' } });
+        capture('oauth_callback_failed', { error_message: error instanceof Error ? error.message : String(error) });
         const errorSlug = error instanceof Error ? error.message.replace(/\s+/g, "_").toLowerCase() : "exchange_failed";
         setMessage("We couldn't complete the sign-in. Redirecting you to try again...");
         setTimeout(() => {

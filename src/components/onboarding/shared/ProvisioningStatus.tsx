@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import * as Sentry from "@sentry/react";
+import { capture } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -61,6 +63,8 @@ export function ProvisioningStatus({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const startTimeRef = useRef(Date.now());
+  const analyticsTracked = useRef({ completed: false, failed: false, timedOut: false });
 
   const TIMEOUT_SECONDS = 300; // 5 minutes
 
@@ -83,6 +87,11 @@ export function ProvisioningStatus({
     if (provisioningStatus === "completed" && vapiPhoneNumber) {
       setProgress(100);
       setPhoneNumber(vapiPhoneNumber);
+      if (!analyticsTracked.current.completed) {
+        analyticsTracked.current.completed = true;
+        const durationMs = Date.now() - startTimeRef.current;
+        capture('provisioning_completed', { account_id: accountId, duration_ms: durationMs });
+      }
       onComplete(vapiPhoneNumber);
     }
 
@@ -90,6 +99,11 @@ export function ProvisioningStatus({
     if (provisioningStatus === "active" && vapiPhoneNumber) {
       setProgress(100);
       setPhoneNumber(vapiPhoneNumber);
+      if (!analyticsTracked.current.completed) {
+        analyticsTracked.current.completed = true;
+        const durationMs = Date.now() - startTimeRef.current;
+        capture('provisioning_completed', { account_id: accountId, duration_ms: durationMs });
+      }
       onComplete(vapiPhoneNumber);
     }
 
@@ -97,6 +111,15 @@ export function ProvisioningStatus({
     if (provisioningStatus === "failed") {
       const errorMsg = provisioningError || "Provisioning failed. Please contact support.";
       setError(errorMsg);
+      if (!analyticsTracked.current.failed) {
+        analyticsTracked.current.failed = true;
+        capture('provisioning_failed', { account_id: accountId, error_message: errorMsg });
+        Sentry.captureMessage(`Provisioning failed: ${errorMsg}`, {
+          level: 'error',
+          tags: { flow: 'provisioning' },
+          extra: { accountId, errorMsg },
+        });
+      }
       onError?.(errorMsg);
     }
   };
@@ -183,6 +206,15 @@ export function ProvisioningStatus({
     // Set timeout for provisioning
     timeoutId = window.setTimeout(() => {
       setTimedOut(true);
+      if (!analyticsTracked.current.timedOut) {
+        analyticsTracked.current.timedOut = true;
+        capture('provisioning_timeout', { account_id: accountId, timeout_seconds: TIMEOUT_SECONDS });
+        Sentry.captureMessage('Provisioning timed out after 5 minutes', {
+          level: 'warning',
+          tags: { flow: 'provisioning' },
+          extra: { accountId, timeoutSeconds: TIMEOUT_SECONDS },
+        });
+      }
     }, TIMEOUT_SECONDS * 1000);
 
     // Initial poll

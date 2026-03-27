@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useStripe, useElements } from "@stripe/react-stripe-js";
 import { toast } from "sonner";
+import * as Sentry from "@sentry/react";
+import { capture, identify } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -252,6 +254,13 @@ export function SelfServeTrialFlow({
         await currentConfig.onSuccess();
       }
 
+      // Track step completion in PostHog
+      capture('onboarding_step_completed', {
+        step_id: currentConfig.id,
+        step_index: currentStepIndex,
+        funnel: 'self_serve_trial',
+      });
+
       if (currentStepIndex === FLOW_STEPS.length - 1) {
         await handleSubmit();
       } else {
@@ -289,9 +298,12 @@ export function SelfServeTrialFlow({
       if (stripeError) {
         setCardError(stripeError.message || "Payment failed");
         toast.error(stripeError.message || "Payment failed");
+        capture('trial_signup_payment_error', { error_message: stripeError.message, error_code: stripeError.code });
         setIsSubmitting(false);
         return;
       }
+
+      capture('trial_signup_submitted', { plan_type: form.getValues("planType"), funnel: 'self_serve_trial' });
 
       const formData = form.getValues();
       const { data, error } = await supabase.functions.invoke("create-trial", {
@@ -309,10 +321,31 @@ export function SelfServeTrialFlow({
         throw new Error(data.error || "Trial creation failed");
       }
 
+      // Re-identify with confirmed user_id and account context
+      if (data.user_id) {
+        identify(data.user_id, {
+          account_id: data.account_id,
+          plan_key: data.plan_type,
+          billing_status: 'trialing',
+          last_active_at: new Date().toISOString(),
+        });
+      }
+
+      capture('trial_signup_success', {
+        plan_type: data.plan_type,
+        account_id: data.account_id,
+        source: 'self_serve',
+      });
+
       setAccountId(data.account_id);
       toast.success("Trial started! Setting up your Agent...");
     } catch (error) {
       console.error("Trial signup error:", error);
+      Sentry.captureException(error, { tags: { flow: 'self_serve_trial', step: 'create_trial' } });
+      capture('trial_signup_failed', {
+        error_message: error instanceof Error ? error.message : String(error),
+        funnel: 'self_serve_trial',
+      });
       toast.error(error instanceof Error ? error.message : "Signup failed");
       setIsSubmitting(false);
     }

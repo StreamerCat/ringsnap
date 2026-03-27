@@ -1874,6 +1874,15 @@ Deno.serve(async (req: Request) => {
 
     console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
 
+    // PostHog server-side conversion event — fire-and-forget
+    capturePostHogEvent('trial_created', currentUserId ?? data.email ?? 'anonymous', {
+      plan_type: data.planType,
+      source: data.source ?? 'website',
+      account_id: currentAccountId,
+      subscription_id: subscription.id,
+      $lib: 'edge-function',
+    });
+
     return new Response(
       JSON.stringify(successResponse),
       {
