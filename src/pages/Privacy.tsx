@@ -1,6 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ContractorFooter } from '../components/ContractorFooter';
+import { SiteHeader } from '../components/SiteHeader';
 
 const sections = [
   { id: 'information-we-collect', title: '1. Information We Collect' },
@@ -39,7 +40,8 @@ export default function Privacy() {
         <link rel="canonical" href="https://getringsnap.com/privacy" />
       </Helmet>
 
-      <div className="min-h-screen bg-background">
+      <SiteHeader />
+      <div className="min-h-screen bg-background pt-14">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <header className="mb-10 sm:mb-12">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#D97757]">Privacy Policy</h1>

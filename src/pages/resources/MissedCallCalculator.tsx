@@ -55,6 +55,7 @@ const MissedCallCalculator = () => {
                 { label: "Missed Call Revenue Calculator" },
             ]}
             toc={toc}
+            article={{ datePublished: "2026-01-15", dateModified: "2026-03-15" }}
         >
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4 leading-tight">
                 Missed Call Revenue Calculator

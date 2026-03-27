@@ -99,24 +99,16 @@ const Index = () => {
     "url": "https://getringsnap.com",
     "logo": "https://getringsnap.com/RS_logo_color.svg",
     "slogan": "Built to book jobs",
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "telephone": "+1-800-555-0199",
-      "contactType": "customer support",
-      "availableLanguage": ["English", "Spanish"]
-    }
+    "sameAs": [
+      "https://www.linkedin.com/company/ringsnap"
+    ]
   };
 
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "RingSnap",
-    "url": "https://getringsnap.com",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://getringsnap.com/search?q={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
+    "url": "https://getringsnap.com"
   };
 
   const faqStructuredData = {
@@ -165,10 +157,6 @@ const Index = () => {
         <meta
           name="description"
           content="Never miss a call. Book jobs 24/7. RingSnap's virtual receptionist answers in under 1 second with professional call handling. Try free for 3 days."
-        />
-        <meta
-          name="keywords"
-          content="virtual answering service, contractor receptionist, human-sounding receptionist, 24/7 call answering, plumber answering service, HVAC answering service, emergency call booking, voice agent, virtual assistant"
         />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://getringsnap.com/" />

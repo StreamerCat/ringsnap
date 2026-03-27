@@ -94,7 +94,7 @@ For machine-readable information, we provide JSON-LD structured data on all mark
 - Organization schema
 - SoftwareApplication schema with current pricing offers
 - FAQPage schema
-- WebSite schema with search action
+- WebSite schema
 - BreadcrumbList schema on resource pages
 - HowTo schema on guide pages
 

@@ -81,22 +81,22 @@ const Difference = () => {
     };
     return <>
         <Helmet>
-            <title>The RingSnap Difference | Trained Front Desk for Home Services</title>
-            <meta name="description" content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes. Built for contractors." />
+            <title>Why RingSnap? | AI Answering Service Built for Contractors</title>
+            <meta name="description" content="RingSnap is an AI answering service for HVAC, plumbing, electrical, and roofing contractors. Answers every call, books jobs, handles emergencies 24/7 — no voicemail, no hold music, no missed revenue." />
             <meta name="robots" content="index, follow" />
             <link rel="canonical" href="https://getringsnap.com/difference" />
-            <meta property="og:title" content="The RingSnap Difference | Trained Front Desk for Home Services" />
-            <meta property="og:description" content="RingSnap answers calls in under 2 rings, handles real conversations, follows your rules, and learns from outcomes." />
+            <meta property="og:title" content="Why RingSnap? | AI Answering Service Built for Contractors" />
+            <meta property="og:description" content="AI answering service for HVAC, plumbing, electrical, and roofing. Answers every call, books jobs, handles emergencies 24/7." />
             <meta property="og:type" content="website" />
             <meta property="og:url" content="https://getringsnap.com/difference" />
             <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
-                <meta property="og:image:width" content="512" />
-                <meta property="og:image:height" content="512" />
-                <meta property="og:image:type" content="image/png" />
+            <meta property="og:image:width" content="512" />
+            <meta property="og:image:height" content="512" />
+            <meta property="og:image:type" content="image/png" />
             <meta property="og:site_name" content="RingSnap" />
             <meta name="twitter:card" content="summary_large_image" />
-            <meta name="twitter:title" content="The RingSnap Difference" />
-            <meta name="twitter:description" content="The trained front desk that books jobs and gets sharper over time." />
+            <meta name="twitter:title" content="Why RingSnap? | AI Answering Service for Contractors" />
+            <meta name="twitter:description" content="AI answering service for HVAC, plumbing, electrical &amp; roofing. Books jobs, handles emergencies 24/7." />
             <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
             {featureFlags.enhancedMarketingSchema && (
