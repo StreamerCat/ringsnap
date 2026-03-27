@@ -53,6 +53,7 @@ import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-ch
 import { extractUserError, logClientError } from "@/lib/errors";
 import { trackFunnelEvent, trackCheckpoint, trackConversion, trackFormEvent, trackTiming } from "@/lib/sentry-tracking";
 import { capture, identify } from "@/lib/analytics";
+import { getExperimentAttribution } from "@/lib/experimentAttribution";
 import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
 
@@ -82,6 +83,7 @@ if (!STRIPE_KEY) {
 }
 
 const stripePromise = loadStripe(STRIPE_KEY!);
+const HOMEPAGE_HERO_EXPERIMENT_KEY = 'exp_homepage_hero_copy_v1';
 
 // Message type
 interface Message {
@@ -763,6 +765,16 @@ function OnboardingChatInner() {
       // PostHog: checkout_completed, trial_activated, onboarding_started
       capture('checkout_completed', { plan_key: data.planType, amount: 0, trial: true });
       capture('trial_activated', { plan_key: data.planType, signup_source: 'onboarding_chat' });
+      const experimentAttribution = getExperimentAttribution(HOMEPAGE_HERO_EXPERIMENT_KEY);
+      capture('trial_started', {
+        plan_key: data.planType,
+        signup_source: 'onboarding_chat',
+        experiment_key: HOMEPAGE_HERO_EXPERIMENT_KEY,
+        variant: experimentAttribution?.variant ?? 'control',
+        page: '/onboarding-chat',
+        section: 'checkout',
+        cta_text: experimentAttribution?.ctaText,
+      });
       capture('onboarding_started', { plan_key: data.planType });
 
       // Re-identify with Supabase user_id now that account is created
