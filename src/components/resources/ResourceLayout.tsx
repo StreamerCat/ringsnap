@@ -22,6 +22,12 @@ interface BreadcrumbItem {
     href?: string;
 }
 
+interface ArticleMeta {
+    datePublished: string; // ISO date string, e.g. "2026-01-15"
+    dateModified?: string;
+    author?: string;
+}
+
 interface ResourceLayoutProps {
     children: ReactNode;
     title: string;
@@ -31,6 +37,7 @@ interface ResourceLayoutProps {
     breadcrumbs: BreadcrumbItem[];
     toc?: TOCItem[];
     schema?: object;
+    article?: ArticleMeta;
     ogTitle?: string;
     ogDescription?: string;
     contentClassName?: string;
@@ -45,6 +52,7 @@ export const ResourceLayout = ({
     breadcrumbs,
     toc,
     schema,
+    article,
     ogTitle,
     ogDescription,
     contentClassName,
@@ -88,6 +96,34 @@ export const ResourceLayout = ({
         })),
     };
 
+    const articleSchema = article
+        ? {
+              "@context": "https://schema.org",
+              "@type": "Article",
+              "headline": ogTitle || title,
+              "description": metaDescription,
+              "datePublished": article.datePublished,
+              ...(article.dateModified ? { "dateModified": article.dateModified } : {}),
+              "author": {
+                  "@type": "Organization",
+                  "name": article.author || "RingSnap",
+                  "url": "https://getringsnap.com",
+              },
+              "publisher": {
+                  "@type": "Organization",
+                  "name": "RingSnap",
+                  "url": "https://getringsnap.com",
+                  "logo": {
+                      "@type": "ImageObject",
+                      "url": "https://getringsnap.com/RS_logo_color.svg",
+                  },
+              },
+              "mainEntityOfPage": {
+                  "@type": "WebPage",
+              },
+          }
+        : null;
+
     // Normalize: strip trailing slash (except bare "/") then prepend domain
     const normalizedPath = canonical.endsWith("/") && canonical.length > 1
         ? canonical.slice(0, -1)
@@ -126,6 +162,11 @@ export const ResourceLayout = ({
                 {schema && (
                     <script type="application/ld+json">
                         {JSON.stringify(schema)}
+                    </script>
+                )}
+                {articleSchema && (
+                    <script type="application/ld+json">
+                        {JSON.stringify(articleSchema)}
                     </script>
                 )}
             </Helmet>

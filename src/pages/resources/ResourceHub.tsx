@@ -58,7 +58,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "HVAC Dispatcher Script Template + Call Intake Checklist",
         description: "Complete call scripts for dispatchers, price shoppers, after-hours, and emergency HVAC scenarios. Includes intake checklist and booking benchmarks.",
-        href: "/resources/hvac-dispatcher-script-template/",
+        href: "/resources/hvac-dispatcher-script-template",
         tags: ["HVAC", "Scripts", "Checklist"],
         icon: Thermometer,
         categories: ["hvac", "book-jobs"],
@@ -66,7 +66,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Plumbing Dispatcher Script Template + Emergency Call Intake",
         description: "Copy/paste scripts for burst pipes, sewer backups, drain cleaning, and after-hours plumbing calls. Plus emergency intake checklist.",
-        href: "/resources/plumbing-dispatcher-script-template/",
+        href: "/resources/plumbing-dispatcher-script-template",
         tags: ["Plumbing", "Scripts", "Emergency"],
         icon: Wrench,
         categories: ["plumbing", "book-jobs", "emergencies"],
@@ -74,7 +74,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Electrician Call Answering Script + Safety Triage Checklist",
         description: "Safety-first call scripts, panel upgrade booking, power outage handling, and the safety triage checklist every electrical shop needs.",
-        href: "/resources/electrician-call-answering-script/",
+        href: "/resources/electrician-call-answering-script",
         tags: ["Electrical", "Scripts", "Safety"],
         icon: Zap,
         categories: ["electrical", "book-jobs", "emergencies"],
@@ -83,7 +83,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "HVAC After-Hours Answering Script",
         description: "Ready-to-use script for handling HVAC calls after business hours. Book emergency jobs and reassure customers overnight.",
-        href: "/resources/hvac-after-hours-answering-script/",
+        href: "/resources/hvac-after-hours-answering-script",
         tags: ["HVAC", "After-Hours"],
         icon: Moon,
         categories: ["hvac", "after-hours"],
@@ -91,7 +91,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "HVAC Price Shopper Phone Script",
         description: "Turn price shoppers into booked jobs. This script shifts the conversation from cost to value without being pushy.",
-        href: "/resources/hvac-price-shopper-phone-script/",
+        href: "/resources/hvac-price-shopper-phone-script",
         tags: ["HVAC", "Pricing"],
         icon: DollarSign,
         categories: ["hvac", "increase-ticket", "pricing"],
@@ -99,7 +99,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "HVAC Emergency Call Triage",
         description: "Triage guide for gas leaks, no-heat, and AC failures. Know what's urgent vs. what can wait for the morning.",
-        href: "/resources/hvac-emergency-call-triage/",
+        href: "/resources/hvac-emergency-call-triage",
         tags: ["HVAC", "Emergency"],
         icon: AlertTriangle,
         categories: ["hvac", "emergencies"],
@@ -108,7 +108,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Burst Pipe Call Script",
         description: "Walk callers through immediate shutoff steps while dispatching your crew. Calm, professional, and fast.",
-        href: "/resources/burst-pipe-call-script/",
+        href: "/resources/burst-pipe-call-script",
         tags: ["Plumbing", "Emergency"],
         icon: Wrench,
         categories: ["plumbing", "emergencies"],
@@ -116,7 +116,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Sewer Backup Call Script",
         description: "Handle sewer backup calls with urgency and safety guidance. Script covers health risks, containment, and dispatch.",
-        href: "/resources/sewer-backup-call-script/",
+        href: "/resources/sewer-backup-call-script",
         tags: ["Plumbing", "Emergency"],
         icon: AlertTriangle,
         categories: ["plumbing", "emergencies"],
@@ -124,7 +124,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Drain Cleaning Upsell Script",
         description: "Turn a basic drain cleaning into a full-value visit with camera inspection, maintenance plans, and line treatments.",
-        href: "/resources/drain-cleaning-upsell-script/",
+        href: "/resources/drain-cleaning-upsell-script",
         tags: ["Plumbing", "Upsell"],
         icon: TrendingUp,
         categories: ["plumbing", "increase-ticket"],
@@ -133,7 +133,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Electrical Safety Triage Questions",
         description: "The 8 questions every dispatcher needs to ask on an electrical call to assess danger and prioritize response.",
-        href: "/resources/electrical-safety-triage-questions/",
+        href: "/resources/electrical-safety-triage-questions",
         tags: ["Electrical", "Safety"],
         icon: Zap,
         categories: ["electrical", "emergencies"],
@@ -141,7 +141,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Panel Upgrade Booking Script",
         description: "Book panel upgrade consultations by asking the right questions about home age, tripping breakers, and expansion plans.",
-        href: "/resources/panel-upgrade-booking-script/",
+        href: "/resources/panel-upgrade-booking-script",
         tags: ["Electrical", "Booking"],
         icon: PhoneCall,
         categories: ["electrical", "book-jobs", "increase-ticket"],
@@ -149,7 +149,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Power Outage Call Script",
         description: "Differentiate utility outages from panel issues. Guide callers through safety checks and dispatch only when needed.",
-        href: "/resources/power-outage-call-script/",
+        href: "/resources/power-outage-call-script",
         tags: ["Electrical", "Emergency"],
         icon: AlertTriangle,
         categories: ["electrical", "emergencies"],
@@ -158,7 +158,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Missed Call Revenue Calculator",
         description: "See exactly how much revenue your shop loses from missed and unanswered calls each month.",
-        href: "/resources/missed-call-revenue-calculator/",
+        href: "/resources/missed-call-revenue-calculator",
         tags: ["Calculator", "Revenue"],
         icon: Calculator,
         categories: ["tools", "book-jobs"],
@@ -166,7 +166,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "After-Hours Call Opportunity Calculator",
         description: "Calculate the revenue hiding in your after-hours call volume. Most shops leave 20-40% of revenue on the table.",
-        href: "/resources/after-hours-call-calculator/",
+        href: "/resources/after-hours-call-calculator",
         tags: ["Calculator", "After-Hours"],
         icon: Calculator,
         categories: ["tools", "after-hours"],
@@ -174,7 +174,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Service Pricing & Profit Calculator",
         description: "Build profitable pricing using your real numbers: labor rate, margin target, materials, and trip charges.",
-        href: "/resources/service-pricing-calculator/",
+        href: "/resources/service-pricing-calculator",
         tags: ["Calculator", "Pricing"],
         icon: Calculator,
         categories: ["tools", "pricing"],
@@ -182,7 +182,7 @@ const allResources: (ResourceCardProps & { categories: FilterCategory[] })[] = [
     {
         title: "Average Revenue Per Job Growth Planner",
         description: "Plan your average ticket increase with trade-specific upsell menus, scripts, and revenue projections.",
-        href: "/resources/increase-average-ticket/",
+        href: "/resources/increase-average-ticket",
         tags: ["Calculator", "Growth"],
         icon: TrendingUp,
         categories: ["tools", "increase-ticket"],
@@ -214,7 +214,7 @@ const ResourceHub = () => {
         <ResourceLayout
             title="Contractor Phone Scripts, Call Intake & After-Hours Answering Resources | RingSnap"
             metaDescription="Free phone scripts, call intake checklists, benchmarks, and revenue calculators for HVAC, plumbing, and electrical contractors. Built by contractors, for contractors."
-            canonical="/resources/"
+            canonical="/resources"
             keywords="contractor phone scripts, hvac call scripts, plumbing dispatcher script, electrician answering script, contractor call intake checklist, after hours answering script"
             breadcrumbs={[
                 { label: "Home", href: "/" },
