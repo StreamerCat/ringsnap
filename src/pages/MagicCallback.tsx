@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import * as Sentry from "@sentry/react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 import { getOrCreateDeviceNonce } from "@/lib/auth/deviceNonce";
-import { identify } from "@/lib/analytics";
+import { identify, capture } from "@/lib/analytics";
 
 export default function MagicCallback() {
   const navigate = useNavigate();
@@ -92,6 +93,8 @@ export default function MagicCallback() {
 
       } catch (error: any) {
         console.error("[MagicCallback] Verification error:", error);
+        Sentry.captureException(error, { tags: { flow: 'auth', step: 'magic_link_verify' } });
+        capture('magic_link_verify_failed', { error_message: error?.message ?? String(error) });
         setStatus("error");
         setErrorMessage(error?.message || "Failed to verify magic link");
       }

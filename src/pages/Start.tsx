@@ -28,6 +28,7 @@ import { captureSignupLead } from '@/lib/api/leads';
 import { useUser } from '@/lib/auth/useUser';
 import { trackFunnelEvent, trackFormEvent, trackPageLoad } from '@/lib/sentry-tracking';
 import { capture, identify } from '@/lib/analytics';
+import * as Sentry from '@sentry/react';
 
 // Store lead_id in localStorage for persistence
 const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
@@ -115,7 +116,6 @@ export default function Start() {
               navigate('/activation', { replace: true });
             }
           }
-          return;
           return;
         } catch (error) {
           console.error('[Start] Session check failed, clearing invalid session:', error);
@@ -282,6 +282,8 @@ export default function Start() {
 
     } catch (error: any) {
       console.error('[Start] signup lead insert failed', error);
+      Sentry.captureException(error, { tags: { flow: 'signup', step: 'lead_capture' } });
+      capture('lead_capture_failed', { error_message: error?.message ?? String(error) });
 
       let message = 'Something went wrong. Please try again.';
 

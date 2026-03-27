@@ -38,7 +38,7 @@ const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) |
  * Paths where session replay is enabled (10% sampling).
  * All other paths: replay explicitly disabled.
  */
-const REPLAY_PATHS = ['/start', '/onboarding-chat', '/activation'];
+const REPLAY_PATHS = ['/start', '/onboarding-chat', '/onboarding', '/activation'];
 const REPLAY_SAMPLE_RATE = 0.1;
 
 

@@ -227,15 +227,10 @@ export function trackFunnelEvent(
         data: { step, ...data, timestamp: Date.now() },
     });
 
-    // Set as tag for filtering in Sentry
+    // Set as tag for filtering in Sentry session replays and errors
     Sentry.setTag("funnel.latest_step", step);
-
-    // Capture as a custom event for analytics
-    Sentry.captureMessage(`Funnel: ${step}`, {
-        level: "info",
-        tags: { funnel_step: step },
-        extra: data,
-    });
+    // NOTE: captureMessage intentionally omitted — funnel steps are tracked in PostHog,
+    // not as Sentry events (prevents quota exhaustion at scale).
 }
 
 /**
