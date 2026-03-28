@@ -117,6 +117,10 @@ export function initAnalytics(): void {
     // Manual $pageview fired by RouteTracker in App.tsx; automatic $pageleave enabled
     persistence: 'localStorage+cookie',
   }));
+
+  if (typeof window !== 'undefined') {
+    (window as Window & { posthog?: typeof posthog }).posthog = posthog;
+  }
 }
 
 // ============================================================================
