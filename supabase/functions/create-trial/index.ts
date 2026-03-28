@@ -53,6 +53,7 @@ import {
   sendSignupFailureNotifications,
   sendSignupNotifications,
 } from "../_shared/signup-notifications.ts";
+import { posthog } from "../_shared/posthog.ts";
 
 /** PostHog server-side capture — best-effort, never throws. */
 async function capturePostHogEvent(
@@ -83,28 +84,27 @@ async function capturePostHogException(
   tags: Record<string, unknown>,
   distinctId: string
 ): Promise<void> {
-  const key = Deno.env.get('POSTHOG_API_KEY');
-  if (!key) return;
   const e = err instanceof Error ? err : new Error(String(err));
   try {
-    await fetch('https://us.i.posthog.com/capture/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: key,
-        event: '$exception',
-        distinct_id: distinctId,
-        properties: {
-          $exception_type: e.name,
-          $exception_message: e.message,
-          $exception_stack_trace_raw: e.stack ?? '',
-          $lib: 'edge-function',
-          ...tags,
-        },
-        timestamp: new Date().toISOString(),
-      }),
+    await posthog?.captureException(e, distinctId, {
+      error_message: e.message,
+      ...tags,
     });
   } catch { /* best-effort */ }
+}
+
+function captureCreateTrialException(
+  err: unknown,
+  step: string,
+  distinctId: string,
+  context: Record<string, unknown> = {}
+): void {
+  capturePostHogException(err, {
+    error_source: "create_trial",
+    step,
+    error_message: err instanceof Error ? err.message : String(err),
+    ...context,
+  }, distinctId);
 }
 
 const FUNCTION_NAME = "create-trial";
@@ -269,6 +269,10 @@ async function createAdminAlert(
         phase: "admin_alert",
       },
     });
+    captureCreateTrialException(err, "admin_alert_create", accountId ?? "anonymous", {
+      alert_type: alertType,
+      account_id: accountId ?? null,
+    });
   }
 }
 
@@ -302,6 +306,11 @@ async function trackEvent(
         phase: "analytics_tracking",
         userId: userId ?? null,
       },
+    });
+    captureCreateTrialException(err, "analytics_tracking", userId ?? accountId ?? "anonymous", {
+      account_id: accountId,
+      user_id: userId,
+      event_type: eventType,
     });
   }
 }
@@ -347,6 +356,9 @@ async function getExistingUserByEmail(
         phase: "existing_user_check",
         email: maskEmailForLogs(email),
       },
+    });
+    captureCreateTrialException(err, "existing_user_check", email, {
+      user_email: email,
     });
     return null;
   }
@@ -502,6 +514,10 @@ async function cleanupStripeResources(
       error: cleanupError,
       context: { customerId, subscriptionId },
     });
+    captureCreateTrialException(cleanupError, "stripe_cleanup", logOptions?.userId ?? "anonymous", {
+      customer_id: customerId,
+      subscription_id: subscriptionId,
+    });
   }
 }
 
@@ -653,6 +669,10 @@ async function withRetry<T>(
     } catch (err: any) {
       lastError = err;
       console.warn(`[${options.operationName}] Attempt ${i + 1} failed: ${err.message}`);
+      captureCreateTrialException(err, "with_retry_attempt", "anonymous", {
+        operation_name: options.operationName,
+        attempt: i + 1,
+      });
 
       // Don't retry if it looks like a permanent validation error (e.g. 400s)
       if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
@@ -708,6 +728,7 @@ Deno.serve(async (req: Request) => {
     );
     assertEnv(requiredVars, FUNCTION_NAME);
   } catch (envError: any) {
+    captureCreateTrialException(envError, "env_validation", "anonymous");
     return new Response(
       JSON.stringify({
         success: false,
@@ -802,6 +823,7 @@ Deno.serve(async (req: Request) => {
       } catch (err: any) {
         stepError("idempotency_check", baseStepContext(), err, { phase: "idempotency_check" });
         logWarn("Idempotency check error (continuing)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "idempotency_check", currentUserId ?? attemptedSignupData.email ?? "anonymous");
       }
     }
 
@@ -812,6 +834,7 @@ Deno.serve(async (req: Request) => {
       rawData = await req.json();
     } catch (err: any) {
       logWarn("Invalid JSON in request body", { ...baseLogOptions, error: err, context: { phase } });
+      captureCreateTrialException(err, "validate_input_json_parse", attemptedSignupData.email ?? "anonymous");
       return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: corsHeaders });
     }
 
@@ -825,6 +848,9 @@ Deno.serve(async (req: Request) => {
       logWarn("Validation error in create-trial", {
         ...baseLogOptions,
         context: { errors: zodError.errors, rawLeadId: rawData.leadId },
+      });
+      captureCreateTrialException(zodError, "validate_input_schema", attemptedSignupData.email ?? "anonymous", {
+        validation_errors: zodError?.errors,
       });
 
       return new Response(
@@ -868,6 +894,9 @@ Deno.serve(async (req: Request) => {
 
     if (!isValidPhoneNumber(data.phone)) {
       console.log("[create-trial] Invalid phone number", { phone: data.phone });
+      captureCreateTrialException(new Error("Invalid phone number format"), "validation_phone", data.email ?? "anonymous", {
+        phone_number: data.phone,
+      });
       return new Response(
         JSON.stringify({ error: "Invalid phone number format" }),
         {
@@ -882,6 +911,9 @@ Deno.serve(async (req: Request) => {
       logWarn("Blocked disposable email", {
         ...baseLogOptions,
         context: { email: data.email },
+      });
+      captureCreateTrialException(new Error("Disposable email blocked"), "validation_email", data.email ?? "anonymous", {
+        user_email: data.email,
       });
 
       return new Response(
@@ -956,6 +988,11 @@ Deno.serve(async (req: Request) => {
             success: false,
             blocked_reason: "IP rate limit exceeded (3 trials per 30 days)",
           });
+          captureCreateTrialException(new Error("IP rate limit exceeded"), "validation_ip_rate_limit", data.email ?? "anonymous", {
+            user_email: data.email,
+            phone_number: data.phone,
+            source: data.source,
+          });
 
           return new Response(
             JSON.stringify({
@@ -970,6 +1007,10 @@ Deno.serve(async (req: Request) => {
       } catch (err: any) {
         stepError("ip_rate_limit_check", baseStepContext(), err, { phase });
         logWarn("IP rate limit check error (continuing)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "validation_ip_rate_limit_check", data.email ?? "anonymous", {
+          user_email: data.email,
+          phone_number: data.phone,
+        });
       }
 
       // Check phone number reuse
@@ -999,6 +1040,10 @@ Deno.serve(async (req: Request) => {
             success: false,
             blocked_reason: "Phone number used within 30 days",
           });
+          captureCreateTrialException(new Error("Phone recently used for trial"), "validation_phone_reuse", data.email ?? "anonymous", {
+            user_email: data.email,
+            phone_number: data.phone,
+          });
 
           return new Response(
             JSON.stringify({
@@ -1013,6 +1058,10 @@ Deno.serve(async (req: Request) => {
       } catch (err: any) {
         stepError("phone_reuse_check", baseStepContext(), err, { phase });
         logWarn("Phone reuse check error (continuing)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "validation_phone_reuse_check", data.email ?? "anonymous", {
+          user_email: data.email,
+          phone_number: data.phone,
+        });
       }
     }
 
@@ -1058,6 +1107,11 @@ Deno.serve(async (req: Request) => {
           },
         });
       } catch (e: any) {
+        captureCreateTrialException(e, "stripe_customer_create", data.email ?? "anonymous", {
+          user_email: data.email,
+          phone_number: data.phone,
+          plan_type: data.planType,
+        });
         throw new Error(`Stripe Customer Create Failed: ${e.message}`);
       }
 
@@ -1083,6 +1137,11 @@ Deno.serve(async (req: Request) => {
             customerId: customer.id,
             paymentMethodId: data.paymentMethodId
           }
+        });
+        captureCreateTrialException(e, "stripe_payment_method_attach", data.email ?? "anonymous", {
+          user_email: data.email,
+          phone_number: data.phone,
+          plan_type: data.planType,
         });
 
         // Always return a response directly for payment errors so the frontend can read
@@ -1125,6 +1184,11 @@ Deno.serve(async (req: Request) => {
           error: e,
           context: { phase, customerId: customer.id }
         });
+        captureCreateTrialException(e, "stripe_subscription_create", data.email ?? "anonymous", {
+          user_email: data.email,
+          phone_number: data.phone,
+          plan_type: data.planType,
+        });
 
         // Always return a response directly for payment errors so the frontend can read
         // result.error/result.message. Throwing causes a 500 where the SDK returns
@@ -1150,7 +1214,10 @@ Deno.serve(async (req: Request) => {
     if (data.businessHours) {
       try {
         businessHoursValue = JSON.parse(data.businessHours);
-      } catch {
+      } catch (err: any) {
+        captureCreateTrialException(err, "business_hours_parse", data.email ?? "anonymous", {
+          user_email: data.email,
+        });
         businessHoursValue = { text: data.businessHours };
       }
     }
@@ -1210,6 +1277,9 @@ Deno.serve(async (req: Request) => {
           ...baseLogOptions,
           context: { email: data.email, existingAccountId: existingUser.accountId },
         });
+        captureCreateTrialException(new Error("Account already exists for email"), "validation_account_exists", data.email ?? "anonymous", {
+          user_email: data.email,
+        });
 
         return new Response(
           JSON.stringify({
@@ -1256,6 +1326,9 @@ Deno.serve(async (req: Request) => {
 
           if (fallbackProfile?.account_id) {
             // They have an account - redirect to login
+            captureCreateTrialException(new Error("Account already exists for email"), "validation_account_exists", data.email ?? "anonymous", {
+              user_email: data.email,
+            });
             return new Response(
               JSON.stringify({
                 error: "An account with this email already exists. Please log in instead.",
@@ -1273,26 +1346,32 @@ Deno.serve(async (req: Request) => {
               ...baseLogOptions,
               context: { email: data.email, userId: currentUserId },
             });
-          } else {
-            // Can't recover - create admin alert and return error
-            await createAdminAlert(supabase, "user_creation_failed", {
-              email: data.email,
-              error: userError.message,
-              phase: "user_creation",
-              request_id,
+	          } else {
+	            // Can't recover - create admin alert and return error
+	            await createAdminAlert(supabase, "user_creation_failed", {
+	              email: data.email,
+	              error: userError.message,
+	              phase: "user_creation",
+	              request_id,
+	            });
+              captureCreateTrialException(userError, "supabase_create_user", data.email ?? "anonymous", {
+                user_email: data.email,
+              });
+	            throw new Error(`Auth User Creation Failed: ${userError.message}`);
+	          }
+	        } else {
+	          // Different error - throw it
+	          await createAdminAlert(supabase, "user_creation_failed", {
+	            email: data.email,
+	            error: userError.message,
+	            phase: "user_creation",
+	            request_id,
+	          });
+            captureCreateTrialException(userError, "supabase_create_user", data.email ?? "anonymous", {
+              user_email: data.email,
             });
-            throw new Error(`Auth User Creation Failed: ${userError.message}`);
-          }
-        } else {
-          // Different error - throw it
-          await createAdminAlert(supabase, "user_creation_failed", {
-            email: data.email,
-            error: userError.message,
-            phase: "user_creation",
-            request_id,
-          });
-          throw new Error(`Auth User Creation Failed: ${userError.message}`);
-        }
+	          throw new Error(`Auth User Creation Failed: ${userError.message}`);
+	        }
       } else {
         currentUserId = userData.user.id;
       }
@@ -1313,6 +1392,10 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (accountError) {
+      captureCreateTrialException(accountError, "supabase_insert_account", currentUserId ?? data.email ?? "anonymous", {
+        user_email: data.email,
+        plan_type: data.planType,
+      });
       // Rollback user if possible, or just throw (manual rollback complex here)
       throw new Error(`Account Insertion Failed: ${accountError.message}`);
     }
@@ -1333,6 +1416,10 @@ Deno.serve(async (req: Request) => {
       });
 
     if (profileError) {
+      captureCreateTrialException(profileError, "supabase_upsert_profile", currentUserId ?? data.email ?? "anonymous", {
+        user_email: data.email,
+        account_id: currentAccountId,
+      });
       throw new Error(`Profile Upsert Failed: ${profileError.message}`);
     }
 
@@ -1355,6 +1442,10 @@ Deno.serve(async (req: Request) => {
         error: memberError,
         accountId: currentAccountId
       });
+      captureCreateTrialException(memberError, "supabase_insert_account_member", currentUserId ?? data.email ?? "anonymous", {
+        user_email: data.email,
+        account_id: currentAccountId,
+      });
     }
 
     // 5. Link Account to User Metadata
@@ -1365,6 +1456,10 @@ Deno.serve(async (req: Request) => {
       logWarn("Could not fetch existing user_metadata before update — proceeding with empty base", {
         ...baseLogOptions,
         error: authUserLookupError,
+      });
+      captureCreateTrialException(authUserLookupError, "supabase_get_auth_user", currentUserId ?? data.email ?? "anonymous", {
+        user_email: data.email,
+        account_id: currentAccountId,
       });
     }
     const existingUserMetadata =
@@ -1461,10 +1556,20 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
             error: leadLinkError,
           });
+          captureCreateTrialException(leadLinkError, "supabase_update_lead_link", currentUserId ?? data.email ?? "anonymous", {
+            user_email: data.email,
+            account_id: currentAccountId,
+            lead_id: data.leadId,
+          });
         }
       } catch (err: any) {
         stepError("lead_link", baseStepContext(), err, { phase: "lead_link" });
         logWarn("Lead linking error (non-critical)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "supabase_update_lead_link", currentUserId ?? data.email ?? "anonymous", {
+          user_email: data.email,
+          account_id: currentAccountId,
+          lead_id: data.leadId,
+        });
       }
     }
 
@@ -1508,6 +1613,10 @@ Deno.serve(async (req: Request) => {
           phase: "log_signup_success",
         });
         logWarn("Signup attempt logging error (non-critical)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "supabase_insert_signup_attempt", currentUserId ?? data.email ?? "anonymous", {
+          user_email: data.email,
+          account_id: currentAccountId,
+        });
       }
     }
 
@@ -1609,6 +1718,10 @@ Deno.serve(async (req: Request) => {
             ...baseLogOptions,
             error: phoneError,
           });
+          captureCreateTrialException(phoneError, "twilio_provision", currentUserId ?? data.email ?? "anonymous", {
+            user_email: data.email,
+            account_id: currentAccountId,
+          });
         }
 
         // 2. Insert vapi_assistants row (mirrors LIVE: provision-vapi line 220-227)
@@ -1628,6 +1741,10 @@ Deno.serve(async (req: Request) => {
           logWarn("TEST MODE: Assistant insert error (may already exist)", {
             ...baseLogOptions,
             error: assistantError,
+          });
+          captureCreateTrialException(assistantError, "vapi_setup", currentUserId ?? data.email ?? "anonymous", {
+            user_email: data.email,
+            account_id: currentAccountId,
           });
         }
 
@@ -1671,6 +1788,10 @@ Deno.serve(async (req: Request) => {
           ...baseLogOptions,
           accountId: currentAccountId,
           error: testErr,
+        });
+        captureCreateTrialException(testErr, "test_mode_provisioning", currentUserId ?? data.email ?? "anonymous", {
+          user_email: data.email,
+          account_id: currentAccountId,
         });
         // Non-critical - signup still succeeded, user can retry
       }
@@ -1731,6 +1852,10 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
             error: jobError,
           });
+          captureCreateTrialException(jobError, "vapi_setup", currentUserId ?? data.email ?? "anonymous", {
+            user_email: data.email,
+            account_id: currentAccountId,
+          });
 
           // Create admin alert for failed job enqueue
           await createAdminAlert(supabase, "provisioning_job_enqueue_failed", {
@@ -1752,6 +1877,10 @@ Deno.serve(async (req: Request) => {
             stepError("trigger_provision_vapi_background", baseStepContext(), err, {
               phase: "vapi_provision_start",
             });
+            captureCreateTrialException(err, "vapi_setup_background_invoke", currentUserId ?? data.email ?? "anonymous", {
+              user_email: data.email,
+              account_id: currentAccountId,
+            });
           });
 
           // FIRE-AND-FORGET: Send Welcome Email
@@ -1765,6 +1894,10 @@ Deno.serve(async (req: Request) => {
             stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
               phase: "vapi_provision_start",
               email: maskEmailForLogs(data.email),
+            });
+            captureCreateTrialException(err, "welcome_email_background_invoke", currentUserId ?? data.email ?? "anonymous", {
+              user_email: data.email,
+              account_id: currentAccountId,
             });
           });
 
@@ -1783,11 +1916,19 @@ Deno.serve(async (req: Request) => {
             stepError("admin_signup_notifications_background", baseStepContext(), err, {
               phase: "background_notification",
             });
+            captureCreateTrialException(err, "signup_notifications_background", currentUserId ?? data.email ?? "anonymous", {
+              user_email: data.email,
+              account_id: currentAccountId,
+            });
           });
         }
       } catch (err: any) {
         stepError("vapi_provision_start", baseStepContext(), err, { phase: "vapi_provision_start" });
         logWarn("Provisioning job enqueue error (non-critical)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "vapi_setup", currentUserId ?? data.email ?? "anonymous", {
+          user_email: data.email,
+          account_id: currentAccountId,
+        });
 
         // Create admin alert for exception during job enqueue
         await createAdminAlert(supabase, "provisioning_job_exception", {
@@ -1869,6 +2010,9 @@ Deno.serve(async (req: Request) => {
       } catch (err: any) {
         stepError("idempotency_cache", baseStepContext(), err, { phase: "idempotency_cache" });
         logWarn("Idempotency cache error (non-critical)", { ...baseLogOptions, error: err });
+        captureCreateTrialException(err, "idempotency_cache", currentUserId ?? attemptedSignupData.email ?? "anonymous", {
+          account_id: currentAccountId,
+        });
       }
     }
 
@@ -1922,7 +2066,11 @@ Deno.serve(async (req: Request) => {
       error_source: 'create_trial',
       step: 'create_trial',
     });
-    capturePostHogException(error, { source: 'create_trial' }, _phDistinctId);
+    captureCreateTrialException(error, "top_level_catch", _phDistinctId, {
+      phase,
+      account_id: currentAccountId,
+      user_email: attemptedSignupData.email,
+    });
 
     // FIRE-AND-FORGET: Admin signup failure notification (email + Slack)
     sendSignupFailureNotifications({
@@ -1934,6 +2082,9 @@ Deno.serve(async (req: Request) => {
     }).catch((err) => {
       stepError("admin_signup_failure_notifications_background", baseStepContext(), err, {
         phase: "background_failure_notification",
+      });
+      captureCreateTrialException(err, "signup_failure_notifications_background", _phDistinctId, {
+        phase,
       });
     });
 
