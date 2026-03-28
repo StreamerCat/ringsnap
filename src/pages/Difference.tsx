@@ -320,6 +320,48 @@ const Difference = () => {
                 </div>
             </section>
 
+            {/* SECTION 5.5: Built-In CRM + Integrations */}
+            <section className="section-spacer bg-muted/30">
+                <div className="container mx-auto px-4 max-w-4xl">
+                    <div className="text-center mb-10">
+                        <h2 className="text-h2 mb-4">Every call becomes a lead — not just a transcript</h2>
+                        <p className="text-body-default text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                            Most AI receptionists answer the call and hand off a log. RingSnap captures the lead — with job type, urgency, full context, and a clear next step. Your team follows up on organized data, not a list of callbacks.
+                        </p>
+                    </div>
+
+                    <div className="grid sm:grid-cols-3 gap-6 mb-8">
+                        <div className="p-6 rounded-xl bg-white border text-center">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                                <Phone className="w-5 h-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold mb-2">Lead capture</h3>
+                            <p className="text-sm text-muted-foreground">Every call creates a lead record automatically. Caller info, job type, urgency, full transcript.</p>
+                        </div>
+                        <div className="p-6 rounded-xl bg-white border text-center">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                                <MessageSquare className="w-5 h-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold mb-2">Intent signals</h3>
+                            <p className="text-sm text-muted-foreground">Urgency and job-type classification on every call. More advanced AI intent signals evolving.</p>
+                        </div>
+                        <div className="p-6 rounded-xl bg-white border text-center">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                                <ArrowRight className="w-5 h-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold mb-2">Works with your stack</h3>
+                            <p className="text-sm text-muted-foreground">Integrates with Jobber. RingSnap complements your existing CRM — it doesn't replace it.</p>
+                        </div>
+                    </div>
+
+                    <div className="text-center">
+                        <Button variant="outline" className="rounded-full px-6" onClick={() => navigate('/crm')}>
+                            Learn about the built-in CRM <ArrowRight className="ml-2 w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
             {/* SECTION 6: Proof */}
             <ErrorBoundary>
                 <Suspense fallback={<div className="w-full h-64 flex items-center justify-center"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>

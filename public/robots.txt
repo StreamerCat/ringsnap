@@ -66,6 +66,8 @@ User-agent: GPTBot
 Allow: /
 Allow: /pricing
 Allow: /difference
+Allow: /crm
+Allow: /compare/
 Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
@@ -86,6 +88,8 @@ User-agent: ChatGPT-User
 Allow: /
 Allow: /pricing
 Allow: /difference
+Allow: /crm
+Allow: /compare/
 Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
@@ -106,6 +110,8 @@ User-agent: Claude-Web
 Allow: /
 Allow: /pricing
 Allow: /difference
+Allow: /crm
+Allow: /compare/
 Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
@@ -126,6 +132,8 @@ User-agent: anthropic-ai
 Allow: /
 Allow: /pricing
 Allow: /difference
+Allow: /crm
+Allow: /compare/
 Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
@@ -146,6 +154,8 @@ User-agent: Perplexitybot
 Allow: /
 Allow: /pricing
 Allow: /difference
+Allow: /crm
+Allow: /compare/
 Allow: /plumbers
 Allow: /hvac
 Allow: /electricians
@@ -166,6 +176,8 @@ User-agent: Google-Extended
 Allow: /
 Allow: /pricing
 Allow: /difference
+Allow: /crm
+Allow: /compare/
 Allow: /plumbers
 Allow: /hvac
 Allow: /electricians

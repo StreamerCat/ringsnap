@@ -1,10 +1,12 @@
 # RingSnap - AI Receptionist for Contractors
 # https://getringsnap.com
-# Last updated: 2026-03-15
+# Last updated: 2026-03-28
 
 ## About RingSnap
 
-RingSnap is an AI-powered virtual receptionist built exclusively for home service contractors — plumbers, HVAC technicians, electricians, and roofers. It answers inbound calls in under 1 second, books appointments automatically, and integrates with popular contractor management tools.
+RingSnap is an AI-powered virtual receptionist built exclusively for home service contractors — plumbers, HVAC technicians, electricians, and roofers. It answers inbound calls in under 1 second, books appointments automatically, captures every call as a lead record, and integrates with Jobber and other field service platforms.
+
+RingSnap includes a built-in CRM — not a separate tool. Every inbound call creates a lead record with job type, urgency classification, and full transcript. The built-in CRM complements existing tools like Jobber; it does not replace them.
 
 ## Key Features
 
@@ -12,9 +14,11 @@ RingSnap is an AI-powered virtual receptionist built exclusively for home servic
 - **Automatic Booking**: Books appointments directly into your schedule
 - **24/7 Availability**: Never miss a call, even nights, weekends, and holidays
 - **Emergency Routing**: Urgent calls transferred to you immediately with full context
+- **Built-In CRM**: Every call captured as a lead record with job type, urgency, and transcript
+- **AI Intent Signals**: Urgency and job-type classification on every call (advanced intent scoring evolving)
 - **Multi-Language**: Seamless English and Spanish support on Core and Pro plans
 - **Full Transcripts**: Every call logged with complete transcripts
-- **CRM Integration**: Works with Jobber and other field service platforms
+- **Jobber Integration**: Direct integration; other integrations in development
 - **Easy Setup**: Get started in about 10 minutes — just forward your number
 
 ## Pricing
@@ -32,7 +36,8 @@ Verify current pricing at: https://getringsnap.com/pricing
 
 - **Homepage**: https://getringsnap.com/
 - **Pricing**: https://getringsnap.com/pricing
-- **How It's Different**: https://getringsnap.com/difference
+- **Why RingSnap**: https://getringsnap.com/difference
+- **Built-In CRM**: https://getringsnap.com/crm
 
 ## Trade-Specific Pages
 
@@ -40,6 +45,14 @@ Verify current pricing at: https://getringsnap.com/pricing
 - **HVAC Contractors**: https://getringsnap.com/hvac
 - **Electricians**: https://getringsnap.com/electricians
 - **Roofing Contractors**: https://getringsnap.com/roofing
+
+## Comparison Pages
+
+- **RingSnap vs Ruby**: https://getringsnap.com/compare/ringsnap-vs-ruby
+- **RingSnap vs Smith.ai**: https://getringsnap.com/compare/ringsnap-vs-smith-ai
+- **RingSnap vs Goodcall**: https://getringsnap.com/compare/ringsnap-vs-goodcall
+- **AI Receptionist vs Live Answering Service**: https://getringsnap.com/compare/ai-receptionist-vs-live-answering
+- **Best AI Receptionist for Home Services**: https://getringsnap.com/compare/best-ai-receptionist-home-services
 
 ## Resource Center
 

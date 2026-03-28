@@ -40,17 +40,17 @@ If you consistently exceed your limit, we'll proactively suggest upgrading to th
 
   const footerLinks = {
     product: [{
-      label: "Features",
-      href: "/#features"
+      label: "Why RingSnap",
+      href: "/difference"
     }, {
-      label: "Hear it in action",
-      href: "/#live-demo"
+      label: "Built-In CRM",
+      href: "/crm"
     }, {
       label: "Pricing",
       href: "/pricing"
     }, {
-      label: "The Difference",
-      href: "/difference"
+      label: "Hear it in action",
+      href: "/#live-demo"
     }, {
       label: "ROI Calculator",
       href: "/#roi-calculator"
@@ -67,6 +67,22 @@ If you consistently exceed your limit, we'll proactively suggest upgrading to th
     }, {
       label: "For Roofing",
       href: "/roofing"
+    }],
+    compare: [{
+      label: "vs Ruby",
+      href: "/compare/ringsnap-vs-ruby"
+    }, {
+      label: "vs Smith.ai",
+      href: "/compare/ringsnap-vs-smith-ai"
+    }, {
+      label: "vs Goodcall",
+      href: "/compare/ringsnap-vs-goodcall"
+    }, {
+      label: "AI vs Live Answering",
+      href: "/compare/ai-receptionist-vs-live-answering"
+    }, {
+      label: "Best AI for Home Services",
+      href: "/compare/best-ai-receptionist-home-services"
     }],
     resources: [{
       label: "Resource Hub",
@@ -135,9 +151,9 @@ If you consistently exceed your limit, we'll proactively suggest upgrading to th
     {/* Footer Links */}
     <div className="border-t">
       <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid md:grid-cols-5 gap-8 mb-12">
+        <div className="grid sm:grid-cols-2 md:grid-cols-6 gap-8 mb-12">
           {/* Brand Column */}
-          <div className="space-y-4">
+          <div className="space-y-4 sm:col-span-2 md:col-span-1">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 gradient-core rounded-lg flex items-center justify-center">
                 <Phone className="w-4 h-4 text-white" />
@@ -162,6 +178,14 @@ If you consistently exceed your limit, we'll proactively suggest upgrading to th
             <h3 className="font-semibold mb-4">For Contractors</h3>
             <ul className="space-y-2">
               {footerLinks.trades.map(renderLink)}
+            </ul>
+          </div>
+
+          {/* Compare */}
+          <div>
+            <h3 className="font-semibold mb-4">Compare</h3>
+            <ul className="space-y-2">
+              {footerLinks.compare.map(renderLink)}
             </ul>
           </div>
 

@@ -1,4 +1,4 @@
-import { Home, Thermometer, Wrench, Zap } from "lucide-react";
+import { Home, Thermometer, Wrench, Zap, ClipboardList, GitCompareArrows } from "lucide-react";
 
 export const tradeNavItems = [
   {
@@ -27,9 +27,42 @@ export const tradeNavItems = [
   },
 ] as const;
 
+export const compareNavItems = [
+  {
+    title: "RingSnap vs Ruby",
+    href: "/compare/ringsnap-vs-ruby",
+    description: "AI vs human virtual receptionists for contractors.",
+    icon: GitCompareArrows,
+  },
+  {
+    title: "RingSnap vs Smith.ai",
+    href: "/compare/ringsnap-vs-smith-ai",
+    description: "Purpose-built vs general virtual receptionist.",
+    icon: GitCompareArrows,
+  },
+  {
+    title: "RingSnap vs Goodcall",
+    href: "/compare/ringsnap-vs-goodcall",
+    description: "Contractor-specific AI vs general AI phone agent.",
+    icon: GitCompareArrows,
+  },
+  {
+    title: "AI vs Live Answering",
+    href: "/compare/ai-receptionist-vs-live-answering",
+    description: "Which is better for home service contractors?",
+    icon: GitCompareArrows,
+  },
+  {
+    title: "Best AI Receptionist for Home Services",
+    href: "/compare/best-ai-receptionist-home-services",
+    description: "Buyer's guide: 6 criteria that matter for contractors.",
+    icon: ClipboardList,
+  },
+] as const;
+
 export const topLevelNavItems = [
   { label: "Why RingSnap", href: "/difference" },
+  { label: "Built-In CRM", href: "/crm" },
   { label: "Field Guides", href: "/resources" },
-  { label: "Hear It Live", href: "/#live-demo" },
   { label: "Pricing", href: "/pricing" },
 ] as const;
