@@ -54,37 +54,29 @@ export function useCopyExperiment<TPayload extends Record<string, unknown>>(
   });
 
   useEffect(() => {
-    if (!hasPosthogKey) return;
-
-    console.log('[useCopyExperiment] hook mounted, posthog.__loaded:', (posthog as { __loaded?: boolean }).__loaded);
-
-    setState((current) => ({
-      ...current,
-      isReady: false,
-    }));
-
-    // Feature flags are fetched asynchronously after posthog.init();
-    // synchronous getFeatureFlag/getFeatureFlagPayload reads can be undefined before this callback runs.
+    // onFeatureFlags is async — flags are not available on first render.
+    // We must wait for this callback before reading any flag values.
     const unsubscribe = posthog.onFeatureFlags(() => {
-      const featureFlag = posthog.getFeatureFlag(flagKey);
-      const rawPayload = posthog.getFeatureFlagPayload(flagKey);
-      console.log('[useCopyExperiment] onFeatureFlags fired', { variant: featureFlag, rawPayload });
-      const variant = featureFlag === undefined
-        ? defaultVariant
-        : String(featureFlag);
-      const payloadOverride = isObject(rawPayload) ? rawPayload as Partial<TPayload> : {};
+      const variant = (posthog.getFeatureFlag(flagKey) as string) ?? 'control';
+      const rawPayload = (posthog.getFeatureFlagPayload(flagKey) as Partial<TPayload>) ?? {};
+
+      if (!rawPayload || Object.keys(rawPayload).length === 0) {
+        console.warn('[useCopyExperiment] No payload for variant:', variant);
+      }
+
+      console.log('[useCopyExperiment] onFeatureFlags fired', { variant, rawPayload });
 
       setState({
         isReady: true,
-        payload: deepMerge(fallbackPayload, payloadOverride),
         variant,
+        payload: { ...fallbackPayload, ...rawPayload },
       });
     });
 
     return () => {
-      unsubscribe?.();
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, [defaultVariant, fallbackPayload, flagKey, hasPosthogKey]);
+  }, [flagKey]);
 
   return state;
 }
