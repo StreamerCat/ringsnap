@@ -195,14 +195,14 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
   return (
     <div className={cn("bg-white", className)}>
-      <section className="section-spacer bg-gradient-to-br from-off-white to-cream/30 text-center px-4 sm:px-6">
+      <section className="bg-gradient-to-br from-off-white to-cream/30 text-center px-4 sm:px-6 py-8 sm:py-10 lg:py-12">
         <div className="container mx-auto max-w-3xl">
           {showHeading && (
-            <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl lg:text-5xl mb-4 sm:mb-5" style={{ color: "hsl(var(--charcoal))" }}>
+            <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl lg:text-[2.75rem] mb-3 sm:mb-4" style={{ color: "hsl(var(--charcoal))" }}>
               Stop Losing <span style={{ color: "hsl(var(--primary))" }}>$4,200 a Month</span> to Missed Calls
             </h1>
           )}
-          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-7 sm:mb-8">
+          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-5 sm:mb-6">
             RingSnap answers every call, books every job, and logs it to your CRM — built exclusively for home service contractors.
           </p>
           <Button size="lg" onClick={handleSignup} className="text-base w-full sm:w-auto px-6 sm:px-8">

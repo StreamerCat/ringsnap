@@ -16,7 +16,6 @@ import {
   Link as LinkIcon,
   Star,
   Clock,
-  Shield,
   Sparkles,
 } from "lucide-react";
 
@@ -150,23 +149,23 @@ const CRM = () => {
         </a>
 
         {/* HERO */}
-        <section className="section-spacer-compact sm:py-14 lg:py-16 bg-gradient-to-br from-off-white to-cream/30">
+        <section className="bg-gradient-to-br from-off-white to-cream/30 py-8 sm:py-10 lg:py-12">
           <div className="site-container max-w-5xl">
             <div className="text-center">
               <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-4">
                 Built-In CRM · No Extra Tools
               </p>
-              <h1 className="text-page-h1 mb-5">
+              <h1 className="text-page-h1 mb-4">
                 Most AI receptionists answer the call.<br />
                 RingSnap captures the lead.
               </h1>
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-8 leading-relaxed">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto mb-6 leading-relaxed">
                 Every inbound call creates a lead record — caller info, job type, urgency level, full
                 transcript, and what was booked. Your team sees clean, actionable context. No re-entry.
                 No chasing voicemails. Works with Jobber and other field service tools you already use.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
                 <Button
                   size="lg"
                   variant="gradient"
@@ -185,7 +184,7 @@ const CRM = () => {
                 </Button>
               </div>
 
-              <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
+              <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Star className="w-4 h-4 text-primary fill-primary" />
                   <span>4.9/5 contractor rating</span>
@@ -193,10 +192,6 @@ const CRM = () => {
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-primary" />
                   <span>Live in 10 minutes</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-primary" />
-                  <span>3-day free trial, no card required</span>
                 </div>
               </div>
             </div>
