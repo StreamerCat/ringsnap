@@ -48,6 +48,14 @@ const ROUTES = [
     '/resources/after-hours-call-calculator',
     '/resources/service-pricing-calculator',
     '/resources/increase-average-ticket',
+    // CRM page
+    '/crm',
+    // Comparison pages
+    '/compare/ringsnap-vs-ruby',
+    '/compare/ringsnap-vs-smith-ai',
+    '/compare/ringsnap-vs-goodcall',
+    '/compare/ai-receptionist-vs-live-answering',
+    '/compare/best-ai-receptionist-home-services',
 ];
 
 const PORT = 8787;

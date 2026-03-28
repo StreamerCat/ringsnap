@@ -71,6 +71,16 @@ const AfterHoursCalculator = lazy(() => import("./pages/resources/AfterHoursCalc
 const ServicePricingCalculator = lazy(() => import("./pages/resources/ServicePricingCalculator"));
 const AverageTicketPlanner = lazy(() => import("./pages/resources/AverageTicketPlanner"));
 
+// CRM page
+const CRM = lazy(() => import("./pages/CRM"));
+
+// Comparison pages
+const RingSnapVsRuby = lazy(() => import("./pages/compare/RingSnapVsRuby"));
+const RingSnapVsSmithAi = lazy(() => import("./pages/compare/RingSnapVsSmithAi"));
+const RingSnapVsGoodcall = lazy(() => import("./pages/compare/RingSnapVsGoodcall"));
+const AiReceptionistVsLiveAnswering = lazy(() => import("./pages/compare/AiReceptionistVsLiveAnswering"));
+const BestAiReceptionistHomeServices = lazy(() => import("./pages/compare/BestAiReceptionistHomeServices"));
+
 const queryClient = new QueryClient();
 
 const HashScrollHandler = () => {
@@ -196,6 +206,14 @@ const App = () => (
                 <Route path="/resources/after-hours-call-calculator" element={<AfterHoursCalculator />} />
                 <Route path="/resources/service-pricing-calculator" element={<ServicePricingCalculator />} />
                 <Route path="/resources/increase-average-ticket" element={<AverageTicketPlanner />} />
+                {/* CRM page */}
+                <Route path="/crm" element={<CRM />} />
+                {/* Comparison pages */}
+                <Route path="/compare/ringsnap-vs-ruby" element={<RingSnapVsRuby />} />
+                <Route path="/compare/ringsnap-vs-smith-ai" element={<RingSnapVsSmithAi />} />
+                <Route path="/compare/ringsnap-vs-goodcall" element={<RingSnapVsGoodcall />} />
+                <Route path="/compare/ai-receptionist-vs-live-answering" element={<AiReceptionistVsLiveAnswering />} />
+                <Route path="/compare/best-ai-receptionist-home-services" element={<BestAiReceptionistHomeServices />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

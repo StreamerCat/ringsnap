@@ -5,7 +5,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { topLevelNavItems, tradeNavItems } from "@/components/siteNavConfig";
+import { topLevelNavItems, tradeNavItems, compareNavItems } from "@/components/siteNavConfig";
 
 const mobileMenuId = "mobile-site-navigation";
 
@@ -82,6 +82,27 @@ export const MobileNav = () => {
                       )}
                     >
                       {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+
+              <li className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Compare
+              </li>
+              {compareNavItems.map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      to={item.href}
+                      onClick={closeMenu}
+                      className={cn(
+                        "flex min-h-11 items-center rounded-md px-3 text-[15px] font-medium leading-6 tracking-normal text-foreground transition-colors hover:bg-muted",
+                        isActive && "bg-primary/10 text-primary"
+                      )}
+                    >
+                      {item.title}
                     </Link>
                   </li>
                 );
