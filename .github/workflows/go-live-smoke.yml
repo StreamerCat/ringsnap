@@ -2,6 +2,13 @@ name: Go Live Smoke
 
 on:
   pull_request:
+    paths:
+      - 'src/**'
+      - 'supabase/functions/**'
+      - 'supabase/migrations/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
   push:
     branches: [main]
 

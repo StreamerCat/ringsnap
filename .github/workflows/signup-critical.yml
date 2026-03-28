@@ -47,6 +47,9 @@ jobs:
           sed -i 's/price_premium_plan_id/price_test_prem/g' .env
           sed -i 's/your-vapi-api-key/dummy_vapi_key/g' .env
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Start Supabase
         run: supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector
 
@@ -55,19 +58,15 @@ jobs:
           STATUS=$(supabase status -o json)
           API_URL=$(echo $STATUS | jq -r .apiUrl)
           echo "Supabase Local API URL: $API_URL"
-          
+
           if [[ "$API_URL" != *"127.0.0.1"* ]] && [[ "$API_URL" != *"localhost"* ]]; then
             echo "❌ CRITICAL FAILURE: Supabase is NOT running locally! URL: $API_URL"
             exit 1
           fi
-          
+
           # Verify connection
           curl -f "$API_URL/rest/v1/" --header "apikey: $(echo $STATUS | jq -r .anonKey)" || (echo "❌ API not reachable" && exit 1)
           echo "✅ Local Supabase is healthy and reachable."
-
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Run Signup Critical Tests
         working-directory: ./

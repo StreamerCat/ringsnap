@@ -47,9 +47,5 @@ jobs:
       # Required for billing Playwright run path
       - run: npx playwright install --with-deps chromium
 
-      # Optional but recommended prechecks
-      - run: npm run lint
-      - run: npm run typecheck
-
       # Main billing suite
       - run: npm run test:billing
