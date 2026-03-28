@@ -62,13 +62,11 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gtm-staging-gate' || github.event_name == 'workflow_dispatch'
         run: npx playwright test --project=full
 
-      # NOTE: Tier 4 (Lighthouse CI) requires @lhci/cli in devDependencies and a
-      # configured lighthouserc file. It is disabled until lhci is added to the project.
-      # - name: "Tier 4: Lighthouse CI"
-      #   if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-      #   run: npm run test:lhci
-      #   env:
-      #     LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+      - name: "Tier 4: Lighthouse CI"
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        run: npm run test:lhci
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
 
       - name: "Tier 5: SEO & Indexing Check"
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
