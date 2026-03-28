@@ -168,7 +168,7 @@ const FAQS = [
 function CompCell({ value }: { value: boolean | string }) {
   if (value === true) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-label="Included">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary" aria-label="Included">
         <Check className="h-4 w-4" />
       </span>
     );
@@ -247,7 +247,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-600 shrink-0" />
+                      <Check className="h-4 w-4 text-primary shrink-0" />
                       <span>{plan.includedMinutes.toLocaleString()} minutes included</span>
                     </div>
                     <div className="text-muted-foreground text-xs ml-6">${plan.overageRate.toFixed(2)}/min if you go over</div>
@@ -286,7 +286,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
       <section className="px-4 sm:px-6 pb-14">
         <div className="container mx-auto max-w-5xl">
-          <div className="rounded-2xl border bg-gradient-to-br from-primary/5 via-white to-emerald-50 p-6 sm:p-8 text-center">
+          <div className="rounded-2xl border bg-gradient-to-br from-primary/5 via-white to-cream/40 p-6 sm:p-8 text-center">
             <Badge variant="secondary" className="mb-3">Contractor proof</Badge>
             <p className="text-lg sm:text-xl font-semibold" style={{ color: "hsl(var(--charcoal))" }}>
               Teams using RingSnap report recovering <span className="text-primary">$8k–$42k/month</span> in previously missed revenue.

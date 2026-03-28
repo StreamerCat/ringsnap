@@ -121,12 +121,12 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
         </a>
 
         {/* HERO */}
-        <section className="section-spacer bg-gradient-to-br from-off-white to-cream/30">
+        <section className="section-spacer-compact sm:py-14 lg:py-16 bg-gradient-to-br from-off-white to-cream/30">
           <div className="site-container max-w-4xl text-center">
             <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-4">
               {config.hero.eyebrow}
             </p>
-            <h1 className="text-h1 mb-6">{config.hero.h1}</h1>
+            <h1 className="text-page-h1 mb-5">{config.hero.h1}</h1>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-8 leading-relaxed">
               {config.hero.intro}
             </p>

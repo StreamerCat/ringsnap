@@ -32,7 +32,7 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
   return (
     <>
       <SiteHeader />
-      <section className="relative min-h-screen-safe flex items-center overflow-hidden section-spacer pt-14">
+      <section className="relative flex items-center overflow-hidden section-spacer-compact sm:py-14 lg:py-16 pt-14">
         {/* Gradient Aura Background */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-gradient-to-br from-off-white to-cream/30" />
@@ -40,7 +40,7 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
           <div className="absolute bottom-20 -left-40 w-96 h-96 gradient-secondary opacity-10 blur-3xl rounded-full" />
         </div>
 
-        <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-28">
+        <div className="mx-auto w-full max-w-screen-xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
             {/* Left Column */}
@@ -53,12 +53,12 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                   </Badge>
                 </div>
 
-                <h1 className="text-5xl sm:text-6xl lg:text-7xl leading-tight font-bold text-charcoal">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-tight font-bold text-charcoal">
                   {config.hero.headline}
                 </h1>
 
                 <div className="space-y-4">
-                  <p className="text-2xl sm:text-3xl leading-tight font-bold text-charcoal/90">
+                  <p className="text-xl sm:text-2xl leading-tight font-bold text-charcoal/90">
                     {config.hero.subheadline}
                   </p>
                 </div>

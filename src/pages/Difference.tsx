@@ -118,10 +118,10 @@ const Difference = () => {
             </a>
 
             {/* SECTION 1: Hero */}
-            <section className="section-spacer bg-gradient-to-br from-off-white to-cream/30">
+            <section className="section-spacer-compact sm:py-14 lg:py-16 bg-gradient-to-br from-off-white to-cream/30">
                 <div className="container mx-auto px-4 max-w-5xl">
                     <div className="text-center">
-                        <h1 className="text-h1 mb-6">
+                        <h1 className="text-page-h1 mb-5">
                             The trained front desk that books jobs and gets sharper over time
                         </h1>
                         <p className="text-body-default text-muted-foreground max-w-3xl mx-auto mb-8 text-lg leading-relaxed">Built for home service pros. RingSnap answers in under 2 rings, handles real conversations, follows your rules, and uses outcomes and patterns to improve talk tracks and routing over time, within boundaries you control.</p>
