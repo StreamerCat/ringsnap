@@ -56,6 +56,8 @@ export function useCopyExperiment<TPayload extends Record<string, unknown>>(
   useEffect(() => {
     if (!hasPosthogKey) return;
 
+    console.log('[useCopyExperiment] hook mounted, posthog.__loaded:', (posthog as { __loaded?: boolean }).__loaded);
+
     setState((current) => ({
       ...current,
       isReady: false,
@@ -65,10 +67,11 @@ export function useCopyExperiment<TPayload extends Record<string, unknown>>(
     // synchronous getFeatureFlag/getFeatureFlagPayload reads can be undefined before this callback runs.
     const unsubscribe = posthog.onFeatureFlags(() => {
       const featureFlag = posthog.getFeatureFlag(flagKey);
+      const rawPayload = posthog.getFeatureFlagPayload(flagKey);
+      console.log('[useCopyExperiment] onFeatureFlags fired', { variant: featureFlag, rawPayload });
       const variant = featureFlag === undefined
         ? defaultVariant
         : String(featureFlag);
-      const rawPayload = posthog.getFeatureFlagPayload(flagKey);
       const payloadOverride = isObject(rawPayload) ? rawPayload as Partial<TPayload> : {};
 
       setState({
