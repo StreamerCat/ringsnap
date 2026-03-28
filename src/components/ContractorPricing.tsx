@@ -168,7 +168,7 @@ const FAQS = [
 function CompCell({ value }: { value: boolean | string }) {
   if (value === true) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-label="Included">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary" aria-label="Included">
         <Check className="h-4 w-4" />
       </span>
     );
@@ -195,14 +195,14 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
   return (
     <div className={cn("bg-white", className)}>
-      <section className="section-spacer bg-gradient-to-br from-off-white to-cream/30 text-center px-4 sm:px-6">
+      <section className="bg-gradient-to-br from-off-white to-cream/30 text-center px-4 sm:px-6 py-8 sm:py-10 lg:py-12">
         <div className="container mx-auto max-w-3xl">
           {showHeading && (
-            <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl lg:text-5xl mb-4 sm:mb-5" style={{ color: "hsl(var(--charcoal))" }}>
+            <h1 className="text-3xl leading-tight font-bold tracking-tight sm:text-4xl lg:text-[2.75rem] mb-3 sm:mb-4" style={{ color: "hsl(var(--charcoal))" }}>
               Stop Losing <span style={{ color: "hsl(var(--primary))" }}>$4,200 a Month</span> to Missed Calls
             </h1>
           )}
-          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-7 sm:mb-8">
+          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-5 sm:mb-6">
             RingSnap answers every call, books every job, and logs it to your CRM — built exclusively for home service contractors.
           </p>
           <Button size="lg" onClick={handleSignup} className="text-base w-full sm:w-auto px-6 sm:px-8">
@@ -247,7 +247,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-600 shrink-0" />
+                      <Check className="h-4 w-4 text-primary shrink-0" />
                       <span>{plan.includedMinutes.toLocaleString()} minutes included</span>
                     </div>
                     <div className="text-muted-foreground text-xs ml-6">${plan.overageRate.toFixed(2)}/min if you go over</div>
@@ -286,7 +286,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
       <section className="px-4 sm:px-6 pb-14">
         <div className="container mx-auto max-w-5xl">
-          <div className="rounded-2xl border bg-gradient-to-br from-primary/5 via-white to-emerald-50 p-6 sm:p-8 text-center">
+          <div className="rounded-2xl border bg-gradient-to-br from-primary/5 via-white to-cream/40 p-6 sm:p-8 text-center">
             <Badge variant="secondary" className="mb-3">Contractor proof</Badge>
             <p className="text-lg sm:text-xl font-semibold" style={{ color: "hsl(var(--charcoal))" }}>
               Teams using RingSnap report recovering <span className="text-primary">$8k–$42k/month</span> in previously missed revenue.

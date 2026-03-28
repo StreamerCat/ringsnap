@@ -461,8 +461,8 @@ const LegacyInteractive = () => {
               <p className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.ringSnapSays}</p>
             </section>
             <section className="space-y-2" aria-labelledby="legacy-logged-outcome-title">
-              <Badge variant="secondary" id="legacy-logged-outcome-title" className="text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">Logged outcome</Badge>
-              <p className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.loggedOutcome}</p>
+              <Badge variant="secondary" id="legacy-logged-outcome-title" className="text-xs font-bold uppercase tracking-wider bg-primary/15 text-primary">Logged outcome</Badge>
+              <p className="rounded-xl border border-primary/20 bg-cream/40 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.loggedOutcome}</p>
             </section>
           </CardContent>
         </Card>
@@ -562,23 +562,23 @@ export const RingSnapCallToCashInteractive = () => {
               </section>
 
               <section className="space-y-3" aria-labelledby="you-get-title">
-                <Badge variant="secondary" id="you-get-title" className="text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">You get</Badge>
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+                <Badge variant="secondary" id="you-get-title" className="text-xs font-bold uppercase tracking-wider bg-primary/15 text-primary">You get</Badge>
+                <div className="rounded-2xl border border-primary/20 bg-cream/40 p-4 space-y-3">
                   <p className="font-semibold text-sm text-foreground">{activeStory.result.title}</p>
-                  <p className="inline-flex items-center gap-2 rounded-full bg-white border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <p className="inline-flex items-center gap-2 rounded-full bg-white border border-primary/25 px-3 py-1 text-xs font-semibold text-primary">
                     <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                     {activeStory.result.outcome}
                   </p>
                   <ul className="space-y-2">
                     {activeStory.result.details.map((detail) => (
                       <li key={detail} className="flex items-start gap-2 text-xs text-foreground/90">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                        <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" aria-hidden="true" />
                         <span>{detail}</span>
                       </li>
                     ))}
                   </ul>
                   {activeStory.result.learningNote && (
-                    <p className="text-xs text-muted-foreground border-t border-emerald-200 pt-2">{activeStory.result.learningNote}</p>
+                    <p className="text-xs text-muted-foreground border-t border-primary/20 pt-2">{activeStory.result.learningNote}</p>
                   )}
                 </div>
               </section>
@@ -593,7 +593,7 @@ export const RingSnapCallToCashInteractive = () => {
               <ul className="grid gap-2 sm:grid-cols-2">
                 {activeStory.supportBullets.map((item) => (
                   <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" aria-hidden="true" />
                     <span>{item}</span>
                   </li>
                 ))}

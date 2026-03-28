@@ -12,7 +12,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, X, ArrowRight, Star, Shield, Clock } from "lucide-react";
+import { CheckCircle2, X, ArrowRight, Star, Clock } from "lucide-react";
 
 const ContractorFooter = lazy(() =>
   import("@/components/ContractorFooter").then((m) => ({ default: m.ContractorFooter }))
@@ -121,17 +121,17 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
         </a>
 
         {/* HERO */}
-        <section className="section-spacer bg-gradient-to-br from-off-white to-cream/30">
+        <section className="bg-gradient-to-br from-off-white to-cream/30 py-8 sm:py-10 lg:py-12">
           <div className="site-container max-w-4xl text-center">
             <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-4">
               {config.hero.eyebrow}
             </p>
-            <h1 className="text-h1 mb-6">{config.hero.h1}</h1>
-            <p className="text-lg text-muted-foreground max-w-3xl mx-auto mb-8 leading-relaxed">
+            <h1 className="text-page-h1 mb-4">{config.hero.h1}</h1>
+            <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto mb-6 leading-relaxed">
               {config.hero.intro}
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
               <Button
                 size="lg"
                 variant="gradient"
@@ -150,7 +150,7 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
               </Button>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-primary fill-primary" />
                 <span>4.9/5 contractor rating</span>
@@ -158,10 +158,6 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" />
                 <span>Live in 10 minutes</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-primary" />
-                <span>3-day free trial, no card required</span>
               </div>
             </div>
           </div>
