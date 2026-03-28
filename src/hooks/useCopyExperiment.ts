@@ -57,7 +57,9 @@ export function useCopyExperiment<TPayload extends Record<string, unknown>>(
     // onFeatureFlags is async — flags are not available on first render.
     // We must wait for this callback before reading any flag values.
     const unsubscribe = posthog.onFeatureFlags(() => {
-      const variant = (posthog.getFeatureFlag(flagKey) as string) ?? 'control';
+      const flagValue = posthog.getFeatureFlag(flagKey);
+      const variant =
+        typeof flagValue === 'string' && flagValue.length > 0 ? flagValue : defaultVariant;
       const rawPayload = (posthog.getFeatureFlagPayload(flagKey) as Partial<TPayload>) ?? {};
 
       if (!rawPayload || Object.keys(rawPayload).length === 0) {
@@ -69,14 +71,14 @@ export function useCopyExperiment<TPayload extends Record<string, unknown>>(
       setState({
         isReady: true,
         variant,
-        payload: { ...fallbackPayload, ...rawPayload },
+        payload: deepMerge(fallbackPayload, rawPayload),
       });
     });
 
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, [flagKey]);
+  }, [defaultVariant, fallbackPayload, flagKey]);
 
   return state;
 }
