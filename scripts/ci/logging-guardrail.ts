@@ -170,9 +170,13 @@ async function lintFile(filePath: string): Promise<LintResult> {
  */
 async function getChangedFiles(): Promise<string[]> {
   try {
-    // Try to get changed files from git
+    // Try to get changed files from git.
+    // In a PR context (GitHub Actions), compare against the base branch so we
+    // capture all commits in the PR rather than just the current HEAD delta.
+    const base = Deno.env.get("GITHUB_BASE_REF");
+    const diffTarget = base ? `origin/${base}...HEAD` : "HEAD~1...HEAD";
     const process = new Deno.Command("git", {
-      args: ["diff", "--name-only", "--diff-filter=ACMR", "HEAD"],
+      args: ["diff", "--name-only", "--diff-filter=ACMR", diffTarget],
       stdout: "piped",
       stderr: "piped",
     });

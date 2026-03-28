@@ -28,10 +28,10 @@ jobs:
           # Deploy capture-signup-lead and create-trial
           # JWT verification is controlled by supabase/config.toml (verify_jwt = false)
           supabase functions deploy capture-signup-lead \
-            --project-ref rmyvvbqnccpfeyowidrq
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
           supabase functions deploy create-trial \
-            --project-ref rmyvvbqnccpfeyowidrq
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
           echo "✅ Successfully deployed public functions (JWT settings from config.toml)"
         env:
@@ -43,7 +43,7 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
           supabase functions list \
-            --project-ref rmyvvbqnccpfeyowidrq
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
