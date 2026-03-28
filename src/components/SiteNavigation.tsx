@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { topLevelNavItems, tradeNavItems } from "@/components/siteNavConfig";
+import { topLevelNavItems, tradeNavItems, compareNavItems } from "@/components/siteNavConfig";
 
 export const SiteNavigation = () => {
     const location = useLocation();
@@ -39,10 +39,33 @@ export const SiteNavigation = () => {
                     </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                {/* PRICING */}
+                {/* COMPARE MEGA MENU */}
+                <NavigationMenuItem>
+                    <NavigationMenuTrigger className="text-sm font-semibold text-foreground hover:text-primary bg-transparent hover:bg-transparent focus:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-transparent px-3 h-auto py-2">
+                        Compare
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                        <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-1 lg:w-[480px]">
+                            {compareNavItems.map((item) => (
+                                <ListItem
+                                    key={item.title}
+                                    title={item.title}
+                                    href={item.href}
+                                    icon={item.icon}
+                                >
+                                    {item.description}
+                                </ListItem>
+                            ))}
+                        </ul>
+                    </NavigationMenuContent>
+                </NavigationMenuItem>
+
+                {/* TOP-LEVEL NAV ITEMS */}
                 {topLevelNavItems.map((item) => {
                     const isActive = item.href === "/resources"
                         ? location.pathname.startsWith("/resources")
+                        : item.href === "/crm"
+                        ? location.pathname === "/crm"
                         : location.pathname === item.href;
 
                     return (

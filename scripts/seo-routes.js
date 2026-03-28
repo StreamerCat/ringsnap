@@ -29,6 +29,16 @@ export const INDEXABLE_ROUTES = [
   { path: '/resources/after-hours-call-calculator', changefreq: 'monthly', priority: '0.7' },
   { path: '/resources/service-pricing-calculator', changefreq: 'monthly', priority: '0.7' },
   { path: '/resources/increase-average-ticket', changefreq: 'monthly', priority: '0.7' },
+
+  // CRM page
+  { path: '/crm', changefreq: 'monthly', priority: '0.9' },
+
+  // Comparison pages
+  { path: '/compare/ringsnap-vs-ruby', changefreq: 'monthly', priority: '0.8' },
+  { path: '/compare/ringsnap-vs-smith-ai', changefreq: 'monthly', priority: '0.8' },
+  { path: '/compare/ringsnap-vs-goodcall', changefreq: 'monthly', priority: '0.8' },
+  { path: '/compare/ai-receptionist-vs-live-answering', changefreq: 'monthly', priority: '0.8' },
+  { path: '/compare/best-ai-receptionist-home-services', changefreq: 'monthly', priority: '0.9' },
 ];
 
 export const FIELD_GUIDE_ROUTE_PATHS = INDEXABLE_ROUTES

@@ -230,6 +230,28 @@ const Index = () => {
                 </div>
               </section>
 
+              {/* CRM Teaser */}
+              <section className="section-spacer-compact bg-white border-t border-border/5">
+                <div className="site-container">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
+                    <div className="max-w-2xl text-center md:text-left">
+                      <h2 className="text-2xl font-bold mb-3">Not just a receptionist — a built-in CRM</h2>
+                      <p className="text-muted-foreground mb-0">
+                        Every call creates a lead record automatically — job type, urgency, full transcript. Works with Jobber. No extra tools needed.
+                      </p>
+                    </div>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="rounded-full px-8 h-14 text-base font-semibold whitespace-nowrap border-2"
+                      onClick={() => navigate('/crm')}
+                    >
+                      See the Built-In CRM
+                    </Button>
+                  </div>
+                </div>
+              </section>
+
               {/* Resource Center Teaser */}
               <section className="section-spacer bg-white border-t border-border/5">
                 <div className="site-container">
