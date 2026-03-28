@@ -6,7 +6,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RingSnapCallToCashInteractive } from "@/components/marketing/RingSnapCallToCashInteractive";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Phone, PhoneCall, CheckCircle2, Clock, Star, Settings, Users, Briefcase, MessageSquare, ArrowRight, Shield } from "lucide-react";
+import { Phone, PhoneCall, CheckCircle2, Clock, Star, Settings, Users, Briefcase, MessageSquare, ArrowRight } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({
     default: m.ContractorTestimonials
@@ -118,16 +118,16 @@ const Difference = () => {
             </a>
 
             {/* SECTION 1: Hero */}
-            <section className="section-spacer bg-gradient-to-br from-off-white to-cream/30">
+            <section className="bg-gradient-to-br from-off-white to-cream/30 py-8 sm:py-10 lg:py-12">
                 <div className="container mx-auto px-4 max-w-5xl">
                     <div className="text-center">
-                        <h1 className="text-h1 mb-6">
+                        <h1 className="text-page-h1 mb-4">
                             The trained front desk that books jobs and gets sharper over time
                         </h1>
-                        <p className="text-body-default text-muted-foreground max-w-3xl mx-auto mb-8 text-lg leading-relaxed">Built for home service pros. RingSnap answers in under 2 rings, handles real conversations, follows your rules, and uses outcomes and patterns to improve talk tracks and routing over time, within boundaries you control.</p>
+                        <p className="text-body-default text-muted-foreground max-w-3xl mx-auto mb-6 text-base sm:text-lg leading-relaxed">Built for home service pros. RingSnap answers in under 2 rings, handles real conversations, follows your rules, and uses outcomes and patterns to improve talk tracks and routing over time, within boundaries you control.</p>
 
                         {/* CTAs */}
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
                             <Button size="lg" variant="gradient" className="text-lg h-14 px-8 rounded-full" onClick={scrollToDemo}>
                                 <PhoneCall className="mr-2 w-5 h-5" />
                                 Hear a Live Call
@@ -138,7 +138,7 @@ const Difference = () => {
                         </div>
 
                         {/* Trust Bar */}
-                        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
+                        <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm">
                             <div className="flex items-center gap-2">
                                 <Star className="w-4 h-4 text-primary fill-primary" />
                                 <span>4.9/5 contractor rating</span>
@@ -154,10 +154,6 @@ const Difference = () => {
                             <div className="flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-primary" />
                                 <span>Live in 10 minutes</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-primary" />
-                                <span>Free trial</span>
                             </div>
                         </div>
                     </div>

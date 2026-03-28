@@ -540,6 +540,15 @@ All colors MUST be HSL.
     text-wrap: balance;
   }
 
+  /* Non-homepage hero heading scale (comparison, pricing, product pages) */
+  .text-page-h1 {
+    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold;
+    color: hsl(var(--charcoal));
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
   .text-h2 {
     @apply text-3xl sm:text-4xl md:text-5xl font-bold;
     color: hsl(var(--charcoal));
