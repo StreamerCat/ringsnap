@@ -2,10 +2,19 @@
  * authorize-call
  *
  * Called by Vapi BEFORE answering every inbound call.
- * Implements:
- *   3a. Trial minute enforcement (hard reject at 50 min limit)
- *   3b. Live plan overflow behavior (always_answer | soft_cap | hard_cap)
- *   3c. Night & Weekend time restriction (after-hours only)
+ * Implements call-based billing enforcement (billing_call_based_v1) with
+ * backward-compatible fallback to minute-based logic for legacy accounts.
+ *
+ *   Trial (trialExperienceV1=true):
+ *     3a. Verification call gating: only from allowlisted numbers, max 3
+ *     3b. Live trial cap: hard reject at 15 handled calls
+ *
+ *   Live plans (call-based):
+ *     3c. Night & Weekend time restriction (after-hours only)
+ *     3d. Call-based overflow behavior (always_answer | soft_cap | hard_cap)
+ *
+ *   Live plans (minute-based, legacy fallback):
+ *     3e. Minute-based overflow logic (unchanged)
  *
  * Returns: { allowed: boolean, message?: string }
  * `allowed: false` with a message → Vapi plays the message and hangs up
@@ -55,6 +64,29 @@ function toLocalDate(utcNow: Date, timezone: string): Date {
   }
 }
 
+// ─── PostHog capture ──────────────────────────────────────────────────────────
+async function capturePostHog(
+  event: string,
+  distinctId: string,
+  props: Record<string, unknown>
+): Promise<void> {
+  const key = Deno.env.get('POSTHOG_API_KEY');
+  if (!key) return;
+  try {
+    await fetch('https://us.i.posthog.com/capture/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        event,
+        distinct_id: distinctId,
+        properties: { ...props, $lib: 'edge-function', function: FUNCTION_NAME },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch { /* best-effort */ }
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -78,14 +110,16 @@ serve(async (req) => {
     );
 
     const payload = await req.json();
-    // Vapi sends: { phoneNumber, customData: { accountId } }
+    // Vapi sends: { phoneNumber, customData: { accountId }, customer: { number } }
     const accountId: string | null =
       payload?.customData?.accountId || payload?.accountId || null;
+    const callerNumber: string | null =
+      payload?.customer?.number ?? payload?.phoneNumber ?? null;
 
     logInfo('Authorize call request received', {
       ...baseLogOptions,
       accountId,
-      context: { phoneNumber: payload?.phoneNumber }
+      context: { callerNumber }
     });
 
     if (!accountId) {
@@ -98,8 +132,12 @@ serve(async (req) => {
       .select(
         'id, account_status, subscription_status, plan_key, plan_type, ' +
         'trial_active, trial_minutes_used, trial_minutes_limit, trial_end_date, ' +
+        'trial_live_calls_used, trial_live_calls_limit, ' +
+        'verification_calls_used, verification_calls_limit, ' +
         'minutes_used_current_period, overage_minutes_current_period, ' +
+        'calls_used_current_period, overage_calls_current_period, ' +
         'overflow_behavior, soft_cap_overage_minutes, ' +
+        'billing_call_based, selected_post_trial_plan, ' +
         'rejected_daytime_calls, ceiling_reject_sent, alerts_sent'
       )
       .eq('id', accountId)
@@ -116,12 +154,15 @@ serve(async (req) => {
     // Fetch plan configuration from DB
     const { data: plan } = await supabase
       .from('plans')
-      .select('included_minutes, system_overage_ceiling_minutes, coverage_hours')
+      .select('included_minutes, system_overage_ceiling_minutes, coverage_hours, billing_unit, included_calls, max_overage_calls, overage_rate_calls_cents, plan_version')
       .eq('plan_key', planKey)
       .single();
 
-    const includedMinutes: number = plan?.included_minutes ?? 600;
-    const ceilingMinutes: number = plan?.system_overage_ceiling_minutes ?? 200;
+    // Determine billing mode.
+    // Explicit false on account = legacy/grandfathered, must stay on minute-based.
+    // Env flag only applies when account flag is not explicitly false.
+    const useCallBased: boolean = account.billing_call_based === true ||
+      (account.billing_call_based !== false && Deno.env.get('BILLING_CALL_BASED_V1') === 'true');
 
     // ── Check account status ─────────────────────────────────────────────────
     if (['suspended', 'disabled', 'cancelled'].includes(account.account_status || '')) {
@@ -149,45 +190,25 @@ serve(async (req) => {
       customerPhone = authUser?.user?.phone || null;
     }
 
-    const minutesUsed: number = account.minutes_used_current_period || 0;
-
-    const alertCtx = {
-      accountId,
-      customerPhone,
-      customerEmail,
-      planKey,
-      minutesUsed,
-      minutesLimit: includedMinutes,
-      functionName: FUNCTION_NAME,
-      correlationId,
-    };
+    const phDistinctId = accountId;
 
     // ══════════════════════════════════════════════════════════════════════════
-    // 3a. TRIAL ENFORCEMENT — hard reject at limit; no overage for trials
+    // TRIAL ENFORCEMENT
     // ══════════════════════════════════════════════════════════════════════════
     const isTrial = account.trial_active === true || account.subscription_status === 'trial';
 
     if (isTrial) {
-      const trialUsed: number = account.trial_minutes_used || 0;
-      const trialLimit: number = account.trial_minutes_limit || 50;
       const trialEndDate = account.trial_end_date ? new Date(account.trial_end_date) : null;
       const expiredByTime = trialEndDate !== null && trialEndDate <= new Date();
-      const expiredByMinutes = trialUsed >= trialLimit;
 
-      if (expiredByTime || expiredByMinutes) {
-        logInfo('Trial ended — rejecting call (hard reject)', {
-          ...baseLogOptions,
-          accountId,
-          context: { trialUsed, trialLimit, expiredByTime, expiredByMinutes },
+      if (expiredByTime) {
+        logInfo('Trial expired by time — rejecting call', { ...baseLogOptions, accountId });
+        await sendUsageAlert(supabase, 'trial_ended_time', {
+          accountId, customerPhone, customerEmail, planKey,
+          callsUsed: 0, callsLimit: 0,
+          minutesUsed: 0, minutesLimit: 0,
+          functionName: FUNCTION_NAME, correlationId,
         });
-
-        const alertType = expiredByMinutes ? 'trial_ended_minutes' : 'trial_ended_time';
-        await sendUsageAlert(supabase, alertType, {
-          ...alertCtx,
-          minutesUsed: trialUsed,
-          minutesLimit: trialLimit,
-        });
-
         return json({
           allowed: false,
           message:
@@ -196,40 +217,153 @@ serve(async (req) => {
         });
       }
 
-      // Trial active — fire threshold alerts
-      const pct = trialLimit > 0 ? (trialUsed / trialLimit) * 100 : 0;
-      if (pct >= 90) {
-        await sendUsageAlert(supabase, 'trial_90_pct', {
-          ...alertCtx, minutesUsed: trialUsed, minutesLimit: trialLimit,
+      // ── New call-based trial enforcement ────────────────────────────────────
+      if (useCallBased || Deno.env.get('TRIAL_EXPERIENCE_V1') === 'true') {
+        const liveCallsUsed: number = account.trial_live_calls_used || 0;
+        const liveCallsLimit: number = account.trial_live_calls_limit || 15;
+        const verifCallsUsed: number = account.verification_calls_used || 0;
+        const verifCallsLimit: number = account.verification_calls_limit || 3;
+
+        // Check if caller is on verification allowlist
+        const isVerificationCall = await checkVerificationAllowlist(supabase, accountId, callerNumber);
+
+        if (isVerificationCall) {
+          // ── Verification call path ─────────────────────────────────────────
+          if (verifCallsUsed >= verifCallsLimit) {
+            logInfo('Verification call limit reached — rejecting', {
+              ...baseLogOptions, accountId,
+              context: { verifCallsUsed, verifCallsLimit, callerNumber }
+            });
+            await capturePostHog('call_blocked_over_limit', phDistinctId, {
+              account_id: accountId, plan_key: planKey, call_kind: 'verification',
+              blocked_reason: 'verification_cap_reached', calls_used: verifCallsUsed,
+              calls_limit: verifCallsLimit,
+            });
+            return json({
+              allowed: false,
+              message: 'Your 3 setup verification calls have been used. This number can still receive live calls.',
+            });
+          }
+
+          logInfo('Verification call authorized', {
+            ...baseLogOptions, accountId,
+            context: { verifCallsUsed, verifCallsLimit }
+          });
+          await capturePostHog('trial_verification_call_authorized', phDistinctId, {
+            account_id: accountId, verif_calls_used: verifCallsUsed + 1,
+          });
+          return json({ allowed: true, callKind: 'verification' });
+        }
+
+        // ── Live trial call path ───────────────────────────────────────────
+        if (liveCallsUsed >= liveCallsLimit) {
+          logInfo('Trial live call cap reached — hard reject', {
+            ...baseLogOptions, accountId,
+            context: { liveCallsUsed, liveCallsLimit }
+          });
+          await sendUsageAlert(supabase, 'trial_live_cap_reached', {
+            accountId, customerPhone, customerEmail, planKey,
+            callsUsed: liveCallsUsed, callsLimit: liveCallsLimit,
+            minutesUsed: 0, minutesLimit: 0,
+            functionName: FUNCTION_NAME, correlationId,
+          });
+          await capturePostHog('trial_cap_reached', phDistinctId, {
+            account_id: accountId, plan_key: planKey,
+            live_calls_used: liveCallsUsed, live_calls_limit: liveCallsLimit,
+          });
+          const selectedPlan = account.selected_post_trial_plan || 'lite';
+          return json({
+            allowed: false,
+            message:
+              'Your free trial has reached the 15-call limit. ' +
+              'Visit ringsnap.ai/dashboard to activate your plan and keep answering calls.',
+          });
+        }
+
+        // Fire threshold alerts before allowing
+        const pct = liveCallsLimit > 0 ? (liveCallsUsed / liveCallsLimit) * 100 : 0;
+        if (pct >= 80) {
+          await sendUsageAlert(supabase, 'trial_80_pct', {
+            accountId, customerPhone, customerEmail, planKey,
+            callsUsed: liveCallsUsed, callsLimit: liveCallsLimit,
+            minutesUsed: 0, minutesLimit: 0,
+            functionName: FUNCTION_NAME, correlationId,
+          });
+        }
+
+        logInfo('Trial live call authorized (call-based)', {
+          ...baseLogOptions, accountId,
+          context: { liveCallsUsed, liveCallsLimit }
         });
-      } else if (pct >= 70) {
-        await sendUsageAlert(supabase, 'trial_70_pct', {
-          ...alertCtx, minutesUsed: trialUsed, minutesLimit: trialLimit,
+        await capturePostHog('trial_live_call_authorized', phDistinctId, {
+          account_id: accountId, live_calls_used: liveCallsUsed + 1,
+        });
+        return json({ allowed: true, callKind: 'live' });
+      }
+
+      // ── Legacy minute-based trial enforcement (fallback) ────────────────────
+      const trialUsed: number = account.trial_minutes_used || 0;
+      const trialLimit: number = account.trial_minutes_limit || 50;
+      const expiredByMinutes = trialUsed >= trialLimit;
+
+      if (expiredByMinutes) {
+        logInfo('Trial ended (minutes) — rejecting call', { ...baseLogOptions, accountId });
+        await sendUsageAlert(supabase, 'trial_ended_minutes', {
+          accountId, customerPhone, customerEmail, planKey,
+          callsUsed: 0, callsLimit: 0,
+          minutesUsed: trialUsed, minutesLimit: trialLimit,
+          functionName: FUNCTION_NAME, correlationId,
+        });
+        return json({
+          allowed: false,
+          message:
+            'Your free trial has ended. Visit ringsnap.ai/dashboard to start your plan ' +
+            'and reactivate your AI receptionist in minutes.',
         });
       }
 
-      logInfo('Trial call authorized', { ...baseLogOptions, accountId });
+      const pct = trialLimit > 0 ? (trialUsed / trialLimit) * 100 : 0;
+      if (pct >= 90) {
+        await sendUsageAlert(supabase, 'trial_90_pct', {
+          accountId, customerPhone, customerEmail, planKey,
+          callsUsed: 0, callsLimit: 0,
+          minutesUsed: trialUsed, minutesLimit: trialLimit,
+          functionName: FUNCTION_NAME, correlationId,
+        });
+      } else if (pct >= 70) {
+        await sendUsageAlert(supabase, 'trial_70_pct', {
+          accountId, customerPhone, customerEmail, planKey,
+          callsUsed: 0, callsLimit: 0,
+          minutesUsed: trialUsed, minutesLimit: trialLimit,
+          functionName: FUNCTION_NAME, correlationId,
+        });
+      }
+
+      logInfo('Trial call authorized (minute-based)', { ...baseLogOptions, accountId });
       return json({ allowed: true });
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // 3c. NIGHT & WEEKEND TIME RESTRICTION
-    // Check BEFORE overflow logic. Daytime calls are rejected without consuming minutes.
+    // NIGHT & WEEKEND TIME RESTRICTION
+    // Check BEFORE overflow logic. Daytime calls rejected without consuming usage.
     // ══════════════════════════════════════════════════════════════════════════
     if (planKey === 'night_weekend') {
       const nowLocal = toLocalDate(new Date(), customerTimezone);
       if (isBusinessHours(nowLocal)) {
         logInfo('Night & Weekend: blocking daytime call', {
-          ...baseLogOptions,
-          accountId,
+          ...baseLogOptions, accountId,
           context: { localTime: nowLocal.toString() },
         });
 
-        // Increment daytime-rejected call counter (used for upgrade nudge in dashboard)
         await supabase
           .from('accounts')
           .update({ rejected_daytime_calls: (account.rejected_daytime_calls || 0) + 1 })
           .eq('id', accountId);
+
+        await capturePostHog('call_blocked_daytime_window', phDistinctId, {
+          account_id: accountId, plan_key: planKey,
+          local_time: nowLocal.toISOString(),
+        });
 
         return json({
           allowed: false,
@@ -241,24 +375,141 @@ serve(async (req) => {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // 3b. LIVE PLAN OVERFLOW BEHAVIOR ENGINE
+    // CALL-BASED OVERFLOW ENFORCEMENT (billing_call_based_v1)
     // ══════════════════════════════════════════════════════════════════════════
+    if (useCallBased) {
+      const includedCalls: number = plan?.included_calls ?? 60;
+      const maxOverageCalls: number = plan?.max_overage_calls ?? 40;
+      const callsUsed: number = account.calls_used_current_period || 0;
+      const overageCalls: number = Math.max(0, callsUsed - includedCalls);
+      const totalCap = includedCalls + maxOverageCalls;
+      const alertCtx = {
+        accountId, customerPhone, customerEmail, planKey,
+        callsUsed, callsLimit: includedCalls,
+        minutesUsed: 0, minutesLimit: 0,
+        functionName: FUNCTION_NAME, correlationId,
+      };
 
+      // 1. System ceiling (hard stop — non-user-configurable)
+      if (callsUsed >= totalCap) {
+        logWarn('Call ceiling reached — blocking call', {
+          ...baseLogOptions, accountId,
+          context: { callsUsed, totalCap, includedCalls, maxOverageCalls },
+        });
+
+        if (!account.ceiling_reject_sent) {
+          await sendUsageAlert(supabase, 'plan_ceiling_hit', alertCtx);
+          await supabase.from('accounts')
+            .update({ ceiling_reject_sent: true })
+            .eq('id', accountId);
+        }
+
+        await capturePostHog('hard_cap_reached', phDistinctId, {
+          account_id: accountId, plan_key: planKey,
+          calls_used: callsUsed, total_cap: totalCap,
+        });
+
+        return json({
+          allowed: false,
+          message:
+            "We're experiencing high call volume right now. Your team will return your call shortly. " +
+            'Please leave a message with your name, number, and the best time to reach you.',
+        });
+      }
+
+      // 2. Over included calls — check user's overflow preference
+      if (callsUsed >= includedCalls) {
+        const behavior: string = account.overflow_behavior || 'always_answer';
+
+        if (behavior === 'hard_cap') {
+          logInfo('hard_cap: rejecting overage call (call-based)', {
+            ...baseLogOptions, accountId, context: { callsUsed, includedCalls }
+          });
+          await capturePostHog('call_blocked_over_limit', phDistinctId, {
+            account_id: accountId, plan_key: planKey, overflow_mode: 'hard_cap',
+            calls_used: callsUsed, included_calls: includedCalls,
+          });
+          return json({
+            allowed: false,
+            message:
+              "You've reached your monthly call limit. " +
+              'Upgrade at ringsnap.ai/dashboard for immediate reactivation.',
+          });
+        }
+
+        if (behavior === 'soft_cap') {
+          // soft_cap_overage_minutes field is reused as soft_cap_overage_calls
+          const buffer: number = Math.min(account.soft_cap_overage_minutes || 40, maxOverageCalls);
+          if (overageCalls >= buffer) {
+            logInfo('soft_cap: buffer exhausted, rejecting call (call-based)', {
+              ...baseLogOptions, accountId,
+              context: { callsUsed, overageCalls, buffer }
+            });
+            await capturePostHog('soft_cap_reached', phDistinctId, {
+              account_id: accountId, plan_key: planKey, overflow_mode: 'soft_cap',
+              calls_used: callsUsed, overage_calls: overageCalls, buffer,
+            });
+            return json({
+              allowed: false,
+              message:
+                "You've reached your monthly call limit. " +
+                'Upgrade at ringsnap.ai/dashboard for immediate reactivation.',
+            });
+          }
+        }
+
+        // always_answer or soft_cap within buffer → allow
+        if (overageCalls === 0) {
+          // Exactly at 100% — this call starts overage; warn before billing kicks in
+          await sendUsageAlert(supabase, 'plan_100_pct', alertCtx);
+        } else {
+          await sendUsageAlert(supabase, 'plan_overage_started', alertCtx);
+        }
+        await capturePostHog('overage_started', phDistinctId, {
+          account_id: accountId, plan_key: planKey,
+          calls_used: callsUsed, overage_calls: overageCalls,
+        });
+
+      } else {
+        // Within included calls — check 80% threshold
+        const pct = includedCalls > 0 ? (callsUsed / includedCalls) * 100 : 0;
+        if (pct >= 80) {
+          await sendUsageAlert(supabase, 'plan_80_pct', alertCtx);
+        }
+      }
+
+      logInfo('Call authorized (call-based)', {
+        ...baseLogOptions, accountId,
+        context: { planKey, callsUsed, includedCalls }
+      });
+      return json({ allowed: true });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // LEGACY MINUTE-BASED OVERFLOW ENGINE (fallback for non-call-based accounts)
+    // ══════════════════════════════════════════════════════════════════════════
+    const includedMinutes: number = plan?.included_minutes ?? 600;
+    const ceilingMinutes: number = plan?.system_overage_ceiling_minutes ?? 200;
+    const minutesUsed: number = account.minutes_used_current_period || 0;
     const overageMinutes: number = Math.max(0, minutesUsed - includedMinutes);
     const ceilingReached: boolean = overageMinutes >= ceilingMinutes;
 
-    // 1. System ceiling (hard stop — non-user-configurable)
+    const alertCtx = {
+      accountId, customerPhone, customerEmail, planKey,
+      callsUsed: 0, callsLimit: 0,
+      minutesUsed, minutesLimit: includedMinutes,
+      functionName: FUNCTION_NAME, correlationId,
+    };
+
     if (ceilingReached) {
-      logWarn('System overage ceiling reached — routing to voicemail', {
-        ...baseLogOptions,
-        accountId,
+      logWarn('System overage ceiling reached (minute-based) — routing to voicemail', {
+        ...baseLogOptions, accountId,
         context: { minutesUsed, includedMinutes, ceilingMinutes },
       });
 
       if (!account.ceiling_reject_sent) {
         await sendUsageAlert(supabase, 'plan_ceiling_hit', alertCtx);
-        await supabase
-          .from('accounts')
+        await supabase.from('accounts')
           .update({ ceiling_reject_sent: true })
           .eq('id', accountId);
       }
@@ -271,12 +522,10 @@ serve(async (req) => {
       });
     }
 
-    // 2. Over included minutes — check user's overflow preference
     if (minutesUsed >= includedMinutes) {
       const behavior: string = account.overflow_behavior || 'always_answer';
 
       if (behavior === 'hard_cap') {
-        logInfo('hard_cap: rejecting overage call', { ...baseLogOptions, accountId });
         return json({
           allowed: false,
           message:
@@ -288,11 +537,6 @@ serve(async (req) => {
       if (behavior === 'soft_cap') {
         const buffer: number = account.soft_cap_overage_minutes || 100;
         if (overageMinutes >= buffer) {
-          logInfo('soft_cap: buffer exhausted, rejecting call', {
-            ...baseLogOptions,
-            accountId,
-            context: { overageMinutes, buffer },
-          });
           return json({
             allowed: false,
             message:
@@ -302,11 +546,8 @@ serve(async (req) => {
         }
       }
 
-      // always_answer or soft_cap within buffer → allow, fire overage alert
       await sendUsageAlert(supabase, 'plan_overage_started', alertCtx);
-
     } else {
-      // Within included minutes — check 70%/90% thresholds
       const pct = includedMinutes > 0 ? (minutesUsed / includedMinutes) * 100 : 0;
       if (pct >= 90) {
         await sendUsageAlert(supabase, 'plan_90_pct', alertCtx);
@@ -315,7 +556,9 @@ serve(async (req) => {
       }
     }
 
-    logInfo('Call authorized', { ...baseLogOptions, accountId, context: { planKey, minutesUsed } });
+    logInfo('Call authorized (minute-based legacy)', {
+      ...baseLogOptions, accountId, context: { planKey, minutesUsed }
+    });
     return json({ allowed: true });
 
   } catch (err) {
@@ -324,3 +567,31 @@ serve(async (req) => {
     return json({ allowed: true });
   }
 });
+
+/**
+ * Check if a caller number is on the verification call allowlist for this account.
+ * Returns true only when:
+ *   1. Caller number is present
+ *   2. Account has an active entry for that number in verification_call_allowlist
+ */
+async function checkVerificationAllowlist(
+  supabase: ReturnType<typeof createClient>,
+  accountId: string,
+  callerNumber: string | null
+): Promise<boolean> {
+  if (!callerNumber) return false;
+
+  try {
+    const { data } = await supabase
+      .from('verification_call_allowlist')
+      .select('id')
+      .eq('account_id', accountId)
+      .eq('phone_number', callerNumber)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    return !!data;
+  } catch {
+    return false;
+  }
+}

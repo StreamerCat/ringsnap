@@ -2,6 +2,7 @@ import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
 import { extractCallDetails, VapiCall, VapiMessage } from "./call_parser.ts";
 import { withSentryEdge } from "../_shared/sentry.ts";
+import { classifyCall, writeBillingLedgerEntry } from "../_shared/call-classifier.ts";
 
 /**
  * Vapi Webhook Handler
@@ -433,6 +434,21 @@ Deno.serve(withSentryEdge(
                         account_id: mappingResult.accountId,
                     });
                 }
+
+                // ── CALL BILLING LEDGER ────────────────────────────────────────────
+                // Write to billing ledger for call-based accounts (idempotent).
+                if (mappingResult.accountId && providerCallId) {
+                    await writeBillingLedgerForCall(
+                        supabase,
+                        mappingResult.accountId,
+                        providerCallId,
+                        (callRecord as any).id ?? null,
+                        call,
+                        callRecord,
+                        durationSeconds,
+                        phDistinctId,
+                    );
+                }
             }
 
             console.log(JSON.stringify({
@@ -801,5 +817,194 @@ async function trackActivationCallIfApplicable(
     } catch (e) {
         // Fail silently - this is diagnostic only
         console.warn('Failed to track activation call:', e);
+    }
+}
+
+/**
+ * Write to call_billing_ledger after a completed call.
+ * Only runs for accounts with billing_call_based=true.
+ * Idempotent: safe to call multiple times for the same call.
+ * Best-effort: errors are logged but do not fail the webhook.
+ */
+async function writeBillingLedgerForCall(
+    supabase: ReturnType<typeof createClient>,
+    accountId: string,
+    providerCallId: string,
+    callLogId: string | null,
+    call: VapiCall,
+    callRecord: Record<string, unknown>,
+    durationSeconds: number,
+    phDistinctId: string,
+): Promise<void> {
+    try {
+        // Fetch account state for billing context
+        const { data: account } = await supabase
+            .from('accounts')
+            .select(
+                'billing_call_based, trial_active, subscription_status, ' +
+                'plan_key, plan_type, calls_used_current_period, ' +
+                'trial_live_calls_used, verification_calls_used, ' +
+                'overflow_behavior, current_period_start, current_period_end'
+            )
+            .eq('id', accountId)
+            .single();
+
+        if (!account) return;
+
+        // Only run call-based billing logic for call-based accounts.
+        // Explicit false = legacy/grandfathered account; env flag does not override.
+        const useCallBased = account.billing_call_based === true ||
+            (account.billing_call_based !== false && Deno.env.get('BILLING_CALL_BASED_V1') === 'true');
+        if (!useCallBased) return;
+
+        const planKey = account.plan_key || account.plan_type || 'night_weekend';
+        const isTrial = account.trial_active === true || account.subscription_status === 'trial';
+
+        // Fetch plan snapshot
+        const { data: plan } = await supabase
+            .from('plans')
+            .select('plan_version, billing_unit, included_calls, overage_rate_calls_cents, max_overage_calls')
+            .eq('plan_key', planKey)
+            .single();
+
+        // Check if caller is on verification allowlist
+        const callerNumber: string | null = call.customer?.number ?? null;
+        const isVerificationNumber = await checkVerificationAllowlistForLedger(supabase, accountId, callerNumber);
+
+        const classification = classifyCall(
+            {
+                accountId,
+                providerCallId,
+                callerNumber,
+                durationSeconds,
+                endedReason: (call as any).endedReason ?? null,
+                callLogId,
+            },
+            isVerificationNumber,
+            isTrial,
+        );
+
+        const planSnapshot = {
+            planKey,
+            planVersion: plan?.plan_version ?? 2,
+            billingUnit: plan?.billing_unit ?? 'call',
+            includedCalls: plan?.included_calls ?? 60,
+            overageRateCents: plan?.overage_rate_calls_cents ?? 95,
+            maxOverageCalls: plan?.max_overage_calls ?? 50,
+            overflowMode: account.overflow_behavior || 'always_answer',
+        };
+
+        const callsUsedBefore = account.calls_used_current_period || 0;
+
+        const { inserted, alreadyCounted, existedBefore, error: ledgerError } = await writeBillingLedgerEntry(
+            supabase,
+            {
+                accountId,
+                providerCallId,
+                callLogId,
+                callStartedAt: callRecord.started_at as string ?? new Date().toISOString(),
+                callEndedAt: callRecord.ended_at as string ?? null,
+                durationSeconds,
+                classification,
+                planSnapshot,
+                billingPeriodStart: account.current_period_start ?? null,
+                billingPeriodEnd: account.current_period_end ?? null,
+                callsUsedBefore,
+                // Skip calls_used_current_period increment during trial;
+                // trial uses trial_live_calls_used for enforcement.
+                isTrial,
+            }
+        );
+
+        if (ledgerError) {
+            console.error(JSON.stringify({
+                event: 'billing_ledger_write_failed',
+                accountId, providerCallId, error: ledgerError,
+            }));
+            await capturePostHog('usage_tracking_error', phDistinctId, {
+                account_id: accountId, error: ledgerError, call_id: providerCallId,
+            });
+            return;
+        }
+
+        if (alreadyCounted) {
+            console.log(JSON.stringify({
+                event: 'billing_ledger_duplicate_skipped',
+                accountId, providerCallId,
+            }));
+            return;
+        }
+
+        // Update trial-specific counters — only when ledger row is newly inserted.
+        // existedBefore guards against duplicate webhook replays for non-billable
+        // calls (e.g. verification) where counted_in_usage=false would otherwise
+        // pass the alreadyCounted check above and re-increment on every replay.
+        if (isTrial && !existedBefore) {
+            if (classification.callKind === 'verification') {
+                await supabase.rpc('increment_verification_calls', { p_account_id: accountId });
+            } else if (classification.callKind === 'live' && classification.billable) {
+                await supabase.rpc('increment_trial_live_calls', { p_account_id: accountId });
+            }
+        }
+
+        // PostHog event
+        const phEvent = classification.callKind === 'verification'
+            ? 'trial_verification_call_recorded'
+            : classification.billable
+                ? (isTrial ? 'trial_live_call_recorded' : 'billable_call_recorded')
+                : 'call_excluded_from_billing';
+
+        await capturePostHog(phEvent, phDistinctId, {
+            account_id: accountId,
+            call_id: providerCallId,
+            plan_key: planKey,
+            billing_unit: 'call',
+            call_kind: classification.callKind,
+            billable: classification.billable,
+            excluded_reason: classification.excludedReason ?? null,
+            duration_seconds: durationSeconds,
+            estimated_cogs_cents: classification.estimatedCogsCents ?? null,
+            calls_used_after: callsUsedBefore + (classification.billable ? 1 : 0),
+        });
+
+        console.log(JSON.stringify({
+            event: 'billing_ledger_written',
+            accountId, providerCallId,
+            callKind: classification.callKind,
+            billable: classification.billable,
+            durationSeconds,
+        }));
+
+    } catch (e) {
+        // Never fail the webhook for billing errors
+        console.error('writeBillingLedgerForCall exception:', e);
+        try {
+            await capturePostHog('usage_tracking_error', phDistinctId, {
+                account_id: accountId, error: String(e), call_id: providerCallId,
+            });
+        } catch { /* best-effort */ }
+    }
+}
+
+/**
+ * Check verification allowlist (used in billing ledger writes, separate from authorize-call check).
+ */
+async function checkVerificationAllowlistForLedger(
+    supabase: ReturnType<typeof createClient>,
+    accountId: string,
+    callerNumber: string | null,
+): Promise<boolean> {
+    if (!callerNumber) return false;
+    try {
+        const { data } = await supabase
+            .from('verification_call_allowlist')
+            .select('id')
+            .eq('account_id', accountId)
+            .eq('phone_number', callerNumber)
+            .eq('is_active', true)
+            .maybeSingle();
+        return !!data;
+    } catch {
+        return false;
     }
 }

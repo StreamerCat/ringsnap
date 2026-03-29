@@ -205,6 +205,11 @@ const createTrialSchema = z.object({
 
   // Test Mode Bypass Override
   bypassStripe: z.boolean().optional(),
+
+  // Onboarding signals for post-trial plan pre-selection
+  teamSize: z.string().max(50).optional(),
+  coveragePreference: z.enum(["after_hours_only", "24_7"]).optional(),
+  selectedPostTrialPlan: z.enum(["night_weekend", "lite", "core", "pro"]).optional(),
 });
 
 /**
@@ -214,7 +219,8 @@ function normalizePayload(rawPayload: any): any {
   const normalized = { ...rawPayload };
   const optionalFields = [
     'leadId', 'referralCode', 'deviceFingerprint', 'website', 'serviceArea',
-    'zipCode', 'businessHours', 'emergencyPolicy', 'primaryGoal', 'salesRepName'
+    'zipCode', 'businessHours', 'emergencyPolicy', 'primaryGoal', 'salesRepName',
+    'teamSize', 'coveragePreference', 'selectedPostTrialPlan',
   ];
 
   for (const field of optionalFields) {
@@ -686,6 +692,35 @@ async function withRetry<T>(
   }
 
   throw lastError;
+}
+
+/**
+ * Pre-select a post-trial plan from onboarding signals.
+ * Mirrors the frontend logic in src/lib/billing/dashboardPlans.ts.
+ */
+function preSelectPostTrialPlan(signals: {
+  trade?: string | null;
+  teamSize?: string | null;
+  coveragePreference?: string | null;
+  explicit?: string | null;
+}): { planKey: string; reason: string } {
+  if (signals.explicit) {
+    return { planKey: signals.explicit, reason: "explicit_selection" };
+  }
+  if (signals.coveragePreference === "after_hours_only") {
+    return { planKey: "night_weekend", reason: "coverage_after_hours_only" };
+  }
+  const trade = (signals.trade || "").toLowerCase();
+  const teamSize = (signals.teamSize || "").toLowerCase();
+  // Use exact matching to avoid "6-10".includes("10") routing mid-sized teams to Pro.
+  // Valid teamSize values: 'solo' | '2-5' | '6-10' | '10+'
+  if (teamSize === "10+") {
+    return { planKey: "pro", reason: "team_size_large" };
+  }
+  if (trade.includes("hvac") || trade.includes("plumb") || trade.includes("multi") || teamSize === "6-10") {
+    return { planKey: "core", reason: teamSize === "6-10" ? "multi_truck" : "trade_high_volume" };
+  }
+  return { planKey: "lite", reason: "default" };
 }
 
 Deno.serve(async (req: Request) => {
@@ -1230,6 +1265,14 @@ Deno.serve(async (req: Request) => {
     };
     const normalizedPlanKey = legacyPlanMap[data.planType] || data.planType || "night_weekend";
 
+    // Determine post-trial plan from onboarding signals or explicit selection
+    const { planKey: selectedPostTrialPlan, reason: preselectReason } = preSelectPostTrialPlan({
+      trade: data.trade,
+      teamSize: data.teamSize,
+      coveragePreference: data.coveragePreference,
+      explicit: data.selectedPostTrialPlan,
+    });
+
     const accountData: Record<string, unknown> = {
       company_name: data.companyName,
       trade: data.trade,
@@ -1238,6 +1281,17 @@ Deno.serve(async (req: Request) => {
       trial_active: true,                   // marks trial period active
       trial_minutes_used: 0,
       trial_minutes_limit: 50,
+      // Call-based billing fields (new trial model)
+      billing_call_based: true,
+      trial_live_calls_used: 0,
+      trial_live_calls_limit: 15,
+      verification_calls_used: 0,
+      verification_calls_limit: 3,
+      selected_post_trial_plan: selectedPostTrialPlan,
+      post_trial_plan_preselect_reason: preselectReason,
+      onboarding_trade: data.trade,
+      onboarding_team_size: data.teamSize || null,
+      onboarding_coverage_preference: data.coveragePreference || null,
       phone_number_area_code: data.zipCode?.slice(0, 3) || null,
       zip_code: data.zipCode || null,
       business_hours: businessHoursValue ? JSON.stringify(businessHoursValue) : null,
@@ -1508,6 +1562,94 @@ Deno.serve(async (req: Request) => {
       context: {
         source: data.source
       },
+    });
+
+    // ═══════════════════════════════════════════════════════════════
+    // CALL-BASED TRIAL: Verification allowlist + trial_usage_summary
+    // ═══════════════════════════════════════════════════════════════
+
+    phase = "trial_call_setup";
+    console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
+
+    // Seed verification allowlist with the owner's phone number so their calls
+    // from this number are classified as non-billable verification calls.
+    try {
+      const { error: allowlistError } = await supabase
+        .from("verification_call_allowlist")
+        .insert({
+          account_id: currentAccountId,
+          phone_number: data.phone,
+          label: "owner",
+          added_by: currentUserId,
+        });
+      if (allowlistError) {
+        logWarn("Failed to seed verification allowlist (non-critical)", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: allowlistError,
+        });
+        captureCreateTrialException(allowlistError, "verification_allowlist_seed", currentUserId ?? data.email ?? "anonymous", {
+          account_id: currentAccountId,
+        });
+      }
+    } catch (err: any) {
+      logWarn("Verification allowlist seed error (non-critical)", { ...baseLogOptions, error: err });
+      captureCreateTrialException(err, "verification_allowlist_seed", currentUserId ?? data.email ?? "anonymous", {
+        account_id: currentAccountId,
+      });
+    }
+
+    // Create trial_usage_summary row to track trial metrics
+    try {
+      const trialStartDate = new Date().toISOString();
+      const { error: summaryError } = await supabase
+        .from("trial_usage_summary")
+        .insert({
+          account_id: currentAccountId,
+          trial_start: trialStartDate,
+          trial_end: trialEndDate,
+          selected_post_trial_plan: selectedPostTrialPlan,
+          live_trial_calls_limit: 15,
+          verification_calls_limit: 3,
+          live_trial_calls_used: 0,
+          verification_calls_used: 0,
+        });
+      if (summaryError) {
+        logWarn("Failed to create trial_usage_summary (non-critical)", {
+          ...baseLogOptions,
+          accountId: currentAccountId,
+          error: summaryError,
+        });
+        captureCreateTrialException(summaryError, "trial_usage_summary_insert", currentUserId ?? data.email ?? "anonymous", {
+          account_id: currentAccountId,
+        });
+      }
+    } catch (err: any) {
+      logWarn("trial_usage_summary insert error (non-critical)", { ...baseLogOptions, error: err });
+      captureCreateTrialException(err, "trial_usage_summary_insert", currentUserId ?? data.email ?? "anonymous", {
+        account_id: currentAccountId,
+      });
+    }
+
+    // PostHog: trial_started + trial_plan_preselected (best-effort, fire-and-forget)
+    capturePostHogEvent("trial_started", currentUserId ?? data.email ?? "anonymous", {
+      plan_type: normalizedPlanKey,
+      source: data.source ?? "website",
+      account_id: currentAccountId,
+      billing_call_based: true,
+      trial_live_calls_limit: 15,
+      selected_post_trial_plan: selectedPostTrialPlan,
+      $lib: "edge-function",
+    });
+    capturePostHogEvent("trial_plan_preselected", currentUserId ?? data.email ?? "anonymous", {
+      selected_plan: selectedPostTrialPlan,
+      preselect_reason: preselectReason,
+      account_id: currentAccountId,
+      trade: data.trade,
+      team_size: data.teamSize ?? null,
+      coverage_preference: data.coveragePreference ?? null,
+      explicit_selection: !!data.selectedPostTrialPlan,
+      $lib: "edge-function",
     });
 
     // ═══════════════════════════════════════════════════════════════

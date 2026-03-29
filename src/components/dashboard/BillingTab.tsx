@@ -46,7 +46,22 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
     const isCanceled = account.subscription_status === "cancelled" || account.cancel_at_period_end;
     const isNightWeekend = (currentPlan?.key === "night_weekend");
 
-    // Usage figures — prefer new columns, fall back to legacy
+    // Billing unit: call-based (v2) or minute-based (legacy)
+    const useCallBased = account.billing_call_based === true;
+
+    // Call-based usage figures
+    const trialLiveCallsUsed: number = account.trial_live_calls_used ?? 0;
+    const trialLiveCallsLimit: number = account.trial_live_calls_limit ?? 15;
+    const verifCallsUsed: number = account.verification_calls_used ?? 0;
+    const verifCallsLimit: number = account.verification_calls_limit ?? 3;
+    const periodCallsUsed: number = account.calls_used_current_period ?? 0;
+    const includedCalls: number = currentPlan?.includedCalls ?? 60;
+    const overageCalls: number = Math.max(0, periodCallsUsed - includedCalls);
+    const projectedOverageCalls: number = overageCalls * (currentPlan?.overageRateCalls ?? 0.95);
+    const maxOverageCalls: number = currentPlan?.maxOverageCalls ?? 50;
+    const selectedPostTrialPlan = account.selected_post_trial_plan;
+
+    // Legacy minute-based usage figures
     const trialUsed: number = account.trial_minutes_used ?? 0;
     const trialLimit: number = account.trial_minutes_limit ?? 50;
     const periodUsed: number = account.minutes_used_current_period ?? account.monthly_minutes_used ?? 0;
@@ -55,6 +70,8 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
     const projectedOverage: number = overageMinutes * (currentPlan?.overageRate ?? 0.28);
 
     // Usage percentages
+    const trialCallPct = trialLiveCallsLimit > 0 ? Math.min(100, Math.round((trialLiveCallsUsed / trialLiveCallsLimit) * 100)) : 0;
+    const periodCallPct = includedCalls > 0 ? Math.min(100, Math.round((periodCallsUsed / includedCalls) * 100)) : 0;
     const trialPct = trialLimit > 0 ? Math.min(100, Math.round((trialUsed / trialLimit) * 100)) : 0;
     const periodPct = includedMinutes > 0 ? Math.min(100, Math.round((periodUsed / includedMinutes) * 100)) : 0;
 
@@ -179,12 +196,25 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                                 ${currentPlan?.priceMonthly ?? 59}
                                 <span className="text-base font-normal text-muted-foreground">/month</span>
                             </p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                {includedMinutes.toLocaleString()} minutes included/mo
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                ${currentPlan?.overageRate?.toFixed(2) ?? "0.45"}/min if you go over
-                            </p>
+                            {useCallBased ? (
+                                <>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {includedCalls.toLocaleString()} handled calls/mo
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        ${currentPlan?.overageRateCalls?.toFixed(2) ?? "0.95"}/call if you go over
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {includedMinutes.toLocaleString()} minutes included/mo
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        ${currentPlan?.overageRate?.toFixed(2) ?? "0.45"}/min if you go over
+                                    </p>
+                                </>
+                            )}
                         </div>
 
                         {/* Dates */}
@@ -227,8 +257,76 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                         </div>
                     </div>
 
-                    {/* ── 4c: Trial minutes display ── */}
-                    {isTrialing && (
+                    {/* ── Trial usage display ── */}
+                    {isTrialing && useCallBased && (
+                        <div className="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200 space-y-4">
+                            {/* Selected post-trial plan */}
+                            {selectedPostTrialPlan && trialEndDate && (
+                                <div className="text-sm text-amber-900 bg-amber-100 rounded-lg p-3">
+                                    <p className="font-medium">
+                                        On {format(trialEndDate, "MMM d, yyyy")}, you'll start your{" "}
+                                        <strong>{selectedPostTrialPlan.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</strong>{" "}
+                                        plan unless you change or cancel.
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-2 h-7 text-xs"
+                                        onClick={() => setUpgradeModalOpen(true)}
+                                    >
+                                        Change Plan
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Live trial call cap */}
+                            <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                    <span className="font-medium text-amber-900">Live trial calls</span>
+                                    <span className="text-amber-700 font-bold">{trialLiveCallsUsed} / {trialLiveCallsLimit} used</span>
+                                </div>
+                                <div className="w-full h-2 bg-amber-200 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-2 rounded-full transition-all ${progressColor(trialCallPct)}`}
+                                        style={{ width: `${trialCallPct}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs text-amber-700 mt-1">
+                                    {trialLiveCallsLimit - trialLiveCallsUsed} calls remaining in trial
+                                </p>
+                            </div>
+
+                            {/* Verification call allowance */}
+                            <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                    <span className="text-amber-800">Setup verification calls</span>
+                                    <span className="text-amber-700">{verifCallsUsed} / {verifCallsLimit} used</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Verification calls are free test calls from your approved team numbers. They don't count against your 15-call trial limit.
+                                </p>
+                            </div>
+
+                            {/* Upgrade nudge near cap */}
+                            {trialCallPct >= 80 && (
+                                <div className="p-2 bg-amber-100 rounded text-xs text-amber-900">
+                                    {trialLiveCallsUsed >= trialLiveCallsLimit
+                                        ? "Your trial is at its call limit. Activate your plan to keep answering calls."
+                                        : "You're nearing the trial call limit — consider activating your plan early."}
+                                    <Button
+                                        size="sm"
+                                        className="ml-2 h-6 text-xs"
+                                        onClick={() => setUpgradeModalOpen(true)}
+                                    >
+                                        Activate Plan
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Legacy: Trial minutes display (minute-based accounts) ── */}
+                    {isTrialing && !useCallBased && (
                         <div className="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200">
                             <div className="flex justify-between text-sm mb-2">
                                 <span className="font-medium text-amber-900">
@@ -262,8 +360,53 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                         </div>
                     )}
 
-                    {/* ── 4a: Usage progress bar (active plan) ── */}
-                    {!isTrialing && (
+                    {/* ── Usage progress bar (active plan) ── */}
+                    {!isTrialing && useCallBased && (
+                        <div className="mt-6">
+                            <div className="flex justify-between text-sm mb-2">
+                                <span className="font-medium">Calls handled this period</span>
+                                <span className="font-bold">
+                                    {periodCallsUsed.toLocaleString()} / {includedCalls.toLocaleString()} calls
+                                </span>
+                            </div>
+                            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                    className={`h-2 rounded-full transition-all ${progressColor(periodCallPct)}`}
+                                    style={{ width: `${Math.min(100, periodCallPct)}%` }}
+                                />
+                            </div>
+                            {overageCalls > 0 && (
+                                <div className="mt-2 flex items-center gap-2 text-sm text-orange-700">
+                                    <TrendingUp className="h-4 w-4" />
+                                    <span>
+                                        {overageCalls} overage calls — projected extra:{" "}
+                                        <strong>${projectedOverageCalls.toFixed(2)}</strong> this month
+                                        {" "}(max {maxOverageCalls} overage calls)
+                                    </span>
+                                </div>
+                            )}
+                            {periodCallPct >= 80 && overageCalls === 0 && (
+                                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                                    <p className="text-yellow-800">
+                                        {periodCallPct >= 100
+                                            ? "⚠️ All included calls used — overage charges are now active."
+                                            : "You're nearing your call limit — consider upgrading before overage kicks in."}
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-2"
+                                        onClick={() => setUpgradeModalOpen(true)}
+                                    >
+                                        View Plan Options
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Legacy: Usage progress bar (minute-based active plan) ── */}
+                    {!isTrialing && !useCallBased && (
                         <div className="mt-6">
                             <div className="flex justify-between text-sm mb-2">
                                 <span className="font-medium">Minutes used this period</span>

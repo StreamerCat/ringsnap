@@ -6,9 +6,14 @@
  *
  * Plan keys: night_weekend | lite | core | pro
  * These must match the `plans` table plan_key values exactly.
+ *
+ * Billing units:
+ *   billingUnit = 'call'   → new call-based pricing (v2 plans, pricingCallBasedV1=true)
+ *   billingUnit = 'minute' → legacy minute-based pricing (grandfathered accounts)
  */
 
 export type PlanKey = "night_weekend" | "lite" | "core" | "pro";
+export type BillingUnit = "call" | "minute";
 
 export type PlanDef = {
     key: PlanKey;
@@ -16,10 +21,25 @@ export type PlanDef = {
     headline: string;
     priceMonthly: number;
 
+    // ── Call-based billing (billingUnit = 'call') ─────────────────────────────
+    billingUnit: BillingUnit;
+
+    /** Handled calls included in base price */
+    includedCalls: number;
+    /** Cost per overage call in cents */
+    overageRateCallsCents: number;
+    /** $/call formatted (convenience) */
+    overageRateCalls: number;
+    /** Hard ceiling: max overage calls above includedCalls (non-user-configurable) */
+    maxOverageCalls: number;
+
+    // ── Minute-based billing (billingUnit = 'minute', legacy) ─────────────────
+    /** @deprecated Use includedCalls for new plans */
     includedMinutes: number;
+    /** @deprecated Use overageRateCalls for new plans */
     overageRate: number; // $/min
 
-    /** System-enforced hard ceiling for overage (non-user-configurable) */
+    /** System-enforced hard ceiling for overage (legacy minute-based) */
     systemCeilingMinutes: number;
 
     /** Description of when calls are handled */
@@ -34,6 +54,9 @@ export type PlanDef = {
     recommended?: boolean;
     badgeText?: string;
     notes?: string;
+
+    /** Plan schema version: 1=minute-based (legacy), 2=call-based (v1) */
+    planVersion: 1 | 2;
 };
 
 export const DASHBOARD_PLANS: PlanDef[] = [
@@ -42,9 +65,20 @@ export const DASHBOARD_PLANS: PlanDef[] = [
         name: "Night & Weekend",
         headline: "After-hours and weekend coverage",
         priceMonthly: 59,
+        planVersion: 2,
+        billingUnit: "call",
+
+        // Call-based (authoritative for new signups)
+        includedCalls: 60,
+        overageRateCallsCents: 110,
+        overageRateCalls: 1.10,
+        maxOverageCalls: 40,
+
+        // Minute-based (kept for legacy/grandfathered display)
         includedMinutes: 150,
         overageRate: 0.45,
         systemCeilingMinutes: 100,
+
         coverageHours: "after_hours_only",
         priceIdEnv: "STRIPE_PRICE_ID_NIGHT_WEEKEND",
         overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_NIGHT_WEEKEND",
@@ -62,9 +96,18 @@ export const DASHBOARD_PLANS: PlanDef[] = [
         name: "Lite",
         headline: "24/7 coverage for handymen, painters, and roofers",
         priceMonthly: 129,
+        planVersion: 2,
+        billingUnit: "call",
+
+        includedCalls: 125,
+        overageRateCallsCents: 95,
+        overageRateCalls: 0.95,
+        maxOverageCalls: 50,
+
         includedMinutes: 300,
         overageRate: 0.38,
         systemCeilingMinutes: 150,
+
         coverageHours: "24_7",
         priceIdEnv: "STRIPE_PRICE_ID_LITE",
         overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_LITE",
@@ -82,9 +125,18 @@ export const DASHBOARD_PLANS: PlanDef[] = [
         name: "Core",
         headline: "24/7 coverage for plumbers and HVAC contractors",
         priceMonthly: 229,
+        planVersion: 2,
+        billingUnit: "call",
+
+        includedCalls: 250,
+        overageRateCallsCents: 85,
+        overageRateCalls: 0.85,
+        maxOverageCalls: 75,
+
         includedMinutes: 600,
         overageRate: 0.28,
         systemCeilingMinutes: 200,
+
         coverageHours: "24_7",
         priceIdEnv: "STRIPE_PRICE_ID_CORE",
         overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_CORE",
@@ -104,10 +156,19 @@ export const DASHBOARD_PLANS: PlanDef[] = [
         key: "pro",
         name: "Pro",
         headline: "High-volume contractors and multi-truck operations",
-        priceMonthly: 399,
+        priceMonthly: 449,
+        planVersion: 2,
+        billingUnit: "call",
+
+        includedCalls: 450,
+        overageRateCallsCents: 75,
+        overageRateCalls: 0.75,
+        maxOverageCalls: 90,
+
         includedMinutes: 1200,
         overageRate: 0.22,
         systemCeilingMinutes: 300,
+
         coverageHours: "24_7",
         priceIdEnv: "STRIPE_PRICE_ID_PRO",
         overagePriceIdEnv: "STRIPE_OVERAGE_PRICE_ID_PRO",
@@ -151,6 +212,40 @@ export function getUpgradeOptions(currentPlanKey: PlanKey | string): PlanDef[] {
     const normalized = normalizeLegacyPlanKey(currentPlanKey);
     const currentIndex = DASHBOARD_PLANS.findIndex((p) => p.key === normalized);
     return DASHBOARD_PLANS.filter((_, i) => i > currentIndex);
+}
+
+/**
+ * Select the best post-trial plan based on onboarding signals.
+ * Returns a plan key and the reason for the selection.
+ */
+export function preSelectPostTrialPlan(signals: {
+    trade?: string | null;
+    teamSize?: string | null;
+    coveragePreference?: string | null;
+}): { planKey: PlanKey; reason: string } {
+    const trade = (signals.trade || '').toLowerCase();
+    const teamSize = signals.teamSize || '';
+    const coverage = signals.coveragePreference || '';
+
+    // After-hours only → Night & Weekend
+    if (coverage === 'after_hours_only') {
+        return { planKey: 'night_weekend', reason: 'after_hours_only' };
+    }
+
+    // Very high volume / multi-location → Pro (must check before Core/multi-truck)
+    if (teamSize === '10+') {
+        return { planKey: 'pro', reason: 'high_volume_multi_location' };
+    }
+
+    // HVAC, plumbing, or clearly multi-truck → Core
+    const isHighVolumeTrade = ['hvac', 'plumbing', 'plumber', 'heating', 'cooling', 'air conditioning'].some(t => trade.includes(t));
+    const isMultiTruck = teamSize === '6-10';
+    if (isHighVolumeTrade || isMultiTruck) {
+        return { planKey: 'core', reason: isMultiTruck ? 'multi_truck' : 'trade_hvac_plumbing' };
+    }
+
+    // Default → Lite
+    return { planKey: 'lite', reason: 'default' };
 }
 
 /** Check if provisioning is complete */

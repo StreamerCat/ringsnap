@@ -122,6 +122,50 @@ export interface FeatureFlags {
   enhancedMarketingSchema: boolean;
 
   internalSkipOnboarding: boolean;
+
+  // ============================================================================
+  // Sprint 2026-03-29: Call-Based Pricing V1
+  // ============================================================================
+
+  /**
+   * ROLLOUT FLAG: Enable call-based pricing surfaces (marketing, pricing page,
+   * plan cards). Controls whether new plans show "calls" instead of "minutes".
+   *
+   * Default: ON for all environments (new signups only see calls).
+   * Kill switch: set VITE_FEATURE_PRICING_CALL_BASED_V1=false to revert UI.
+   */
+  pricingCallBasedV1: boolean;
+
+  /**
+   * ROLLOUT FLAG: Enable call-based billing enforcement in authorize-call and
+   * billing ledger writes. When OFF, falls back to legacy minute-based logic.
+   * Per-account override: accounts.billing_call_based column takes precedence.
+   *
+   * Default: ON for new accounts (controlled by DB column).
+   * Kill switch: set VITE_FEATURE_BILLING_CALL_BASED_V1=false to disable globally.
+   */
+  billingCallBasedV1: boolean;
+
+  /**
+   * ROLLOUT FLAG: Enable call-based usage notification templates (email + SMS).
+   * When OFF, legacy minute-based alert messages are sent.
+   *
+   * Default: ON when pricingCallBasedV1 is ON.
+   * Set via: VITE_FEATURE_USAGE_NOTIFICATIONS_V1=false
+   */
+  usageNotificationsV1: boolean;
+
+  /**
+   * ROLLOUT FLAG: Enable the new dedicated trial experience:
+   * - Standalone 24/7 trial (not tied to N&W plan)
+   * - 15 live calls hard cap
+   * - 3 verification calls from allowlisted numbers
+   * - Post-trial plan selector during signup and throughout trial
+   *
+   * Default: ON for new signups.
+   * Kill switch: set VITE_FEATURE_TRIAL_EXPERIENCE_V1=false
+   */
+  trialExperienceV1: boolean;
 }
 
 /**
@@ -232,6 +276,34 @@ export const featureFlags: FeatureFlags = {
     import.meta.env.VITE_FEATURE_ENHANCED_MARKETING_SCHEMA,
     true
   ),
+
+  // ============================================================================
+  // Call-Based Pricing V1 (2026-03-29)
+  // ============================================================================
+
+  // Pricing UI shows calls not minutes: ENABLED by default for all environments
+  pricingCallBasedV1: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_PRICING_CALL_BASED_V1,
+    true
+  ),
+
+  // Billing enforcement uses calls: ENABLED by default
+  billingCallBasedV1: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_BILLING_CALL_BASED_V1,
+    true
+  ),
+
+  // Usage notification templates use calls language: ENABLED by default
+  usageNotificationsV1: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_USAGE_NOTIFICATIONS_V1,
+    true
+  ),
+
+  // New dedicated trial experience: ENABLED by default
+  trialExperienceV1: parseBoolEnv(
+    import.meta.env.VITE_FEATURE_TRIAL_EXPERIENCE_V1,
+    true
+  ),
 };
 
 /**
@@ -251,4 +323,7 @@ if (import.meta.env.DEV) {
   console.log('[FeatureFlags] Activation onboarding:', featureFlags.activationOnboardingEnabled ? 'ENABLED' : 'DISABLED');
   console.log('[FeatureFlags] Reporting wow:', featureFlags.reportingWowEnabled ? 'ENABLED' : 'DISABLED');
   console.log('[FeatureFlags] Enhanced marketing schema:', featureFlags.enhancedMarketingSchema ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Call-based pricing V1:', featureFlags.pricingCallBasedV1 ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Call-based billing V1:', featureFlags.billingCallBasedV1 ? 'ENABLED' : 'DISABLED');
+  console.log('[FeatureFlags] Trial experience V1:', featureFlags.trialExperienceV1 ? 'ENABLED' : 'DISABLED');
 }
