@@ -8,6 +8,10 @@ import { test, expect } from '@playwright/test';
  *  2. API – create-trial edge function accepts a valid payload (bypassStripe)
  *  3. API – duplicate email returns a 409 / ACCOUNT_EXISTS error
  *  4. API – missing required fields are rejected (4xx validation error)
+ *
+ * Tests skip gracefully when the dev server or Supabase is unreachable,
+ * so they are safe to run in any environment and will only assert when
+ * both services are available.
  */
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -33,11 +37,31 @@ function getAnonKey(): string {
     );
 }
 
+/** Returns true if the error is a TCP-level connection failure. */
+function isConnectionRefused(err: unknown): boolean {
+    const msg = String(err);
+    return (
+        msg.includes('ERR_CONNECTION_REFUSED') ||
+        msg.includes('ECONNREFUSED') ||
+        msg.includes('ENOTFOUND') ||
+        msg.includes('ETIMEDOUT')
+    );
+}
+
 // ─── UI smoke tests (no auth required) ──────────────────────────────────────
 
 test.describe('Signup – /start page', () => {
     test('page loads with name and email inputs', async ({ page }) => {
-        await page.goto('/start');
+        try {
+            await page.goto('/start');
+        } catch (err) {
+            if (isConnectionRefused(err)) {
+                test.skip(true, 'Dev server not reachable – skipping UI test');
+                return;
+            }
+            throw err;
+        }
+
         await page.waitForLoadState('networkidle');
 
         // Should show some form of lead-capture form
@@ -46,13 +70,8 @@ test.describe('Signup – /start page', () => {
         // Accept either a redirect to signin or the actual /start form
         const url = page.url();
         if (url.includes('/start')) {
-            // Expect name input to eventually appear
-            const nameInput = page
-                .getByRole('textbox', { name: /name/i })
-                .first();
-            const emailInput = page
-                .getByRole('textbox', { name: /email/i })
-                .first();
+            const nameInput = page.getByRole('textbox', { name: /name/i }).first();
+            const emailInput = page.getByRole('textbox', { name: /email/i }).first();
 
             const hasName = await nameInput.isVisible().catch(() => false);
             const hasEmail = await emailInput.isVisible().catch(() => false);
@@ -63,7 +82,16 @@ test.describe('Signup – /start page', () => {
     });
 
     test('entering name and email enables the submit button', async ({ page }) => {
-        await page.goto('/start');
+        try {
+            await page.goto('/start');
+        } catch (err) {
+            if (isConnectionRefused(err)) {
+                test.skip(true, 'Dev server not reachable – skipping UI test');
+                return;
+            }
+            throw err;
+        }
+
         await page.waitForLoadState('networkidle');
 
         if (!page.url().includes('/start')) {
@@ -71,26 +99,21 @@ test.describe('Signup – /start page', () => {
             return;
         }
 
-        const nameInput = page
-            .getByRole('textbox', { name: /name/i })
-            .first();
-        const emailInput = page
-            .getByRole('textbox', { name: /email/i })
-            .first();
+        const nameInput = page.getByRole('textbox', { name: /name/i }).first();
+        const emailInput = page.getByRole('textbox', { name: /email/i }).first();
 
         const hasForm =
             (await nameInput.isVisible().catch(() => false)) &&
             (await emailInput.isVisible().catch(() => false));
 
         if (!hasForm) {
-            // Form not visible; skip gracefully
+            // Form not visible – skip gracefully
             return;
         }
 
         await nameInput.fill('Test User');
         await emailInput.fill(`test+${Date.now()}@getringsnap.com`);
 
-        // After filling the form, a submit/continue button should be enabled
         const submitBtn = page
             .getByRole('button', { name: /continue|get started|start|sign up/i })
             .first();
@@ -104,38 +127,44 @@ test.describe('Signup – /start page', () => {
 // ─── API tests – create-trial edge function ──────────────────────────────────
 
 test.describe('Signup – create-trial API', () => {
-    test.skip(
-        !process.env.SUPABASE_URL && !process.env.VITE_SUPABASE_URL,
-        'Skipping create-trial API tests – no SUPABASE_URL configured'
-    );
-
     const supabaseUrl = getSupabaseUrl();
     const anonKey = getAnonKey();
     const endpoint = `${supabaseUrl}/functions/v1/create-trial`;
+
+    const defaultHeaders = () => ({
+        'Content-Type': 'application/json',
+        ...(anonKey ? { Authorization: `Bearer ${anonKey}` } : {}),
+    });
 
     test('create-trial accepts valid payload with bypassStripe', async ({ request }) => {
         const timestamp = Date.now();
         const testEmail = `e2e-trial-${timestamp}@getringsnap.com`;
 
-        const response = await request.post(endpoint, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(anonKey ? { Authorization: `Bearer ${anonKey}` } : {}),
-            },
-            data: {
-                name: 'E2E Test User',
-                email: testEmail,
-                phone: '5551234567',
-                companyName: 'E2E Plumbing Co',
-                trade: 'Plumbing',
-                planType: 'professional',
-                paymentMethodId: 'pm_bypass_test',
-                bypassStripe: true,
-                zipCode: '90210',
-                assistantGender: 'female',
-                source: 'website',
-            },
-        });
+        let response: Awaited<ReturnType<typeof request.post>>;
+        try {
+            response = await request.post(endpoint, {
+                headers: defaultHeaders(),
+                data: {
+                    name: 'E2E Test User',
+                    email: testEmail,
+                    phone: '5551234567',
+                    companyName: 'E2E Plumbing Co',
+                    trade: 'Plumbing',
+                    planType: 'professional',
+                    paymentMethodId: 'pm_bypass_test',
+                    bypassStripe: true,
+                    zipCode: '90210',
+                    assistantGender: 'female',
+                    source: 'website',
+                },
+            });
+        } catch (err) {
+            if (isConnectionRefused(err)) {
+                test.skip(true, 'Supabase not reachable – skipping API test');
+                return;
+            }
+            throw err;
+        }
 
         // Should not be a hard 404 (function not deployed)
         expect(response.status()).not.toBe(404);
@@ -149,9 +178,9 @@ test.describe('Signup – create-trial API', () => {
             expect(typeof body.account_id).toBe('string');
             expect(body.account_id.length).toBeGreaterThan(0);
         } else {
-            // Function is deployed but returned a non-2xx status
-            // (e.g. Stripe not bypassed in this env, env vars missing, etc.)
-            // We accept any structured error response – just assert it's not a deploy 404
+            // Function is deployed but returned a non-2xx status.
+            // Accept any structured error (env-var missing, Stripe not bypassed, etc.)
+            // – just assert it's not a deploy 404.
             expect([400, 401, 409, 422, 500]).toContain(response.status());
         }
     });
@@ -174,16 +203,20 @@ test.describe('Signup – create-trial API', () => {
             source: 'website',
         };
 
-        const headers = {
-            'Content-Type': 'application/json',
-            ...(anonKey ? { Authorization: `Bearer ${anonKey}` } : {}),
-        };
-
         // First call – create the account
-        const first = await request.post(endpoint, {
-            headers,
-            data: commonPayload,
-        });
+        let first: Awaited<ReturnType<typeof request.post>>;
+        try {
+            first = await request.post(endpoint, {
+                headers: defaultHeaders(),
+                data: commonPayload,
+            });
+        } catch (err) {
+            if (isConnectionRefused(err)) {
+                test.skip(true, 'Supabase not reachable – skipping API test');
+                return;
+            }
+            throw err;
+        }
 
         expect(first.status()).not.toBe(404);
 
@@ -194,7 +227,7 @@ test.describe('Signup – create-trial API', () => {
 
         // Second call – same email should be rejected
         const second = await request.post(endpoint, {
-            headers,
+            headers: defaultHeaders(),
             data: { ...commonPayload, name: 'E2E Dup User 2' },
         });
 
@@ -214,17 +247,23 @@ test.describe('Signup – create-trial API', () => {
     });
 
     test('create-trial rejects missing required fields', async ({ request }) => {
-        const response = await request.post(endpoint, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(anonKey ? { Authorization: `Bearer ${anonKey}` } : {}),
-            },
-            data: {
-                // Intentionally omit required fields (email, phone, companyName, etc.)
-                name: 'Incomplete User',
-                source: 'website',
-            },
-        });
+        let response: Awaited<ReturnType<typeof request.post>>;
+        try {
+            response = await request.post(endpoint, {
+                headers: defaultHeaders(),
+                data: {
+                    // Intentionally omit required fields (email, phone, companyName, etc.)
+                    name: 'Incomplete User',
+                    source: 'website',
+                },
+            });
+        } catch (err) {
+            if (isConnectionRefused(err)) {
+                test.skip(true, 'Supabase not reachable – skipping API test');
+                return;
+            }
+            throw err;
+        }
 
         // Should return a 4xx validation error, not a 500 or 404
         expect(response.status()).not.toBe(404);
