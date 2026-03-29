@@ -1080,6 +1080,10 @@ serve(async (req) => {
             overage_minutes_current_period: 0,
             monthly_minutes_used: 0,
             overage_minutes_used: 0,
+            // Call-based billing counters (billing_call_based_v1)
+            calls_used_current_period: 0,
+            overage_calls_current_period: 0,
+            blocked_calls_current_period: 0,
             rejected_daytime_calls: 0,
             ceiling_reject_sent: false,
             alerts_sent: {},

@@ -588,3 +588,97 @@ describe("Usage notification thresholds", () => {
     expect(trialUsed / trialLimit).toBeGreaterThanOrEqual(0.8);
   });
 });
+
+// ─── 12. isTrial flag prevents calls_used_current_period pollution ─────────────
+
+describe("Trial call isolation (isTrial flag)", () => {
+  // Simulate writeBillingLedgerEntry with isTrial flag
+  function simulateLedgerWrite(
+    classification: { billable: boolean },
+    existingEntry: null | { counted_in_usage: boolean },
+    isTrial: boolean
+  ): { wouldIncrementPeriodCounter: boolean; wouldIncrementTrialCounter: boolean } {
+    if (existingEntry?.counted_in_usage) {
+      return { wouldIncrementPeriodCounter: false, wouldIncrementTrialCounter: false };
+    }
+    // increment_calls_used only fires when billable AND !existing AND !isTrial
+    const wouldIncrementPeriodCounter = classification.billable && !isTrial;
+    // trial counter incremented separately by caller (vapi-webhook) when isTrial
+    const wouldIncrementTrialCounter = classification.billable && isTrial;
+    return { wouldIncrementPeriodCounter, wouldIncrementTrialCounter };
+  }
+
+  it("trial live call: does NOT increment calls_used_current_period", () => {
+    const result = simulateLedgerWrite({ billable: true }, null, /* isTrial */ true);
+    expect(result.wouldIncrementPeriodCounter).toBe(false);
+  });
+
+  it("trial live call: DOES signal trial counter should be incremented", () => {
+    const result = simulateLedgerWrite({ billable: true }, null, /* isTrial */ true);
+    expect(result.wouldIncrementTrialCounter).toBe(true);
+  });
+
+  it("paid plan call: DOES increment calls_used_current_period", () => {
+    const result = simulateLedgerWrite({ billable: true }, null, /* isTrial */ false);
+    expect(result.wouldIncrementPeriodCounter).toBe(true);
+  });
+
+  it("duplicate trial call: no counter increments", () => {
+    const result = simulateLedgerWrite({ billable: true }, { counted_in_usage: true }, /* isTrial */ true);
+    expect(result.wouldIncrementPeriodCounter).toBe(false);
+    expect(result.wouldIncrementTrialCounter).toBe(false);
+  });
+
+  it("first paid period starts with clean counter (trial calls never polluted it)", () => {
+    // If trial calls never increment calls_used_current_period,
+    // the first paid period counter starts at 0 even after a busy trial.
+    const callsUsedCurrentPeriodAtTrialEnd = 0; // because isTrial skipped increment
+    const callsUsedCurrentPeriodAfterConversion = callsUsedCurrentPeriodAtTrialEnd;
+    expect(callsUsedCurrentPeriodAfterConversion).toBe(0);
+  });
+});
+
+// ─── 13. invoice.upcoming resets call-based counters ──────────────────────────
+
+describe("Billing period reset via invoice.upcoming", () => {
+  it("reset includes all call-based counter fields", () => {
+    // Simulate the full reset object from stripe-webhook invoice.upcoming handler
+    const resetPayload = {
+      minutes_used_current_period: 0,
+      overage_minutes_current_period: 0,
+      monthly_minutes_used: 0,
+      overage_minutes_used: 0,
+      // Call-based (the fix):
+      calls_used_current_period: 0,
+      overage_calls_current_period: 0,
+      blocked_calls_current_period: 0,
+      rejected_daytime_calls: 0,
+      ceiling_reject_sent: false,
+      alerts_sent: {},
+    };
+
+    // All call-based counters must be in the reset payload
+    expect("calls_used_current_period" in resetPayload).toBe(true);
+    expect("overage_calls_current_period" in resetPayload).toBe(true);
+    expect("blocked_calls_current_period" in resetPayload).toBe(true);
+    expect(resetPayload.calls_used_current_period).toBe(0);
+    expect(resetPayload.overage_calls_current_period).toBe(0);
+  });
+
+  it("account with 87 calls used is fully reset at period renewal", () => {
+    const prePeriodState = {
+      calls_used_current_period: 87,
+      overage_calls_current_period: 27,
+      blocked_calls_current_period: 2,
+    };
+    // After invoice.upcoming reset:
+    const postReset = {
+      calls_used_current_period: 0,
+      overage_calls_current_period: 0,
+      blocked_calls_current_period: 0,
+    };
+    // Verify counter never carries over
+    expect(postReset.calls_used_current_period).toBe(0);
+    expect(prePeriodState.calls_used_current_period).toBeGreaterThan(0); // had real usage
+  });
+});

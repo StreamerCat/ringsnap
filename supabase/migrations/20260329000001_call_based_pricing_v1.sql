@@ -291,9 +291,8 @@ DO $$ BEGIN
     CREATE POLICY cbl_owner_select ON public.call_billing_ledger
       FOR SELECT TO authenticated
       USING (account_id IN (
-        SELECT a.id FROM public.accounts a
-        JOIN public.staff_roles sr ON sr.account_id = a.id
-        WHERE sr.user_id = auth.uid() AND sr.role IN ('owner', 'admin')
+        SELECT am.account_id FROM public.account_members am
+        WHERE am.user_id = auth.uid() AND am.role IN ('owner', 'admin')
       ));
   END IF;
 END $$;
@@ -308,6 +307,17 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='billing_period_usage_summary' AND policyname='bpus_owner_select') THEN
+    CREATE POLICY bpus_owner_select ON public.billing_period_usage_summary
+      FOR SELECT TO authenticated
+      USING (account_id IN (
+        SELECT am.account_id FROM public.account_members am
+        WHERE am.user_id = auth.uid() AND am.role IN ('owner', 'admin')
+      ));
+  END IF;
+END $$;
+
 -- trial_usage_summary: service_role + owner read
 ALTER TABLE public.trial_usage_summary ENABLE ROW LEVEL SECURITY;
 
@@ -315,6 +325,17 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='trial_usage_summary' AND policyname='tus_service_role_all') THEN
     CREATE POLICY tus_service_role_all ON public.trial_usage_summary
       FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='trial_usage_summary' AND policyname='tus_owner_select') THEN
+    CREATE POLICY tus_owner_select ON public.trial_usage_summary
+      FOR SELECT TO authenticated
+      USING (account_id IN (
+        SELECT am.account_id FROM public.account_members am
+        WHERE am.user_id = auth.uid() AND am.role IN ('owner', 'admin')
+      ));
   END IF;
 END $$;
 
@@ -333,14 +354,12 @@ DO $$ BEGIN
     CREATE POLICY vcal_owner_all ON public.verification_call_allowlist
       FOR ALL TO authenticated
       USING (account_id IN (
-        SELECT a.id FROM public.accounts a
-        JOIN public.staff_roles sr ON sr.account_id = a.id
-        WHERE sr.user_id = auth.uid() AND sr.role IN ('owner', 'admin')
+        SELECT am.account_id FROM public.account_members am
+        WHERE am.user_id = auth.uid() AND am.role IN ('owner', 'admin')
       ))
       WITH CHECK (account_id IN (
-        SELECT a.id FROM public.accounts a
-        JOIN public.staff_roles sr ON sr.account_id = a.id
-        WHERE sr.user_id = auth.uid() AND sr.role IN ('owner', 'admin')
+        SELECT am.account_id FROM public.account_members am
+        WHERE am.user_id = auth.uid() AND am.role IN ('owner', 'admin')
       ));
   END IF;
 END $$;

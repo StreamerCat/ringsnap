@@ -909,6 +909,9 @@ async function writeBillingLedgerForCall(
                 billingPeriodStart: account.current_period_start ?? null,
                 billingPeriodEnd: account.current_period_end ?? null,
                 callsUsedBefore,
+                // Skip calls_used_current_period increment during trial;
+                // trial uses trial_live_calls_used for enforcement.
+                isTrial,
             }
         );
 

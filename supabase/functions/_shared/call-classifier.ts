@@ -131,12 +131,17 @@ export async function writeBillingLedgerEntry(
     billingPeriodStart: string | null;
     billingPeriodEnd: string | null;
     callsUsedBefore: number;
+    /** When true, skip incrementing calls_used_current_period.
+     *  Trial enforcement uses trial_live_calls_used, not calls_used_current_period.
+     *  Prevents trial counts from polluting the first paid billing period. */
+    isTrial?: boolean;
   }
 ): Promise<{ inserted: boolean; alreadyCounted: boolean; error?: string }> {
   const {
     accountId, providerCallId, callLogId,
     callStartedAt, callEndedAt, durationSeconds,
     classification, planSnapshot, billingPeriodStart, billingPeriodEnd, callsUsedBefore,
+    isTrial = false,
   } = input;
 
   // Check existing entry first for idempotency
@@ -195,8 +200,10 @@ export async function writeBillingLedgerEntry(
     return { inserted: false, alreadyCounted: false, error: error.message };
   }
 
-  // If billable, increment calls_used_current_period atomically
-  if (classification.billable && !existing) {
+  // If billable AND not a trial, increment calls_used_current_period atomically.
+  // Trial accounts use trial_live_calls_used (incremented by the caller after this returns).
+  // Skipping during trial prevents trial call counts from polluting the first paid period.
+  if (classification.billable && !existing && !isTrial) {
     await supabase.rpc('increment_calls_used', {
       p_account_id: accountId,
       p_delta: 1,
