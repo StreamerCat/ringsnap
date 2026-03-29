@@ -4,48 +4,70 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Plan {
-  id: 'starter' | 'professional' | 'premium';
+  id: 'night_weekend' | 'lite' | 'core' | 'pro';
   name: string;
   price: number;
+  includedCalls: number;
+  overageRate: string;
   features: string[];
   popular?: boolean;
 }
 
 const PLANS: Plan[] = [
   {
-    id: 'starter',
+    id: 'night_weekend',
     name: 'Night & Weekend',
     price: 59,
+    includedCalls: 60,
+    overageRate: '$1.10/call',
     features: [
-      '150 minutes included/month',
-      '24/7 AI answering',
+      '60 calls included/month',
+      'After-hours + weekend coverage',
       'Urgent transfer to your phone',
       'CRM included'
     ]
   },
   {
-    id: 'professional',
+    id: 'lite',
     name: 'Lite',
     price: 129,
+    includedCalls: 125,
+    overageRate: '$0.95/call',
     features: [
-      '300 minutes included/month',
+      '125 calls included/month',
+      '24/7 call answering',
       'Google Calendar + Zapier',
-      'Urgent call transfer with context',
       'Call recordings + transcripts',
-      '24/7 call answering'
+      'Urgent call transfer with context'
     ],
     popular: true
   },
   {
-    id: 'premium',
+    id: 'core',
     name: 'Core',
     price: 229,
+    includedCalls: 250,
+    overageRate: '$0.85/call',
     features: [
-      '600 minutes included/month',
+      '250 calls included/month',
+      '24/7 call answering',
       'Priority support',
-      'Branded voice options',
       'Smart call routing by urgency',
       'Multi-language (English + Spanish)'
+    ]
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: 449,
+    includedCalls: 450,
+    overageRate: '$0.75/call',
+    features: [
+      '450 calls included/month',
+      '24/7 call answering',
+      'Dedicated account manager',
+      'Custom voice + branding',
+      'Multi-location support'
     ]
   }
 ];
@@ -72,7 +94,7 @@ export const PlanSelectionStep = ({
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((plan) => (
           <Card
             key={plan.id}

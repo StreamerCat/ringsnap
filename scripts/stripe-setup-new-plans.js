@@ -16,14 +16,22 @@
  *     archived + replaced if amount differs (e.g. Pro $399 → $449).
  *   - Overage prices: same check (per-call amount).
  *
+ * After creating/confirming prices, writes IDs back to:
+ *   1. scripts/stripe-plan-ids.json
+ *   2. plans table in Supabase (stripe_price_id, stripe_overage_price_id, stripe_product_id)
+ *
  * Usage:
- *   STRIPE_SECRET_KEY=sk_live_... node scripts/stripe-setup-new-plans.js
+ *   STRIPE_SECRET_KEY=sk_live_... \
+ *   SUPABASE_URL=https://xxx.supabase.co \
+ *   SUPABASE_SERVICE_ROLE_KEY=eyJ... \
+ *   node scripts/stripe-setup-new-plans.js
  *
  * Output:
  *   scripts/stripe-plan-ids.json
  */
 
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -35,6 +43,16 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 if (!STRIPE_SECRET_KEY) {
   console.error("ERROR: STRIPE_SECRET_KEY environment variable is required.");
   process.exit(1);
+}
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
+  : null;
+
+if (!supabase) {
+  console.warn("⚠  SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set — will skip DB sync.");
 }
 
 const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
@@ -295,6 +313,26 @@ async function main() {
   writeFileSync(OUTPUT_FILE, JSON.stringify(result, null, 2));
   console.log(`\n✅ Done! IDs written to: ${OUTPUT_FILE}\n`);
   console.log(JSON.stringify(result, null, 2));
+
+  // 6. Sync price IDs back to Supabase plans table
+  if (supabase) {
+    console.log("\n[DB Sync] Writing price IDs to plans table...");
+    for (const [plan_key, ids] of Object.entries(result)) {
+      const { error } = await supabase
+        .from("plans")
+        .update({
+          stripe_product_id: ids.product_id,
+          stripe_price_id: ids.price_id,
+          stripe_overage_price_id: ids.overage_price_id,
+        })
+        .eq("plan_key", plan_key);
+      if (error) {
+        console.error(`  ✗ Failed to update plans.${plan_key}: ${error.message}`);
+      } else {
+        console.log(`  ✓ plans.${plan_key} updated`);
+      }
+    }
+  }
 
   console.log("\n📋 Next steps:");
   console.log("  1. Add these to your Supabase project secrets (Settings → Edge Functions → Secrets):");
