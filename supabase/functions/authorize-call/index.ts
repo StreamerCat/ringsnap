@@ -158,10 +158,11 @@ serve(async (req) => {
       .eq('plan_key', planKey)
       .single();
 
-    // Determine billing mode
-    // DB account flag takes precedence; env flag is the global default
+    // Determine billing mode.
+    // Explicit false on account = legacy/grandfathered, must stay on minute-based.
+    // Env flag only applies when account flag is not explicitly false.
     const useCallBased: boolean = account.billing_call_based === true ||
-      Deno.env.get('BILLING_CALL_BASED_V1') === 'true';
+      (account.billing_call_based !== false && Deno.env.get('BILLING_CALL_BASED_V1') === 'true');
 
     // ── Check account status ─────────────────────────────────────────────────
     if (['suspended', 'disabled', 'cancelled'].includes(account.account_status || '')) {
@@ -457,19 +458,22 @@ serve(async (req) => {
           }
         }
 
-        // always_answer or soft_cap within buffer → allow, fire overage alert
-        await sendUsageAlert(supabase, 'plan_overage_started', alertCtx);
+        // always_answer or soft_cap within buffer → allow
+        if (overageCalls === 0) {
+          // Exactly at 100% — this call starts overage; warn before billing kicks in
+          await sendUsageAlert(supabase, 'plan_100_pct', alertCtx);
+        } else {
+          await sendUsageAlert(supabase, 'plan_overage_started', alertCtx);
+        }
         await capturePostHog('overage_started', phDistinctId, {
           account_id: accountId, plan_key: planKey,
           calls_used: callsUsed, overage_calls: overageCalls,
         });
 
       } else {
-        // Within included calls — check 80%/100% thresholds
+        // Within included calls — check 80% threshold
         const pct = includedCalls > 0 ? (callsUsed / includedCalls) * 100 : 0;
-        if (pct >= 100) {
-          await sendUsageAlert(supabase, 'plan_100_pct', alertCtx);
-        } else if (pct >= 80) {
+        if (pct >= 80) {
           await sendUsageAlert(supabase, 'plan_80_pct', alertCtx);
         }
       }

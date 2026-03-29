@@ -136,7 +136,7 @@ export async function writeBillingLedgerEntry(
      *  Prevents trial counts from polluting the first paid billing period. */
     isTrial?: boolean;
   }
-): Promise<{ inserted: boolean; alreadyCounted: boolean; error?: string }> {
+): Promise<{ inserted: boolean; alreadyCounted: boolean; existedBefore: boolean; error?: string }> {
   const {
     accountId, providerCallId, callLogId,
     callStartedAt, callEndedAt, durationSeconds,
@@ -152,8 +152,10 @@ export async function writeBillingLedgerEntry(
     .eq('provider_call_id', providerCallId)
     .maybeSingle();
 
+  const existedBefore = !!existing;
+
   if (existing?.counted_in_usage) {
-    return { inserted: false, alreadyCounted: true };
+    return { inserted: false, alreadyCounted: true, existedBefore: true };
   }
 
   const callsUsedAfter = classification.billable ? callsUsedBefore + 1 : callsUsedBefore;
@@ -197,18 +199,18 @@ export async function writeBillingLedgerEntry(
     .upsert(ledgerRow, { onConflict: 'account_id,provider_call_id' });
 
   if (error) {
-    return { inserted: false, alreadyCounted: false, error: error.message };
+    return { inserted: false, alreadyCounted: false, existedBefore, error: error.message };
   }
 
   // If billable AND not a trial, increment calls_used_current_period atomically.
   // Trial accounts use trial_live_calls_used (incremented by the caller after this returns).
   // Skipping during trial prevents trial call counts from polluting the first paid period.
-  if (classification.billable && !existing && !isTrial) {
+  if (classification.billable && !existedBefore && !isTrial) {
     await supabase.rpc('increment_calls_used', {
       p_account_id: accountId,
       p_delta: 1,
     });
   }
 
-  return { inserted: true, alreadyCounted: false };
+  return { inserted: !existedBefore, alreadyCounted: false, existedBefore };
 }

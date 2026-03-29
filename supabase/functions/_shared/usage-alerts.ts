@@ -336,14 +336,27 @@ export async function sendUsageAlert(
     }
 
     case 'plan_overage_started': {
-      const overageCalls = Math.max(0, callsUsed - callsLimit);
-      const extraCost = overageCalls * callPlan.overageRateDollars;
-      smsText = `RingSnap: You've passed your ${callPlan.name} included calls. Overage: ${fmt$(callPlan.overageRateDollars)}/call. Extra cost so far: ${fmt$(extraCost)}. Upgrade: ${DASHBOARD_URL}`;
-      emailSubject = 'Overage started — here\'s what it costs and how to stop it';
-      emailHtml = upgradeCallsEmailBody(
-        callPlan.name, callsUsed, callsLimit,
-        callPlan.overageRateDollars, callPlan.nextPlan, callPlan.nextPlanPrice
-      );
+      if (ctx.callsLimit && ctx.callsLimit > 0) {
+        // Call-based billing — use call-denominated template
+        const overageCalls = Math.max(0, callsUsed - callsLimit);
+        const extraCost = overageCalls * callPlan.overageRateDollars;
+        smsText = `RingSnap: You've passed your ${callPlan.name} included calls. Overage: ${fmt$(callPlan.overageRateDollars)}/call. Extra cost so far: ${fmt$(extraCost)}. Upgrade: ${DASHBOARD_URL}`;
+        emailSubject = 'Overage started — here\'s what it costs and how to stop it';
+        emailHtml = upgradeCallsEmailBody(
+          callPlan.name, callsUsed, callsLimit,
+          callPlan.overageRateDollars, callPlan.nextPlan, callPlan.nextPlanPrice
+        );
+      } else {
+        // Minute-based billing (legacy) — use minute-denominated template
+        const overageMinutes = Math.max(0, ctx.minutesUsed - ctx.minutesLimit);
+        const extraCost = overageMinutes * minPlan.overageRate;
+        smsText = `RingSnap: You've passed your ${minPlan.name} included minutes. Overage: ${fmt$(minPlan.overageRate)}/min. Extra cost so far: ${fmt$(extraCost)}. Upgrade: ${DASHBOARD_URL}`;
+        emailSubject = 'Overage started — here\'s what it costs and how to stop it';
+        emailHtml = upgradeEmailBody(
+          minPlan.name, 0, ctx.minutesUsed, ctx.minutesLimit,
+          minPlan.overageRate, minPlan.nextPlan, minPlan.nextPlanPrice
+        );
+      }
       break;
     }
 

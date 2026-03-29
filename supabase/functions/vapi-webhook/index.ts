@@ -851,9 +851,10 @@ async function writeBillingLedgerForCall(
 
         if (!account) return;
 
-        // Only run call-based billing logic for call-based accounts
+        // Only run call-based billing logic for call-based accounts.
+        // Explicit false = legacy/grandfathered account; env flag does not override.
         const useCallBased = account.billing_call_based === true ||
-            Deno.env.get('BILLING_CALL_BASED_V1') === 'true';
+            (account.billing_call_based !== false && Deno.env.get('BILLING_CALL_BASED_V1') === 'true');
         if (!useCallBased) return;
 
         const planKey = account.plan_key || account.plan_type || 'night_weekend';
@@ -895,7 +896,7 @@ async function writeBillingLedgerForCall(
 
         const callsUsedBefore = account.calls_used_current_period || 0;
 
-        const { inserted, alreadyCounted, error: ledgerError } = await writeBillingLedgerEntry(
+        const { inserted, alreadyCounted, existedBefore, error: ledgerError } = await writeBillingLedgerEntry(
             supabase,
             {
                 accountId,
@@ -934,8 +935,11 @@ async function writeBillingLedgerForCall(
             return;
         }
 
-        // Update trial-specific counters
-        if (isTrial) {
+        // Update trial-specific counters — only when ledger row is newly inserted.
+        // existedBefore guards against duplicate webhook replays for non-billable
+        // calls (e.g. verification) where counted_in_usage=false would otherwise
+        // pass the alreadyCounted check above and re-increment on every replay.
+        if (isTrial && !existedBefore) {
             if (classification.callKind === 'verification') {
                 await supabase.rpc('increment_verification_calls', { p_account_id: accountId });
             } else if (classification.callKind === 'live' && classification.billable) {

@@ -232,16 +232,16 @@ export function preSelectPostTrialPlan(signals: {
         return { planKey: 'night_weekend', reason: 'after_hours_only' };
     }
 
-    // HVAC, plumbing, or clearly multi-truck → Core
-    const isHighVolumeTrade = ['hvac', 'plumbing', 'plumber', 'heating', 'cooling', 'air conditioning'].some(t => trade.includes(t));
-    const isMultiTruck = ['6-10', '10+'].includes(teamSize);
-    if (isHighVolumeTrade || isMultiTruck) {
-        return { planKey: 'core', reason: isMultiTruck ? 'multi_truck' : 'trade_hvac_plumbing' };
-    }
-
-    // Very high volume / multi-location → Pro
+    // Very high volume / multi-location → Pro (must check before Core/multi-truck)
     if (teamSize === '10+') {
         return { planKey: 'pro', reason: 'high_volume_multi_location' };
+    }
+
+    // HVAC, plumbing, or clearly multi-truck → Core
+    const isHighVolumeTrade = ['hvac', 'plumbing', 'plumber', 'heating', 'cooling', 'air conditioning'].some(t => trade.includes(t));
+    const isMultiTruck = teamSize === '6-10';
+    if (isHighVolumeTrade || isMultiTruck) {
+        return { planKey: 'core', reason: isMultiTruck ? 'multi_truck' : 'trade_hvac_plumbing' };
     }
 
     // Default → Lite
