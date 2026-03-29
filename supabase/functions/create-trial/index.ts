@@ -93,6 +93,15 @@ async function capturePostHogException(
   } catch { /* best-effort */ }
 }
 
+async function flushPostHogClient(): Promise<void> {
+  if (!posthog) return;
+  try {
+    await posthog.flush();
+  } catch {
+    // best-effort
+  }
+}
+
 function captureCreateTrialException(
   err: unknown,
   step: string,
@@ -724,6 +733,7 @@ function preSelectPostTrialPlan(signals: {
 }
 
 Deno.serve(async (req: Request) => {
+  try {
   const request_id = crypto.randomUUID();
   const correlationId = extractCorrelationId(req);
   const baseLogOptions = {
@@ -2283,5 +2293,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+  }
+  } finally {
+    await flushPostHogClient();
   }
 });
