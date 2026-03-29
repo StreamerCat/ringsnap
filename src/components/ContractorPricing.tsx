@@ -26,8 +26,9 @@ const PLANS = [
     key: "night_weekend",
     name: "Night & Weekend",
     price: 59,
-    includedMinutes: 150,
-    overageRate: 0.45,
+    includedCalls: 60,
+    overageRatePerCall: 1.10,
+    maxOverageCalls: 40,
     badge: null,
     highlight: false,
     tagline: "After hours and weekends covered, so emergency revenue gets recovered",
@@ -45,8 +46,9 @@ const PLANS = [
     key: "lite",
     name: "Lite",
     price: 129,
-    includedMinutes: 300,
-    overageRate: 0.38,
+    includedCalls: 125,
+    overageRatePerCall: 0.95,
+    maxOverageCalls: 50,
     badge: null,
     highlight: false,
     tagline: "Round-the-clock coverage for handymen, painters, and roofers",
@@ -65,8 +67,9 @@ const PLANS = [
     key: "core",
     name: "Core",
     price: 229,
-    includedMinutes: 600,
-    overageRate: 0.28,
+    includedCalls: 250,
+    overageRatePerCall: 0.85,
+    maxOverageCalls: 75,
     badge: "Best Value",
     highlight: true,
     tagline: "Always-on coverage for plumbers and HVAC teams ready to scale",
@@ -87,9 +90,10 @@ const PLANS = [
   {
     key: "pro",
     name: "Pro",
-    price: 399,
-    includedMinutes: 1200,
-    overageRate: 0.22,
+    price: 449,
+    includedCalls: 450,
+    overageRatePerCall: 0.75,
+    maxOverageCalls: 90,
     badge: null,
     highlight: false,
     tagline: "Built for high-volume contractors and growing multi-truck operations",
@@ -117,39 +121,39 @@ const COMPARISON_TABLE = [
   { feature: "Starts at", ringsnap: "$59/mo", goodcall: "$59/mo", agentzap: "$79/mo", smithai: "$292/mo" },
 ];
 
-const MINUTE_GUIDE = [
+const CALL_GUIDE = [
   {
     trade: "Plumbing + HVAC",
-    callVolume: "160–240 calls/month",
-    avgCallLength: "2.5 minutes average",
-    fit: "Core is best for most phone-first teams that want predictable monthly billing and more booked jobs.",
+    callVolume: "150–250 calls/month",
+    planFit: "Core (250 calls)",
+    fit: "Core is best for most phone-first HVAC and plumbing teams. 250 included calls covers steady inbound volume without overage surprises.",
   },
   {
     trade: "Electrical + Roofing",
-    callVolume: "90–150 calls/month",
-    avgCallLength: "2.1 minutes average",
-    fit: "Lite is ideal if you want the lowest base cost and are comfortable paying usage as volume grows.",
+    callVolume: "90–140 calls/month",
+    planFit: "Lite (125 calls)",
+    fit: "Lite covers most electrical and roofing teams. Extra calls are $0.95 each if volume spikes.",
   },
   {
     trade: "Handyman + General Repair",
-    callVolume: "60–110 calls/month",
-    avgCallLength: "1.8 minutes average",
-    fit: "Lite covers most teams here, with room to scale into Core as call volume increases.",
+    callVolume: "50–100 calls/month",
+    planFit: "Lite (125 calls) or Night & Weekend (60 calls)",
+    fit: "Lite covers most handyman teams 24/7. Night & Weekend is ideal if you only need after-hours coverage.",
   },
 ];
 
 const FAQS = [
   {
-    q: "What counts as a minute?",
-    a: "Active AI call time. Calls under 30 seconds don't count.",
+    q: "What counts as a handled call?",
+    a: "Any inbound call answered and meaningfully handled by the AI. Silent hangups under 10 seconds and failed connects don't count. If the AI answers and then transfers to you, it counts as one call — not two.",
   },
   {
-    q: "What if I go over my minutes?",
-    a: "By default, we keep answering every call and bill overage at your plan's per-minute rate (Night & Weekend $0.45/min, Lite $0.38/min, Core $0.28/min, Pro $0.22/min). We alert you at 70% and 90% so you're never surprised. You can also set a buffer or a hard stop in your dashboard under Call Handling Preferences.",
+    q: "What if I go over my included calls?",
+    a: "By default, we keep answering every call and bill overage at your plan's per-call rate (Night & Weekend $1.10/call, Lite $0.95/call, Core $0.85/call, Pro $0.75/call). We alert you at 80% and 100% so you're never surprised. You can also set a buffer or a hard stop in your dashboard under Call Handling Preferences.",
   },
   {
-    q: "Will my calls ever get cut off?",
-    a: "Only if you've set a hard cap in your preferences, or if you hit the safety ceiling (a maximum overage limit we set to protect against billing surprises — you'll be alerted immediately if you approach it). Otherwise, we always answer.",
+    q: "Is there a maximum on overage charges?",
+    a: "Yes. Each plan has a built-in overage ceiling (Night & Weekend +40 calls, Lite +50, Core +75, Pro +90). Once you hit the ceiling, new calls route to a voicemail fallback and you'll get an immediate alert to upgrade.",
   },
   {
     q: "What's in the CRM?",
@@ -248,9 +252,9 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-primary shrink-0" />
-                      <span>{plan.includedMinutes.toLocaleString()} minutes included</span>
+                      <span>{plan.includedCalls.toLocaleString()} handled calls included</span>
                     </div>
-                    <div className="text-muted-foreground text-xs ml-6">${plan.overageRate.toFixed(2)}/min if you go over</div>
+                    <div className="text-muted-foreground text-xs ml-6">${plan.overageRatePerCall.toFixed(2)}/call if you go over</div>
                     {plan.coverageNote && (
                       <div className="flex items-center gap-2 text-sm text-amber-700 font-medium mt-1">
                         <Moon className="h-3.5 w-3.5 shrink-0" />
@@ -336,20 +340,20 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
       <section className="section-spacer px-4 sm:px-6">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "hsl(var(--charcoal))" }}>How many minutes do you actually need?</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: "hsl(var(--charcoal))" }}>Which plan is right for your trade?</h2>
             <p className="text-sm sm:text-base text-muted-foreground max-w-3xl mx-auto">
-              Home service calls usually run 2–3 minutes. Use this guide to choose the fastest path to ROI.
+              Pricing is per handled call. Use this guide to choose the plan that fits your call volume.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            {MINUTE_GUIDE.map((item) => (
+            {CALL_GUIDE.map((item) => (
               <Card key={item.trade} className="border-slate-200">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">{item.trade}</CardTitle>
                   <CardDescription>{item.callVolume}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{item.avgCallLength}</p>
+                  <p className="text-sm font-medium text-primary">{item.planFit}</p>
                   <p className="text-sm">{item.fit}</p>
                 </CardContent>
               </Card>

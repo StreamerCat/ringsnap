@@ -21,11 +21,12 @@ const Pricing = () => {
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
         "url": "https://getringsnap.com/pricing",
-        "description": "AI receptionist built exclusively for home service contractors — answers calls 24/7, books jobs, logs to CRM. Starting at $59/month.",
+        "description": "AI receptionist built exclusively for home service contractors — answers calls 24/7, books jobs, logs to CRM. Priced per handled call. Starting at $59/month.",
         "offers": [
             {
                 "@type": "Offer",
                 "name": "Night & Weekend Plan",
+                "description": "60 handled calls/month, after-hours only",
                 "price": "59",
                 "priceCurrency": "USD",
                 "url": "https://getringsnap.com/pricing"
@@ -33,6 +34,7 @@ const Pricing = () => {
             {
                 "@type": "Offer",
                 "name": "Lite Plan",
+                "description": "125 handled calls/month, 24/7",
                 "price": "129",
                 "priceCurrency": "USD",
                 "url": "https://getringsnap.com/pricing"
@@ -40,6 +42,7 @@ const Pricing = () => {
             {
                 "@type": "Offer",
                 "name": "Core Plan",
+                "description": "250 handled calls/month, 24/7",
                 "price": "229",
                 "priceCurrency": "USD",
                 "url": "https://getringsnap.com/pricing"
@@ -47,7 +50,8 @@ const Pricing = () => {
             {
                 "@type": "Offer",
                 "name": "Pro Plan",
-                "price": "399",
+                "description": "450 handled calls/month, 24/7",
+                "price": "449",
                 "priceCurrency": "USD",
                 "url": "https://getringsnap.com/pricing"
             }
@@ -63,7 +67,7 @@ const Pricing = () => {
                 "name": "How much does RingSnap cost?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "RingSnap starts at $59/month for the Night & Weekend plan (after-hours coverage). Lite is $129/month, Core is $229/month, and Pro is $399/month. All plans include a 3-day free trial."
+                    "text": "RingSnap starts at $59/month for the Night & Weekend plan (after-hours coverage, 60 calls/mo). Lite is $129/month (125 calls/mo), Core is $229/month (250 calls/mo), and Pro is $449/month (450 calls/mo). All plans include a 3-day free trial."
                 }
             },
             {
@@ -71,15 +75,15 @@ const Pricing = () => {
                 "name": "Is there a free trial?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "Yes. All RingSnap plans include a 3-day free trial. No credit card required upfront. Cancel anytime."
+                    "text": "Yes. All RingSnap plans include a 3-day free trial with up to 15 free handled calls. Card required at signup to reserve your number. Cancel anytime."
                 }
             },
             {
                 "@type": "Question",
-                "name": "What happens if I go over my included minutes?",
+                "name": "What happens if I go over my included calls?",
                 "acceptedAnswer": {
                     "@type": "Answer",
-                    "text": "By default, RingSnap keeps answering every call and bills overage at your plan's per-minute rate. You're alerted at 70% and 90% usage. You can also set a buffer or hard stop in your dashboard."
+                    "text": "By default, RingSnap keeps answering every call and bills overage at your plan's per-call rate (Night & Weekend $1.10/call, Lite $0.95/call, Core $0.85/call, Pro $0.75/call). You're alerted at 80% and 100% usage. You can also set a buffer or hard stop in your dashboard."
                 }
             },
             {
