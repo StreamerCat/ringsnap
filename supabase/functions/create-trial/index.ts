@@ -712,11 +712,13 @@ function preSelectPostTrialPlan(signals: {
   }
   const trade = (signals.trade || "").toLowerCase();
   const teamSize = (signals.teamSize || "").toLowerCase();
-  if (teamSize.includes("10") || teamSize.includes("15") || teamSize.includes("20") || teamSize.includes("25+")) {
+  // Use exact matching to avoid "6-10".includes("10") routing mid-sized teams to Pro.
+  // Valid teamSize values: 'solo' | '2-5' | '6-10' | '10+'
+  if (teamSize === "10+") {
     return { planKey: "pro", reason: "team_size_large" };
   }
-  if (trade.includes("hvac") || trade.includes("plumb") || trade.includes("multi")) {
-    return { planKey: "core", reason: "trade_high_volume" };
+  if (trade.includes("hvac") || trade.includes("plumb") || trade.includes("multi") || teamSize === "6-10") {
+    return { planKey: "core", reason: teamSize === "6-10" ? "multi_truck" : "trade_high_volume" };
   }
   return { planKey: "lite", reason: "default" };
 }
