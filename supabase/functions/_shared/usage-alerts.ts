@@ -13,6 +13,29 @@
 import { sendSMS } from './sms.ts';
 import { logError, logInfo } from './logging.ts';
 
+// ─── PostHog capture ──────────────────────────────────────────────────────────
+async function capturePostHog(
+  event: string,
+  distinctId: string,
+  props: Record<string, unknown>
+): Promise<void> {
+  const key = Deno.env.get('POSTHOG_API_KEY');
+  if (!key) return;
+  try {
+    await fetch('https://us.i.posthog.com/capture/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        event,
+        distinct_id: distinctId,
+        properties: { ...props, $lib: 'edge-function', function: 'usage-alerts' },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch { /* best-effort */ }
+}
+
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || Deno.env.get('RESEND_PROD_KEY') || '';
 const EMAIL_FROM = Deno.env.get('EMAIL_FROM') || 'RingSnap <noreply@getringsnap.com>';
 const DASHBOARD_URL = 'https://ringsnap.ai/dashboard';
@@ -433,6 +456,16 @@ export async function sendUsageAlert(
     functionName: ctx.functionName,
     correlationId: ctx.correlationId,
     accountId: ctx.accountId,
+  });
+
+  await capturePostHog('usage_alert_sent', ctx.accountId, {
+    alert_type: alertType,
+    plan_key: ctx.planKey,
+    calls_used: ctx.callsUsed ?? null,
+    calls_limit: ctx.callsLimit ?? null,
+    minutes_used: ctx.minutesUsed,
+    minutes_limit: ctx.minutesLimit,
+    source_function: ctx.functionName,
   });
 
   return true;
