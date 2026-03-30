@@ -4,6 +4,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import { parseTraceId, createObservabilityContext } from "../_shared/observability.ts";
+import { buildPriceToKeyMap } from "../_shared/stripe-price-ids.ts";
 
 /**
  * PostHog server-side capture — best-effort, never throws.
@@ -759,18 +760,14 @@ serve(async (req) => {
         const customerId = subscription.customer;
         const previousStatus = event.data?.previous_attributes?.status;
 
-        // Map Stripe price ID → plan_key (check new env vars first, then legacy)
+        // Map Stripe price ID → plan_key (env vars + hardcoded production fallbacks)
         const priceEnvMap: Record<string, string> = {
-          [Deno.env.get('STRIPE_PRICE_ID_NIGHT_WEEKEND') || '']: 'night_weekend',
-          [Deno.env.get('STRIPE_PRICE_ID_LITE') || '']: 'lite',
-          [Deno.env.get('STRIPE_PRICE_ID_CORE') || '']: 'core',
-          [Deno.env.get('STRIPE_PRICE_ID_PRO') || '']: 'pro',
-          // Legacy plan keys
-          [Deno.env.get('STRIPE_PRICE_STARTER_OLD') || '']: 'lite',
-          [Deno.env.get('STRIPE_PRICE_PROFESSIONAL_OLD') || '']: 'core',
-          [Deno.env.get('STRIPE_PRICE_PREMIUM_OLD') || '']: 'pro',
+          ...buildPriceToKeyMap(),
+          // Legacy env var overrides (still supported for grandfathered accounts)
+          ...(Deno.env.get('STRIPE_PRICE_STARTER_OLD') ? { [Deno.env.get('STRIPE_PRICE_STARTER_OLD')!]: 'lite' } : {}),
+          ...(Deno.env.get('STRIPE_PRICE_PROFESSIONAL_OLD') ? { [Deno.env.get('STRIPE_PRICE_PROFESSIONAL_OLD')!]: 'core' } : {}),
+          ...(Deno.env.get('STRIPE_PRICE_PREMIUM_OLD') ? { [Deno.env.get('STRIPE_PRICE_PREMIUM_OLD')!]: 'pro' } : {}),
         };
-        delete priceEnvMap['']; // remove empty-key entries
 
         // Find base (non-metered) price item
         const baseItem = (subscription.items?.data || []).find(

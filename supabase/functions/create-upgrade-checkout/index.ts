@@ -16,6 +16,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&no-check";
 import { createClient } from "supabase";
 import { initSentry, captureError } from "../_shared/sentry.ts";
+import { getStripePriceId as _sharedGetStripePriceId, getStripeOveragePriceId as _sharedGetStripeOveragePriceId } from "../_shared/stripe-price-ids.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -118,12 +119,14 @@ serve(async (req) => {
         const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
         if (!stripeKey) return errorResponse(500, "Missing Stripe configuration", "CONFIG_ERROR");
 
-        // 4. Resolve price IDs
-        const basePriceId = Deno.env.get(PLAN_BASE_PRICE_ENV[planKey])?.trim();
-        const overagePriceId = Deno.env.get(PLAN_OVERAGE_PRICE_ENV[planKey])?.trim();
-
-        if (!basePriceId) {
-            log(`Missing base price env var: ${PLAN_BASE_PRICE_ENV[planKey]}`);
+        // 4. Resolve price IDs (env var → hardcoded production fallback)
+        let basePriceId: string;
+        let overagePriceId: string | undefined;
+        try {
+            basePriceId = _sharedGetStripePriceId(planKey);
+            overagePriceId = _sharedGetStripeOveragePriceId(planKey);
+        } catch (priceErr: any) {
+            log(`Failed to resolve price IDs for ${planKey}: ${priceErr?.message}`);
             return errorResponse(500, `Base price not configured for ${planKey}`, "PRICE_NOT_CONFIGURED");
         }
 

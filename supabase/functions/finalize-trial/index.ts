@@ -52,6 +52,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
+import { getStripePriceId as _getStripePriceId } from "../_shared/stripe-price-ids.ts";
 
 const FUNCTION_NAME = "finalize-trial";
 
@@ -103,30 +104,11 @@ function generateSecurePassword(): string {
 }
 
 /**
- * Get Stripe price ID for plan type — supports new plan keys and legacy mapping
+ * Get Stripe price ID for plan type — delegates to shared module
+ * (env var → hardcoded production fallback → throws)
  */
 function getStripePriceId(planType: string): string {
-  // Map legacy plan keys to new plan keys
-  const legacyMap: Record<string, string> = {
-    starter: "night_weekend",
-    professional: "core",
-    premium: "pro",
-  };
-  const normalizedPlan = legacyMap[planType] || planType;
-
-  // New plan env vars
-  const newPriceIds: Record<string, string | undefined> = {
-    night_weekend: Deno.env.get("STRIPE_PRICE_ID_NIGHT_WEEKEND"),
-    lite: Deno.env.get("STRIPE_PRICE_ID_LITE"),
-    core: Deno.env.get("STRIPE_PRICE_ID_CORE"),
-    pro: Deno.env.get("STRIPE_PRICE_ID_PRO"),
-  };
-
-  const priceId = newPriceIds[normalizedPlan];
-  if (!priceId) {
-    throw new Error(`Stripe price ID not configured for plan: ${planType}`);
-  }
-  return priceId;
+  return _getStripePriceId(planType);
 }
 
 /**

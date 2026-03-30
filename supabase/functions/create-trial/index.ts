@@ -48,6 +48,7 @@ import {
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
+import { getStripePriceId as _sharedGetStripePriceId } from "../_shared/stripe-price-ids.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import {
   sendSignupFailureNotifications,
@@ -371,43 +372,30 @@ async function getExistingUserByEmail(
 }
 
 /**
- * Get Stripe price ID for plan type
+ * Get Stripe price ID for plan type.
+ * Resolution: env var → hardcoded production fallback (new plans) → legacy env var → throws
  */
 function getStripePriceId(planType: string): string {
   const stripeKey = (Deno.env.get("STRIPE_SECRET_KEY") || "").trim();
-  // Check for live key or if the key contains "_live_" (to be extra safe)
   const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_") || stripeKey.includes("_live_");
 
   console.log(`[getStripePriceId] Key prefix: ${stripeKey.substring(0, 8)}... isLive=${isLive} plan=${planType}`);
 
-  // Normalize legacy plan keys to new plan keys
-  const legacyToNew: Record<string, string> = {
-    starter: "night_weekend",
-    professional: "core",
-    premium: "pro",
-  };
-  const normalizedPlan = legacyToNew[planType] || planType;
-
-  // New plan price IDs from environment variables (populated via stripe-setup-new-plans.js)
-  const newPlanPriceIds: Record<string, string | undefined> = {
-    night_weekend: Deno.env.get("STRIPE_PRICE_ID_NIGHT_WEEKEND"),
-    lite: Deno.env.get("STRIPE_PRICE_ID_LITE"),
-    core: Deno.env.get("STRIPE_PRICE_ID_CORE"),
-    pro: Deno.env.get("STRIPE_PRICE_ID_PRO"),
-  };
-
-  const newPriceId = newPlanPriceIds[normalizedPlan];
-  if (newPriceId) {
-    console.log(`[getStripePriceId] Using new plan price ID for ${normalizedPlan}: ${newPriceId}`);
-    return newPriceId;
+  // Try shared module (env var → hardcoded production fallback for new plans)
+  try {
+    const id = _sharedGetStripePriceId(planType);
+    console.log(`[getStripePriceId] Resolved ${planType} → ${id}`);
+    return id;
+  } catch {
+    // Fall through to legacy
   }
 
-  // Fallback to legacy hardcoded live IDs (in case new IDs not yet configured)
+  // Fallback: legacy hardcoded live IDs for old plan types (grandfathered accounts)
   if (isLive) {
     const livePriceIds: Record<string, string> = {
-      starter: "price_1SMav5IdevV48BnpEEIRKvk5",
+      starter:      "price_1SMav5IdevV48BnpEEIRKvk5",
       professional: "price_1SMaw9IdevV48BnpJkUs1UY0",
-      premium: "price_1SMawyIdevV48BnpM9r2mk2g",
+      premium:      "price_1SMawyIdevV48BnpM9r2mk2g",
     };
     const liveId = livePriceIds[planType];
     if (liveId) {
@@ -416,12 +404,12 @@ function getStripePriceId(planType: string): string {
     }
   }
 
-  // Fallback to legacy environment variables
+  // Fallback: legacy environment variables
   console.log("[getStripePriceId] Falling back to legacy ENV VAR price IDs");
   const legacyPriceIds: Record<string, string | undefined> = {
-    starter: Deno.env.get("STRIPE_PRICE_STARTER_OLD"),
+    starter:      Deno.env.get("STRIPE_PRICE_STARTER_OLD"),
     professional: Deno.env.get("STRIPE_PRICE_PROFESSIONAL_OLD"),
-    premium: Deno.env.get("STRIPE_PRICE_PREMIUM_OLD"),
+    premium:      Deno.env.get("STRIPE_PRICE_PREMIUM_OLD"),
   };
 
   const priceId = legacyPriceIds[planType];

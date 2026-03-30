@@ -42,6 +42,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import { getStripePriceId as _getStripePriceId } from "../_shared/stripe-price-ids.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 
@@ -59,28 +60,11 @@ const provisionAccountSchema = z.object({
 });
 
 /**
- * Get Stripe price ID for plan key — supports new plan keys and legacy mapping
+ * Get Stripe price ID for plan key — delegates to shared module
+ * (env var → hardcoded production fallback → throws)
  */
 function getStripePriceId(planType: string = "night_weekend"): string {
-  const legacyMap: Record<string, string> = {
-    starter: "night_weekend",
-    professional: "core",
-    premium: "pro",
-  };
-  const normalizedPlan = legacyMap[planType] || planType;
-
-  const newPriceIds: Record<string, string | undefined> = {
-    night_weekend: Deno.env.get("STRIPE_PRICE_ID_NIGHT_WEEKEND"),
-    lite: Deno.env.get("STRIPE_PRICE_ID_LITE"),
-    core: Deno.env.get("STRIPE_PRICE_ID_CORE"),
-    pro: Deno.env.get("STRIPE_PRICE_ID_PRO"),
-  };
-
-  const priceId = newPriceIds[normalizedPlan];
-  if (!priceId) {
-    throw new Error(`Stripe price ID not configured for plan: ${planType}`);
-  }
-  return priceId;
+  return _getStripePriceId(planType);
 }
 
 /**
