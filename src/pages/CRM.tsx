@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { BuiltInCrmSimulation } from "@/components/marketing/BuiltInCrmSimulation";
 import {
   CheckCircle2,
   ArrowRight,
@@ -251,6 +252,23 @@ const CRM = () => {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </section>
+
+        {/* CRM SIMULATION */}
+        <section className="section-spacer-compact bg-background">
+          <div className="site-container max-w-5xl">
+            <div className="text-center mb-8">
+              <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-3">
+                Live Demo · One Real Lead
+              </p>
+              <h2 className="text-h2 mb-3">Watch a lead get captured in real time</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                Gary calls about a leaking water heater. Watch as RingSnap captures his details,
+                scores his intent, routes the job, and sends a follow-up — all automatically.
+              </p>
+            </div>
+            <BuiltInCrmSimulation />
           </div>
         </section>
 
