@@ -444,11 +444,23 @@ serve(async (req) => {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
 
-      // Compare signatures (constant-time comparison)
-      // Check if ANY of the provided signatures match the expected one
+      // Compare signatures using a constant-time byte comparison to prevent
+      // timing oracle attacks.  JS string equality (===) is not constant-time.
+      const encoder2 = new TextEncoder();
+      const expectedBytes = encoder2.encode(expectedSignature);
+
+      function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+        if (a.length !== b.length) return false;
+        let diff = 0;
+        for (let i = 0; i < a.length; i++) {
+          diff |= a[i] ^ b[i];
+        }
+        return diff === 0;
+      }
+
       let isVerified = false;
       for (const sig of signaturesV1) {
-        if (sig === expectedSignature) {
+        if (timingSafeEqual(encoder2.encode(sig), expectedBytes)) {
           isVerified = true;
           break;
         }
@@ -585,23 +597,18 @@ serve(async (req) => {
           });
         }
 
-        // Apply account credits to invoice
-        const invoiceAmountCents = invoice.amount_due ?? 0;
-
+        // Mark any available account credits as applied (bookkeeping).
+        // The actual Stripe discount is applied via customer balance transactions created
+        // when the credits are awarded — Stripe automatically deducts the customer balance
+        // from the next invoice, so no invoice-time Stripe API call is needed here.
         const { data: credits } = await supabase
           .from('account_credits')
-          .select('*')
+          .select('id, amount_cents')
           .eq('account_id', account.id)
           .eq('status', 'available')
           .order('expires_at', { ascending: true });
 
-        let remainingAmount: number = invoiceAmountCents;
-
         for (const credit of credits || []) {
-          if (remainingAmount <= 0) break;
-
-          const appliedAmount = Math.min(credit.amount_cents, remainingAmount);
-
           await supabase
             .from('account_credits')
             .update({
@@ -609,20 +616,17 @@ serve(async (req) => {
               applied_to_invoice_id: invoice.id,
             })
             .eq('id', credit.id);
-
-          remainingAmount -= appliedAmount;
         }
 
-        logInfo('Applied credits to invoice', {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: {
-            invoiceId: invoice.id,
-            remainingAmountCents: remainingAmount
-          }
-        });
+        if ((credits || []).length > 0) {
+          logInfo('Marked account credits as applied (Stripe balance already applied)', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            context: { invoiceId: invoice.id, creditCount: credits!.length },
+          });
+        }
 
-        // Check if this is first payment for referral conversion
+        // Check if this is the first payment for referral conversion
         const { data: referrals } = await supabase
           .from('referrals')
           .select('*')
@@ -644,6 +648,7 @@ serve(async (req) => {
           const expiresAt = new Date();
           expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year expiration
 
+          // Persist credits in DB for audit trail
           await supabase.from('account_credits').insert([
             {
               account_id: referral.referrer_account_id,
@@ -662,6 +667,80 @@ serve(async (req) => {
               status: 'available',
             },
           ]);
+
+          // Apply credits to Stripe customer balance so they are automatically
+          // deducted from each party's next invoice.
+          // Negative balance = Stripe owes the customer money → reduces next charge.
+          const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
+          if (stripeKey) {
+            const stripeForCredits = new Stripe(stripeKey, {
+              apiVersion: '2023-10-16',
+              httpClient: Stripe.createFetchHttpClient(),
+            });
+
+            // Referee credit ($25) — their stripe_customer_id is already on `account`
+            try {
+              await stripeForCredits.customers.createBalanceTransaction(
+                account.stripe_customer_id as string,
+                {
+                  amount: -2500, // negative = credit
+                  currency: 'usd',
+                  description: `RingSnap referral credit (referee) — referral ${referral.id}`,
+                }
+              );
+              logInfo('Referee Stripe balance credit applied', {
+                ...baseLogOptions,
+                accountId: currentAccountId,
+                context: { referralId: referral.id, amountCents: 2500 },
+              });
+            } catch (creditErr) {
+              logError('Failed to apply referee Stripe balance credit (non-blocking)', {
+                ...baseLogOptions,
+                accountId: currentAccountId,
+                error: creditErr,
+                context: { referralId: referral.id },
+              });
+            }
+
+            // Referrer credit ($50) — look up their stripe_customer_id
+            try {
+              const { data: referrerAccount } = await supabase
+                .from('accounts')
+                .select('stripe_customer_id')
+                .eq('id', referral.referrer_account_id)
+                .maybeSingle();
+
+              if (referrerAccount?.stripe_customer_id) {
+                await stripeForCredits.customers.createBalanceTransaction(
+                  referrerAccount.stripe_customer_id,
+                  {
+                    amount: -5000, // negative = credit
+                    currency: 'usd',
+                    description: `RingSnap referral credit (referrer) — referral ${referral.id}`,
+                  }
+                );
+                logInfo('Referrer Stripe balance credit applied', {
+                  ...baseLogOptions,
+                  context: {
+                    referralId: referral.id,
+                    referrerAccountId: referral.referrer_account_id,
+                    amountCents: 5000,
+                  },
+                });
+              } else {
+                logInfo('Referrer has no Stripe customer ID — skipping balance credit', {
+                  ...baseLogOptions,
+                  context: { referralId: referral.id, referrerAccountId: referral.referrer_account_id },
+                });
+              }
+            } catch (creditErr) {
+              logError('Failed to apply referrer Stripe balance credit (non-blocking)', {
+                ...baseLogOptions,
+                error: creditErr,
+                context: { referralId: referral.id },
+              });
+            }
+          }
 
           logInfo('Referral converted from payment', {
             ...baseLogOptions,
