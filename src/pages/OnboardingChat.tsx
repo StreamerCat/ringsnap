@@ -609,7 +609,7 @@ function OnboardingChatInner() {
     trackCheckpoint("onboarding_goal_collected", { goal: value });
     capture('checkout_started', { plan_key: 'starter', source_channel: 'onboarding_chat' });
     await showTypingDelay(600);
-    addMessage("assistant", "Almost done — start free for 3 days, cancel anytime.");
+    addMessage("assistant", "Almost done. Enter your card below to start your 3-day trial. You won't be charged until your trial ends or your usage limit is reached.");
   };
 
   // Handle payment submission
@@ -985,9 +985,9 @@ function OnboardingChatInner() {
                 <div className="space-y-4 p-4 border rounded-lg bg-card">
                   {/* Trial Messaging - Prominent */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
-                    <p className="text-sm font-semibold text-blue-900">Start your 3-day free trial</p>
+                    <p className="text-sm font-semibold text-blue-900">Start your 3-day trial</p>
                     <p className="text-xs text-blue-700">
-                      You will not be charged today. Your card will only be charged after your 3-day trial ends if you do not cancel.
+                      Credit card required. You won't be charged until your trial ends or your usage limit is reached. Cancel anytime before trial ends to avoid charges.
                     </p>
                   </div>
 

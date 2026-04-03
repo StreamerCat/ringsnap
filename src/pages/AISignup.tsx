@@ -262,7 +262,7 @@ export default function AISignup() {
       <>
         <p className="mb-3">Perfect! You're almost done.</p>
         <p className="mb-2">We'll start you on our <strong>Night & Weekend plan ($59/mo)</strong> with a <strong>3-day free trial</strong>. You can upgrade to Lite, Core, or Pro anytime.</p>
-        <p className="text-sm opacity-75">Enter your payment details below to activate your trial. You won't be charged until after the trial ends.</p>
+        <p className="text-sm opacity-75">Enter your payment details below to activate your trial. You won't be charged until your trial ends or your usage limit is reached.</p>
       </>
     );
   };

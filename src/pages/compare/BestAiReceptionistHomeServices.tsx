@@ -313,8 +313,7 @@ const BestAiReceptionistHomeServices = () => {
             <div className="text-center mb-8">
               <h2 className="text-h2 mb-4">RingSnap pricing for home service contractors</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                All plans include a built-in CRM, emergency routing, and a 3-day free trial. No credit
-                card required. No long-term contracts.
+                All plans include a built-in CRM, emergency routing, and a 3-day free trial. Credit card required to start. No long-term contracts.
               </p>
             </div>
 
@@ -375,7 +374,7 @@ const BestAiReceptionistHomeServices = () => {
                 },
                 {
                   q: "How do I evaluate an AI receptionist before committing?",
-                  a: "The best way is a free trial with real calls. RingSnap offers a 3-day free trial with ~150 minutes — enough to test emergency scenarios, routine bookings, and after-hours coverage with actual calls. No credit card required.",
+                  a: "The best way is a free trial with real calls. RingSnap offers a 3-day trial with ~150 minutes, enough to test emergency scenarios, routine bookings, and after-hours coverage with actual calls. Credit card required to start. You won't be charged until your trial ends or your usage limit is reached.",
                 },
                 {
                   q: "How much does an AI receptionist cost for a small contracting business?",
@@ -396,7 +395,7 @@ const BestAiReceptionistHomeServices = () => {
           <div className="site-container max-w-3xl text-center">
             <h2 className="text-h2 mb-4">See why contractors choose RingSnap</h2>
             <p className="text-muted-foreground mb-8">
-              3-day free trial. No credit card required. Live in 10 minutes.{" "}
+              3-day trial. Credit card required to start. You won't be charged until your trial ends. Live in 10 minutes.{" "}
               <Link to="/pricing" className="text-primary hover:underline">
                 Plans starting at $59/month.
               </Link>

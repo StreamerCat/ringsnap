@@ -83,7 +83,7 @@ export function PaymentForm({
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Your card will not be charged during the 3-day trial period
+          Your card will not be charged until your trial ends or your usage limit is reached
         </p>
       </div>
 

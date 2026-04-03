@@ -204,7 +204,7 @@ export function SelfServeTrialFlow({
     },
     {
       id: "payment",
-      botMessage: "Almost done! Secure your trial below. You won't be charged today.",
+      botMessage: "Almost done! Enter your card below to start your trial. You won't be charged until your trial ends or your usage limit is reached.",
       fieldsToValidate: [] as (keyof SelfServeFormData)[],
       customValidation: () => {
         if (!cardComplete) return "Please complete your card information";
