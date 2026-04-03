@@ -245,12 +245,29 @@ serve(async (req) => {
             lineItems.push({ price: overagePriceId });
         }
 
+        // Only offer the 3-day trial to genuinely new subscribers.
+        // Re-subscribing customers (previously had a subscription, even if canceled) do not
+        // qualify for another trial.  On error, default to no trial (conservative).
+        let isFirstSubscription = false;
+        try {
+            const previousSubs = await stripe.subscriptions.list({
+                customer: account.stripe_customer_id,
+                status: "all",
+                limit: 10,
+            });
+            isFirstSubscription = previousSubs.data.length === 0;
+        } catch (listErr: any) {
+            log("Could not determine subscription history — skipping trial", { error: listErr.message });
+            isFirstSubscription = false;
+        }
+        log("Trial eligibility", { isFirstSubscription });
+
         const session = await stripe.checkout.sessions.create({
             customer: account.stripe_customer_id,
             mode: "subscription",
             line_items: lineItems,
             subscription_data: {
-                trial_period_days: 3, // 1b: 3-day trial on all plans
+                ...(isFirstSubscription ? { trial_period_days: 3 } : {}),
                 metadata: {
                     plan_key: planKey,
                     trial_minutes: "50",

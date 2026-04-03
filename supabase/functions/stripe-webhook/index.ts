@@ -444,11 +444,23 @@ serve(async (req) => {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
 
-      // Compare signatures (constant-time comparison)
-      // Check if ANY of the provided signatures match the expected one
+      // Compare signatures using a constant-time byte comparison to prevent
+      // timing oracle attacks.  JS string equality (===) is not constant-time.
+      const encoder2 = new TextEncoder();
+      const expectedBytes = encoder2.encode(expectedSignature);
+
+      function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+        if (a.length !== b.length) return false;
+        let diff = 0;
+        for (let i = 0; i < a.length; i++) {
+          diff |= a[i] ^ b[i];
+        }
+        return diff === 0;
+      }
+
       let isVerified = false;
       for (const sig of signaturesV1) {
-        if (sig === expectedSignature) {
+        if (timingSafeEqual(encoder2.encode(sig), expectedBytes)) {
           isVerified = true;
           break;
         }
@@ -585,23 +597,18 @@ serve(async (req) => {
           });
         }
 
-        // Apply account credits to invoice
-        const invoiceAmountCents = invoice.amount_due ?? 0;
-
+        // Mark any available account credits as applied (bookkeeping).
+        // The actual Stripe discount is applied via customer balance transactions created
+        // when the credits are awarded — Stripe automatically deducts the customer balance
+        // from the next invoice, so no invoice-time Stripe API call is needed here.
         const { data: credits } = await supabase
           .from('account_credits')
-          .select('*')
+          .select('id, amount_cents')
           .eq('account_id', account.id)
           .eq('status', 'available')
           .order('expires_at', { ascending: true });
 
-        let remainingAmount: number = invoiceAmountCents;
-
         for (const credit of credits || []) {
-          if (remainingAmount <= 0) break;
-
-          const appliedAmount = Math.min(credit.amount_cents, remainingAmount);
-
           await supabase
             .from('account_credits')
             .update({
@@ -609,20 +616,17 @@ serve(async (req) => {
               applied_to_invoice_id: invoice.id,
             })
             .eq('id', credit.id);
-
-          remainingAmount -= appliedAmount;
         }
 
-        logInfo('Applied credits to invoice', {
-          ...baseLogOptions,
-          accountId: currentAccountId,
-          context: {
-            invoiceId: invoice.id,
-            remainingAmountCents: remainingAmount
-          }
-        });
+        if ((credits || []).length > 0) {
+          logInfo('Marked account credits as applied (Stripe balance already applied)', {
+            ...baseLogOptions,
+            accountId: currentAccountId,
+            context: { invoiceId: invoice.id, creditCount: credits!.length },
+          });
+        }
 
-        // Check if this is first payment for referral conversion
+        // Check if this is the first payment for referral conversion
         const { data: referrals } = await supabase
           .from('referrals')
           .select('*')
@@ -644,6 +648,7 @@ serve(async (req) => {
           const expiresAt = new Date();
           expiresAt.setFullYear(expiresAt.getFullYear() + 1); // 1 year expiration
 
+          // Persist credits in DB for audit trail
           await supabase.from('account_credits').insert([
             {
               account_id: referral.referrer_account_id,
@@ -662,6 +667,80 @@ serve(async (req) => {
               status: 'available',
             },
           ]);
+
+          // Apply credits to Stripe customer balance so they are automatically
+          // deducted from each party's next invoice.
+          // Negative balance = Stripe owes the customer money → reduces next charge.
+          const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
+          if (stripeKey) {
+            const stripeForCredits = new Stripe(stripeKey, {
+              apiVersion: '2023-10-16',
+              httpClient: Stripe.createFetchHttpClient(),
+            });
+
+            // Referee credit ($25) — their stripe_customer_id is already on `account`
+            try {
+              await stripeForCredits.customers.createBalanceTransaction(
+                account.stripe_customer_id as string,
+                {
+                  amount: -2500, // negative = credit
+                  currency: 'usd',
+                  description: `RingSnap referral credit (referee) — referral ${referral.id}`,
+                }
+              );
+              logInfo('Referee Stripe balance credit applied', {
+                ...baseLogOptions,
+                accountId: currentAccountId,
+                context: { referralId: referral.id, amountCents: 2500 },
+              });
+            } catch (creditErr) {
+              logError('Failed to apply referee Stripe balance credit (non-blocking)', {
+                ...baseLogOptions,
+                accountId: currentAccountId,
+                error: creditErr,
+                context: { referralId: referral.id },
+              });
+            }
+
+            // Referrer credit ($50) — look up their stripe_customer_id
+            try {
+              const { data: referrerAccount } = await supabase
+                .from('accounts')
+                .select('stripe_customer_id')
+                .eq('id', referral.referrer_account_id)
+                .maybeSingle();
+
+              if (referrerAccount?.stripe_customer_id) {
+                await stripeForCredits.customers.createBalanceTransaction(
+                  referrerAccount.stripe_customer_id,
+                  {
+                    amount: -5000, // negative = credit
+                    currency: 'usd',
+                    description: `RingSnap referral credit (referrer) — referral ${referral.id}`,
+                  }
+                );
+                logInfo('Referrer Stripe balance credit applied', {
+                  ...baseLogOptions,
+                  context: {
+                    referralId: referral.id,
+                    referrerAccountId: referral.referrer_account_id,
+                    amountCents: 5000,
+                  },
+                });
+              } else {
+                logInfo('Referrer has no Stripe customer ID — skipping balance credit', {
+                  ...baseLogOptions,
+                  context: { referralId: referral.id, referrerAccountId: referral.referrer_account_id },
+                });
+              }
+            } catch (creditErr) {
+              logError('Failed to apply referrer Stripe balance credit (non-blocking)', {
+                ...baseLogOptions,
+                error: creditErr,
+                context: { referralId: referral.id },
+              });
+            }
+          }
 
           logInfo('Referral converted from payment', {
             ...baseLogOptions,
@@ -926,6 +1005,10 @@ serve(async (req) => {
         let overageItemId: string | null = null;
         let periodStart: string | null = null;
         let periodEnd: string | null = null;
+        // Capture the authoritative Stripe subscription status to avoid the race condition
+        // where checkout.session.completed processes after customer.subscription.created and
+        // overwrites the correct 'trialing' status with a hardcoded 'active'.
+        let stripeSubStatus: string | null = null;
 
         if (subscriptionId) {
           try {
@@ -936,6 +1019,7 @@ serve(async (req) => {
                 httpClient: Stripe.createFetchHttpClient(),
               });
               const sub = await stripe.subscriptions.retrieve(subscriptionId as string);
+              stripeSubStatus = sub.status ?? null;
               trialStart = sub.trial_start ? new Date(sub.trial_start * 1000).toISOString() : null;
               trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
               periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null;
@@ -954,12 +1038,17 @@ serve(async (req) => {
           }
         }
 
+        // Use Stripe's authoritative status. Fall back to 'active' only when we couldn't fetch.
+        // Never overwrite 'trialing' with 'active' — that would bypass trial call-limit enforcement.
+        const resolvedSubStatus: string = stripeSubStatus ?? 'active';
+
         const updateData: Record<string, unknown> = {
           plan_key: planKey || 'night_weekend',
           plan_type: planKey || 'night_weekend',
-          subscription_status: 'active',
+          subscription_status: resolvedSubStatus,
           account_status: 'active',
-          trial_active: false,
+          // Only clear trial_active when Stripe confirms the sub is no longer in trial.
+          ...(resolvedSubStatus !== 'trialing' ? { trial_active: false } : {}),
         };
 
         if (subscriptionId) updateData.stripe_subscription_id = subscriptionId;
@@ -1026,7 +1115,7 @@ serve(async (req) => {
 
         const { data: account } = await supabase
           .from('accounts')
-          .select('id, overage_minutes_current_period, stripe_overage_item_id, plan_key')
+          .select('id, overage_minutes_current_period, overage_calls_current_period, billing_call_based, stripe_overage_item_id, plan_key')
           .eq('stripe_customer_id', customerId)
           .maybeSingle();
 
@@ -1036,16 +1125,35 @@ serve(async (req) => {
         }
 
         currentAccountId = account.id;
+
+        // Choose the correct overage counter based on billing mode.
+        // Call-based accounts (billing_call_based=true or env flag) track overage_calls_current_period.
+        // Legacy minute-based accounts track overage_minutes_current_period.
+        const useCallBasedBilling: boolean =
+          account.billing_call_based === true ||
+          (account.billing_call_based !== false && Deno.env.get('BILLING_CALL_BASED_V1') === 'true');
+
+        const overageQuantity: number = useCallBasedBilling
+          ? (account.overage_calls_current_period || 0)
+          : (account.overage_minutes_current_period || 0);
+        const overageUnit = useCallBasedBilling ? 'calls' : 'minutes';
+
         const overageMinutes: number = account.overage_minutes_current_period || 0;
 
         logInfo('invoice.upcoming: processing overage', {
           ...baseLogOptions,
           accountId: account.id,
-          context: { overageMinutes, overageItemId: account.stripe_overage_item_id },
+          context: {
+            overageQuantity,
+            overageUnit,
+            overageMinutes,
+            useCallBasedBilling,
+            overageItemId: account.stripe_overage_item_id,
+          },
         });
 
         // Report metered overage to Stripe
-        if (overageMinutes > 0 && account.stripe_overage_item_id) {
+        if (overageQuantity > 0 && account.stripe_overage_item_id) {
           try {
             const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
             if (stripeSecretKey) {
@@ -1055,7 +1163,7 @@ serve(async (req) => {
               });
               await stripe.subscriptionItems.createUsageRecord(
                 account.stripe_overage_item_id,
-                { quantity: overageMinutes, action: 'set' }
+                { quantity: overageQuantity, action: 'set' }
               );
               logInfo('Overage usage record reported to Stripe', {
                 ...baseLogOptions,

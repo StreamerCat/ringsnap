@@ -85,7 +85,11 @@ serve(async (req) => {
 
     // ── Determine plan context ────────────────────────────────────────────────
     const planKey: string = account.plan_key || account.plan_type || 'night_weekend';
-    const isTrial = account.trial_active === true || account.subscription_status === 'trial';
+    // Stripe stores the trial period status as 'trialing' (not 'trial').
+    // The subscription_status column is written verbatim from Stripe's subscription.status.
+    const isTrial = account.trial_active === true ||
+      account.subscription_status === 'trial' ||
+      account.subscription_status === 'trialing';
 
     // Fetch plan limits from plans table (new schema)
     const { data: plan } = await supabase

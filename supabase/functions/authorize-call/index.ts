@@ -195,7 +195,12 @@ serve(async (req) => {
     // ══════════════════════════════════════════════════════════════════════════
     // TRIAL ENFORCEMENT
     // ══════════════════════════════════════════════════════════════════════════
-    const isTrial = account.trial_active === true || account.subscription_status === 'trial';
+    // Stripe stores the trial period status as 'trialing' (not 'trial').
+    // The subscription_status column is written verbatim from Stripe's subscription.status,
+    // so we must match both spellings here.
+    const isTrial = account.trial_active === true ||
+      account.subscription_status === 'trial' ||
+      account.subscription_status === 'trialing';
 
     if (isTrial) {
       const trialEndDate = account.trial_end_date ? new Date(account.trial_end_date) : null;
