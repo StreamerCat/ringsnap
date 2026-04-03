@@ -98,7 +98,7 @@ const config: ComparisonConfig = {
     },
     {
       q: "Can I switch from Ruby to RingSnap?",
-      a: "Yes. RingSnap setup takes about 10 minutes — you forward your existing number to RingSnap. No credit card required for the 3-day trial. Your existing number stays the same.",
+      a: "Yes. RingSnap setup takes about 10 minutes. You forward your existing number to RingSnap. Credit card required to start the 3-day trial. You won't be charged until the trial ends. Your existing number stays the same.",
     },
   ],
   schema,

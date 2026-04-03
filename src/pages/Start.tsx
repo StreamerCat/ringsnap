@@ -411,7 +411,7 @@ export default function Start() {
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>No credit card required</span>
+                      <span>Won't be charged during trial</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="h-4 w-4 text-blue-600" />

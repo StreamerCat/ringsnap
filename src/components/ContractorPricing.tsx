@@ -223,7 +223,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
 
       <section className="section-spacer px-4 sm:px-6">
         <div className="container mx-auto max-w-7xl">
-          <p className="text-center text-sm sm:text-base text-muted-foreground mb-5 sm:mb-6">3 days free, cancel anytime on every plan.</p>
+          <p className="text-center text-sm sm:text-base text-muted-foreground mb-5 sm:mb-6">Credit card required to start. Won't be charged during your 3-day trial. Cancel anytime before trial ends.</p>
           <div className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
             {PLANS.map((plan) => (
               <Card key={plan.key} className={cn("relative flex h-full flex-col", plan.highlight && "border-primary border-2 shadow-lg")}>

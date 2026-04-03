@@ -278,7 +278,7 @@ export const FreeTrialSignupForm = ({ open, onOpenChange }: FreeTrialSignupFormP
             Start Taking Every Call in 10 Minutes
           </DialogTitle>
           <p className="text-center text-sm text-muted-foreground pt-2">
-            150 minutes free • Cancel anytime
+            Credit card required. Won't be charged during your 3-day trial.
           </p>
         </DialogHeader>
 

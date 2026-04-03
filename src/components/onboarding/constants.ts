@@ -145,7 +145,7 @@ export const POLLING_INTERVALS = {
  */
 export const TRIAL_CONFIG = {
   DURATION_DAYS: 3,
-  NO_CHARGE_MESSAGE: "Your card will not be charged during the trial period",
+  NO_CHARGE_MESSAGE: "Your card will not be charged until your trial ends or your usage limit is reached",
 } as const;
 
 /**
