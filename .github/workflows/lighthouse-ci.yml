@@ -1,0 +1,189 @@
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lighthouse:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build without prerendering — faster, sufficient for Lighthouse JS execution.
+      # Marketing pages are SPAs served from index.html; Lighthouse executes JS and
+      # measures the rendered result, so prerendering is not required for accurate scores.
+      - name: Build app
+        run: npm run build:no-prerender
+        env:
+          # Placeholder values so the build succeeds in CI.
+          # Marketing pages don't make API calls at initial load so Lighthouse
+          # scores are valid. Auth-dependent pages are not tested here.
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: placeholder-anon-key
+          VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+          VITE_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+          VITE_ENV_TIER: staging
+          # Disable Sentry in CI builds to avoid init errors with placeholder DSN
+          VITE_SENTRY_DSN: ''
+
+      # Run Lighthouse CI using lighthouserc.js.
+      # - Starts vite preview on port 4173
+      # - Audits /, /pricing, /plumbers, /difference
+      # - Asserts category scores and individual SEO/a11y audits
+      # - Uploads reports to temporary-public-storage (public URLs in summary)
+      - name: Run Lighthouse CI
+        id: lhci
+        run: npx lhci autorun --config=lighthouserc.js
+        env:
+          # Set this secret in repo settings to enable GitHub commit status checks.
+          # Generate via: https://github.com/settings/tokens (repo scope).
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      # Always upload the raw LHR JSON and HTML reports as a workflow artifact,
+      # regardless of pass/fail. Downloadable for 14 days from the Actions tab.
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports-${{ github.run_number }}
+          path: .lighthouseci/
+          retention-days: 14
+
+      # Generate and post a PR comment with per-route score tables and
+      # any regression warnings. Runs even when lhci assert fails so the
+      # PR comment still appears with the diagnosis.
+      - name: Post PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const dir = '.lighthouseci';
+            if (!fs.existsSync(dir)) {
+              console.log('No Lighthouse reports found — skipping PR comment.');
+              return;
+            }
+
+            const lhrFiles = fs.readdirSync(dir)
+              .filter(f => f.startsWith('lhr-') && f.endsWith('.json'))
+              .sort();
+
+            if (lhrFiles.length === 0) {
+              console.log('No LHR files found — skipping PR comment.');
+              return;
+            }
+
+            // Group reports by URL, keep the last run for each URL
+            const reportsByUrl = {};
+            for (const file of lhrFiles) {
+              const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+              const url = new URL(data.finalUrl).pathname || '/';
+              reportsByUrl[url] = data;
+            }
+
+            const score = (v) => v == null ? 'N/A' : `${Math.round(v * 100)}`;
+            const emoji = (v) => {
+              if (v == null) return '⚪';
+              if (v >= 0.9) return '🟢';
+              if (v >= 0.7) return '🟡';
+              return '🔴';
+            };
+
+            const lhciPassed = '${{ steps.lhci.outcome }}' === 'success';
+            const header = lhciPassed
+              ? '## ✅ Lighthouse CI — Passed'
+              : '## ❌ Lighthouse CI — Regression Detected';
+
+            const rows = Object.entries(reportsByUrl)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([urlPath, lhr]) => {
+                const cats = lhr.categories;
+                const perf  = cats.performance?.score;
+                const a11y  = cats.accessibility?.score;
+                const bp    = cats['best-practices']?.score;
+                const seo   = cats.seo?.score;
+                return `| \`${urlPath}\` | ${emoji(perf)} ${score(perf)} | ${emoji(a11y)} ${score(a11y)} | ${emoji(bp)} ${score(bp)} | ${emoji(seo)} ${score(seo)} |`;
+              })
+              .join('\n');
+
+            // Surface failed assertions if any
+            let diagSection = '';
+            if (!lhciPassed) {
+              const assertFile = path.join(dir, 'assertion-results.json');
+              if (fs.existsSync(assertFile)) {
+                const assertions = JSON.parse(fs.readFileSync(assertFile, 'utf8'));
+                const failures = assertions.filter(a => a.level === 'error' && !a.passed);
+                if (failures.length > 0) {
+                  const lines = failures.slice(0, 10).map(a =>
+                    `- **${a.auditId}** on \`${new URL(a.url).pathname}\`: got \`${a.actual}\`, expected \`${a.operator} ${a.expected}\``
+                  );
+                  diagSection = `\n\n### Failed assertions\n${lines.join('\n')}${failures.length > 10 ? `\n_…and ${failures.length - 10} more. Download the artifact for the full report._` : ''}`;
+                }
+              }
+            }
+
+            const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${header}
+
+| Route | Perf | A11y | Best Practices | SEO |
+|-------|------|------|----------------|-----|
+${rows}
+
+> 🟢 ≥ 90 · 🟡 70–89 · 🔴 < 70${diagSection}
+
+<details>
+<summary>What do these thresholds mean?</summary>
+
+| Category | Gate | Action on fail |
+|----------|------|----------------|
+| Performance | warn ≥ 60 | Advisory — check for large JS regressions |
+| Accessibility | error ≥ 85 | **Blocks merge** |
+| Best Practices | error ≥ 85 | **Blocks merge** |
+| SEO | error ≥ 85 | **Blocks merge** |
+
+See [docs/lighthouse-ci.md](docs/lighthouse-ci.md) for how to update routes and budgets.
+[📥 Download full reports](${artifactUrl})
+</details>`;
+
+            // Upsert comment — find an existing Lighthouse comment and replace it
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' && c.body.includes('Lighthouse CI')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

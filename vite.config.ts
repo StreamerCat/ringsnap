@@ -21,8 +21,26 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core React runtime — always needed
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-toast', '@radix-ui/react-tabs'],
+          // Radix UI primitives — shared across most pages
+          ui: [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-select',
+          ],
+          // Charting — only loaded by dashboard/analytics pages
+          charts: ['recharts'],
+          // Stripe — only loaded by billing/upgrade pages
+          stripe: ['@stripe/react-stripe-js', '@stripe/stripe-js'],
+          // Analytics/observability — defer parse until after page loads
+          analytics: ['posthog-js', '@sentry/react'],
+          // Vapi voice SDK — only loaded on specific pages
+          vapi: ['@vapi-ai/web'],
         },
         // Include source maps in separate files (not inline) for Sentry upload
         sourcemapExcludeSources: false,
