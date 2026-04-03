@@ -926,6 +926,10 @@ serve(async (req) => {
         let overageItemId: string | null = null;
         let periodStart: string | null = null;
         let periodEnd: string | null = null;
+        // Capture the authoritative Stripe subscription status to avoid the race condition
+        // where checkout.session.completed processes after customer.subscription.created and
+        // overwrites the correct 'trialing' status with a hardcoded 'active'.
+        let stripeSubStatus: string | null = null;
 
         if (subscriptionId) {
           try {
@@ -936,6 +940,7 @@ serve(async (req) => {
                 httpClient: Stripe.createFetchHttpClient(),
               });
               const sub = await stripe.subscriptions.retrieve(subscriptionId as string);
+              stripeSubStatus = sub.status ?? null;
               trialStart = sub.trial_start ? new Date(sub.trial_start * 1000).toISOString() : null;
               trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
               periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null;
@@ -954,12 +959,17 @@ serve(async (req) => {
           }
         }
 
+        // Use Stripe's authoritative status. Fall back to 'active' only when we couldn't fetch.
+        // Never overwrite 'trialing' with 'active' — that would bypass trial call-limit enforcement.
+        const resolvedSubStatus: string = stripeSubStatus ?? 'active';
+
         const updateData: Record<string, unknown> = {
           plan_key: planKey || 'night_weekend',
           plan_type: planKey || 'night_weekend',
-          subscription_status: 'active',
+          subscription_status: resolvedSubStatus,
           account_status: 'active',
-          trial_active: false,
+          // Only clear trial_active when Stripe confirms the sub is no longer in trial.
+          ...(resolvedSubStatus !== 'trialing' ? { trial_active: false } : {}),
         };
 
         if (subscriptionId) updateData.stripe_subscription_id = subscriptionId;
@@ -1026,7 +1036,7 @@ serve(async (req) => {
 
         const { data: account } = await supabase
           .from('accounts')
-          .select('id, overage_minutes_current_period, stripe_overage_item_id, plan_key')
+          .select('id, overage_minutes_current_period, overage_calls_current_period, billing_call_based, stripe_overage_item_id, plan_key')
           .eq('stripe_customer_id', customerId)
           .maybeSingle();
 
@@ -1036,16 +1046,35 @@ serve(async (req) => {
         }
 
         currentAccountId = account.id;
+
+        // Choose the correct overage counter based on billing mode.
+        // Call-based accounts (billing_call_based=true or env flag) track overage_calls_current_period.
+        // Legacy minute-based accounts track overage_minutes_current_period.
+        const useCallBasedBilling: boolean =
+          account.billing_call_based === true ||
+          (account.billing_call_based !== false && Deno.env.get('BILLING_CALL_BASED_V1') === 'true');
+
+        const overageQuantity: number = useCallBasedBilling
+          ? (account.overage_calls_current_period || 0)
+          : (account.overage_minutes_current_period || 0);
+        const overageUnit = useCallBasedBilling ? 'calls' : 'minutes';
+
         const overageMinutes: number = account.overage_minutes_current_period || 0;
 
         logInfo('invoice.upcoming: processing overage', {
           ...baseLogOptions,
           accountId: account.id,
-          context: { overageMinutes, overageItemId: account.stripe_overage_item_id },
+          context: {
+            overageQuantity,
+            overageUnit,
+            overageMinutes,
+            useCallBasedBilling,
+            overageItemId: account.stripe_overage_item_id,
+          },
         });
 
         // Report metered overage to Stripe
-        if (overageMinutes > 0 && account.stripe_overage_item_id) {
+        if (overageQuantity > 0 && account.stripe_overage_item_id) {
           try {
             const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
             if (stripeSecretKey) {
@@ -1055,7 +1084,7 @@ serve(async (req) => {
               });
               await stripe.subscriptionItems.createUsageRecord(
                 account.stripe_overage_item_id,
-                { quantity: overageMinutes, action: 'set' }
+                { quantity: overageQuantity, action: 'set' }
               );
               logInfo('Overage usage record reported to Stripe', {
                 ...baseLogOptions,
