@@ -1275,6 +1275,17 @@ Deno.serve(async (req: Request) => {
     };
     const normalizedPlanKey = legacyPlanMap[data.planType] || data.planType || "night_weekend";
 
+    // Map new plan keys back to legacy plan_type values.
+    // plan_type is a legacy column constrained to ('starter','professional','premium').
+    // plan_key is the authoritative column for new plan names.
+    const newToLegacyPlanMap: Record<string, string> = {
+      night_weekend: "starter",
+      lite: "starter",
+      core: "professional",
+      pro: "premium",
+    };
+    const legacyPlanType = newToLegacyPlanMap[normalizedPlanKey] || data.planType || "starter";
+
     // Determine post-trial plan from onboarding signals or explicit selection
     const { planKey: selectedPostTrialPlan, reason: preselectReason } = preSelectPostTrialPlan({
       trade: data.trade,
@@ -1286,7 +1297,7 @@ Deno.serve(async (req: Request) => {
     const accountData: Record<string, unknown> = {
       company_name: data.companyName,
       trade: data.trade,
-      plan_type: normalizedPlanKey,        // keep legacy column in sync
+      plan_type: legacyPlanType,            // legacy column — always a legacy value to satisfy original constraint
       plan_key: normalizedPlanKey,          // new column
       trial_active: true,                   // marks trial period active
       trial_minutes_used: 0,
