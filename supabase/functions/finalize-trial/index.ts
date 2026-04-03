@@ -461,6 +461,16 @@ serve(async (req) => {
     };
     const normalizedPlanKey = legacyPlanMap[data.planType] || data.planType;
 
+    // Map new plan keys back to legacy values for the plan_type column.
+    // plan_type is constrained to ('starter','professional','premium'); plan_key holds new names.
+    const newToLegacyPlanMap: Record<string, string> = {
+      night_weekend: "starter",
+      lite: "starter",
+      core: "professional",
+      pro: "premium",
+    };
+    const legacyPlanType = newToLegacyPlanMap[normalizedPlanKey] || data.planType || "starter";
+
     let subscription: Stripe.Subscription;
     try {
       const priceId = getStripePriceId(data.planType);
@@ -522,7 +532,7 @@ serve(async (req) => {
       phone: data.phone,
       company_name: data.companyName,
       trade: data.trade,
-      plan_type: normalizedPlanKey,
+      plan_type: legacyPlanType,            // legacy column — always a legacy value to satisfy original constraint
       plan_key: normalizedPlanKey,
       phone_number_area_code: data.zipCode?.slice(0, 3) || null,
       zip_code: data.zipCode || null,
