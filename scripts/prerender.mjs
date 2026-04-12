@@ -6,8 +6,8 @@
  * 
  * Usage: node scripts/prerender.mjs
  * 
- * Note: If Puppeteer is unavailable (e.g., in CI environments like Vercel),
- * the script will skip prerendering gracefully.
+ * Note: CI checks can skip prerender safely, while production can enforce it
+ * by setting REQUIRE_PRERENDER=true.
  */
 
 import { createServer } from 'http';
@@ -174,7 +174,9 @@ async function main() {
         process.exit(1);
     }
 
-    const allowSkip = process.env.ALLOW_PRERENDER_SKIP === 'true';
+    const requirePrerender = process.env.REQUIRE_PRERENDER === 'true';
+    const forceSkip = process.env.ALLOW_PRERENDER_SKIP === 'true';
+    const allowSkip = forceSkip || !requirePrerender;
 
     // Try to import Puppeteer
     let puppeteer;
@@ -183,11 +185,13 @@ async function main() {
     } catch (err) {
         console.log('⚠️  Puppeteer not available:', err.message);
         if (allowSkip) {
-            console.log('   ALLOW_PRERENDER_SKIP=true, skipping prerender and continuing build.');
+            console.log(forceSkip
+                ? '   ALLOW_PRERENDER_SKIP=true, skipping prerender and continuing build.'
+                : '   REQUIRE_PRERENDER is not enabled; skipping prerender and continuing build.');
             process.exit(0);
         }
-        console.error('   Prerender is required for production indexing quality.');
-        console.error('   Install puppeteer/browser dependencies or set ALLOW_PRERENDER_SKIP=true to bypass intentionally.');
+        console.error('   Prerender is required when REQUIRE_PRERENDER=true.');
+        console.error('   Install puppeteer/browser dependencies, or use ALLOW_PRERENDER_SKIP=true to bypass intentionally.');
         process.exit(1);
     }
 
@@ -206,13 +210,15 @@ async function main() {
     } catch (err) {
         console.log('⚠️  Could not launch browser:', err.message);
         if (allowSkip) {
-            console.log('   ALLOW_PRERENDER_SKIP=true, skipping prerender and continuing build.');
+            console.log(forceSkip
+                ? '   ALLOW_PRERENDER_SKIP=true, skipping prerender and continuing build.'
+                : '   REQUIRE_PRERENDER is not enabled; skipping prerender and continuing build.');
             server.close();
             process.exit(0);
         }
 
-        console.error('   Prerender is required for production indexing quality.');
-        console.error('   Install Chrome dependencies or set ALLOW_PRERENDER_SKIP=true to bypass intentionally.');
+        console.error('   Prerender is required when REQUIRE_PRERENDER=true.');
+        console.error('   Install Chrome dependencies, or set ALLOW_PRERENDER_SKIP=true to bypass intentionally.');
         console.error('   Try installing Chrome or run: npx puppeteer browsers install chrome');
         server.close();
         process.exit(1);
@@ -242,7 +248,9 @@ async function main() {
     // Exit with error if any routes failed (unless skip override is explicitly enabled)
     if (failCount > 0) {
         if (allowSkip) {
-            console.log('⚠️  Some pages failed to prerender, but ALLOW_PRERENDER_SKIP=true was set.');
+            console.log(forceSkip
+                ? '⚠️  Some pages failed to prerender, but ALLOW_PRERENDER_SKIP=true was set.'
+                : '⚠️  Some pages failed to prerender, but REQUIRE_PRERENDER is not enabled.');
             process.exit(0);
         }
         process.exit(1);
@@ -253,9 +261,15 @@ async function main() {
 
 main().catch((err) => {
     console.error('Fatal error:', err);
-    if (process.env.ALLOW_PRERENDER_SKIP === 'true') {
-        console.log('⚠️  Fatal prerender error ignored because ALLOW_PRERENDER_SKIP=true.');
+    const requirePrerender = process.env.REQUIRE_PRERENDER === 'true';
+    const forceSkip = process.env.ALLOW_PRERENDER_SKIP === 'true';
+
+    if (forceSkip || !requirePrerender) {
+        console.log(forceSkip
+            ? '⚠️  Fatal prerender error ignored because ALLOW_PRERENDER_SKIP=true.'
+            : '⚠️  Fatal prerender error ignored because REQUIRE_PRERENDER is not enabled.');
         process.exit(0);
     }
+
     process.exit(1);
 });

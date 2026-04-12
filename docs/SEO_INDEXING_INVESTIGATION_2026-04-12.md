@@ -30,6 +30,8 @@ When a JS-heavy SPA serves nearly identical HTML to every route at first respons
 3. **Preserve non-indexing for internal pages**:
    - prerender route list remains limited to known public/indexable routes only.
    - internal routes continue to be excluded via robots disallow + page-level noindex where applicable.
+4. **Keep CI checks stable while protecting production SEO**:
+   - CI pre-check pipelines can skip prerender by default, while production deploys can enforce strict prerendering by setting `REQUIRE_PRERENDER=true` (with optional emergency override `ALLOW_PRERENDER_SKIP=true`).
 
 ## Rollout / Validation Plan
 1. Deploy build.
