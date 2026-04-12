@@ -315,7 +315,7 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
           <div className="site-container max-w-3xl text-center">
             <h2 className="text-h2 mb-4">Ready to answer every call and capture every lead?</h2>
             <p className="text-muted-foreground mb-8">
-              3-day free trial. No credit card required. Live in 10 minutes.{" "}
+              3-day trial. Credit card required to start. You won't be charged until your trial ends. Live in 10 minutes.{" "}
               <Link to="/pricing" className="text-primary hover:underline">
                 Plans starting at $59/month.
               </Link>

@@ -93,7 +93,7 @@ describe("Start Page", () => {
     it("renders trust badges", () => {
       render(<TestWrapper />);
 
-      expect(screen.getByText(/no credit card required/i)).toBeInTheDocument();
+      expect(screen.getByText(/won't be charged during trial/i)).toBeInTheDocument();
       expect(screen.getByText(/setup in 2 minutes/i)).toBeInTheDocument();
       expect(screen.getByText(/150 minutes included/i)).toBeInTheDocument();
     });
