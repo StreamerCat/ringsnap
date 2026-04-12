@@ -568,8 +568,11 @@ serve(async (req) => {
 
   } catch (err) {
     logError('authorize-call unexpected error', { ...baseLogOptions, error: err });
-    // Fail open — never drop a customer call on an unexpected server error
-    return json({ allowed: true });
+    // Fail closed — billing enforcement must not be bypassed on infrastructure errors
+    return json({
+      allowed: false,
+      message: "We're having a technical issue right now. Please try your call again in a few minutes."
+    });
   }
 });
 

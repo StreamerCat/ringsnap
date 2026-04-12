@@ -92,7 +92,7 @@ serve(async (req) => {
     logInfo('Using selected area code', {
       ...baseLogOptions,
       accountId,
-      context: { areaCode: sanitizedAreaCode, requestedAreaCode: normalizedRequestAreaCode }
+      context: { areaCode, requestedAreaCode: requestedAreaCode ?? areaCode }
     });
 
     // Get plan limits
@@ -105,10 +105,17 @@ serve(async (req) => {
     const monthlyMinutesLimit = planDef?.monthly_minutes_limit || 150;
 
     // 1. Create VAPI Phone Number (with area code fallback)
-    let vapiPhoneId = null;
-    let phoneNumber = null;
+    // Idempotency: if phone was already provisioned for this account, reuse it
+    let vapiPhoneId: string | null = account.vapi_phone_id || null;
+    let phoneNumber: string | null = account.vapi_phone_number || null;
 
-    if (VAPI_API_KEY && areaCode) {
+    if (vapiPhoneId && phoneNumber) {
+      logInfo('Phone already provisioned, reusing existing number (idempotent retry)', {
+        ...baseLogOptions,
+        accountId,
+        context: { vapiPhoneId, phoneNumber }
+      });
+    } else if (VAPI_API_KEY && areaCode) {
       logInfo('Requesting VAPI phone number with area code', {
         ...baseLogOptions,
         accountId,
@@ -223,9 +230,16 @@ serve(async (req) => {
     }
 
     // 2. Create VAPI Assistant
-    let vapiAssistantId = null;
+    // Idempotency: if assistant was already created for this account, reuse it
+    let vapiAssistantId: string | null = account.vapi_assistant_id || null;
 
-    if (VAPI_API_KEY) {
+    if (vapiAssistantId) {
+      logInfo('Assistant already provisioned, reusing existing assistant (idempotent retry)', {
+        ...baseLogOptions,
+        accountId,
+        context: { vapiAssistantId }
+      });
+    } else if (VAPI_API_KEY) {
       const voiceId = account.assistant_gender === 'male' ? 'michael' : 'sarah';
 
       const { data: recordingLaw } = await supabase

@@ -81,7 +81,7 @@ export const SolutionDemo = () => {
             <CardContent className="space-y-3 p-0">
               <DollarSign className="w-8 sm:w-10 h-8 sm:h-10 text-primary mx-auto opacity-80 hover:opacity-100 transition-opacity" />
               <h3 className="font-bold text-base sm:text-lg">Affordable for any size</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground">Night & Weekend $59, Lite $129, Core $229, Pro $399.</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Night & Weekend $59, Lite $129, Core $229, Pro $449.</p>
             </CardContent>
           </Card>
           <Card className="card-tier-2 text-center">

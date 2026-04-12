@@ -48,7 +48,7 @@ const faqSchema = {
       name: "How much does an AI receptionist cost for contractors?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "AI receptionist pricing for contractors varies. RingSnap starts at $59/month for night and weekend coverage, $129/month for full after-hours plus daytime overflow, $229/month for full 24/7, and $399/month for high-volume with advanced features. All plans include a 3-day free trial.",
+        text: "AI receptionist pricing for contractors varies. RingSnap starts at $59/month for night and weekend coverage, $129/month for full after-hours plus daytime overflow, $229/month for full 24/7, and $449/month for high-volume with advanced features. All plans include a 3-day free trial.",
       },
     },
   ],
@@ -331,7 +331,7 @@ const BestAiReceptionistHomeServices = () => {
                     { plan: "Night & Weekend", price: "$59/month", coverage: "After-hours and weekend calls" },
                     { plan: "Lite", price: "$129/month", coverage: "Unlimited after-hours + daytime overflow" },
                     { plan: "Core", price: "$229/month", coverage: "Full 24/7 with multi-language support" },
-                    { plan: "Pro", price: "$399/month", coverage: "Full 24/7, highest volume, advanced features" },
+                    { plan: "Pro", price: "$449/month", coverage: "Full 24/7, highest volume, advanced features" },
                   ].map(({ plan, price, coverage }, i) => (
                     <tr key={plan} className={i % 2 === 0 ? "bg-white" : "bg-muted/20"}>
                       <td className="p-4 font-medium">{plan}</td>

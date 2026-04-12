@@ -54,6 +54,7 @@ serve(async (req) => {
 
     // Safety Blocklist: Never release these via this cron (unless banned)
     const ACTIVE_STATUSES = ['active', 'trialing', 'past_due'];
+    let numbersToRelease: any[] = [];
 
     if (inactiveServiceNumbers) {
       numbersToRelease = inactiveServiceNumbers.filter((record: any) => {
