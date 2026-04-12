@@ -6,8 +6,8 @@
  * 
  * Usage: node scripts/prerender.mjs
  * 
- * Note: If Puppeteer is unavailable (e.g., in CI environments like Vercel),
- * the script will skip prerendering gracefully.
+ * Note: CI checks can skip prerender safely, while production can enforce it
+ * by setting REQUIRE_PRERENDER=true.
  */
 
 import { createServer } from 'http';
@@ -111,20 +111,23 @@ async function prerenderRoute(browser, route) {
         console.log(`  📄 Prerendering: ${route}`);
 
         await page.goto(url, {
-            waitUntil: 'networkidle0',
-            timeout: 30000,
+            waitUntil: 'domcontentloaded',
+            timeout: 45000,
         });
 
         // Wait for React to fully hydrate and render
         await page.waitForSelector('#root', { timeout: 10000 });
 
-        // Wait for any lazy-loaded content
+        // Wait for lazy-rendered sections and helmet metadata to settle.
+        // Avoid networkidle waits because persistent sockets can keep pages
+        // open forever in production-like environments.
         await page.evaluate(() => {
             return new Promise((resolve) => {
+                const settle = () => setTimeout(resolve, 2500);
                 if (document.readyState === 'complete') {
-                    setTimeout(resolve, 2000); // Extra time for React lazy components
+                    settle();
                 } else {
-                    window.addEventListener('load', () => setTimeout(resolve, 2000));
+                    window.addEventListener('load', settle, { once: true });
                 }
             });
         });
@@ -171,25 +174,25 @@ async function main() {
         process.exit(1);
     }
 
-    // Check if we're in CI or an environment where Puppeteer won't work
-    const isCI = process.env.CI === 'true' || process.env.VERCEL === '1' || process.env.NETLIFY === 'true';
-
-    // Skip entirely on Netlify/CI — Chrome launches fine there but hangs on
-    // networkidle0 because Supabase realtime opens persistent WebSocket connections
-    // that never settle. Use SKIP_PRERENDER=false to force prerendering locally.
-    if (isCI && process.env.SKIP_PRERENDER !== 'false') {
-        console.log('⏭️  Skipping prerender (Netlify/CI detected). Build continues normally.');
-        process.exit(0);
-    }
+    const requirePrerender = process.env.REQUIRE_PRERENDER === 'true';
+    const forceSkip = process.env.ALLOW_PRERENDER_SKIP === 'true';
+    const allowSkip = forceSkip || !requirePrerender;
 
     // Try to import Puppeteer
     let puppeteer;
     try {
         puppeteer = await import('puppeteer');
     } catch (err) {
-        console.log('⚠️  Puppeteer not available, skipping prerendering.');
-        console.log('   The SPA will work normally but won\'t have prerendered HTML.');
-        process.exit(0);
+        console.log('⚠️  Puppeteer not available:', err.message);
+        if (allowSkip) {
+            console.log(forceSkip
+                ? '   ALLOW_PRERENDER_SKIP=true, skipping prerender and continuing build.'
+                : '   REQUIRE_PRERENDER is not enabled; skipping prerender and continuing build.');
+            process.exit(0);
+        }
+        console.error('   Prerender is required when REQUIRE_PRERENDER=true.');
+        console.error('   Install puppeteer/browser dependencies, or use ALLOW_PRERENDER_SKIP=true to bypass intentionally.');
+        process.exit(1);
     }
 
     // Start local server
@@ -206,16 +209,19 @@ async function main() {
         });
     } catch (err) {
         console.log('⚠️  Could not launch browser:', err.message);
-        if (isCI) {
-            console.log('   This is expected in CI environments without Chrome.');
-            console.log('   Skipping prerendering - the SPA will work normally.');
+        if (allowSkip) {
+            console.log(forceSkip
+                ? '   ALLOW_PRERENDER_SKIP=true, skipping prerender and continuing build.'
+                : '   REQUIRE_PRERENDER is not enabled; skipping prerender and continuing build.');
             server.close();
             process.exit(0);
-        } else {
-            console.error('   Try installing Chrome or run: npx puppeteer browsers install chrome');
-            server.close();
-            process.exit(1);
         }
+
+        console.error('   Prerender is required when REQUIRE_PRERENDER=true.');
+        console.error('   Install Chrome dependencies, or set ALLOW_PRERENDER_SKIP=true to bypass intentionally.');
+        console.error('   Try installing Chrome or run: npx puppeteer browsers install chrome');
+        server.close();
+        process.exit(1);
     }
 
     let successCount = 0;
@@ -239,26 +245,31 @@ async function main() {
     }
     console.log('\n✨ Prerendering complete!\n');
 
-    // Exit with error if any routes failed (skip failure in CI to avoid breaking builds)
+    // Exit with error if any routes failed (unless skip override is explicitly enabled)
     if (failCount > 0) {
-        if (isCI) {
-            console.log('⚠️  Some pages failed to prerender in CI. Continuing build anyway.');
+        if (allowSkip) {
+            console.log(forceSkip
+                ? '⚠️  Some pages failed to prerender, but ALLOW_PRERENDER_SKIP=true was set.'
+                : '⚠️  Some pages failed to prerender, but REQUIRE_PRERENDER is not enabled.');
             process.exit(0);
-        } else {
-            process.exit(1);
         }
-    } else {
-        process.exit(0);
+        process.exit(1);
     }
+
+    process.exit(0);
 }
 
 main().catch((err) => {
     console.error('Fatal error:', err);
-    // Don't fail the build if prerendering fails in CI
-    const isCI = process.env.CI === 'true' || process.env.VERCEL === '1' || process.env.NETLIFY === 'true';
-    if (isCI) {
-        console.log('⚠️  Prerendering failed but continuing build (CI environment).');
+    const requirePrerender = process.env.REQUIRE_PRERENDER === 'true';
+    const forceSkip = process.env.ALLOW_PRERENDER_SKIP === 'true';
+
+    if (forceSkip || !requirePrerender) {
+        console.log(forceSkip
+            ? '⚠️  Fatal prerender error ignored because ALLOW_PRERENDER_SKIP=true.'
+            : '⚠️  Fatal prerender error ignored because REQUIRE_PRERENDER is not enabled.');
         process.exit(0);
     }
+
     process.exit(1);
 });
