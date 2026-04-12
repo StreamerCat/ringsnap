@@ -105,9 +105,17 @@ serve(async (req) => {
     const monthlyMinutesLimit = planDef?.monthly_minutes_limit || 150;
 
     // 1. Create VAPI Phone Number (with area code fallback)
-    // Idempotency: if phone was already provisioned for this account, reuse it
-    let vapiPhoneId: string | null = account.vapi_phone_id || null;
-    let phoneNumber: string | null = account.vapi_phone_number || null;
+    // Idempotency: query phone_numbers table directly — vapi_phone_id lives there,
+    // not on accounts (accounts only has vapi_phone_number, not vapi_phone_id).
+    const { data: existingPrimaryPhone } = await supabase
+      .from('phone_numbers')
+      .select('id, vapi_phone_id, phone_number')
+      .eq('account_id', accountId)
+      .eq('is_primary', true)
+      .maybeSingle();
+
+    let vapiPhoneId: string | null = existingPrimaryPhone?.vapi_phone_id || null;
+    let phoneNumber: string | null = existingPrimaryPhone?.phone_number || null;
 
     if (vapiPhoneId && phoneNumber) {
       logInfo('Phone already provisioned, reusing existing number (idempotent retry)', {
@@ -344,9 +352,9 @@ serve(async (req) => {
       code: referralCode,
     });
 
-    // 5. Insert phone number record
-    let phoneNumberId = null;
-    if (phoneNumber && vapiPhoneId) {
+    // 5. Insert phone number record (skip if already exists from idempotency query above)
+    let phoneNumberId: string | null = existingPrimaryPhone?.id || null;
+    if (!phoneNumberId && phoneNumber && vapiPhoneId) {
       const { data: phoneRecord, error: phoneInsertError } = await supabase
         .from('phone_numbers')
         .insert({
