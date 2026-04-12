@@ -490,7 +490,7 @@ const CRM = () => {
           <div className="site-container max-w-3xl text-center">
             <h2 className="text-h2 mb-4">Start capturing leads, not just calls</h2>
             <p className="text-muted-foreground mb-8 leading-relaxed">
-              3-day free trial. No credit card required. Live in 10 minutes.{" "}
+              3-day trial. Credit card required to start. You won't be charged until your trial ends. Live in 10 minutes.{" "}
               <Link to="/pricing" className="text-primary hover:underline">
                 See plans starting at $59/month.
               </Link>
