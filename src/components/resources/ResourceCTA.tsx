@@ -89,6 +89,7 @@ export const ResourceCTA = ({ variant, trade, service, className = "" }: Resourc
                 isOpen={isDownloadModalOpen}
                 onClose={() => setIsDownloadModalOpen(false)}
                 resourceName={trade ? `${trade} Script Pack` : "Script Pack"}
+                trade={trade}
             />
         </>
     );
