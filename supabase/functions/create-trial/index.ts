@@ -93,10 +93,10 @@ async function capturePostHogException(
   } catch { /* best-effort */ }
 }
 
-async function flushPostHogClient(): Promise<void> {
+async function shutdownPostHogClient(): Promise<void> {
   if (!posthog) return;
   try {
-    await posthog.flush();
+    await posthog.shutdown();
   } catch {
     // best-effort
   }
@@ -2306,6 +2306,6 @@ Deno.serve(async (req: Request) => {
     }
   }
   } finally {
-    await flushPostHogClient();
+    await shutdownPostHogClient();
   }
 });
