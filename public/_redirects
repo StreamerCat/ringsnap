@@ -17,5 +17,10 @@
 /signup/form     /start          301
 /onboarding      /onboarding-chat 301
 
+# Sitemap aliases (avoid SPA fallback returning HTML)
+/sitemap             /sitemap.xml       301
+/sitemap_index.xml   /sitemap.xml       301
+/sitemap.xml         /sitemap.xml       200
+
 # SPA fallback - must be last
 /*    /index.html   200
