@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/tooltip";
 import { isBookedCall, getDisplayName, isSentinelValue, formatPhoneNumber } from "@/lib/appointments";
 import { sanitizeCallReason } from "@/lib/call-sanitation";
+import { getDashboardPlanByKey, normalizeLegacyPlanKey } from "@/lib/billing/dashboardPlans";
 
 interface OverviewTabProps {
     account: any;
@@ -131,6 +132,11 @@ export function OverviewTab({
         setDrawerOpen(true);
     };
 
+    const useCallBased = !!account?.billing_call_based;
+    const planDef = getDashboardPlanByKey(account?.plan_key || account?.plan_type);
+    const includedCalls = planDef?.includedCalls ?? 0;
+    const callsUsed = account?.calls_used_current_period ?? 0;
+
     return (
         <div className="space-y-4 sm:space-y-6">
             {/* Stats Cards - 2 cols mobile, 3 cols desktop */}
@@ -166,7 +172,7 @@ export function OverviewTab({
                     </CardHeader>
                     <CardContent className="space-y-2">
                         <div className="flex flex-col gap-1">
-                            <span className="text-lg font-bold uppercase">{account.plan_type || 'Free'}</span>
+                            <span className="text-lg font-bold">{planDef?.name || account.plan_type || 'Free'}</span>
                             <Badge variant={account.subscription_status === 'active' ? 'default' : 'secondary'} className="w-fit text-xs">
                                 {account.subscription_status}
                             </Badge>
@@ -203,10 +209,17 @@ export function OverviewTab({
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        <div className="text-lg font-bold">
-                            {Math.ceil(usageLogs.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) / 60)}
-                            <span className="text-sm font-normal text-muted-foreground"> / {account.monthly_minutes_limit} min</span>
-                        </div>
+                        {useCallBased ? (
+                            <div className="text-lg font-bold">
+                                {callsUsed.toLocaleString()}
+                                <span className="text-sm font-normal text-muted-foreground"> / {includedCalls.toLocaleString()} calls</span>
+                            </div>
+                        ) : (
+                            <div className="text-lg font-bold">
+                                {Math.ceil(usageLogs.reduce((acc, call) => acc + (call.duration_seconds || 0), 0) / 60)}
+                                <span className="text-sm font-normal text-muted-foreground"> / {account.monthly_minutes_limit} min</span>
+                            </div>
+                        )}
                         <Progress value={usagePercent} className="h-2" />
                         <p className="text-xs text-muted-foreground">
                             {usagePercent}% used

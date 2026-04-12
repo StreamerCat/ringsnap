@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { getRoleDashboardUrl } from "@/lib/auth/redirects";
-import { isProvisioningInProgress, isProvisioned } from "@/lib/billing/dashboardPlans";
+import { isProvisioningInProgress, isProvisioned, getDashboardPlanByKey } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
 import { capture, identify, group, resetAnalytics } from "@/lib/analytics";
@@ -288,18 +288,22 @@ export default function CustomerDashboard() {
   // Helper to calculate usage from calls
   const calculateUsagePercent = () => {
     if (!account) return 0;
-    // Sum duration_seconds from usageLogs (which are now call_logs)
-    // Filter for current billing period if possible, or just this month
-    // MVP: Sum all loaded calls (last 30 days) or ideally respect billing cycle.
-    // For MVP "Usage is not updating", we'll just sum the loaded calls for now or fetch aggregate.
-    // Better: Filter logs by current month.
+
+    // Call-based accounts: use the authoritative counter from DB
+    if (account.billing_call_based) {
+      const planDef = getDashboardPlanByKey(account.plan_key || account.plan_type);
+      const includedCalls = planDef?.includedCalls;
+      if (includedCalls) {
+        return Math.min(100, Math.round(((account.calls_used_current_period ?? 0) / includedCalls) * 100));
+      }
+    }
+
+    // Legacy minute-based fallback
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
     const minutesUsed = usageLogs
       .filter((c: any) => c.started_at >= startOfMonth)
       .reduce((acc: number, c: any) => acc + (c.duration_seconds || 0), 0) / 60;
-
     return Math.round((minutesUsed / account.monthly_minutes_limit) * 100);
   };
 
