@@ -350,12 +350,28 @@ serve(async (req) => {
       });
     }
 
-    // 4. Generate referral code
-    const referralCode = generateReferralCode();
-    await supabase.from('referral_codes').insert({
-      account_id: accountId,
-      code: referralCode,
-    });
+    // 4. Generate referral code (skip if already exists — idempotency guard)
+    const { data: existingReferral } = await supabase
+      .from('referral_codes')
+      .select('code')
+      .eq('account_id', accountId)
+      .maybeSingle();
+
+    if (!existingReferral) {
+      const referralCode = generateReferralCode();
+      const { error: referralInsertError } = await supabase.from('referral_codes').insert({
+        account_id: accountId,
+        code: referralCode,
+      });
+      if (referralInsertError) {
+        // Non-fatal: log and continue — provisioning should not fail over a referral code
+        logWarn('Failed to insert referral code', {
+          ...baseLogOptions,
+          accountId,
+          context: { error: referralInsertError.message }
+        });
+      }
+    }
 
     // 5. Insert phone number record (skip if already exists from idempotency query above)
     let phoneNumberId: string | null = existingPrimaryPhone?.id || null;

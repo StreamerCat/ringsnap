@@ -51,6 +51,21 @@ jobs:
           sed -i 's/price_lite_plan_id/price_test_lite/g' .env
           sed -i 's/price_core_plan_id/price_test_core/g' .env
           sed -i 's/price_pro_plan_id/price_test_pro/g' .env
+          # Create supabase/.env for edge function secrets.
+          # The root .env is read by Vite/Node — NOT by the Supabase functions runtime.
+          # supabase start reads secrets for edge functions from supabase/.env.
+          cat > supabase/.env << 'EOF'
+STRIPE_SECRET_KEY=sk_test_dummy_key
+STRIPE_PRICE_ID_NIGHT_WEEKEND=price_test_night_weekend
+STRIPE_PRICE_ID_LITE=price_test_lite
+STRIPE_PRICE_ID_CORE=price_test_core
+STRIPE_PRICE_ID_PRO=price_test_pro
+STRIPE_PRICE_STARTER_OLD=price_test_starter
+STRIPE_PRICE_PROFESSIONAL_OLD=price_test_prof
+STRIPE_PRICE_PREMIUM_OLD=price_test_prem
+VAPI_API_KEY=dummy_vapi_key
+VAPI_BASE_URL=https://api.vapi.ai
+EOF
 
       - name: Install dependencies
         run: npm ci
