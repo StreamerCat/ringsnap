@@ -53,7 +53,6 @@ export const salesDetailsSchema = z.object({
 
 // Combined schemas
 export const trialSignupSchema = leadCaptureSchema
-  .merge(businessDetailsSchema)
   .merge(planSelectionSchema)
   .merge(paymentSchema);
 
