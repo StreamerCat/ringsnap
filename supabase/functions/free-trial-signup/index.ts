@@ -38,6 +38,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // This function is deprecated. All new signups go through create-trial.
+  // Return 410 Gone so any remaining callers get a clear signal to update.
+  logWarn("free-trial-signup called — function is deprecated, returning 410", baseLogOptions);
+  return new Response(
+    JSON.stringify({
+      error: "This endpoint has been removed. Please use the current signup flow.",
+      deprecated: true,
+    }),
+    {
+      status: 410,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
+  );
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

@@ -1,10 +1,12 @@
 # API Proxy
-/api/webhooks/stripe     https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/stripe-ingest     200
-/api/webhooks/vapi       https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/clever-api        200
-/api/assistant/toggle    https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/assistant-toggle  200
-/api/billing/checkout    https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-checkout  200
-/api/billing/portal      https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/billing-portal    200
-/api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu              200
+# IMPORTANT: If Stripe/Vapi webhooks are configured to POST to these paths,
+# verify the webhook signing secrets in Supabase match the endpoint registered
+# in each provider's dashboard (signing secrets differ per registered endpoint).
+/api/webhooks/stripe     https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/stripe-webhook              200
+/api/webhooks/vapi       https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/vapi-webhook                200
+/api/billing/checkout    https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/create-upgrade-checkout     200
+/api/billing/portal      https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/create-billing-portal-session 200
+/api/provision           https://hook.us2.make.com/htv39rfnj3mafmucym5ammaq3r8hpfwu                        200
 
 # NOTE:
 # Do not force slash-removal redirects here.
