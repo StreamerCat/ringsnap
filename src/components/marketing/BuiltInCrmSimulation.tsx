@@ -47,7 +47,7 @@ const TRANSCRIPT = [
 const LINES_PER_STEP = [0, 4, 6, 8, 9] as const;
 
 // Auto-advance durations per step (ms). 0 = final step, no auto-advance.
-const STEP_DURATIONS = [2200, 3000, 2600, 2200, 0] as const;
+const STEP_DURATIONS = [1400, 2000, 1800, 1400, 0] as const;
 
 const STEP_LABELS = [
   "Incoming Call",
@@ -56,6 +56,9 @@ const STEP_LABELS = [
   "Booking",
   "Follow-up",
 ] as const;
+
+// Shorter labels for mobile step tabs
+const STEP_SHORT_LABELS = ["Call", "Intake", "Qualify", "Book", "Done"] as const;
 
 const STATUS_PER_STEP = [
   "Open",
@@ -196,37 +199,69 @@ export function BuiltInCrmSimulation() {
   const status = STATUS_PER_STEP[step];
 
   return (
-    <div
-      ref={containerRef}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      aria-label="CRM lead capture simulation"
-    >
-      {/* Step progress dots + current label */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-1.5" role="list" aria-label="Simulation steps">
+    <>
+      {/* CSS keyframe for step progress bar — unique name to avoid collisions */}
+      <style>{`@keyframes crm-sim-progress { from { width: 0% } to { width: 100% } }`}</style>
+      <div
+        ref={containerRef}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        aria-label="CRM lead capture simulation"
+      >
+      {/* Labeled step tabs + progress bar */}
+      <div className="mb-4">
+        {/* Clickable step tabs */}
+        <div className="flex items-center gap-1 flex-wrap mb-2" role="list" aria-label="Simulation steps">
           {STEP_LABELS.map((label, i) => (
             <button
               key={i}
               role="listitem"
               onClick={() => goToStep(i)}
-              aria-label={`Go to step ${i + 1}: ${label}`}
+              aria-label={`Step ${i + 1}: ${label}`}
               aria-current={step === i ? "step" : undefined}
               className={cn(
-                "rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
+                "text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none",
                 step === i
-                  ? "w-6 h-2 bg-primary"
-                  : "w-2 h-2 bg-muted-foreground/25 hover:bg-muted-foreground/50"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : step > i
+                  ? "bg-muted/60 text-muted-foreground border-border/30"
+                  : "bg-white text-muted-foreground border-border/40 hover:border-primary/40 hover:text-foreground"
               )}
-            />
+            >
+              <span className="hidden sm:inline">{i + 1}. {label}</span>
+              <span className="sm:hidden">{i + 1}. {STEP_SHORT_LABELS[i]}</span>
+            </button>
           ))}
         </div>
-        <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-          {STEP_LABELS[step]}
-          {isPlaying && !isHovered && step < 4 && !reducedMotion && (
-            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-pulse" />
-          )}
-        </span>
+
+        {/* Progress bar + playback hint */}
+        <div className="flex items-center gap-3 px-0.5">
+          <div className="flex-1 h-0.5 bg-muted rounded-full overflow-hidden">
+            {step < 4 && isPlaying && !reducedMotion ? (
+              <div
+                key={`pb-${step}`}
+                className="h-full bg-primary/50 rounded-full"
+                style={{
+                  width: 0,
+                  animationName: "crm-sim-progress",
+                  animationDuration: `${STEP_DURATIONS[step]}ms`,
+                  animationTimingFunction: "linear",
+                  animationFillMode: "forwards",
+                  animationPlayState: isHovered ? "paused" : "running",
+                }}
+              />
+            ) : step >= 4 ? (
+              <div className="h-full w-full bg-primary/30 rounded-full" />
+            ) : null}
+          </div>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">
+            {isHovered
+              ? "Paused — click any step"
+              : step >= 4
+              ? "Complete · replay below"
+              : "Auto-playing · hover to pause"}
+          </span>
+        </div>
       </div>
 
       {/* Three-panel grid */}
@@ -668,6 +703,7 @@ export function BuiltInCrmSimulation() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
