@@ -182,6 +182,7 @@ export function BuiltInCrmSimulation() {
 
   const goToStep = useCallback((n: number) => {
     setStep(n);
+    setIsPlaying(false); // user took control — stop auto-advance
     capture("crm_simulation_step_change", {
       step: n,
       step_label: STEP_LABELS[n],
@@ -255,10 +256,10 @@ export function BuiltInCrmSimulation() {
             ) : null}
           </div>
           <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">
-            {isHovered
-              ? "Paused — click any step"
-              : step >= 4
+            {step >= 4
               ? "Complete · replay below"
+              : isHovered || !isPlaying
+              ? "Paused — use Next or click any step"
               : "Auto-playing · hover to pause"}
           </span>
         </div>
