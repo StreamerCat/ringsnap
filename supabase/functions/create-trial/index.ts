@@ -387,7 +387,7 @@ function getStripePriceId(planType: string): string {
   // Check for live key or if the key contains "_live_" (to be extra safe)
   const isLive = stripeKey.startsWith("sk_live_") || stripeKey.startsWith("rk_live_") || stripeKey.includes("_live_");
 
-  console.log(`[getStripePriceId] Key prefix: ${stripeKey.substring(0, 8)}... isLive=${isLive} plan=${planType}`);
+  logInfo('getStripePriceId resolving plan', { functionName: FUNCTION_NAME, context: { isLive, plan: planType } });
 
   // Normalize legacy plan keys to new plan keys
   const legacyToNew: Record<string, string> = {

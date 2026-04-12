@@ -118,7 +118,7 @@ export const CallValueCalculator = ({
     const recoveredCallCapture = Math.round(missedCalls * 0.95);
     const lostRevenue = missedCalls * inputs.jobValue;
     const recoveredRevenue = recoveredCallCapture * inputs.jobValue;
-    const aiCost = monthlyCalls <= 150 ? 59 : monthlyCalls <= 300 ? 129 : monthlyCalls <= 600 ? 229 : 399;
+    const aiCost = monthlyCalls <= 150 ? 59 : monthlyCalls <= 300 ? 129 : monthlyCalls <= 600 ? 229 : 449;
     const netGain = recoveredRevenue - aiCost;
     const roi = aiCost > 0 ? Math.round(netGain / aiCost * 100) : 0;
     const paybackDays = recoveredRevenue > 0 ? Math.max(1, Math.round(aiCost / recoveredRevenue * 30)) : 30;
