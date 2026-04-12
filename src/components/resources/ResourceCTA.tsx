@@ -15,9 +15,9 @@ interface ResourceCTAProps {
 const ctaConfig: Record<CTAVariant, { icon: typeof Download; heading: string; description: string; buttonText: string; href: string }> = {
     download: {
         icon: Download,
-        heading: "Get the full script pack",
-        description: "Download every script and checklist from this page as a ready-to-use document your team can start with today.",
-        buttonText: "Download Script Pack",
+        heading: "Get the Contractor Call Conversion Pack",
+        description: "Download the exact scripts, triage questions, and booking talk tracks your team can use today for HVAC, plumbing, and electrical calls.",
+        buttonText: "Download the Free Script Pack",
         href: "#",
     },
     "hear-it": {
@@ -44,7 +44,7 @@ export const ResourceCTA = ({ variant, trade, service, className = "" }: Resourc
     // Build dynamic description for demo variant if props are provided
     const displayHeading = variant === "demo" ? "Start your trial!" : config.heading;
     const displayDescription = variant === "demo"
-        ? `Test it on your next ${service || (trade ? trade.toLowerCase() : 'contractor')} calls and see exactly how scripts run on autopilot with RingSnap's receptionist. Built for ${trade || 'professional'} contractors.`
+        ? `Test it on your next ${service || (trade ? trade.toLowerCase() : 'contractor')} calls and see exactly how scripts run on autopilot with RingSnap's receptionist. Built for ${(trade?.toLowerCase() === "contractor" ? "contractors" : `${trade || "professional"} contractors`)}.`
         : config.description + (trade ? ` Tailored for ${trade} contractors.` : "");
 
     const handleAction = (e: React.MouseEvent) => {
