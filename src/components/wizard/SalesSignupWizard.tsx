@@ -28,6 +28,21 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 const STORAGE_KEY = "ringsnap_wizard_progress";
 
+const WIZARD_DEFAULT_VALUES = {
+  companyName: "",
+  trade: "",
+  serviceArea: "",
+  zipCode: "",
+  planType: undefined as "starter" | "professional" | "premium" | undefined,
+  customerName: "",
+  customerEmail: "",
+  customerPhone: "",
+  businessHours: "",
+  emergencyPolicy: "",
+  assistantGender: "female" as "male" | "female",
+  salesRepName: "",
+};
+
 // Inner wizard component with Stripe context
 function WizardInner() {
   const [currentStep, setCurrentStep] = useState<WizardStep>(WizardStep.BusinessEssentials);
@@ -41,20 +56,7 @@ function WizardInner() {
 
   const form = useForm<WizardFormData>({
     mode: "onChange",
-    defaultValues: {
-      companyName: "",
-      trade: "",
-      serviceArea: "",
-      zipCode: "",
-      planType: undefined,
-      customerName: "",
-      customerEmail: "",
-      customerPhone: "",
-      businessHours: "",
-      emergencyPolicy: "",
-      assistantGender: "female",
-      salesRepName: "",
-    },
+    defaultValues: WIZARD_DEFAULT_VALUES,
   });
 
   // Auto-save progress to sessionStorage
@@ -71,7 +73,10 @@ function WizardInner() {
     if (saved) {
       try {
         const { step, data } = JSON.parse(saved);
-        form.reset(data);
+        // Merge with defaults so fields absent from the saved snapshot
+        // (e.g. saved before a later step was reached) keep their empty-string
+        // defaults rather than becoming undefined and failing Zod validation.
+        form.reset({ ...WIZARD_DEFAULT_VALUES, ...data });
         setCurrentStep(step);
         toast.info("Progress restored from your last session");
       } catch (err) {
