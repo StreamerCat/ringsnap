@@ -35,7 +35,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 import { extractCorrelationId, extractTraceId, logError, logInfo, logWarn, stepStart, stepEnd, stepError, maskEmailForLogs, maskPhoneForLogs, type BaseLogContext } from "../_shared/logging.ts";
-import { generateReferralCode } from "../_shared/validators.ts";
+import { generateReferralCode, tryFormatPhoneE164 } from "../_shared/validators.ts";
 import { POOL_CONFIG } from "../_shared/pool-config.ts";
 import { provisionPhoneNumber } from "../_shared/telephony.ts";
 
