@@ -84,9 +84,14 @@ serve(async (req) => {
     if (!areaCode && zipCode) {
       areaCode = getAreaCodeFromZip(zipCode);
     }
+    // Fallback to the area code stored on the account (supports retry calls
+    // from ProvisioningBanner which only sends accountId, not areaCode/zipCode).
+    if (!areaCode) {
+      areaCode = account.phone_number_area_code || null;
+    }
 
     if (!areaCode) {
-      throw new Error('Area code could not be determined from zip code or request');
+      throw new Error('Area code could not be determined from zip code, request, or account record');
     }
 
     logInfo('Using selected area code', {
@@ -381,29 +386,41 @@ serve(async (req) => {
       phoneNumberId = phoneRecord?.id;
     }
 
-    // 6. Insert assistant record
+    // 6. Insert assistant record (skip if already exists — idempotency guard)
     if (vapiAssistantId) {
-      const { error: assistantInsertError } = await supabase.from('assistants').insert({
-        account_id: accountId,
-        phone_number_id: phoneNumberId,
-        vapi_assistant_id: vapiAssistantId,
-        name: `${account.company_name} Assistant`,
-        voice_id: account.assistant_gender === 'male' ? 'michael' : 'sarah',
-        voice_gender: account.assistant_gender,
-        is_primary: true,
-        status: 'active',
-      });
+      const { data: existingAssistant } = await supabase
+        .from('assistants')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('is_primary', true)
+        .maybeSingle();
 
-      if (assistantInsertError) {
-        logError('Failed to insert assistant record', {
+      if (existingAssistant) {
+        logInfo('Assistant DB record already exists, skipping insert (idempotent retry)', {
           ...baseLogOptions,
           accountId,
-          error: assistantInsertError
+          context: { assistantId: existingAssistant.id }
         });
-        // We don't throw here to ensure the phone number remains valid, but we log strictly.
-        // Or should we throw? If assistant is missing, the phone won't work well.
-        // Let's throw to trigger "failed" status so we can retry.
-        throw new Error(`Failed to insert assistant: ${assistantInsertError.message}`);
+      } else {
+        const { error: assistantInsertError } = await supabase.from('assistants').insert({
+          account_id: accountId,
+          phone_number_id: phoneNumberId,
+          vapi_assistant_id: vapiAssistantId,
+          name: `${account.company_name} Assistant`,
+          voice_id: account.assistant_gender === 'male' ? 'michael' : 'sarah',
+          voice_gender: account.assistant_gender,
+          is_primary: true,
+          status: 'active',
+        });
+
+        if (assistantInsertError) {
+          logError('Failed to insert assistant record', {
+            ...baseLogOptions,
+            accountId,
+            error: assistantInsertError
+          });
+          throw new Error(`Failed to insert assistant: ${assistantInsertError.message}`);
+        }
       }
     }
 

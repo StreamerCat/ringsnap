@@ -46,6 +46,11 @@ jobs:
           sed -i 's/price_professional_plan_id/price_test_prof/g' .env
           sed -i 's/price_premium_plan_id/price_test_prem/g' .env
           sed -i 's/your-vapi-api-key/dummy_vapi_key/g' .env
+          # New plan price IDs (required by create-trial assertEnv at startup)
+          sed -i 's/price_night_weekend_plan_id/price_test_night_weekend/g' .env
+          sed -i 's/price_lite_plan_id/price_test_lite/g' .env
+          sed -i 's/price_core_plan_id/price_test_core/g' .env
+          sed -i 's/price_pro_plan_id/price_test_pro/g' .env
 
       - name: Install dependencies
         run: npm ci
