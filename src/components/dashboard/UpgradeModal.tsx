@@ -134,10 +134,10 @@ export function UpgradeModal({ open, onOpenChange, currentPlanKey, accountId }: 
                                     <div className="space-y-1 text-xs">
                                         <div className="flex items-center gap-1.5">
                                             <Check className="h-3 w-3 text-green-600 shrink-0" />
-                                            <span>{plan.includedMinutes.toLocaleString()} min/mo</span>
+                                            <span>{plan.includedCalls.toLocaleString()} calls/mo</span>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-muted-foreground">
-                                            <span className="ml-4">${plan.overageRate.toFixed(2)}/min overage</span>
+                                            <span className="ml-4">${plan.overageRateCalls.toFixed(2)}/call overage</span>
                                         </div>
                                         {plan.key === "night_weekend" && (
                                             <div className="flex items-center gap-1.5 text-muted-foreground">
