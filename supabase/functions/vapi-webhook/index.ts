@@ -435,6 +435,18 @@ Deno.serve(withSentryEdge(
                     });
                 }
 
+                // onboarding_test_call_completed: first valid inbound call during onboarding
+                if (mappingResult.accountId && (callRecord as any).direction === 'inbound' && durationSeconds >= 10) {
+                    await maybeFireOnboardingTestCallEvent(
+                        supabase,
+                        mappingResult.accountId,
+                        mappingResult.phoneNumberId,
+                        providerCallId,
+                        phDistinctId,
+                        callRecord as Record<string, unknown>
+                    );
+                }
+
                 // ── CALL BILLING LEDGER ────────────────────────────────────────────
                 // Write to billing ledger for call-based accounts (idempotent).
                 if (mappingResult.accountId && providerCallId) {
@@ -987,6 +999,74 @@ async function writeBillingLedgerForCall(
                 account_id: accountId, error: String(e), call_id: providerCallId,
             });
         } catch { /* best-effort */ }
+    }
+}
+
+/**
+ * Fire onboarding_test_call_completed PostHog event server-side when a qualifying
+ * inbound call is the first valid test call for an account still in onboarding.
+ *
+ * Deduplication: checks accounts.test_call_verified_at IS NULL so only fires once,
+ * even if the frontend RPC also sets that field later via get_onboarding_state.
+ * Best-effort — never throws.
+ */
+async function maybeFireOnboardingTestCallEvent(
+    supabase: ReturnType<typeof createClient>,
+    accountId: string,
+    phoneNumberId: string | null,
+    callId: string | null,
+    distinctId: string,
+    callRecord: Record<string, unknown>
+): Promise<void> {
+    try {
+        // Skip if test call already verified (idempotent guard)
+        const { data: account } = await supabase
+            .from('accounts')
+            .select('test_call_verified_at')
+            .eq('id', accountId)
+            .single();
+        if (!account || account.test_call_verified_at !== null) return;
+
+        // Get phone activation time for the onboarding window check
+        let activatedAt: string | null = null;
+        if (phoneNumberId) {
+            const { data: phone } = await supabase
+                .from('phone_numbers')
+                .select('activated_at')
+                .eq('id', phoneNumberId)
+                .single();
+            activatedAt = phone?.activated_at ?? null;
+        }
+
+        // Verify call is within the onboarding window — mirrors get_onboarding_state RPC logic:
+        //   started_at >= COALESCE(activated_at, NOW() - INTERVAL '2 hours')
+        const callStartedAt = callRecord.started_at as string | null;
+        if (callStartedAt) {
+            const callTime = new Date(callStartedAt).getTime();
+            const windowStart = activatedAt
+                ? new Date(activatedAt).getTime()
+                : Date.now() - 2 * 60 * 60 * 1000;
+            if (callTime < windowStart) return; // Outside onboarding window
+        }
+
+        await capturePostHog('onboarding_test_call_completed', distinctId, {
+            account_id: accountId,
+            phone_number_id: phoneNumberId,
+            call_id: callId,
+            duration_seconds: callRecord.duration_seconds,
+            from_number: callRecord.from_number,
+            ring_snap_number: callRecord.to_number,
+            activated_at: activatedAt,
+            source: 'server',
+        });
+
+        console.log(JSON.stringify({
+            event: 'onboarding_test_call_completed_fired',
+            account_id: accountId,
+            call_id: callId,
+        }));
+    } catch {
+        // Best-effort — do not let this affect webhook processing
     }
 }
 
