@@ -1,9 +1,13 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, XCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface ProvisioningBannerProps {
     account?: {
+        id?: string | null;
         vapi_phone_number?: string | null;
         vapi_assistant_id?: string | null;
         provisioning_status?: string | null;
@@ -11,30 +15,77 @@ interface ProvisioningBannerProps {
 }
 
 /**
- * Banner shown when provisioning is incomplete.
- * Displays when:
- * - provisioning_status is NOT 'completed', AND
- * - account is missing phone number or assistant ID
- * 
- * Does NOT show if account is fully provisioned (has both phone and assistant).
+ * Banner shown when provisioning is incomplete or failed.
+ * - pending/provisioning: amber "still finishing" with Refresh
+ * - failed: red "setup didn't complete" with Retry + Support link
  */
 export function ProvisioningBanner({ account }: ProvisioningBannerProps) {
-    // If no account data yet, don't show banner (dashboard is still loading)
+    const [retrying, setRetrying] = useState(false);
+
     if (!account) return null;
 
-    // Check if provisioning is actually complete
-    // PRIMARY: provisioning_status is the source of truth
-    // We also accept 'active' as completed (set by standalone provision_number job)
-    const isFullyProvisioned = account.provisioning_status === 'completed' || account.provisioning_status === 'active';
+    const isFullyProvisioned =
+        account.provisioning_status === 'completed' ||
+        account.provisioning_status === 'active';
 
-    // Only show banner if provisioning is NOT complete
-    const shouldShow = !isFullyProvisioned;
+    if (isFullyProvisioned) return null;
 
-    if (!shouldShow) return null;
+    const isFailed = account.provisioning_status?.startsWith('failed');
 
-    const handleRefresh = () => {
-        window.location.reload();
+    const handleRefresh = () => window.location.reload();
+
+    const handleRetry = async () => {
+        if (!account.id) return;
+        setRetrying(true);
+        try {
+            const { error } = await supabase.functions.invoke('provision-resources', {
+                body: { accountId: account.id },
+            });
+            if (error) throw error;
+            toast.success('Retry started — refreshing in a few seconds…');
+            setTimeout(() => window.location.reload(), 4000);
+        } catch (err: any) {
+            toast.error('Retry failed. Please contact support.');
+        } finally {
+            setRetrying(false);
+        }
     };
+
+    if (isFailed) {
+        return (
+            <Alert className="bg-red-50 border-red-200 mb-6">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
+                    <div>
+                        <p className="font-medium text-red-800">Setup didn't complete</p>
+                        <p className="text-sm text-red-700">
+                            There was an issue provisioning your phone number. This can usually be fixed with a retry.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRetry}
+                            disabled={retrying}
+                            className="border-red-300 text-red-700 hover:bg-red-100"
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-1 ${retrying ? 'animate-spin' : ''}`} />
+                            {retrying ? 'Retrying…' : 'Try Again'}
+                        </Button>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="text-red-700 px-0"
+                            asChild
+                        >
+                            <a href="mailto:support@getringsnap.com">Contact Support</a>
+                        </Button>
+                    </div>
+                </AlertDescription>
+            </Alert>
+        );
+    }
 
     return (
         <Alert className="bg-amber-50 border-amber-200 mb-6">

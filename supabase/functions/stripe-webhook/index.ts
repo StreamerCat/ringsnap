@@ -366,6 +366,15 @@ serve(async (req) => {
   // Initialize Sentry with correlation ID for error tracking
   initSentry(FUNCTION_NAME, { correlationId });
 
+  // STRIPE_WEBHOOK_SECRET is mandatory — reject all requests if not configured
+  if (!STRIPE_WEBHOOK_SECRET) {
+    logError('STRIPE_WEBHOOK_SECRET not configured — rejecting webhook', baseLogOptions);
+    return new Response(
+      JSON.stringify({ error: 'Server misconfiguration: webhook secret not set' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -377,8 +386,8 @@ serve(async (req) => {
     const signature = req.headers.get('stripe-signature');
     const body = await req.text();
 
-    // Verify webhook signature if STRIPE_WEBHOOK_SECRET is configured
-    if (STRIPE_WEBHOOK_SECRET) {
+    // Verify webhook signature — always required
+    {
       if (!signature) {
         await obs.error('signature_missing', 'STRIPE_SIGNATURE_FAIL', 'Missing stripe-signature header');
         logError('Missing stripe-signature header', baseLogOptions);
@@ -476,8 +485,6 @@ serve(async (req) => {
       }
 
       logInfo('Webhook signature verified', baseLogOptions);
-    } else {
-      logInfo('Webhook signature validation skipped (STRIPE_WEBHOOK_SECRET not configured)', baseLogOptions);
     }
 
     const event = JSON.parse(body);

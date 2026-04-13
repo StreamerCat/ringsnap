@@ -84,15 +84,20 @@ serve(async (req) => {
     if (!areaCode && zipCode) {
       areaCode = getAreaCodeFromZip(zipCode);
     }
+    // Fallback to the area code stored on the account (supports retry calls
+    // from ProvisioningBanner which only sends accountId, not areaCode/zipCode).
+    if (!areaCode) {
+      areaCode = account.phone_number_area_code || null;
+    }
 
     if (!areaCode) {
-      throw new Error('Area code could not be determined from zip code or request');
+      throw new Error('Area code could not be determined from zip code, request, or account record');
     }
 
     logInfo('Using selected area code', {
       ...baseLogOptions,
       accountId,
-      context: { areaCode: sanitizedAreaCode, requestedAreaCode: normalizedRequestAreaCode }
+      context: { areaCode, requestedAreaCode: requestedAreaCode ?? areaCode }
     });
 
     // Get plan limits
@@ -105,10 +110,25 @@ serve(async (req) => {
     const monthlyMinutesLimit = planDef?.monthly_minutes_limit || 150;
 
     // 1. Create VAPI Phone Number (with area code fallback)
-    let vapiPhoneId = null;
-    let phoneNumber = null;
+    // Idempotency: query phone_numbers table directly — vapi_phone_id lives there,
+    // not on accounts (accounts only has vapi_phone_number, not vapi_phone_id).
+    const { data: existingPrimaryPhone } = await supabase
+      .from('phone_numbers')
+      .select('id, vapi_phone_id, phone_number')
+      .eq('account_id', accountId)
+      .eq('is_primary', true)
+      .maybeSingle();
 
-    if (VAPI_API_KEY && areaCode) {
+    let vapiPhoneId: string | null = existingPrimaryPhone?.vapi_phone_id || null;
+    let phoneNumber: string | null = existingPrimaryPhone?.phone_number || null;
+
+    if (vapiPhoneId && phoneNumber) {
+      logInfo('Phone already provisioned, reusing existing number (idempotent retry)', {
+        ...baseLogOptions,
+        accountId,
+        context: { vapiPhoneId, phoneNumber }
+      });
+    } else if (VAPI_API_KEY && areaCode) {
       logInfo('Requesting VAPI phone number with area code', {
         ...baseLogOptions,
         accountId,
@@ -223,9 +243,16 @@ serve(async (req) => {
     }
 
     // 2. Create VAPI Assistant
-    let vapiAssistantId = null;
+    // Idempotency: if assistant was already created for this account, reuse it
+    let vapiAssistantId: string | null = account.vapi_assistant_id || null;
 
-    if (VAPI_API_KEY) {
+    if (vapiAssistantId) {
+      logInfo('Assistant already provisioned, reusing existing assistant (idempotent retry)', {
+        ...baseLogOptions,
+        accountId,
+        context: { vapiAssistantId }
+      });
+    } else if (VAPI_API_KEY) {
       const voiceId = account.assistant_gender === 'male' ? 'michael' : 'sarah';
 
       const { data: recordingLaw } = await supabase
@@ -323,16 +350,32 @@ serve(async (req) => {
       });
     }
 
-    // 4. Generate referral code
-    const referralCode = generateReferralCode();
-    await supabase.from('referral_codes').insert({
-      account_id: accountId,
-      code: referralCode,
-    });
+    // 4. Generate referral code (skip if already exists — idempotency guard)
+    const { data: existingReferral } = await supabase
+      .from('referral_codes')
+      .select('code')
+      .eq('account_id', accountId)
+      .maybeSingle();
 
-    // 5. Insert phone number record
-    let phoneNumberId = null;
-    if (phoneNumber && vapiPhoneId) {
+    if (!existingReferral) {
+      const referralCode = generateReferralCode();
+      const { error: referralInsertError } = await supabase.from('referral_codes').insert({
+        account_id: accountId,
+        code: referralCode,
+      });
+      if (referralInsertError) {
+        // Non-fatal: log and continue — provisioning should not fail over a referral code
+        logWarn('Failed to insert referral code', {
+          ...baseLogOptions,
+          accountId,
+          context: { error: referralInsertError.message }
+        });
+      }
+    }
+
+    // 5. Insert phone number record (skip if already exists from idempotency query above)
+    let phoneNumberId: string | null = existingPrimaryPhone?.id || null;
+    if (!phoneNumberId && phoneNumber && vapiPhoneId) {
       const { data: phoneRecord, error: phoneInsertError } = await supabase
         .from('phone_numbers')
         .insert({
@@ -359,29 +402,41 @@ serve(async (req) => {
       phoneNumberId = phoneRecord?.id;
     }
 
-    // 6. Insert assistant record
+    // 6. Insert assistant record (skip if already exists — idempotency guard)
     if (vapiAssistantId) {
-      const { error: assistantInsertError } = await supabase.from('assistants').insert({
-        account_id: accountId,
-        phone_number_id: phoneNumberId,
-        vapi_assistant_id: vapiAssistantId,
-        name: `${account.company_name} Assistant`,
-        voice_id: account.assistant_gender === 'male' ? 'michael' : 'sarah',
-        voice_gender: account.assistant_gender,
-        is_primary: true,
-        status: 'active',
-      });
+      const { data: existingAssistant } = await supabase
+        .from('assistants')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('is_primary', true)
+        .maybeSingle();
 
-      if (assistantInsertError) {
-        logError('Failed to insert assistant record', {
+      if (existingAssistant) {
+        logInfo('Assistant DB record already exists, skipping insert (idempotent retry)', {
           ...baseLogOptions,
           accountId,
-          error: assistantInsertError
+          context: { assistantId: existingAssistant.id }
         });
-        // We don't throw here to ensure the phone number remains valid, but we log strictly.
-        // Or should we throw? If assistant is missing, the phone won't work well.
-        // Let's throw to trigger "failed" status so we can retry.
-        throw new Error(`Failed to insert assistant: ${assistantInsertError.message}`);
+      } else {
+        const { error: assistantInsertError } = await supabase.from('assistants').insert({
+          account_id: accountId,
+          phone_number_id: phoneNumberId,
+          vapi_assistant_id: vapiAssistantId,
+          name: `${account.company_name} Assistant`,
+          voice_id: account.assistant_gender === 'male' ? 'michael' : 'sarah',
+          voice_gender: account.assistant_gender,
+          is_primary: true,
+          status: 'active',
+        });
+
+        if (assistantInsertError) {
+          logError('Failed to insert assistant record', {
+            ...baseLogOptions,
+            accountId,
+            error: assistantInsertError
+          });
+          throw new Error(`Failed to insert assistant: ${assistantInsertError.message}`);
+        }
       }
     }
 

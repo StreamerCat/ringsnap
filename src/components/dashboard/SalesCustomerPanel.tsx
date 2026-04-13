@@ -161,9 +161,15 @@ export function SalesCustomerPanel({ accountId, isOpen, onClose }: SalesCustomer
     const primaryContact = account?.profiles?.find(p => p.is_primary) || account?.profiles?.[0];
 
     const planLabels: Record<string, string> = {
-        starter: "Starter - $99/mo",
-        professional: "Professional - $199/mo",
-        premium: "Premium - $399/mo",
+        // Current plans
+        night_weekend: "Night & Weekend - $59/mo",
+        lite: "Lite - $129/mo",
+        core: "Core - $229/mo",
+        pro: "Pro - $449/mo",
+        // Legacy plan names (existing customers)
+        starter: "Starter (legacy) - $99/mo",
+        professional: "Professional (legacy) - $199/mo",
+        premium: "Premium (legacy) - $399/mo",
     };
 
     const statusColors: Record<string, string> = {
