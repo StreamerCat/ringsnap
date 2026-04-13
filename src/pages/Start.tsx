@@ -251,7 +251,8 @@ export default function Start() {
       // Track successful lead capture (Sentry)
       trackFunnelEvent('lead_captured', { lead_id: leadId });
 
-      // PostHog: form submitted + first identity assignment (pending_signup_id = leadId)
+      // PostHog: lead captured (conversion funnel top-of-funnel event)
+      capture('lead_captured', { lead_id: leadId, form_id: 'signup_step1', funnel_step: 'step1_lead_capture' });
       capture('form_submitted', { form_id: 'signup_step1', funnel_step: 'step1_lead_capture' });
       identify(
         leadId,

@@ -41,6 +41,25 @@ import { trackEvent } from "../_shared/analytics.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import { getLiveCallModel } from "../_shared/live-call-model.ts";
 
+/** Best-effort PostHog server-side event capture. Never throws. */
+async function capturePostHog(event: string, distinctId: string, props: Record<string, unknown>): Promise<void> {
+  const key = Deno.env.get("POSTHOG_API_KEY");
+  if (!key || !distinctId) return;
+  try {
+    await fetch("https://us.i.posthog.com/capture/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: key,
+        event,
+        distinct_id: distinctId,
+        properties: { ...props, $lib: "provision-vapi" },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch { /* best-effort */ }
+}
+
 import { provisionPhoneNumber, ProviderConfig } from "../_shared/telephony.ts";
 
 const FUNCTION_NAME = "provision-vapi";
@@ -384,19 +403,30 @@ async function provisionVapiPhone(
     .limit(1)
     .maybeSingle();
 
+  // Flag: when a pool number already has a vapi_phone_id, we PATCH the assistant
+  // binding rather than doing a full POST import (which requires live Twilio creds).
+  // This allows pool reuse even when the Twilio account is suspended.
+  let poolVapiPhoneId: string | null = null;
+
   if (poolNumber) {
     logInfo("Using pooled phone number", {
       ...baseLogOptions,
-      context: { phoneE164: poolNumber.phone_number, poolId: poolNumber.id }
+      context: {
+        phoneE164: poolNumber.phone_number,
+        poolId: poolNumber.id,
+        hasExistingVapiId: !!poolNumber.vapi_phone_id,
+      }
     });
 
     phoneE164 = poolNumber.phone_number;
-    // If it was already in Vapi (likely), we might have vapi_phone_id
-    // But we will re-import/update it below to be safe and bind to new assistant
-
-    // We treat it as if we "bought" it, but providerId is existing
     providerProviderId = poolNumber.provider_id || `pool-${poolNumber.id}`;
     providerMetadata = { pooled: true, original_id: poolNumber.id };
+
+    // If the number is already registered in Vapi, skip the POST import
+    // and just PATCH the assistantId. No Twilio credentials required.
+    if (poolNumber.vapi_phone_id) {
+      poolVapiPhoneId = poolNumber.vapi_phone_id;
+    }
 
     // We don't need to buy from Twilio/Vapi
   } else if (testConfig?.mock_provider) {
@@ -516,29 +546,48 @@ async function provisionVapiPhone(
     };
   }
 
-  logInfo("Importing number to Vapi", {
-    ...baseLogOptions,
-    context: {
-      phoneE164,
-      payload: { ...vapiPayload, twilioApiSecret: "***" }, // Redact secret
-      isTestMode
-    },
-  });
-
   let vapiPhone: any;
 
   if (isTestMode) {
     // MOCK Vapi Response for Test Mode
     logInfo("Test Mode: Mocking Vapi Import (Skipping actual API call)", baseLogOptions);
     vapiPhone = {
-      id: `test-vapi-phone-${Date.now()}`,
+      id: poolVapiPhoneId || `test-vapi-phone-${Date.now()}`,
       number: phoneE164,
       phoneNumber: phoneE164,
       createdAt: new Date().toISOString(),
       provider: "twilio"
     };
+  } else if (poolVapiPhoneId) {
+    // POOL FAST-PATH: number is already in Vapi — just update the assistant binding.
+    // This only requires the Vapi API key, NOT Twilio credentials, so it works
+    // even when the Twilio account is suspended.
+    logInfo("Pool fast-path: PATCHing existing Vapi phone to bind new assistant", {
+      ...baseLogOptions,
+      context: { vapi_phone_id: poolVapiPhoneId, assistantId: vapiAssistantId },
+    });
+    const patchRes = await fetch(`${VAPI_BASE_URL}/phone-number/${poolVapiPhoneId}`, {
+      method: "PATCH",
+      headers: {
+        "Authorization": `Bearer ${VAPI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ assistantId: vapiAssistantId }),
+    });
+    if (!patchRes.ok) {
+      const errText = await patchRes.text();
+      throw new Error(`Vapi phone PATCH failed: ${patchRes.status} ${errText}`);
+    }
+    vapiPhone = await patchRes.json();
   } else {
-    // REAL Vapi Call
+    // REAL Vapi POST import (requires Twilio credentials)
+    logInfo("Importing number to Vapi", {
+      ...baseLogOptions,
+      context: {
+        phoneE164,
+        payload: { ...vapiPayload, twilioApiSecret: "***" },
+      },
+    });
     let vapiResponse;
     if (testConfig?.mock_provider) {
       logInfo("Test Mode: Mocking Vapi Import (Mock Provider Flag)", baseLogOptions);
@@ -710,6 +759,11 @@ async function processJob(job: any, supabase: any): Promise<void> {
       job_id: job.id,
       attempts: job.attempts
     });
+    capturePostHog("provisioning_started", job.user_id || job.account_id, {
+      account_id: job.account_id,
+      job_id: job.id,
+      attempt: job.attempts || 1,
+    });
 
     // CHECK FOR SIMULATED FAILURE (E2E TESTING)
     const testConfig = job.test_config; // Loaded from select *
@@ -731,12 +785,39 @@ async function processJob(job: any, supabase: any): Promise<void> {
     // NOTE: is_test_account removed from select - column may not exist yet
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
-      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code")
+      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code, subscription_status, trial_active, trial_expires_at")
       .eq("id", job.account_id)
       .single();
 
     if (accountError || !accountData) {
       throw new Error(`Failed to fetch account data: ${accountError?.message || "Account not found"}`);
+    }
+
+    // Guard: don't provision numbers for canceled or permanently expired accounts.
+    // A trialing or active subscription (or null/unknown status during onboarding) proceeds.
+    const canceledStatuses = ["canceled", "cancelled", "unpaid"];
+    const isCanceled = canceledStatuses.includes(accountData.subscription_status || "");
+    const isTrialExpired = accountData.trial_active === false &&
+      accountData.trial_expires_at &&
+      new Date(accountData.trial_expires_at) < new Date() &&
+      !["active", "trialing"].includes(accountData.subscription_status || "");
+
+    if (isCanceled || isTrialExpired) {
+      logWarn("Skipping provisioning for inactive account", {
+        ...baseLogOptions,
+        context: {
+          subscription_status: accountData.subscription_status,
+          trial_active: accountData.trial_active,
+          trial_expires_at: accountData.trial_expires_at,
+          reason: isCanceled ? "canceled" : "trial_expired",
+        },
+      });
+      await supabase.from("provisioning_jobs").update({
+        status: "skipped",
+        error: `Skipped: account is ${isCanceled ? "canceled" : "trial expired"}`,
+        updated_at: new Date().toISOString(),
+      }).eq("id", job.id);
+      return;
     }
 
     // Check for test mode - use zip_code as fallback since is_test_account column may not exist
@@ -917,12 +998,55 @@ async function processJob(job: any, supabase: any): Promise<void> {
       },
     });
 
-    // Track Success
+    // Track Success (DB analytics)
     trackEvent(supabase, job.account_id, job.user_id, "provisioning_completed", {
       job_id: job.id,
       phone_number: phoneE164,
       vapi_phone_id: vapiPhoneId
     });
+
+    // PostHog: provisioning_completed
+    capturePostHog("provisioning_completed", job.user_id || job.account_id, {
+      account_id: job.account_id,
+      job_id: job.id,
+      phone_number: phoneE164,
+      area_code: requestedAreaCode,
+      used_pool: !!providerMetadata?.pooled,
+      attempts: job.attempts || 1,
+    });
+
+    // Notify customer via email + SMS that their number is ready
+    try {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", job.user_id)
+        .maybeSingle();
+
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+      if (supabaseUrl && serviceRoleKey) {
+        await fetch(`${supabaseUrl}/functions/v1/notify_number_ready`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "phone_ready",
+            accountId: job.account_id,
+            phoneNumber: phoneE164,
+            userPhone: profileData?.phone || undefined,
+          }),
+        });
+      }
+    } catch (notifyErr) {
+      // Non-blocking: log but don't fail provisioning
+      logWarn("notify_number_ready failed (non-critical)", {
+        ...baseLogOptions,
+        error: notifyErr,
+      });
+    }
   } catch (error: any) {
     // Job failed - determine if we should retry
     const newAttempts = (job.attempts || 0) + 1;
@@ -983,6 +1107,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         error: error.message,
         attempt: newAttempts,
         is_permanent: true
+      });
+      capturePostHog("provisioning_failed", job.user_id || job.account_id, {
+        account_id: job.account_id,
+        job_id: job.id,
+        error: error.message,
+        attempt: newAttempts,
+        is_permanent: true,
       });
 
       // Update user's onboarding status to provision_failed (hybrid onboarding flow)

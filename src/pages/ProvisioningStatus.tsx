@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { featureFlags } from "@/lib/featureFlags";
 import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
+import { capture } from "@/lib/analytics";
 
 const TIMEOUT_MS = 60000; // 60 seconds
 const STUCK_THRESHOLD_MS = 30000; // Log to Sentry after 30s
@@ -226,6 +227,10 @@ export default function ProvisioningStatus() {
             if (active && status === "pending") {
                 setStatus("timeout");
                 if (timerRef.current) clearInterval(timerRef.current);
+                capture("provisioning_timeout", {
+                    elapsed_ms: TIMEOUT_MS,
+                    account_id: accountId,
+                });
             }
         }, TIMEOUT_MS);
 
