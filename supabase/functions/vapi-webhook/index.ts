@@ -1019,14 +1019,6 @@ async function maybeFireOnboardingTestCallEvent(
     callRecord: Record<string, unknown>
 ): Promise<void> {
     try {
-        // Skip if test call already verified (idempotent guard)
-        const { data: account } = await supabase
-            .from('accounts')
-            .select('test_call_verified_at')
-            .eq('id', accountId)
-            .single();
-        if (!account || account.test_call_verified_at !== null) return;
-
         // Get phone activation time for the onboarding window check
         let activatedAt: string | null = null;
         if (phoneNumberId) {
@@ -1048,6 +1040,17 @@ async function maybeFireOnboardingTestCallEvent(
                 : Date.now() - 2 * 60 * 60 * 1000;
             if (callTime < windowStart) return; // Outside onboarding window
         }
+
+        // Atomically claim the first-fire: only the UPDATE winner fires PostHog.
+        // Mirrors the get_onboarding_state RPC pattern (UPDATE WHERE IS NULL, check row count).
+        // Prevents duplicate events when multiple qualifying calls arrive before the frontend polls.
+        const { data: claimed } = await supabase
+            .from('accounts')
+            .update({ test_call_verified_at: new Date().toISOString() })
+            .eq('id', accountId)
+            .is('test_call_verified_at', null)
+            .select('id');
+        if (!claimed || claimed.length === 0) return; // Already set — another webhook or the RPC won
 
         await capturePostHog('onboarding_test_call_completed', distinctId, {
             account_id: accountId,
