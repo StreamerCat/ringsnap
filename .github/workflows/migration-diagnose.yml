@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector --no-verify-jwt 2>&1 | tee supabase_start.log
+          supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector 2>&1 | tee supabase_start.log
           exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0

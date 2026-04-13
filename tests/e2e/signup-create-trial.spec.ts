@@ -153,7 +153,7 @@ test.describe('Signup – create-trial API', () => {
                     planType: 'professional',
                     paymentMethodId: 'pm_bypass_test',
                     bypassStripe: true,
-                    zipCode: '90210',
+                    zipCode: '99999', // Test mode: skips real Twilio/Vapi provisioning
                     assistantGender: 'female',
                     source: 'website',
                 },
@@ -198,7 +198,7 @@ test.describe('Signup – create-trial API', () => {
             planType: 'professional',
             paymentMethodId: 'pm_bypass_test',
             bypassStripe: true,
-            zipCode: '10001',
+            zipCode: '99999', // Test mode: skips real Twilio/Vapi provisioning
             assistantGender: 'male',
             source: 'website',
         };
