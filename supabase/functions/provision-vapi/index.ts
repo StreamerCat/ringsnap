@@ -1023,6 +1023,15 @@ async function processJob(job: any, supabase: any): Promise<void> {
         .eq("id", job.user_id)
         .maybeSingle();
 
+      // Fetch email directly from auth — avoids relying on the notify_number_ready
+      // fallback which queries profiles by is_primary and can fail silently on
+      // edge-case accounts that lack that flag.
+      let userEmail: string | undefined;
+      if (job.user_id) {
+        const { data: authUser } = await supabase.auth.admin.getUserById(job.user_id);
+        userEmail = authUser?.user?.email || undefined;
+      }
+
       const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
       if (supabaseUrl && serviceRoleKey) {
@@ -1036,6 +1045,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
             type: "phone_ready",
             accountId: job.account_id,
             phoneNumber: phoneE164,
+            userEmail,
             userPhone: profileData?.phone || undefined,
           }),
         });
