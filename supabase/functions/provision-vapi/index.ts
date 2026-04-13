@@ -819,11 +819,18 @@ async function processJob(job: any, supabase: any): Promise<void> {
       }).eq("id", job.id);
       // Reset account lifecycle — it was set to "processing" above; bring it back
       // to a terminal state so the account is never stuck in processing.
-      await supabase.rpc("update_provisioning_lifecycle", {
+      const skipReason = `Skipped: account is ${isCanceled ? "canceled" : "trial expired"}`;
+      const { error: lifecycleSkipError } = await supabase.rpc("update_provisioning_lifecycle", {
         p_account_id: job.account_id,
         p_status: "skipped",
-        p_error: `Skipped: account is ${isCanceled ? "canceled" : "trial expired"}`,
+        p_error: skipReason,
       });
+      if (lifecycleSkipError) {
+        logError("Failed to reset account lifecycle after skip", {
+          ...baseLogOptions,
+          context: { error: lifecycleSkipError.message, reason: skipReason },
+        });
+      }
       return;
     }
 
