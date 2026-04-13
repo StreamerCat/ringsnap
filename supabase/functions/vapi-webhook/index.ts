@@ -1019,16 +1019,20 @@ async function maybeFireOnboardingTestCallEvent(
     callRecord: Record<string, unknown>
 ): Promise<void> {
     try {
-        // Get phone activation time for the onboarding window check
-        let activatedAt: string | null = null;
-        if (phoneNumberId) {
-            const { data: phone } = await supabase
-                .from('phone_numbers')
-                .select('activated_at')
-                .eq('id', phoneNumberId)
-                .single();
-            activatedAt = phone?.activated_at ?? null;
-        }
+        // Verify this is the primary active onboarding number — mirrors get_onboarding_state RPC
+        // which only treats calls to is_primary=true + status='active' numbers as test calls.
+        // Without this guard, calls to secondary/legacy numbers would fire the event while
+        // the RPC still reports onboarding incomplete.
+        if (!phoneNumberId) return; // No phone number resolved — cannot be a test call
+        const { data: phone } = await supabase
+            .from('phone_numbers')
+            .select('activated_at')
+            .eq('id', phoneNumberId)
+            .eq('is_primary', true)
+            .eq('status', 'active')
+            .single();
+        if (!phone) return; // Not the primary active number — skip
+        const activatedAt: string | null = phone.activated_at ?? null;
 
         // Verify call is within the onboarding window — mirrors get_onboarding_state RPC logic:
         //   started_at >= COALESCE(activated_at, NOW() - INTERVAL '2 hours')
