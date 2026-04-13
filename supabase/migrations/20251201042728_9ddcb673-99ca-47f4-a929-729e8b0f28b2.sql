@@ -32,4 +32,4 @@ CREATE INDEX IF NOT EXISTS idx_profiles_onboarding_status ON public.profiles(onb
 UPDATE public.profiles
 SET onboarding_status = 'active'
 WHERE account_id IS NOT NULL
-  AND onboarding_status IS NULL;
+  AND (onboarding_status IS NULL OR onboarding_status = 'not_started');
