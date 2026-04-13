@@ -94,9 +94,20 @@ export const ActivationStepper = ({ accountId }: ActivationStepperProps) => {
                     ? Math.round((Date.now() - callAttemptedAt.getTime()) / 3600000 * 10) / 10
                     : undefined,
             });
+            // PostHog: dedicated onboarding test call completed event
+            capture('onboarding_test_call_completed', {
+                account_id: accountId,
+                phone_number_id: state?.primary_phone_number_id,
+                ring_snap_number: state?.primary_phone_number,
+                test_call_verified_at: state?.test_call_verified_at,
+                time_to_completion_minutes: callAttemptedAt
+                    ? Math.round((Date.now() - callAttemptedAt.getTime()) / 60000)
+                    : undefined,
+                source: 'client',
+            }, { dedupKey: `onboarding_test_call_completed_${accountId}`, dedupWindowMs: 60000 });
             capture('activation_milestone_reached', { milestone_name: 'test_call_detected' });
         }
-    }, [state?.test_call_detected, state?.primary_phone_number_id, callAttemptedAt]);
+    }, [state?.test_call_detected, state?.primary_phone_number_id, callAttemptedAt, accountId, state?.primary_phone_number, state?.test_call_verified_at]);
 
     // Handle Call Now click with tracking
     const handleCallNowClick = useCallback(async () => {
