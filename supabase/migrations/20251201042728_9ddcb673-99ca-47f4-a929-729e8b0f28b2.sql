@@ -29,14 +29,32 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_profiles_onboarding_status ON public.profiles(onboarding_status);
 
 -- Backfill existing records with correct starting status
-UPDATE public.profiles
-SET onboarding_status = 'active'
-WHERE account_id IS NOT NULL
-  AND (onboarding_status IS NULL OR onboarding_status = 'not_started');
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'profiles'
+      AND column_name = 'onboarding_status'
+  ) AND EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'profiles'
+      AND column_name = 'account_id'
+  ) THEN
+    UPDATE public.profiles
+    SET onboarding_status = 'active'
+    WHERE account_id IS NOT NULL
+      AND (onboarding_status IS NULL OR onboarding_status = 'not_started');
 
-UPDATE public.profiles
-SET onboarding_status = 'not_started'
-WHERE onboarding_status IS NULL;
+    UPDATE public.profiles
+    SET onboarding_status = 'not_started'
+    WHERE onboarding_status IS NULL;
+  END IF;
+END
+$$;
 
 -- Ensure future rows default to not_started
 ALTER TABLE public.profiles
