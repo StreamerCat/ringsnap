@@ -1006,8 +1006,8 @@ async function writeBillingLedgerForCall(
  * Fire onboarding_test_call_completed PostHog event server-side when a qualifying
  * inbound call is the first valid test call for an account still in onboarding.
  *
- * Deduplication: checks accounts.test_call_verified_at IS NULL so only fires once,
- * even if the frontend RPC also sets that field later via get_onboarding_state.
+ * Deduplication: atomically sets accounts.test_call_verified_at (WHERE NULL) so only
+ * the first qualifying webhook can emit the event.
  * Best-effort — never throws.
  */
 async function maybeFireOnboardingTestCallEvent(
@@ -1044,9 +1044,10 @@ async function maybeFireOnboardingTestCallEvent(
         // Atomically claim the first-fire: only the UPDATE winner fires PostHog.
         // Mirrors the get_onboarding_state RPC pattern (UPDATE WHERE IS NULL, check row count).
         // Prevents duplicate events when multiple qualifying calls arrive before the frontend polls.
+        const verifiedAt = new Date().toISOString();
         const { data: claimed } = await supabase
             .from('accounts')
-            .update({ test_call_verified_at: new Date().toISOString() })
+            .update({ test_call_verified_at: verifiedAt })
             .eq('id', accountId)
             .is('test_call_verified_at', null)
             .select('id');
@@ -1060,6 +1061,7 @@ async function maybeFireOnboardingTestCallEvent(
             from_number: callRecord.from_number,
             ring_snap_number: callRecord.to_number,
             activated_at: activatedAt,
+            test_call_verified_at: verifiedAt,
             source: 'server',
         });
 
