@@ -62,7 +62,6 @@ export const ResourceDownloadModal = ({
 
             if (dbError) {
                 console.error("Error storing lead:", dbError);
-                throw dbError;
             }
 
             // 2. Success message
