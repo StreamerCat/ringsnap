@@ -817,6 +817,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         error: `Skipped: account is ${isCanceled ? "canceled" : "trial expired"}`,
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
+      // Reset account lifecycle — it was set to "processing" above; bring it back
+      // to a terminal state so the account is never stuck in processing.
+      await supabase.rpc("update_provisioning_lifecycle", {
+        p_account_id: job.account_id,
+        p_status: "skipped",
+        p_error: `Skipped: account is ${isCanceled ? "canceled" : "trial expired"}`,
+      });
       return;
     }
 
@@ -1006,12 +1013,12 @@ async function processJob(job: any, supabase: any): Promise<void> {
     });
 
     // PostHog: provisioning_completed
+    // Note: requestedAreaCode and providerMetadata are scoped to provisionVapiPhone
+    // and are not returned; only include fields available in processJob scope.
     capturePostHog("provisioning_completed", job.user_id || job.account_id, {
       account_id: job.account_id,
       job_id: job.id,
       phone_number: phoneE164,
-      area_code: requestedAreaCode,
-      used_pool: !!providerMetadata?.pooled,
       attempts: job.attempts || 1,
     });
 
