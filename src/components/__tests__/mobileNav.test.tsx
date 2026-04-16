@@ -51,7 +51,7 @@ describe("MobileNav", () => {
     });
   });
 
-  it("renders Hear It Live and keeps Pricing as the last link before Sign In", async () => {
+  it("renders top-level nav links and keeps Pricing before Sign In", async () => {
     const user = userEvent.setup();
 
     render(
@@ -62,9 +62,11 @@ describe("MobileNav", () => {
 
     await user.click(screen.getByRole("button", { name: /open menu/i }));
 
-    const hearItLive = await screen.findByRole("link", { name: "Hear It Live" });
-    expect(hearItLive).toHaveAttribute("href", "/#live-demo");
+    // Verify current top-level nav items are present
+    expect(await screen.findByRole("link", { name: "Field Guides" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Why RingSnap" })).toBeInTheDocument();
 
+    // Pricing should appear before Sign In in document order
     const pricingLink = screen.getByRole("link", { name: "Pricing" });
     const signInLink = screen.getByRole("link", { name: "Sign In" });
     expect(pricingLink.compareDocumentPosition(signInLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

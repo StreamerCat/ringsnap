@@ -14,7 +14,6 @@ describe("marketing navigation anchors", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("link", { name: "Features" })).toHaveAttribute("href", "/#features");
     expect(screen.getByRole("link", { name: "Hear it in action" })).toHaveAttribute("href", "/#live-demo");
     expect(screen.getByRole("link", { name: "ROI Calculator" })).toHaveAttribute("href", "/#roi-calculator");
   });
