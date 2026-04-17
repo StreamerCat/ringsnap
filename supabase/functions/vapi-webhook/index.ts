@@ -107,8 +107,17 @@ Deno.serve(withSentryEdge(
             const expectedSecret = Deno.env.get('VAPI_WEBHOOK_SECRET');
             const incomingSecret = req.headers.get('x-vapi-secret');
 
+            function timingSafeEqual(a: string, b: string): boolean {
+                if (a.length !== b.length) return false;
+                let diff = 0;
+                for (let i = 0; i < a.length; i++) {
+                    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+                }
+                return diff === 0;
+            }
+
             if (authMode === 'secret' && expectedSecret) {
-                if (!incomingSecret || incomingSecret !== expectedSecret) {
+                if (!incomingSecret || !timingSafeEqual(incomingSecret, expectedSecret)) {
                     const errorMsg = incomingSecret ? "Secret mismatch" : "Missing secret header";
                     await writeToInbox(supabase, {
                         provider_call_id: providerCallId,

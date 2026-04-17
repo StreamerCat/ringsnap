@@ -10,6 +10,22 @@ const corsHeaders = {
 serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+    // Require DEBUG_SECRET header — this endpoint exposes full account data and can mutate state.
+    const debugSecret = Deno.env.get("DEBUG_SECRET");
+    if (!debugSecret) {
+        return new Response(JSON.stringify({ error: "Debug endpoint disabled in this environment" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+    const providedSecret = req.headers.get("x-debug-secret");
+    if (!providedSecret || providedSecret !== debugSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+
     try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";

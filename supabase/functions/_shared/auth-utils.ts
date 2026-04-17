@@ -242,9 +242,10 @@ export async function checkRateLimit(
     });
 
   if (error) {
-    console.error('Rate limit check failed:', error);
-    // Fail open - allow the request if rate limit check fails
-    return { allowed: true };
+    // Fail closed: if the rate-limit check itself fails (e.g. DB unavailable),
+    // deny the request rather than silently allowing unlimited attempts.
+    console.error('Rate limit check failed — denying request to prevent brute-force bypass:', error);
+    return { allowed: false };
   }
 
   return { allowed: data as boolean };

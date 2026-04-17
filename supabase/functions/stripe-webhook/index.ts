@@ -351,6 +351,76 @@ async function sendInvoiceEmail({
   });
 }
 
+async function sendPaymentFailureEmail({
+  recipientEmail,
+  customerName,
+  hostedInvoiceUrl,
+  billingPortalUrl,
+  logOptions,
+}: {
+  recipientEmail: string;
+  customerName: string;
+  hostedInvoiceUrl: string | null;
+  billingPortalUrl: string | null;
+  logOptions: BaseLogContext;
+}): Promise<void> {
+  if (!RESEND_API_KEY) return;
+
+  const updateLink = billingPortalUrl ?? hostedInvoiceUrl ?? 'https://getringsnap.com/dashboard?tab=billing';
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background-color:#f9fafb;">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;padding:32px;border:1px solid #e5e7eb;">
+  <h1 style="color:#111827;font-size:20px;margin:0 0 16px;">Payment failed — action required</h1>
+  <p style="color:#374151;margin:0 0 12px;">Hi ${customerName},</p>
+  <p style="color:#374151;margin:0 0 12px;">We weren't able to process your RingSnap subscription payment. Your AI receptionist will continue answering calls for now, but service may be paused if we can't collect payment.</p>
+  <p style="color:#374151;margin:0 0 24px;">Please update your payment method to keep your service running uninterrupted.</p>
+  <a href="${updateLink}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;margin-bottom:24px;">Update Payment Method</a>
+  <p style="color:#6b7280;font-size:14px;margin:0 0 8px;">Common reasons for payment failures:</p>
+  <ul style="color:#6b7280;font-size:14px;margin:0 0 24px;padding-left:20px;">
+    <li>Card expired or invalid</li>
+    <li>Insufficient funds</li>
+    <li>Bank declined the charge</li>
+  </ul>
+  <p style="color:#6b7280;font-size:14px;margin:0;">Questions? Reply to this email and we'll help sort it out.</p>
+  <p style="color:#6b7280;font-size:14px;margin:8px 0 0;">— The RingSnap Team</p>
+</div>
+</body>
+</html>`;
+
+  const textBody = [
+    `Hi ${customerName},`,
+    '',
+    "We weren't able to process your RingSnap subscription payment. Your AI receptionist will continue answering calls for now, but service may be paused if we can't collect payment.",
+    '',
+    `Update your payment method here: ${updateLink}`,
+    '',
+    'Common reasons: card expired, insufficient funds, bank declined.',
+    '',
+    "Questions? Reply to this email and we'll help.",
+    '',
+    '— The RingSnap Team',
+  ].join('\n');
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'RingSnap Billing <billing@getringsnap.com>',
+        to: recipientEmail,
+        subject: 'Action required: RingSnap payment failed',
+        html: htmlBody,
+        text: textBody,
+      }),
+    });
+    logInfo('Payment failure email sent', { ...logOptions, context: { recipientEmail } });
+  } catch (err) {
+    logError('Failed to send payment failure email (non-blocking)', { ...logOptions, error: err });
+  }
+}
+
 const FUNCTION_NAME = "stripe-webhook";
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET');
@@ -780,7 +850,7 @@ serve(async (req) => {
           .from('accounts')
           .update({
             subscription_status: 'past_due',
-            unpaid_since: new Date().toISOString(), // Start tracking delinquency
+            unpaid_since: new Date().toISOString(),
           })
           .eq('stripe_customer_id', customerId);
 
@@ -788,6 +858,48 @@ serve(async (req) => {
           ...baseLogOptions,
           context: { customerId }
         });
+
+        // Send recovery email — look up account + primary profile for recipient
+        if (RESEND_API_KEY && customerId) {
+          try {
+            const { data: failedAccount } = await supabase
+              .from('accounts')
+              .select('id, company_name')
+              .eq('stripe_customer_id', customerId)
+              .maybeSingle();
+
+            if (failedAccount) {
+              const { data: failedProfile } = await supabase
+                .from('profiles')
+                .select('id, name')
+                .eq('account_id', failedAccount.id)
+                .eq('is_primary', true)
+                .maybeSingle();
+
+              if (failedProfile?.id) {
+                const { data: authUser } = await supabase.auth.admin.getUserById(failedProfile.id);
+                const recipientEmail = authUser?.user?.email ?? null;
+                if (recipientEmail) {
+                  const siteUrl = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
+                  await sendPaymentFailureEmail({
+                    recipientEmail,
+                    customerName: failedProfile.name || failedAccount.company_name || 'there',
+                    hostedInvoiceUrl: (invoice as any).hosted_invoice_url ?? null,
+                    billingPortalUrl: `${siteUrl}/dashboard?tab=billing`,
+                    logOptions: { ...baseLogOptions, accountId: failedAccount.id },
+                  });
+                }
+              }
+            }
+          } catch (emailErr) {
+            logError('Non-blocking: failed to send payment failure email', {
+              ...baseLogOptions,
+              error: emailErr,
+              context: { customerId },
+            });
+          }
+        }
+
         break;
       }
 

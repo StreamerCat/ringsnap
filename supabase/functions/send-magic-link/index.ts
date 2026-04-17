@@ -50,11 +50,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Determine SITE_URL from request origin (for local dev) or fallback to env
+  // Determine SITE_URL: only trust the request origin if it matches an explicit allowlist.
+  // Accepting an arbitrary Origin header would allow an attacker to redirect magic-link
+  // callback URLs to a malicious domain and steal the auth token.
   const origin = req.headers.get('origin');
-  const envSiteUrl = Deno.env.get('SITE_URL');
-  // Use origin if it's a valid URL (localhost or known domain), otherwise fallback
-  const SITE_URL = origin || envSiteUrl || 'https://getringsnap.com';
+  const envSiteUrl = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
+  const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '')
+    .split(',').map(o => o.trim()).filter(Boolean);
+  // Always permit localhost in development and the configured SITE_URL.
+  const isAllowedOrigin = origin && (
+    allowedOrigins.includes(origin) ||
+    origin === envSiteUrl ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:')
+  );
+  const SITE_URL = isAllowedOrigin ? origin : envSiteUrl;
 
 
   try {
