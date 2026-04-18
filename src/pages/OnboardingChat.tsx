@@ -52,7 +52,7 @@ import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { extractUserError, logClientError } from "@/lib/errors";
 import { trackFunnelEvent, trackCheckpoint, trackConversion, trackFormEvent, trackTiming } from "@/lib/sentry-tracking";
-import { capture, identify } from "@/lib/analytics";
+import { capture, identify, IS_DEV } from "@/lib/analytics";
 import { getExperimentAttribution } from "@/lib/experimentAttribution";
 import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
@@ -79,7 +79,7 @@ const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 if (!STRIPE_KEY) {
   console.error("VITE_STRIPE_PUBLISHABLE_KEY is missing!");
 } else {
-  console.log("Stripe Key loaded (prefix):", STRIPE_KEY.substring(0, 8) + "...");
+  if (IS_DEV) console.log("Stripe Key loaded (prefix):", STRIPE_KEY.substring(0, 8) + "...");
 }
 
 const stripePromise = loadStripe(STRIPE_KEY!);
@@ -307,7 +307,7 @@ function OnboardingChatInner() {
         const { data: authData, error: authError } = await supabase.auth.getUser();
 
         if (authError && authError.name !== "AuthSessionMissingError") {
-          console.log("[OnboardingChat] auth lookup error", authError);
+          if (IS_DEV) console.log("[OnboardingChat] auth lookup error", authError);
         }
 
         if (authData?.user) {
@@ -330,13 +330,13 @@ function OnboardingChatInner() {
           return;
         }
       } catch (err) {
-        console.log("[OnboardingChat] auth check skipped", err);
+        if (IS_DEV) console.log("[OnboardingChat] auth check skipped", err);
       }
 
       // Check for lead_id
       if (!lead_id) {
         // No lead_id and not authenticated - go back to start
-        console.log("[OnboardingChat] Resume lookup skipped - no lead id");
+        if (IS_DEV) console.log("[OnboardingChat] Resume lookup skipped - no lead id");
         toast.error("Please start the signup process first");
         navigate("/start", { replace: true });
         return;
@@ -344,7 +344,7 @@ function OnboardingChatInner() {
 
       // Load lead data
       try {
-        console.log("[OnboardingChat] Attempting resume lookup", { leadId: lead_id });
+        if (IS_DEV) console.log("[OnboardingChat] Attempting resume lookup", { leadId: lead_id });
         const { data: lead, error } = await supabase
           .from("signup_leads")
           .select("id, email, full_name, completed_at")
@@ -352,7 +352,7 @@ function OnboardingChatInner() {
           .maybeSingle();
 
         if (error || !lead) {
-          console.log("[OnboardingChat] Resume lookup failed - not found", { leadId: lead_id, error });
+          if (IS_DEV) console.log("[OnboardingChat] Resume lookup failed - not found", { leadId: lead_id, error });
           // Clear the bad lead_id so the user gets a clean start form
           try { localStorage.removeItem(LEAD_ID_KEY); } catch { /* ignore */ }
           toast.error("Could not find your signup. Please start again.");
@@ -645,7 +645,7 @@ function OnboardingChatInner() {
       let paymentMethod = { id: "pm_bypass_check_deploy" };
 
       if (isBypassMode) {
-        console.log("[BYPASS MODE] Skipping Stripe frontend - using mock payment method");
+        if (IS_DEV) console.log("[BYPASS MODE] Skipping Stripe frontend - using mock payment method");
         addMessage("assistant", "Test Mode: Skipping payment verification...");
         await showTypingDelay(500);
       } else {

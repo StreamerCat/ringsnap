@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IS_DEV } from "@/lib/analytics";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Elements } from '@stripe/react-stripe-js';
@@ -73,7 +74,7 @@ function FormPreviewInner() {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    console.log("Form Data (Preview Mode - Not Submitted):", data);
+    if (IS_DEV) console.log("Form Data (Preview Mode - Not Submitted):", data);
 
     setShowSuccess(true);
     setIsSubmitting(false);

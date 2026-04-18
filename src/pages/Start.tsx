@@ -27,7 +27,7 @@ import { supabase } from '@/lib/supabase';
 import { captureSignupLead } from '@/lib/api/leads';
 import { useUser } from '@/lib/auth/useUser';
 import { trackFunnelEvent, trackFormEvent, trackPageLoad } from '@/lib/sentry-tracking';
-import { capture, identify } from '@/lib/analytics';
+import { capture, identify, IS_DEV } from '@/lib/analytics';
 import * as Sentry from '@sentry/react';
 
 // Store lead_id in localStorage for persistence
@@ -132,7 +132,7 @@ export default function Start() {
         try {
           // Small optimization: don't block render for this if we want to show form fast?
           // actually we want to redirect fast if lead exists.
-          console.log('[Start] Attempting resume lookup', { leadId: existingLeadId });
+          if (IS_DEV) console.log('[Start] Attempting resume lookup', { leadId: existingLeadId });
           const { data: lead } = await supabase
             .from('signup_leads' as any)
             .select('id, email, full_name, completed_at')
@@ -151,7 +151,7 @@ export default function Start() {
             clearStoredLeadId();
           }
         } catch (err) {
-          console.log('[Start] Resume lookup skipped', err);
+          if (IS_DEV) console.log('[Start] Resume lookup skipped', err);
         }
       }
 
@@ -216,7 +216,7 @@ export default function Start() {
     setIsSubmitting(true);
 
     try {
-      console.log('[Start] Capturing lead:', { name: trimmedName, email: trimmedEmail });
+      if (IS_DEV) console.log('[Start] Capturing lead:', { name: trimmedName, email: trimmedEmail });
 
       // Get UTM params and other metadata
       const utmSource = searchParams.get('utm_source') || undefined;
@@ -243,7 +243,7 @@ export default function Start() {
       if (!leadId) {
         throw new Error('Failed to save your information');
       }
-      console.log('[Start] Lead captured successfully:', { leadId });
+      if (IS_DEV) console.log('[Start] Lead captured successfully:', { leadId });
 
       // Store lead_id for persistence
       storeLeadId(leadId);

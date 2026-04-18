@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Lock } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
+import { IS_DEV } from "@/lib/analytics";
 
 export default function PasswordReset() {
   const navigate = useNavigate();
@@ -46,7 +47,7 @@ export default function PasswordReset() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[PasswordReset] Auth event:", event);
+      if (IS_DEV) console.log("[PasswordReset] Auth event:", event);
       if (session) {
         setRecoverySession(session);
       } else if (event === "SIGNED_OUT") {

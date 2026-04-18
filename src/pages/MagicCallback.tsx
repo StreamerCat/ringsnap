@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 import { getOrCreateDeviceNonce } from "@/lib/auth/deviceNonce";
-import { identify, capture } from "@/lib/analytics";
+import { identify, capture, IS_DEV } from "@/lib/analytics";
 
 export default function MagicCallback() {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export default function MagicCallback() {
       const token = searchParams.get("token");
       const customRedirect = searchParams.get("redirect");
 
-      console.log('[MagicCallback] Starting verification', { token: token?.substring(0, 10), customRedirect });
+      if (IS_DEV) console.log('[MagicCallback] Starting verification', { token: token?.substring(0, 10), customRedirect });
 
       if (!token) {
         setStatus("error");
@@ -31,10 +31,10 @@ export default function MagicCallback() {
       try {
         // Get device nonce
         const deviceNonce = getOrCreateDeviceNonce();
-        console.log('[MagicCallback] Device nonce:', deviceNonce?.substring(0, 10));
+        if (IS_DEV) console.log('[MagicCallback] Device nonce:', deviceNonce?.substring(0, 10));
 
         // Verify the magic link token
-        console.log('[MagicCallback] Calling verify-magic-link...');
+        if (IS_DEV) console.log('[MagicCallback] Calling verify-magic-link...');
         const { data, error } = await supabase.functions.invoke("verify-magic-link", {
           body: {
             token,
@@ -42,7 +42,7 @@ export default function MagicCallback() {
           }
         });
 
-        console.log('[MagicCallback] Edge function response:', { success: data?.success, error });
+        if (IS_DEV) console.log('[MagicCallback] Edge function response:', { success: data?.success, error });
 
         if (error) {
           console.error('[MagicCallback] Edge function error:', error);
@@ -54,7 +54,7 @@ export default function MagicCallback() {
           throw new Error(data?.error || "Failed to verify magic link");
         }
 
-        console.log('[MagicCallback] Setting session...');
+        if (IS_DEV) console.log('[MagicCallback] Setting session...');
         // Set the session
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: data.session.access_token,
@@ -68,7 +68,7 @@ export default function MagicCallback() {
 
         // Verify session was set
         const { data: { user } } = await supabase.auth.getUser();
-        console.log('[MagicCallback] Session set, user:', user?.id);
+        if (IS_DEV) console.log('[MagicCallback] Session set, user:', user?.id);
 
         if (!user) {
           throw new Error("Session was set but user not found");
@@ -84,7 +84,7 @@ export default function MagicCallback() {
 
         // Determine redirect URL based on role
         const redirectUrl = customRedirect || await redirectToRoleDashboard(user.id);
-        console.log('[MagicCallback] Redirecting to:', redirectUrl);
+        if (IS_DEV) console.log('[MagicCallback] Redirecting to:', redirectUrl);
 
         // Redirect after a short delay
         setTimeout(() => {

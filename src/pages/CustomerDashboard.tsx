@@ -16,7 +16,7 @@ import { getRoleDashboardUrl } from "@/lib/auth/redirects";
 import { isProvisioningInProgress, isProvisioned, getDashboardPlanByKey } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
-import { capture, identify, group, resetAnalytics } from "@/lib/analytics";
+import { capture, identify, group, resetAnalytics, IS_DEV } from "@/lib/analytics";
 import * as Sentry from "@sentry/react";
 import { useVapiWidget } from "@/lib/VapiWidgetContext";
 
@@ -117,7 +117,7 @@ export default function CustomerDashboard() {
               filter: `account_id=eq.${account.id}`
             },
             (payload) => {
-              console.log('New call received:', payload);
+              if (IS_DEV) console.log('New call received:', payload);
               // Add new log to state
               setUsageLogs(prev => [payload.new as any, ...prev]);
               // Optionally reload full dashboard data for updated stats
