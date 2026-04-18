@@ -8,7 +8,7 @@ import * as Sentry from "@sentry/react";
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { redirectToRoleDashboard } from "@/lib/auth/redirects";
-import { identify, capture } from "@/lib/analytics";
+import { identify, capture, IS_DEV } from "@/lib/analytics";
 
 const ERROR_REDIRECT = "/signin";
 const EXCHANGE_TIMEOUT_MS = 10000; // 10 second timeout
@@ -90,7 +90,7 @@ export default function AuthCallback() {
         const normalizedNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
         const redirectUrl = normalizedNext ?? await redirectToRoleDashboard(user.id);
 
-        console.log('[AuthCallback] Redirecting user to:', redirectUrl);
+        if (IS_DEV) console.log('[AuthCallback] Redirecting user to:', redirectUrl);
         navigate(redirectUrl, { replace: true });
       } catch (error: unknown) {
         console.error("Supabase OAuth callback failed:", error);

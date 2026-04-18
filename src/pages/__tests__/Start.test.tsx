@@ -14,8 +14,13 @@ vi.mock("@/lib/supabase", () => ({
     from: vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      // Return an active (non-completed) lead so the lead-resume useEffect navigates
+      // instead of calling clearStoredLeadId(). The navigate mock is a no-op.
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'mock-lead-id', completed_at: null }, error: null }),
     })),
     functions: {
       invoke: vi.fn(),

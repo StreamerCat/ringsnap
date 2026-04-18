@@ -351,6 +351,220 @@ async function sendInvoiceEmail({
   });
 }
 
+async function sendPaymentFailedEmail({
+  account,
+  primaryProfile,
+  recipientEmail,
+  amountDue,
+  logOptions,
+}: {
+  account: AccountRecord;
+  primaryProfile: ProfileRecord | null;
+  recipientEmail: string | null;
+  amountDue: number | null;
+  logOptions: BaseLogContext;
+}): Promise<void> {
+  const logBase = { ...logOptions, accountId: logOptions.accountId ?? account.id };
+  const logCtx = { ...logBase, context: { recipientEmail, accountId: account.id } } as const;
+
+  if (!recipientEmail) {
+    logInfo('No primary email available for payment-failed notification', logCtx);
+    return;
+  }
+  if (!RESEND_API_KEY) {
+    logInfo('Resend API key not configured; skipping payment-failed email', logCtx);
+    return;
+  }
+
+  const customerName = primaryProfile?.name || account.company_name || 'there';
+  const amountFormatted = formatCurrencyFromCents(amountDue ?? 0);
+  const SITE_URL = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
+  const billingUrl = `${SITE_URL}/billing`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Action required: update your payment method</title>
+  </head>
+  <body style="margin:0; padding:24px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color:#f9fafb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden;">
+      <tr>
+        <td style="padding:32px;">
+          <h1 style="margin:0 0 16px 0; font-size:22px; color:#111827;">Payment could not be processed</h1>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">Hi ${customerName},</p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Your most recent payment of <strong>${amountFormatted}</strong> for RingSnap could not be processed.
+          </p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Please update your payment method to keep your service active and avoid any interruption to your call answering.
+          </p>
+          <p style="margin:0 0 24px 0;">
+            <a href="${billingUrl}" target="_blank" rel="noopener" style="display:inline-block; background-color:#D95F3C; color:#ffffff; font-weight:600; font-size:15px; padding:12px 24px; border-radius:8px; text-decoration:none;">
+              Update payment method
+            </a>
+          </p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Need help? Reply to this email and our team will assist you right away.
+          </p>
+          <p style="margin:24px 0 0 0; color:#6b7280; font-size:14px;">— The RingSnap Team</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+  `;
+
+  const textBody = [
+    `Hi ${customerName},`,
+    '',
+    `Your most recent payment of ${amountFormatted} for RingSnap could not be processed.`,
+    '',
+    'Please update your payment method to keep your service active:',
+    billingUrl,
+    '',
+    'Need help? Reply to this email and our team will assist you.',
+    '',
+    '— The RingSnap Team',
+  ].join('\n');
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'RingSnap Billing <billing@getringsnap.com>',
+        to: recipientEmail,
+        subject: 'Action required: update your payment method for RingSnap',
+        html: htmlBody,
+        text: textBody,
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      logError('Payment-failed email: Resend returned error', { ...logCtx, error: new Error(`${response.status}: ${body}`) });
+    } else {
+      logInfo('Payment-failed email sent', logCtx);
+    }
+  } catch (err) {
+    logError('Payment-failed email: network error', { ...logCtx, error: err });
+  }
+}
+
+async function sendCancellationEmail({
+  account,
+  primaryProfile,
+  recipientEmail,
+  serviceEndDate,
+  logOptions,
+}: {
+  account: AccountRecord;
+  primaryProfile: ProfileRecord | null;
+  recipientEmail: string | null;
+  serviceEndDate: string;
+  logOptions: BaseLogContext;
+}): Promise<void> {
+  const logBase = { ...logOptions, accountId: logOptions.accountId ?? account.id };
+  const logCtx = { ...logBase, context: { recipientEmail, accountId: account.id } } as const;
+
+  if (!recipientEmail) {
+    logInfo('No primary email available for cancellation notification', logCtx);
+    return;
+  }
+  if (!RESEND_API_KEY) {
+    logInfo('Resend API key not configured; skipping cancellation email', logCtx);
+    return;
+  }
+
+  const customerName = primaryProfile?.name || account.company_name || 'there';
+  const SITE_URL = Deno.env.get('SITE_URL') || 'https://getringsnap.com';
+  const reactivateUrl = `${SITE_URL}/start`;
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your RingSnap subscription has been cancelled</title>
+  </head>
+  <body style="margin:0; padding:24px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color:#f9fafb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden;">
+      <tr>
+        <td style="padding:32px;">
+          <h1 style="margin:0 0 16px 0; font-size:22px; color:#111827;">Subscription cancelled</h1>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">Hi ${customerName},</p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            We've confirmed the cancellation of your RingSnap subscription.
+          </p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Your service will remain active until <strong>${serviceEndDate}</strong>. After that, calls will no longer be answered by your RingSnap agent.
+          </p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Changed your mind? You can reactivate at any time — your settings and history will be waiting.
+          </p>
+          <p style="margin:0 0 24px 0;">
+            <a href="${reactivateUrl}" target="_blank" rel="noopener" style="display:inline-block; background-color:#D95F3C; color:#ffffff; font-weight:600; font-size:15px; padding:12px 24px; border-radius:8px; text-decoration:none;">
+              Reactivate my account
+            </a>
+          </p>
+          <p style="margin:0 0 16px 0; color:#374151; font-size:16px; line-height:1.6;">
+            Questions? Reply to this email and we'll be happy to help.
+          </p>
+          <p style="margin:24px 0 0 0; color:#6b7280; font-size:14px;">— The RingSnap Team</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+  `;
+
+  const textBody = [
+    `Hi ${customerName},`,
+    '',
+    "We've confirmed the cancellation of your RingSnap subscription.",
+    '',
+    `Your service will remain active until ${serviceEndDate}. After that, calls will no longer be answered by your RingSnap agent.`,
+    '',
+    "Changed your mind? You can reactivate at any time:",
+    reactivateUrl,
+    '',
+    "Questions? Reply to this email and we'll be happy to help.",
+    '',
+    '— The RingSnap Team',
+  ].join('\n');
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'RingSnap Billing <billing@getringsnap.com>',
+        to: recipientEmail,
+        subject: 'Your RingSnap subscription has been cancelled',
+        html: htmlBody,
+        text: textBody,
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      logError('Cancellation email: Resend returned error', { ...logCtx, error: new Error(`${response.status}: ${body}`) });
+    } else {
+      logInfo('Cancellation email sent', logCtx);
+    }
+  } catch (err) {
+    logError('Cancellation email: network error', { ...logCtx, error: err });
+  }
+}
+
 const FUNCTION_NAME = "stripe-webhook";
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET');
@@ -780,7 +994,7 @@ serve(async (req) => {
           .from('accounts')
           .update({
             subscription_status: 'past_due',
-            unpaid_since: new Date().toISOString(), // Start tracking delinquency
+            unpaid_since: new Date().toISOString(),
           })
           .eq('stripe_customer_id', customerId);
 
@@ -788,6 +1002,47 @@ serve(async (req) => {
           ...baseLogOptions,
           context: { customerId }
         });
+
+        // Send payment-failed email — best effort, never throws
+        try {
+          const { data: pfAccount } = await supabase
+            .from('accounts')
+            .select('id, company_name, stripe_customer_id')
+            .eq('stripe_customer_id', customerId)
+            .maybeSingle();
+
+          if (pfAccount) {
+            currentAccountId = pfAccount.id;
+
+            const { data: pfProfile } = await supabase
+              .from('profiles')
+              .select('id, name, account_id')
+              .eq('account_id', pfAccount.id)
+              .eq('is_primary', true)
+              .maybeSingle();
+
+            let pfEmail: string | null = null;
+            if (pfProfile?.id) {
+              const { data: pfAuthUser } = await supabase.auth.admin.getUserById(pfProfile.id);
+              pfEmail = pfAuthUser?.user?.email ?? null;
+            }
+
+            await sendPaymentFailedEmail({
+              account: pfAccount,
+              primaryProfile: pfProfile ?? null,
+              recipientEmail: pfEmail,
+              amountDue: (invoice as any).amount_due ?? null,
+              logOptions: { ...baseLogOptions, accountId: pfAccount.id },
+            });
+          }
+        } catch (emailErr) {
+          logError('Failed to send payment-failed email', {
+            ...baseLogOptions,
+            error: emailErr,
+            context: { customerId },
+          });
+        }
+
         break;
       }
 
@@ -835,6 +1090,53 @@ serve(async (req) => {
             source: 'stripe_webhook',
           });
         }
+
+        // Send cancellation confirmation email — best effort, never throws
+        try {
+          const { data: cancelAccount } = await supabase
+            .from('accounts')
+            .select('id, company_name, stripe_customer_id')
+            .eq('stripe_customer_id', customerId)
+            .maybeSingle();
+
+          if (cancelAccount) {
+            currentAccountId = cancelAccount.id;
+
+            const { data: cancelProfile } = await supabase
+              .from('profiles')
+              .select('id, name, account_id')
+              .eq('account_id', cancelAccount.id)
+              .eq('is_primary', true)
+              .maybeSingle();
+
+            let cancelEmail: string | null = null;
+            if (cancelProfile?.id) {
+              const { data: cancelAuthUser } = await supabase.auth.admin.getUserById(cancelProfile.id);
+              cancelEmail = cancelAuthUser?.user?.email ?? null;
+            }
+
+            const serviceEndDate = periodEnd.toLocaleDateString('en-US', {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            });
+
+            await sendCancellationEmail({
+              account: cancelAccount,
+              primaryProfile: cancelProfile ?? null,
+              recipientEmail: cancelEmail,
+              serviceEndDate,
+              logOptions: { ...baseLogOptions, accountId: cancelAccount.id },
+            });
+          }
+        } catch (emailErr) {
+          logError('Failed to send cancellation email', {
+            ...baseLogOptions,
+            error: emailErr,
+            context: { customerId },
+          });
+        }
+
         break;
       }
 
@@ -1159,36 +1461,16 @@ serve(async (req) => {
           },
         });
 
-        // Report metered overage to Stripe
-        if (overageQuantity > 0 && account.stripe_overage_item_id) {
-          try {
-            const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
-            if (stripeSecretKey) {
-              const stripe = new Stripe(stripeSecretKey, {
-                apiVersion: '2023-10-16',
-                httpClient: Stripe.createFetchHttpClient(),
-              });
-              await stripe.subscriptionItems.createUsageRecord(
-                account.stripe_overage_item_id,
-                { quantity: overageQuantity, action: 'set' }
-              );
-              logInfo('Overage usage record reported to Stripe', {
-                ...baseLogOptions,
-                accountId: account.id,
-                context: { overageMinutes },
-              });
-            }
-          } catch (stripeErr) {
-            logError('Failed to report overage to Stripe', {
-              ...baseLogOptions,
-              accountId: account.id,
-              error: stripeErr,
-            });
-          }
-        }
-
-        // Reset period counters after reporting
-        await supabase
+        // Reset period counters FIRST, then report to Stripe.
+        //
+        // Safety ordering: if the Stripe call were first and the webhook failed before the
+        // DB reset, Stripe would already have the charge recorded; on retry the idempotency
+        // guard would short-circuit and the counters would stay high forever, causing the
+        // next billing cycle's invoice.upcoming to double-charge the same overage.
+        //
+        // By resetting first, the worst-case failure is a missed overage charge for this
+        // period (recoverable), not a double charge (unrecoverable from customer trust).
+        const { error: resetError } = await supabase
           .from('accounts')
           .update({
             minutes_used_current_period: 0,
@@ -1207,10 +1489,54 @@ serve(async (req) => {
           })
           .eq('id', account.id);
 
-        logInfo('Period counters reset after invoice.upcoming', {
+        if (resetError) {
+          logError('Period counter reset failed; skipping Stripe overage report to avoid double-billing on retry', {
+            ...baseLogOptions,
+            accountId: account.id,
+            error: resetError,
+          });
+          break;
+        }
+
+        logInfo('Period counters reset before Stripe overage report', {
           ...baseLogOptions,
           accountId: account.id,
         });
+
+        // Report metered overage to Stripe using the quantity captured before the reset
+        if (overageQuantity > 0 && account.stripe_overage_item_id) {
+          try {
+            const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
+            if (stripeSecretKey) {
+              const stripe = new Stripe(stripeSecretKey, {
+                apiVersion: '2023-10-16',
+                httpClient: Stripe.createFetchHttpClient(),
+              });
+              await stripe.subscriptionItems.createUsageRecord(
+                account.stripe_overage_item_id,
+                { quantity: overageQuantity, action: 'set' }
+              );
+              logInfo('Overage usage record reported to Stripe', {
+                ...baseLogOptions,
+                accountId: account.id,
+                context: { overageQuantity, overageUnit },
+              });
+            }
+          } catch (stripeErr) {
+            // Counters are already reset — the overage charge for this period is lost.
+            // This is preferable to double-billing. Alert via Sentry for manual follow-up.
+            logError('Failed to report overage to Stripe after counter reset — overage may be uncharged this period', {
+              ...baseLogOptions,
+              accountId: account.id,
+              error: stripeErr,
+              context: { overageQuantity, overageUnit },
+            });
+            captureError(stripeErr, {
+              tags: { flow: 'billing', step: 'invoice_upcoming_stripe_report' },
+              extra: { accountId: account.id, overageQuantity, overageUnit },
+            });
+          }
+        }
 
         break;
       }

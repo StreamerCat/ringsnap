@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { captureSignupLead } from "@/lib/api/leads";
+import { IS_DEV } from "@/lib/analytics";
 import { ChatMessage, TypingIndicator, MessageRole } from "@/components/onboarding-chat/ChatMessage";
 import { ChatButtons } from "@/components/onboarding-chat/ChatButtons";
 import { ChatInput } from "@/components/onboarding-chat/ChatInput";
@@ -376,7 +377,7 @@ export default function AISignup() {
 
         await captureSignupLead(leadPayload);
 
-        console.log("Lead captured for failed signup");
+        if (IS_DEV) console.log("Lead captured for failed signup");
       } catch (leadError) {
         console.error("[AI Signup] signup lead insert failed", leadError);
         // Don't show error to user - lead capture is best-effort

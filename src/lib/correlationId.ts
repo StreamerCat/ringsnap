@@ -26,6 +26,7 @@ const TRACE_ID_HEADER = 'x-rs-trace-id';
 const CORRELATION_ID_HEADER = 'x-correlation-id';
 
 const SESSION_STORAGE_KEY = 'ringsnap_trace_id';
+const IS_DEV = import.meta.env.DEV;
 
 /**
  * Generate a new UUID v4 correlation ID
@@ -158,7 +159,7 @@ export function createCorrelatedFetch(
       headers,
     };
 
-    console.log(
+    if (IS_DEV) console.log(
       `[correlationId] Request with correlation ID: ${correlationId}`,
       input
     );
@@ -269,7 +270,7 @@ export function withSupabaseCorrelation<T>(
   // Note: This depends on Supabase client API
   // For now, we'll return the client as-is and rely on fetch wrapper
 
-  console.log(`[correlationId] Supabase request with correlation ID: ${id}`);
+  if (IS_DEV) console.log(`[correlationId] Supabase request with correlation ID: ${id}`);
 
   return supabaseClient;
 }
@@ -281,7 +282,7 @@ export function withSupabaseCorrelation<T>(
  */
 export function logCorrelation(action: string, correlationId?: string): void {
   const id = correlationId || getCorrelationId();
-  console.log(
+  if (IS_DEV) console.log(
     `[correlation-trace] ${action} | correlation_id: ${id} | timestamp: ${new Date().toISOString()}`
   );
 }

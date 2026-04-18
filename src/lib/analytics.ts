@@ -30,7 +30,7 @@ import { useEffect, useRef } from 'react';
 // Configuration
 // ============================================================================
 
-const IS_DEV = import.meta.env.DEV;
+export const IS_DEV = import.meta.env.DEV;
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com';
 
@@ -99,9 +99,7 @@ export function initAnalytics(): void {
       maskAllInputs: true,      // PII protection — always mask inputs
       maskAllText: false,        // Keep text visible for UX analysis
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     enable_recording_console_log: false as any,  // no console log capture
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     capture_performance: false as any,            // no network capture
 
     // Replay is decided once at initialization and is not toggled on route changes.
@@ -244,7 +242,6 @@ export function resetAnalytics(): void {
  * Recorder controls are intentionally not called on navigation because route-based
  * stop/start has caused browser security errors during teardown on history changes.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function updateReplayForPath(path: string): void {
   // intentionally empty
 }
