@@ -230,14 +230,29 @@ const Index = () => {
         <TestimonialMetricsStrip />
 
         <div id="main-content" ref={belowTheFoldRef}>
-          {isBelowTheFoldVisible ? (
-            <ErrorBoundary>
-              <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-                <ContractorTestimonials />
-                <CompetitorComparison />
-                <SolutionDemo />
-                <NextStepsStrip />
-                <CallValueCalculator />
+          <ErrorBoundary>
+            <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
+              {isBelowTheFoldVisible ? (
+                <>
+                  <ContractorTestimonials />
+                  <CompetitorComparison />
+                </>
+              ) : (
+                <div className="w-full h-64" aria-hidden="true" />
+              )}
+
+              <section id={!isBelowTheFoldVisible ? "live-demo" : undefined} aria-label="Live demo">
+                {isBelowTheFoldVisible ? <SolutionDemo /> : <div className="w-full min-h-px" aria-hidden="true" />}
+              </section>
+
+              {isBelowTheFoldVisible ? <NextStepsStrip /> : null}
+
+              <section id={!isBelowTheFoldVisible ? "roi-calculator" : undefined} aria-label="ROI calculator">
+                {isBelowTheFoldVisible ? <CallValueCalculator /> : <div className="w-full min-h-px" aria-hidden="true" />}
+              </section>
+
+              {isBelowTheFoldVisible ? (
+                <>
                 <section className="section-spacer-compact bg-charcoal/5 border-y border-charcoal/10">
                   <div className="site-container max-w-3xl text-center">
                     <p className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
@@ -337,11 +352,10 @@ const Index = () => {
                 </section>
 
                 <ContractorFooter />
-              </Suspense>
-            </ErrorBoundary>
-          ) : (
-            <div className="w-full h-64" aria-hidden="true" />
-          )}
+                </>
+              ) : null}
+            </Suspense>
+          </ErrorBoundary>
         </div>
         <MobileFooterCTA />
       </main>
