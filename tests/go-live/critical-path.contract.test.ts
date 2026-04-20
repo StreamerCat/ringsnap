@@ -13,6 +13,8 @@ describe('Go-live contract checks (edge functions + schema map)', () => {
     expect(src).toContain('provisioning_status');
     expect(src).toContain('provisioning_jobs');
     expect(src).toContain('pending');
+    expect(src).toContain('posthog.flush()');
+    expect(src).not.toContain('posthog.shutdown()');
   });
 
   it('stripe-webhook enforces signature verification and idempotency persistence', () => {
