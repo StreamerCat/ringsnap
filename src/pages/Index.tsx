@@ -1,14 +1,12 @@
 import { Helmet } from "react-helmet-async";
-import { lazy, Suspense, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { ContractorHero } from "@/components/ContractorHero";
 import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteHeader } from "@/components/SiteHeader";
 import { trackFunnelEvent, trackPageLoad } from "@/lib/sentry-tracking";
-import { capture } from "@/lib/analytics";
-import * as Sentry from "@sentry/react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, FileText, Calculator, Thermometer, Wrench, Zap } from "lucide-react";
 
@@ -22,13 +20,39 @@ const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
 
 const Index = () => {
-  const navigate = useNavigate();
+  const belowTheFoldRef = useRef<HTMLDivElement | null>(null);
+  const [isBelowTheFoldVisible, setIsBelowTheFoldVisible] = useState(false);
+
   // Track landing page view for funnel analytics (Sentry + PostHog)
   useEffect(() => {
     trackPageLoad('Index');
     trackFunnelEvent('landing_page_view');
     // PostHog: page_viewed fired by RouteTracker; capture landing-specific event
   }, []);
+
+  useEffect(() => {
+    if (isBelowTheFoldVisible) {
+      return;
+    }
+
+    const section = belowTheFoldRef.current;
+    if (!section) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsBelowTheFoldVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "320px 0px" },
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [isBelowTheFoldVisible]);
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -196,8 +220,6 @@ const Index = () => {
 
       <SiteHeader />
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0 pt-14">
-
-
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:shadow-lg"
@@ -207,115 +229,119 @@ const Index = () => {
         <ContractorHero />
         <TestimonialMetricsStrip />
 
-        <div id="main-content">
-          <ErrorBoundary>
-            <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
-              <ContractorTestimonials />
-              <CompetitorComparison />
-              <SolutionDemo />
-              <NextStepsStrip />
-              <CallValueCalculator />
-              <section className="section-spacer-compact bg-charcoal/5 border-y border-charcoal/10">
-                <div className="site-container max-w-3xl text-center">
-                  <p className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
-                    Your competitor just answered the call you missed.
-                  </p>
-                  <p className="text-lg text-muted-foreground">
-                    The average contractor misses 6 calls on a busy Saturday. At $800 per job, that's $4,800 walking out the door — every weekend.
-                  </p>
-                </div>
-              </section>
-              <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
-                <div className="site-container max-w-4xl text-center">
-                  <PricingTeaserCard headingLevel="h2" />
-                </div>
-              </section>
-
-              {/* CRM Teaser */}
-              <section className="section-spacer-compact bg-white border-t border-border/5">
-                <div className="site-container">
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
-                    <div className="max-w-2xl text-center md:text-left">
-                      <h2 className="text-2xl font-bold mb-3">Not just a receptionist — a built-in CRM</h2>
-                      <p className="text-muted-foreground mb-0">
-                        Every call creates a lead record automatically — job type, urgency, full transcript. Works with Jobber. No extra tools needed.
-                      </p>
-                    </div>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="rounded-full px-8 h-14 text-base font-semibold whitespace-nowrap border-2"
-                      asChild
-                    >
-                      <Link to="/crm">See the Built-In CRM</Link>
-                    </Button>
-                  </div>
-                </div>
-              </section>
-
-              {/* Top Field Guides */}
-              <section aria-labelledby="field-guides-heading" className="section-spacer bg-white border-t border-border/5">
-                <div className="site-container">
-                  <div className="text-center mb-8">
-                    <h2 id="field-guides-heading" className="text-2xl sm:text-3xl font-bold mb-3">Top Field Guides for Home Service Contractors</h2>
-                    <p className="text-muted-foreground max-w-2xl mx-auto">
-                      Free dispatcher scripts, emergency triage guides, and revenue calculators — built for HVAC, plumbing, and electrical businesses.
+        <div id="main-content" ref={belowTheFoldRef}>
+          {isBelowTheFoldVisible ? (
+            <ErrorBoundary>
+              <Suspense fallback={<div className="w-full h-64 flex items-center justify-center" aria-busy="true"><div className="animate-pulse text-muted-foreground">Loading...</div></div>}>
+                <ContractorTestimonials />
+                <CompetitorComparison />
+                <SolutionDemo />
+                <NextStepsStrip />
+                <CallValueCalculator />
+                <section className="section-spacer-compact bg-charcoal/5 border-y border-charcoal/10">
+                  <div className="site-container max-w-3xl text-center">
+                    <p className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
+                      Your competitor just answered the call you missed.
+                    </p>
+                    <p className="text-lg text-muted-foreground">
+                      The average contractor misses 6 calls on a busy Saturday. At $800 per job, that's $4,800 walking out the door — every weekend.
                     </p>
                   </div>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                    {[
-                      { href: "/resources/hvac-dispatcher-script-template", icon: Thermometer, label: "HVAC", title: "HVAC Dispatcher Script Template", desc: "Copy/paste scripts for standard calls, emergencies, price shoppers, and after-hours HVAC." },
-                      { href: "/resources/plumbing-dispatcher-script-template", icon: Wrench, label: "Plumbing", title: "Plumbing Dispatcher Script Template", desc: "Burst pipe, sewer backup, drain cleaning scripts with emergency intake checklist." },
-                      { href: "/resources/electrician-call-answering-script", icon: Zap, label: "Electrical", title: "Electrician Call Answering Script", desc: "Safety-first scripts for electrical emergencies, panel upgrades, and after-hours calls." },
-                      { href: "/resources/missed-call-revenue-calculator", icon: Calculator, label: "Calculator", title: "Missed Call Revenue Calculator", desc: "See exactly how much revenue your shop loses from unanswered calls each month." },
-                      { href: "/resources/hvac-emergency-call-triage", icon: FileText, label: "HVAC", title: "HVAC Emergency Call Triage", desc: "Triage guide for gas leaks, no-heat, and AC failures — what's urgent vs can wait." },
-                      { href: "/resources/electrical-safety-triage-questions", icon: FileText, label: "Electrical", title: "Electrical Safety Triage Questions", desc: "The 8 dispatcher questions that assess danger and prioritize every electrical call." },
-                    ].map(({ href, icon: Icon, label, title, desc }) => (
-                      <Link
-                        key={href}
-                        to={href}
-                        className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                </section>
+                <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
+                  <div className="site-container max-w-4xl text-center">
+                    <PricingTeaserCard headingLevel="h2" />
+                  </div>
+                </section>
+
+                {/* CRM Teaser */}
+                <section className="section-spacer-compact bg-white border-t border-border/5">
+                  <div className="site-container">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
+                      <div className="max-w-2xl text-center md:text-left">
+                        <h2 className="text-2xl font-bold mb-3">Not just a receptionist — a built-in CRM</h2>
+                        <p className="text-muted-foreground mb-0">
+                          Every call creates a lead record automatically — job type, urgency, full transcript. Works with Jobber. No extra tools needed.
+                        </p>
+                      </div>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="rounded-full px-8 h-14 text-base font-semibold whitespace-nowrap border-2"
+                        asChild
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Icon className="h-4 w-4 text-primary" />
+                        <Link to="/crm">See the Built-In CRM</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Top Field Guides */}
+                <section aria-labelledby="field-guides-heading" className="section-spacer bg-white border-t border-border/5">
+                  <div className="site-container">
+                    <div className="text-center mb-8">
+                      <h2 id="field-guides-heading" className="text-2xl sm:text-3xl font-bold mb-3">Top Field Guides for Home Service Contractors</h2>
+                      <p className="text-muted-foreground max-w-2xl mx-auto">
+                        Free dispatcher scripts, emergency triage guides, and revenue calculators — built for HVAC, plumbing, and electrical businesses.
+                      </p>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                      {[
+                        { href: "/resources/hvac-dispatcher-script-template", icon: Thermometer, label: "HVAC", title: "HVAC Dispatcher Script Template", desc: "Copy/paste scripts for standard calls, emergencies, price shoppers, and after-hours HVAC." },
+                        { href: "/resources/plumbing-dispatcher-script-template", icon: Wrench, label: "Plumbing", title: "Plumbing Dispatcher Script Template", desc: "Burst pipe, sewer backup, drain cleaning scripts with emergency intake checklist." },
+                        { href: "/resources/electrician-call-answering-script", icon: Zap, label: "Electrical", title: "Electrician Call Answering Script", desc: "Safety-first scripts for electrical emergencies, panel upgrades, and after-hours calls." },
+                        { href: "/resources/missed-call-revenue-calculator", icon: Calculator, label: "Calculator", title: "Missed Call Revenue Calculator", desc: "See exactly how much revenue your shop loses from unanswered calls each month." },
+                        { href: "/resources/hvac-emergency-call-triage", icon: FileText, label: "HVAC", title: "HVAC Emergency Call Triage", desc: "Triage guide for gas leaks, no-heat, and AC failures — what's urgent vs can wait." },
+                        { href: "/resources/electrical-safety-triage-questions", icon: FileText, label: "Electrical", title: "Electrical Safety Triage Questions", desc: "The 8 dispatcher questions that assess danger and prioritize every electrical call." },
+                      ].map(({ href, icon: Icon, label, title, desc }) => (
+                        <Link
+                          key={href}
+                          to={href}
+                          className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Icon className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-xs font-medium text-muted-foreground">{label}</span>
                           </div>
-                          <span className="text-xs font-medium text-muted-foreground">{label}</span>
-                        </div>
-                        <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
-                        <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                          Read guide <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
-                        </span>
+                          <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                            Read guide <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="text-center">
+                      <Link to="/resources" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                        Browse all 17 free guides and tools <ArrowRight className="h-4 w-4" />
                       </Link>
-                    ))}
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <Link to="/resources" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-                      Browse all 17 free guides and tools <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              {/* How We Compare */}
-              <section aria-labelledby="compare-heading" className="section-spacer-compact bg-muted/30 border-t border-border/5">
-                <div className="site-container max-w-4xl text-center">
-                  <h2 id="compare-heading" className="text-xl font-semibold mb-3">How RingSnap compares</h2>
-                  <p className="text-muted-foreground mb-5 text-sm">See how we stack up against the alternatives contractors most often consider.</p>
-                  <div className="flex flex-wrap justify-center gap-3 text-sm">
-                    <Link to="/compare/ringsnap-vs-ruby" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Ruby</Link>
-                    <Link to="/compare/ringsnap-vs-smith-ai" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Smith.ai</Link>
-                    <Link to="/compare/ringsnap-vs-goodcall" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Goodcall</Link>
-                    <Link to="/compare/ai-receptionist-vs-live-answering" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">AI vs Live Answering</Link>
-                    <Link to="/compare/best-ai-receptionist-home-services" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">Best AI Receptionist Guide</Link>
+                {/* How We Compare */}
+                <section aria-labelledby="compare-heading" className="section-spacer-compact bg-muted/30 border-t border-border/5">
+                  <div className="site-container max-w-4xl text-center">
+                    <h2 id="compare-heading" className="text-xl font-semibold mb-3">How RingSnap compares</h2>
+                    <p className="text-muted-foreground mb-5 text-sm">See how we stack up against the alternatives contractors most often consider.</p>
+                    <div className="flex flex-wrap justify-center gap-3 text-sm">
+                      <Link to="/compare/ringsnap-vs-ruby" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Ruby</Link>
+                      <Link to="/compare/ringsnap-vs-smith-ai" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Smith.ai</Link>
+                      <Link to="/compare/ringsnap-vs-goodcall" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Goodcall</Link>
+                      <Link to="/compare/ai-receptionist-vs-live-answering" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">AI vs Live Answering</Link>
+                      <Link to="/compare/best-ai-receptionist-home-services" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">Best AI Receptionist Guide</Link>
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
 
-              <ContractorFooter />
-            </Suspense>
-          </ErrorBoundary>
+                <ContractorFooter />
+              </Suspense>
+            </ErrorBoundary>
+          ) : (
+            <div className="w-full h-64" aria-hidden="true" />
+          )}
         </div>
         <MobileFooterCTA />
       </main>
