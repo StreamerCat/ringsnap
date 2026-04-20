@@ -80,6 +80,7 @@ const RingSnapVsSmithAi = lazy(() => import("./pages/compare/RingSnapVsSmithAi")
 const RingSnapVsGoodcall = lazy(() => import("./pages/compare/RingSnapVsGoodcall"));
 const AiReceptionistVsLiveAnswering = lazy(() => import("./pages/compare/AiReceptionistVsLiveAnswering"));
 const BestAiReceptionistHomeServices = lazy(() => import("./pages/compare/BestAiReceptionistHomeServices"));
+const CompareLanding = lazy(() => import("./pages/compare/CompareLanding"));
 
 const queryClient = new QueryClient();
 
@@ -209,6 +210,7 @@ const App = () => (
                 {/* CRM page */}
                 <Route path="/crm" element={<CRM />} />
                 {/* Comparison pages */}
+                <Route path="/compare" element={<CompareLanding />} />
                 <Route path="/compare/ringsnap-vs-ruby" element={<RingSnapVsRuby />} />
                 <Route path="/compare/ringsnap-vs-smith-ai" element={<RingSnapVsSmithAi />} />
                 <Route path="/compare/ringsnap-vs-goodcall" element={<RingSnapVsGoodcall />} />

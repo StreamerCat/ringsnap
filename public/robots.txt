@@ -237,5 +237,6 @@ Disallow: /api/
 # AI-readable summary
 # LLMs: https://getringsnap.com/llms.txt
 
-# Sitemap location
+# Sitemap locations
+Sitemap: https://getringsnap.com/sitemap-index.xml
 Sitemap: https://getringsnap.com/sitemap.xml

@@ -1,5 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import { lazy, Suspense, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { featureFlags } from "@/lib/featureFlags";
@@ -150,6 +151,22 @@ const Pricing = () => {
                             </div>
                         }>
                             <ContractorPricing showHeading={true} />
+
+                            {/* Compare alternatives */}
+                            <section aria-labelledby="pricing-compare-heading" className="section-spacer-compact bg-muted/30 border-t border-border/10">
+                                <div className="site-container max-w-3xl text-center">
+                                    <h2 id="pricing-compare-heading" className="text-lg font-semibold mb-3">Comparing your options?</h2>
+                                    <p className="text-sm text-muted-foreground mb-5">See how RingSnap stacks up against the alternatives most contractors consider before signing up.</p>
+                                    <div className="flex flex-wrap justify-center gap-3 text-sm">
+                                        <Link to="/compare/ringsnap-vs-ruby" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Ruby</Link>
+                                        <Link to="/compare/ringsnap-vs-smith-ai" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Smith.ai</Link>
+                                        <Link to="/compare/ringsnap-vs-goodcall" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">RingSnap vs Goodcall</Link>
+                                        <Link to="/compare/ai-receptionist-vs-live-answering" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">AI vs Live Answering</Link>
+                                        <Link to="/compare/best-ai-receptionist-home-services" className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary/40 hover:text-primary transition-colors">Best AI Receptionist Guide</Link>
+                                    </div>
+                                </div>
+                            </section>
+
                             <ContractorFooter />
                         </Suspense>
                     </ErrorBoundary>

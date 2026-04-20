@@ -33,7 +33,8 @@ export const INDEXABLE_ROUTES = [
   // CRM page
   { path: '/crm', changefreq: 'monthly', priority: '0.9' },
 
-  // Comparison pages
+  // Comparison hub + pages
+  { path: '/compare', changefreq: 'monthly', priority: '0.8' },
   { path: '/compare/ringsnap-vs-ruby', changefreq: 'monthly', priority: '0.8' },
   { path: '/compare/ringsnap-vs-smith-ai', changefreq: 'monthly', priority: '0.8' },
   { path: '/compare/ringsnap-vs-goodcall', changefreq: 'monthly', priority: '0.8' },

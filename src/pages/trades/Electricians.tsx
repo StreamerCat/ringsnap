@@ -1,11 +1,13 @@
 import { Helmet } from "react-helmet-async";
 import { lazy, Suspense } from "react";
+import { Link } from "react-router-dom";
 import { TradeHero } from "@/components/trades/TradeHero";
 import { TradePainPoints } from "@/components/trades/TradePainPoints";
 import { TradeTestimonials } from "@/components/trades/TradeTestimonials";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getTradeConfig } from "@/components/trades/tradeConfig";
+import { ArrowRight } from "lucide-react";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -13,6 +15,15 @@ const CompetitorComparison = lazy(() => import("@/components/CompetitorCompariso
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
+
+const breadcrumbSchema = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://getringsnap.com/" },
+    { "@type": "ListItem", position: 2, name: "Electrician Answering Service", item: "https://getringsnap.com/electricians" },
+  ],
+};
 
 const Electricians = () => {
   const config = getTradeConfig("electricians")!;
@@ -40,6 +51,8 @@ const Electricians = () => {
         <meta name="twitter:title" content={config.seo.title} />
         <meta name="twitter:description" content={config.seo.description} />
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+
+        <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
@@ -55,6 +68,27 @@ const Electricians = () => {
               <NextStepsStrip />
               <CallValueCalculator preselectedTrade="Electrical" />
               <ContractorPricing />
+
+              {/* Related Electrical Resources */}
+              <section aria-labelledby="electrical-resources-heading" className="section-spacer-compact bg-muted/30 border-t border-border/10">
+                <div className="site-container max-w-4xl">
+                  <h2 id="electrical-resources-heading" className="text-lg font-semibold mb-4">Free Electrician Field Guides</h2>
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    {[
+                      { href: "/resources/electrician-call-answering-script", title: "Electrician Call Answering Script", desc: "Safety-first scripts for electrical emergencies, panel upgrades, and after-hours calls." },
+                      { href: "/resources/electrical-safety-triage-questions", title: "Electrical Safety Triage Questions", desc: "The 8 dispatcher questions that assess danger and prioritize every electrical call." },
+                      { href: "/resources/panel-upgrade-booking-script", title: "Panel Upgrade Booking Script", desc: "Book panel upgrade consultations by asking the right qualifying questions." },
+                    ].map(({ href, title, desc }) => (
+                      <Link key={href} to={href} className="group p-4 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all">
+                        <h3 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors mb-1 leading-snug">{title}</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-2">{desc}</p>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">Read guide <ArrowRight className="h-3 w-3" /></span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
               <ContractorFooter />
             </Suspense>
           </ErrorBoundary>
