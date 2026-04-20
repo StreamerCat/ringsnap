@@ -1,11 +1,13 @@
 import { Helmet } from "react-helmet-async";
 import { lazy, Suspense } from "react";
+import { Link } from "react-router-dom";
 import { TradeHero } from "@/components/trades/TradeHero";
 import { TradePainPoints } from "@/components/trades/TradePainPoints";
 import { TradeTestimonials } from "@/components/trades/TradeTestimonials";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getTradeConfig } from "@/components/trades/tradeConfig";
+import { ArrowRight } from "lucide-react";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -13,6 +15,15 @@ const CompetitorComparison = lazy(() => import("@/components/CompetitorCompariso
 const ContractorPricing = lazy(() => import("@/components/ContractorPricing").then(m => ({ default: m.ContractorPricing })));
 const ContractorFooter = lazy(() => import("@/components/ContractorFooter").then(m => ({ default: m.ContractorFooter })));
 const MobileFooterCTA = lazy(() => import("@/components/MobileFooterCTA").then(m => ({ default: m.MobileFooterCTA })));
+
+const breadcrumbSchema = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://getringsnap.com/" },
+    { "@type": "ListItem", position: 2, name: "HVAC Answering Service", item: "https://getringsnap.com/hvac" },
+  ],
+};
 
 const HVAC = () => {
   const config = getTradeConfig("hvac")!;
@@ -40,6 +51,8 @@ const HVAC = () => {
         <meta name="twitter:title" content={config.seo.title} />
         <meta name="twitter:description" content={config.seo.description} />
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+
+        <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
@@ -55,6 +68,27 @@ const HVAC = () => {
               <NextStepsStrip />
               <CallValueCalculator preselectedTrade="HVAC" />
               <ContractorPricing />
+
+              {/* Related HVAC Resources */}
+              <section aria-labelledby="hvac-resources-heading" className="section-spacer-compact bg-muted/30 border-t border-border/10">
+                <div className="site-container max-w-4xl">
+                  <h2 id="hvac-resources-heading" className="text-lg font-semibold mb-4">Free HVAC Field Guides</h2>
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    {[
+                      { href: "/resources/hvac-dispatcher-script-template", title: "HVAC Dispatcher Script Template", desc: "Copy/paste scripts for standard calls, emergencies, and price shoppers." },
+                      { href: "/resources/hvac-after-hours-answering-script", title: "HVAC After-Hours Answering Script", desc: "Handle overnight and weekend HVAC calls with professional scripts." },
+                      { href: "/resources/hvac-emergency-call-triage", title: "HVAC Emergency Call Triage", desc: "Know when to dispatch immediately vs schedule — gas leaks, no-heat calls." },
+                    ].map(({ href, title, desc }) => (
+                      <Link key={href} to={href} className="group p-4 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all">
+                        <h3 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors mb-1 leading-snug">{title}</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-2">{desc}</p>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">Read guide <ArrowRight className="h-3 w-3" /></span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
               <ContractorFooter />
             </Suspense>
           </ErrorBoundary>
