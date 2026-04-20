@@ -18,8 +18,12 @@
 
 # Sitemap aliases (avoid SPA fallback returning HTML)
 /sitemap             /sitemap.xml       301
-/sitemap_index.xml   /sitemap.xml       301
+/sitemap_index.xml   /sitemap-index.xml 301
 /sitemap.xml         /sitemap.xml       200
+/sitemap-index.xml   /sitemap-index.xml 200
+/sitemap-core.xml    /sitemap-core.xml  200
+/sitemap-resources.xml /sitemap-resources.xml 200
+/sitemap-compare.xml /sitemap-compare.xml 200
 
 # SPA fallback - must be last
 /*    /index.html   200
