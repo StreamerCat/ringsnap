@@ -16,7 +16,11 @@ export const SiteNavigation = () => {
     const location = useLocation();
 
     return (
-        <NavigationMenu viewportClassName="right-0 left-auto origin-top-right justify-end">
+        <NavigationMenu
+            delayDuration={40}
+            skipDelayDuration={200}
+            viewportClassName="right-0 left-auto origin-top-right justify-end"
+        >
             <NavigationMenuList>
                 {/* TRADES MEGA MENU */}
                 <NavigationMenuItem>

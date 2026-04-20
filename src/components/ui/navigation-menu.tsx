@@ -25,10 +25,6 @@ const NavigationMenu = React.forwardRef<
 ));
 NavigationMenu.displayName = NavigationMenuPrimitive.Root.displayName;
 
-// ... (omitting unchanged List, Trigger, etc. for brevity, assuming tool merges correctly or I should include context?)
-// Actually, `replace_file_content` replaces the chunk. I should target the specific blocks or just replace the `NavigationMenu` and `NavigationMenuViewport`.
-// I'll do `NavigationMenu` first.
-
 const NavigationMenuList = React.forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.List>
@@ -75,7 +71,7 @@ const NavigationMenuContent = React.forwardRef<
   <NavigationMenuPrimitive.Content
     ref={ref}
     className={cn(
-      "left-0 top-0 w-full data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 md:absolute md:w-auto",
+      "left-0 top-0 w-full will-change-transform data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:duration-150 data-[motion^=to-]:duration-100 data-[motion^=from-]:ease-out data-[motion^=to-]:ease-in data-[motion^=from-]:fade-in-0 data-[motion^=to-]:fade-out-0 data-[motion=from-end]:slide-in-from-right-2 data-[motion=from-start]:slide-in-from-left-2 data-[motion=to-end]:slide-out-to-right-2 data-[motion=to-start]:slide-out-to-left-2 md:absolute md:w-auto",
       className
     )}
     {...props}
@@ -94,7 +90,7 @@ const NavigationMenuViewport = React.forwardRef<
   <div className={cn("absolute left-0 top-full flex justify-center", wrapperClassName)}>
     <NavigationMenuPrimitive.Viewport
       className={cn(
-        "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-background text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
+        "origin-top-center relative h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-background text-popover-foreground shadow-lg will-change-[width,height,opacity,transform] transition-[width,height] duration-150 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-150 data-[state=closed]:duration-100 data-[state=open]:ease-out data-[state=closed]:ease-in data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 md:w-[var(--radix-navigation-menu-viewport-width)]",
         className
       )}
       ref={ref}
