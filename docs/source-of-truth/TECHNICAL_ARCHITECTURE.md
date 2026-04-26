@@ -131,10 +131,19 @@ Legacy plan keys (grandfathered): `starter` → lite, `professional` → core, `
 - **Import map:** `supabase/deno.json` — maps `@supabase/supabase-js` → npm v2, `stripe` → npm v14.21.0
 
 ### JWT Verification (✅ CONFIRMED — `supabase/config.toml`)
-Functions with `verify_jwt = true` (require valid Supabase JWT):
-`authorize-call`, `complete-onboarding`, `manage-phone-lifecycle`, `manage-staff-role`, `provision`, `reset-monthly-usage`, `sync-usage`, `get-billing-summary`, `create-billing-portal-session`, `stripe-setup-intent`, `update-customer-info`
 
-All other ~62 functions have `verify_jwt = false` (webhooks, signup flows, internal calls, public endpoints).
+78 function directories exist. 38 are explicitly configured in `config.toml`; the remaining 40 inherit Supabase's platform default of **`verify_jwt = true`**.
+
+**Explicitly `verify_jwt = true` in config.toml (7 functions):**
+`authorize-call`, `complete-onboarding`, `manage-phone-lifecycle`, `manage-staff-role`, `provision`, `reset-monthly-usage`, `sync-usage`
+
+**Explicitly `verify_jwt = false` in config.toml (31 functions — webhooks, signup flows, public endpoints):**
+`test-vapi-integration`, `free-trial-signup`, `vapi-demo-call`, `provision-resources`, `send-verification-code`, `verify-code`, `handle-sms-inbound`, `send-sms-confirmation`, `send-onboarding-sms`, `handle-referral-signup`, `stripe-webhook`, `create-sales-account`, `get-available-area-codes`, `send-forwarding-instructions`, `send-password-reset`, `send-magic-link`, `verify-magic-link`, `verify-magic-debug`, `accept-staff-invite`, `validate-staff-invite`, `capture-signup-lead`, `create-trial`, `provision-vapi`, `vapi-webhook`, `debug-db`, `vapi-tools-appointments`, `vapi-tools-availability`, `booking-schedule`, `resend-webhook`, `auth-send-email`, `jobber-oauth-callback`
+
+**No config entry — inherit default `verify_jwt = true` (40 functions):**
+`assistant-chat`, `backfill-phone-lifecycle`, `call-logs-cleanup`, `cancel-subscription`, `cleanup-database`, `create-billing-portal-session`, `create-portal-session`, `create-staff-invite`, `create-staff-user`, `create-upgrade-checkout`, `detect-test-call-alert`, `finalize-trial`, `get-billing-summary`, `jobber-oauth-start`, `jobber-sync`, `list-staff-users`, `manage-team-member`, `monitor-alerts`, `notify_number_ready`, `ops-bridge`, `posthog-signal`, `provision-account`, `provision-phone-number`, `provision_number`, `provision_number_retry`, `reminders-dispatcher`, `require-step-up`, `search-vapi-numbers`, `seed-pool`, `send-welcome-email`, `sentry-debug`, `sentry-test`, `stripe-invoices-list`, `stripe-payment-method-default`, `stripe-setup-intent`, `stripe-subscription-cancel`, `stripe-subscription-update`, `sync-assistant-config`, `update-customer-info`, `vapi-reconcile-calls`
+
+⚠️ Functions in the third group may or may not implement their own auth checks internally — review each before treating as protected.
 
 ### CORS (✅ CONFIRMED — `supabase/functions/_shared/cors.ts`)
 ```
