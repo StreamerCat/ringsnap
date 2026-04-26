@@ -100,7 +100,7 @@ describe("Start Page", () => {
 
       expect(screen.getByText(/won't be charged during trial/i)).toBeInTheDocument();
       expect(screen.getByText(/setup in 2 minutes/i)).toBeInTheDocument();
-      expect(screen.getByText(/150 minutes included/i)).toBeInTheDocument();
+      expect(screen.getByText(/15 live trial calls included/i)).toBeInTheDocument();
     });
 
     it("renders sign-in link", () => {

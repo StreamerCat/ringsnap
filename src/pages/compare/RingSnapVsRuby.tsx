@@ -52,7 +52,7 @@ const config: ComparisonConfig = {
     { feature: "AI intent and urgency classification", ringsnap: true, competitor: false },
     { feature: "Multi-language support (English + Spanish)", ringsnap: "Core & Pro plans", competitor: "Depends on agent availability" },
     { feature: "Starting price", ringsnap: "$59/month", competitor: "Higher — see their site" },
-    { feature: "Per-minute vs flat-rate cost model", ringsnap: "Flat monthly + overage", competitor: "Per-minute / receptionist time" },
+    { feature: "Overage pricing model", ringsnap: "Flat monthly + clear per-call overage", competitor: "Per-minute / receptionist time" },
     { feature: "Setup time", ringsnap: "~10 minutes", competitor: "Onboarding required" },
     { feature: "Human warmth on every call", ringsnap: "AI voice — professional, not human", competitor: true },
   ],

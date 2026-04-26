@@ -26,7 +26,7 @@ const comparisons = [
     href: "/compare/ringsnap-vs-ruby",
     title: "RingSnap vs Ruby Receptionists",
     subtitle: "AI answering vs human virtual receptionists",
-    desc: "Ruby provides human receptionists for small businesses. RingSnap is built exclusively for home service contractors with 24/7 AI coverage, emergency routing, and a built-in CRM — at a fraction of Ruby's per-minute cost.",
+    desc: "Ruby provides human receptionists for small businesses. RingSnap is built exclusively for home service contractors with 24/7 AI coverage, emergency routing, and a built-in CRM — with pricing built for predictable growth.",
     tags: ["Human vs AI", "Pricing", "Coverage"],
   },
   {
@@ -151,7 +151,7 @@ const CompareLanding = () => {
                 "Emergency routing trained on contractor call patterns, not generic escalation rules",
                 "Built-in CRM: every call creates a lead record with job type, urgency, and full transcript",
                 "Jobber integration — lead data flows directly into your field service workflow",
-                "Flat-rate pricing starting at $59/month — no per-minute surprises during busy season",
+                "Flat monthly pricing starting at $59/month + clear per-call overage — no surprise charges during busy season",
               ].map((item) => (
                 <div key={item} className="flex items-start gap-3 p-4 rounded-xl bg-card border border-border">
                   <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />

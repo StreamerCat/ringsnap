@@ -17,7 +17,7 @@ const PLANS: Plan[] = [
     name: 'Night & Weekend',
     price: 59,
     features: [
-      '150 minutes included/month',
+      '60 calls included/month',
       '24/7 AI answering',
       'Urgent transfer to your phone',
       'CRM included'
@@ -28,7 +28,7 @@ const PLANS: Plan[] = [
     name: 'Lite',
     price: 129,
     features: [
-      '300 minutes included/month',
+      '125 calls included/month',
       'Google Calendar + Zapier',
       'Urgent call transfer with context',
       'Call recordings + transcripts',
@@ -41,7 +41,7 @@ const PLANS: Plan[] = [
     name: 'Core',
     price: 229,
     features: [
-      '600 minutes included/month',
+      '250 calls included/month',
       'Priority support',
       'Branded voice options',
       'Smart call routing by urgency',

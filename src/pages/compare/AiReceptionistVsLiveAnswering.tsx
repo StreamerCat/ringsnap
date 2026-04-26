@@ -59,7 +59,7 @@ const config: ComparisonConfig = {
     "You need genuine 24/7 coverage — not 'extended hours' — for weekend emergencies and after-midnight burst pipes",
     "You want every call answered in under 1 second, not after 3 rings while an agent finishes another call",
     "You need built-in CRM so every call creates a lead record your team can act on",
-    "Your call volume spikes seasonally and you don't want to pay per-minute overage for busy weeks",
+    "Your call volume spikes seasonally and you want predictable pricing with clear per-call overage",
     "You want consistent handling on every call — the same quality at 3am on Christmas as on a Tuesday afternoon",
     "You need emergency calls transferred immediately with full context, not relayed as messages",
   ],
@@ -71,7 +71,7 @@ const config: ComparisonConfig = {
   ],
   whoShouldChoose: {
     ringsnap:
-      "You're a home service contractor who needs true 24/7 coverage, consistent emergency routing, and lead management built into your call handling. You want to stop losing jobs to voicemail without hiring more staff or paying per-minute rates that spike in busy seasons.",
+      "You're a home service contractor who needs true 24/7 coverage, consistent emergency routing, and lead management built into your call handling. You want to stop losing jobs to voicemail without hiring more staff — and keep costs predictable with clear per-call overage when volume spikes.",
     competitor:
       "Human warmth is your top priority, your conversations require human judgment that AI can't handle well yet, and you're comfortable with hour limitations and per-minute pricing.",
   },

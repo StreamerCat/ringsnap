@@ -23,17 +23,17 @@ export const ContractorFooter = () => {
     answer: "You can configure VIP customers to transfer directly to you, or the Agent can recognize returning customers by phone number and offer to transfer. You maintain complete control over who gets through and when."
   }, {
     question: "How does the 3-day free trial work?",
-    answer: "Your 3-day trial includes 150 minutes (approximately 40+ test calls) to fully test RingSnap with real scenarios: emergency calls, appointments, after-hours coverage, everything. A credit card is required to start. You won't be charged until your trial ends or your usage limit is reached.\n\nIf you use all 150 minutes during the trial, your service simply pauses and you can upgrade instantly to continue. After 3 days, your selected plan begins automatically unless you cancel. You're in complete control and can cancel anytime before trial ends to avoid charges."
+    answer: "Your 3-day trial includes up to 15 live calls so you can test RingSnap with real scenarios: emergencies, bookings, and after-hours coverage. A credit card is required to start, but you won't be charged until your trial ends or you hit your usage limit.\n\nIf you reach the trial call limit, service pauses and you can upgrade instantly to keep calls flowing. After 3 days, your selected plan starts automatically unless you cancel. You're in control and can cancel anytime before trial ends to avoid charges."
   }, {
-    question: "What if I go over my included minutes?",
-    answer: `No problem. We never cut off your service mid-month. If you exceed your included minutes, overage is billed at your plan's per-minute rate:
+    question: "What if I go over my included calls?",
+    answer: `No problem. We keep answering calls based on your overflow settings. If you go over your included calls, overage is billed per call at a clear rate:
 
-• Night & Weekend: $0.45/minute
-• Lite: $0.38/minute
-• Core: $0.28/minute
-• Pro: $0.22/minute
+• Night & Weekend: $1.10/call
+• Lite: $0.95/call
+• Core: $0.85/call
+• Pro: $0.75/call
 
-You'll receive usage notifications at 70% and 90% so you're never surprised. Most customers stay within plan limits, but busy months happen—we've got you covered.
+You'll get usage alerts before overage starts, so there are no surprise charges. Most customers stay within plan limits, but if calls spike during busy season, you're still covered.
 
 If you consistently exceed your limit, we'll proactively suggest upgrading to the next tier, which usually saves money vs paying overage every month.`
   }];
