@@ -374,7 +374,7 @@ const BestAiReceptionistHomeServices = () => {
                 },
                 {
                   q: "How do I evaluate an AI receptionist before committing?",
-                  a: "The best way is a free trial with real calls. RingSnap offers a 3-day trial with ~150 minutes, enough to test emergency scenarios, routine bookings, and after-hours coverage with actual calls. Credit card required to start. You won't be charged until your trial ends or your usage limit is reached.",
+                  a: "The best way is a free trial with real calls. RingSnap offers a 3-day trial with up to 15 live calls, enough to test emergency scenarios, routine bookings, and after-hours coverage. Credit card required to start. You won't be charged until your trial ends or your usage limit is reached.",
                 },
                 {
                   q: "How much does an AI receptionist cost for a small contracting business?",

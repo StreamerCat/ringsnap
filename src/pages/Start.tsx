@@ -420,7 +420,7 @@ export default function Start() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Zap className="h-4 w-4 text-yellow-600" />
-                      <span>150 minutes included</span>
+                      <span>15 live trial calls included</span>
                     </div>
                   </div>
                 </div>

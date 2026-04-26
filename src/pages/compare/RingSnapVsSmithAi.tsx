@@ -60,7 +60,7 @@ const config: ComparisonConfig = {
     "You need life-threatening emergency calls transferred immediately with context, not just escalated to a queue",
     "You want a built-in CRM so every call becomes a lead record without extra tools or manual entry",
     "You need Jobber integration for lead data to flow directly into your field service workflow",
-    "You want flat-rate pricing rather than per-call or per-minute billing that's harder to predict",
+    "You want flat monthly pricing with transparent per-call overage and no billing guesswork",
     "You need instant pickup on every call — no routing delays while AI and humans hand off",
   ],
   competitorStrengths: [
