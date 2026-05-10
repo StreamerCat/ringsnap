@@ -1,10 +1,11 @@
 import { Helmet } from "react-helmet-async";
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { capture } from "@/lib/analytics";
+import { ResourceDownloadModal } from "@/components/resources/ResourceDownloadModal";
 import { trackPageLoad, trackFunnelEvent, trackClick } from "@/lib/sentry-tracking";
 import * as Sentry from "@sentry/react";
 import {
@@ -27,6 +28,11 @@ const CallValueCalculator = lazy(() =>
     default: m.CallValueCalculator,
   }))
 );
+const VoiceDemoWidget = lazy(() =>
+  import("@/components/VoiceDemoWidget").then((m) => ({
+    default: m.VoiceDemoWidget,
+  }))
+);
 const ContractorFooter = lazy(() =>
   import("@/components/ContractorFooter").then((m) => ({
     default: m.ContractorFooter,
@@ -47,6 +53,8 @@ const SECTIONS = [
   "solution",
   "trades",
   "how_it_works",
+  "live_demo",
+  "resources",
   "objections",
   "calculator",
   "cta",
@@ -56,6 +64,7 @@ const MissedCalls = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const calcRef = useRef<HTMLDivElement>(null);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
   const viewedSections = useRef<Set<string>>(new Set());
 
@@ -458,6 +467,96 @@ const MissedCalls = () => {
           </div>
         </section>
 
+        {/* ── LIVE DEMO ── */}
+        <section ref={registerSection("live_demo")} data-section="live_demo" className="section-spacer-compact border-t border-border/10">
+          <div className="site-container">
+            <div className="max-w-2xl mx-auto text-center mb-8">
+              <Badge variant="secondary" className="mb-4 text-xs font-semibold tracking-wide uppercase px-3 py-1">
+                Live Demo
+              </Badge>
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+                Hear RingSnap answer the calls you're missing.
+              </h2>
+              <p className="text-muted-foreground text-lg leading-relaxed">
+                Click the button below and talk to RingSnap the same way a homeowner would — after hours, during a busy day, or on a missed call. Hear exactly what your callers experience.
+              </p>
+            </div>
+
+            <div className="max-w-2xl mx-auto mb-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-900 flex items-start gap-3">
+                <span className="text-base shrink-0">💡</span>
+                <span>
+                  <span className="font-semibold">Try saying:</span> "I have a burst pipe, can someone come tonight?" or "Do you handle after-hours HVAC calls?"
+                </span>
+              </div>
+            </div>
+
+            <div className="max-w-2xl mx-auto mb-10">
+              <div className="rounded-2xl overflow-hidden border border-border shadow-lg min-h-[420px] bg-card flex items-center justify-center relative">
+                <Suspense fallback={
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <div className="animate-pulse w-12 h-12 rounded-full bg-primary/10" />
+                    <span className="text-sm">Loading demo...</span>
+                  </div>
+                }>
+                  <VoiceDemoWidget />
+                </Suspense>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+              {[
+                { stat: "< 2 rings", label: "Average answer time" },
+                { stat: "24 / 7", label: "Always available" },
+                { stat: "100%", label: "Calls captured, not voicemailed" },
+              ].map(({ stat, label }) => (
+                <div key={label} className="text-center p-4 rounded-xl border border-border bg-muted/30">
+                  <div className="text-xl font-bold text-primary mb-1">{stat}</div>
+                  <div className="text-xs text-muted-foreground">{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── RESOURCES LEAD CAPTURE ── */}
+        <section ref={registerSection("resources")} data-section="resources" className="section-spacer-compact bg-muted/30 border-t border-border/10">
+          <div className="site-container">
+            <div className="max-w-3xl mx-auto">
+              <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-8 md:p-10">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+                  <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-7 w-7 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-foreground mb-2">
+                      Get the Contractor Call Conversion Pack
+                    </h3>
+                    <p className="text-muted-foreground leading-relaxed mb-1">
+                      Free scripts, triage guides, and field templates for HVAC, plumbing, electrical, and roofing — the exact resources at{" "}
+                      <span className="font-medium text-foreground">getringsnap.com/resources</span>.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Download free. No credit card required.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      capture("cta_clicked", { cta_location: "resources_section", cta_text: "Download Free Script Pack", page: PAGE });
+                      trackClick("download_script_pack_resources", { page: PAGE });
+                      setIsDownloadModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap shrink-0"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    Download Free Script Pack
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── OBJECTION REDUCER ── */}
         <section ref={registerSection("objections")} data-section="objections" className="section-spacer-compact border-t border-border/10">
           <div className="site-container">
@@ -562,6 +661,12 @@ const MissedCalls = () => {
       <Suspense fallback={null}>
         <MobileFooterCTA />
       </Suspense>
+
+      <ResourceDownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        resourceName="Contractor Call Conversion Pack"
+      />
     </>
   );
 };
