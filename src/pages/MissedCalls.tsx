@@ -1,6 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import { lazy, Suspense, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,7 @@ const SECTIONS = [
 
 const MissedCalls = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const calcRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
   const viewedSections = useRef<Set<string>>(new Set());
@@ -102,7 +103,9 @@ const MissedCalls = () => {
       destination: "/start",
       page: PAGE,
     });
-    navigate("/start");
+    const params = new URLSearchParams(searchParams);
+    params.set("source", "missed_calls");
+    navigate(`/start?${params.toString()}`);
   };
 
   const scrollToCalc = (location: string) => {
