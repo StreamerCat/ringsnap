@@ -1,0 +1,1240 @@
+# RingSnap — Edge Functions Reference
+# Source of truth derived from supabase/functions/ and supabase/config.toml
+# Generated 2026-04-25
+# CONFIRMED = seen in source | INFERRED = logical from code | UNKNOWN = not determinable
+
+# JWT config legend:
+#   explicit_true  = verify_jwt = true in config.toml
+#   explicit_false = verify_jwt = false in config.toml
+#   default_true   = not in config.toml; inherits Supabase default (verify_jwt=true)
+
+---
+
+## CALL HANDLING & VAPI
+
+- name: authorize-call
+  path: supabase/functions/authorize-call/index.ts
+  jwt: explicit_true
+  purpose: Real-time call authorization gate called by Vapi BEFORE answering each inbound call
+  method: POST
+  inputs:
+    body:
+      - phoneNumber: caller phone number
+      - customData.accountId OR accountId: account UUID
+      - customer.number: alternative caller field
+  outputs:
+    - allowed: boolean
+    - message: string (rejection reason, optional)
+    - callKind: "'live' | 'verification'"
+  external_services:
+    - Supabase PostgreSQL
+    - PostHog (best-effort, non-blocking)
+  env_vars:
+    - SUPABASE_URL
+    - SUPABASE_SERVICE_ROLE_KEY
+    - POSTHOG_API_KEY (optional)
+    - BILLING_CALL_BASED_V1 (feature flag)
+    - TRIAL_EXPERIENCE_V1 (feature flag)
+  tables_read:
+    - accounts
+    - plans
+    - profiles
+    - verification_call_allowlist
+  tables_written:
+    - accounts (rejected_daytime_calls, ceiling_reject_sent counters)
+  failure_paths:
+    - account not found → allowed:false
+    - account suspended/disabled/cancelled → allowed:false
+    - trial expired → allowed:false
+    - trial live call cap (15) reached → allowed:false
+    - trial verification call cap (3) reached → allowed:false
+    - night_weekend plan during business hours → allowed:false
+    - call-based hard cap reached → allowed:false
+    - call-based soft_cap buffer exhausted → allowed:false
+    - legacy minute ceiling reached → allowed:false
+  logs_events:
+    - PostHog call classification events (best-effort)
+    - structured logs via logInfo/logError
+
+- name: vapi-webhook
+  path: supabase/functions/vapi-webhook/index.ts
+  jwt: explicit_false
+  purpose: Inbound Vapi webhook; logs completed calls and updates billing ledger
+  method: POST
+  inputs:
+    body:
+      - message.type: call-started | end-of-call-report | status-update
+      - message.call: Vapi call object (accountId, duration, transcript, provider_call_id)
+  outputs:
+    - "200 OK: { status: 200, message: 'OK' }"
+  external_services:
+    - Supabase PostgreSQL
+    - PostHog (best-effort)
+    - Sentry (withSentryEdge wrapper)
+  env_vars:
+    - SUPABASE_URL
+    - SUPABASE_SERVICE_ROLE_KEY
+    - POSTHOG_API_KEY (optional)
+    - SENTRY_DSN (optional)
+  tables_read:
+    - accounts
+    - phone_numbers
+  tables_written:
+    - call_logs
+    - call_billing_ledger (idempotent on provider_call_id)
+    - billing_period_usage_summary
+  failure_paths:
+    - invalid event structure → 200 OK (graceful)
+    - account not found → logged, entry created with null account_id
+    - classification failure → fallback classification
+  logs_events:
+    - PostHog call classification events
+    - Sentry error boundaries
+
+- name: vapi-tools-appointments
+  path: supabase/functions/vapi-tools-appointments/index.ts
+  jwt: explicit_false
+  purpose: Vapi tool call handler — logs appointment bookings made during calls
+  method: POST
+  inputs:
+    body: appointment details from Vapi tool invocation
+  outputs: appointment confirmation or error
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: [appointments]
+  failure_paths: [UNKNOWN]
+  logs_events: [structured logs]
+
+- name: vapi-tools-availability
+  path: supabase/functions/vapi-tools-availability/index.ts
+  jwt: explicit_false
+  purpose: Vapi tool call handler — checks available time slots during calls
+  method: POST
+  inputs:
+    body: account_id, requested_date
+  outputs: "{ availableSlots: [] }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, appointments]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+  logs_events: [structured logs]
+
+- name: vapi-demo-call
+  path: supabase/functions/vapi-demo-call/index.ts
+  jwt: explicit_false
+  purpose: Initiate a demo call to a Vapi assistant for testing
+  method: POST
+  inputs: UNKNOWN
+  outputs: demo call session details
+  external_services: [Vapi API]
+  env_vars: [VAPI_API_KEY, VAPI_BASE_URL]
+  tables_read: []
+  tables_written: []
+  failure_paths: [UNKNOWN]
+  logs_events: []
+
+- name: vapi-reconcile-calls
+  path: supabase/functions/vapi-reconcile-calls/index.ts
+  jwt: default_true
+  purpose: Periodic reconciliation of Vapi call data with local billing ledger
+  method: POST
+  inputs: UNKNOWN (likely cron-invoked)
+  outputs: reconciliation report
+  external_services: [Vapi API, Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPI_API_KEY]
+  tables_read: [call_logs, call_billing_ledger]
+  tables_written: [call_billing_ledger]
+  failure_paths: [UNKNOWN]
+  logs_events: [structured logs]
+
+- name: test-vapi-integration
+  path: supabase/functions/test-vapi-integration/index.ts
+  jwt: explicit_false
+  purpose: Debug/test Vapi integration connectivity
+  method: POST
+  inputs: UNKNOWN
+  outputs: integration status
+  external_services: [Vapi API]
+  env_vars: [VAPI_API_KEY, VAPI_BASE_URL]
+  tables_read: []
+  tables_written: []
+  failure_paths: []
+  logs_events: []
+
+---
+
+## PHONE NUMBER PROVISIONING & LIFECYCLE
+
+- name: provision-resources
+  path: supabase/functions/provision-resources/index.ts
+  jwt: explicit_false
+  purpose: Main provisioning orchestrator; called internally after onboarding completes
+  method: POST
+  inputs:
+    body:
+      - accountId: UUID
+      - email, name, phone: user details
+      - selectedNumber: chosen phone number
+      - companyName, defaultAvailability: account setup data
+  outputs: "{ ok: true } or error"
+  external_services: [invokes provision-vapi, provision-phone-number edge functions]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, profiles]
+  tables_written: [accounts (provisioning_status), phone_numbers, assistants]
+  failure_paths:
+    - sub-function failure → provisioning_status=failed
+  logs_events: [structured logs, observability context]
+
+- name: provision
+  path: supabase/functions/provision/index.ts
+  jwt: explicit_true
+  purpose: Low-level provisioning invoked by provision-resources
+  method: POST
+  inputs:
+    body: [accountId]
+  outputs: provisioned resource IDs
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: [accounts, phone_numbers, assistants]
+  failure_paths: [UNKNOWN]
+  logs_events: [structured logs]
+
+- name: provision-vapi
+  path: supabase/functions/provision-vapi/index.ts
+  jwt: explicit_false
+  purpose: Create and configure a Vapi assistant for a new account
+  method: POST
+  inputs:
+    body: [accountId, companyName, trade, businessHours, voice, assistantGender]
+  outputs: "{ vapi_assistant_id, vapi_phone_number }"
+  external_services: [Vapi API (create assistant, set tools, configure prompts)]
+  env_vars: [VAPI_API_KEY, VAPI_BASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, state_recording_laws]
+  tables_written: [accounts (vapi_assistant_id), assistants]
+  failure_paths:
+    - Vapi API error → propagates to provision-resources
+  logs_events: [structured logs]
+
+- name: provision-phone-number
+  path: supabase/functions/provision-phone-number/index.ts
+  jwt: default_true
+  purpose: Purchase phone number from Twilio
+  method: POST
+  inputs:
+    body: [accountId, areaCode, countryCode]
+  outputs: "{ phoneNumber, providerId, provider }"
+  external_services: [Twilio REST API via _shared/telephony.ts]
+  env_vars:
+    - TWILIO_ACCOUNT_SID
+    - TWILIO_AUTH_TOKEN
+    - TWILIO_PROVISION_MODE (set to "test" for magic number +15005550006)
+    - SUPABASE_URL
+    - SUPABASE_SERVICE_ROLE_KEY
+  tables_read: []
+  tables_written: [phone_numbers]
+  failure_paths:
+    - area code unavailable → retry without area code
+    - trial account cap → reuse existing number (Twilio error 21404)
+    - purchase failure → throws with status code
+  logs_events: [structured logs]
+
+- name: provision-account
+  path: supabase/functions/provision-account/index.ts
+  jwt: default_true
+  purpose: Initialize new account DB record
+  method: POST
+  inputs:
+    body: [userId, companyName, trade, email]
+  outputs: "{ accountId }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [profiles]
+  tables_written: [accounts]
+  failure_paths: [UNKNOWN]
+  notes: "TODO: Determine area code from zip — not yet implemented"
+
+- name: manage-phone-lifecycle
+  path: supabase/functions/manage-phone-lifecycle/index.ts
+  jwt: explicit_true
+  purpose: Update phone number status; release or reassign numbers
+  method: POST
+  inputs:
+    body:
+      - phoneId: UUID
+      - action: release | reassign | update_routing
+  outputs: updated phone status
+  external_services: [Twilio API (for release)]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN]
+  tables_read: [phone_numbers, accounts]
+  tables_written: [phone_numbers, accounts]
+  failure_paths: [UNKNOWN]
+  logs_events: [structured logs]
+
+- name: backfill-phone-lifecycle
+  path: supabase/functions/backfill-phone-lifecycle/index.ts
+  jwt: default_true
+  purpose: Backfill missing lifecycle events for legacy phone numbers
+  method: POST
+  inputs: UNKNOWN
+  outputs: "{ updatedCount }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [phone_numbers]
+  tables_written: [phone_numbers]
+  failure_paths: [UNKNOWN]
+
+- name: notify_number_ready
+  path: supabase/functions/notify_number_ready/index.ts
+  jwt: default_true
+  purpose: Notify customer when provisioned phone number is ready
+  method: POST
+  inputs:
+    body: [accountId]
+  outputs: notification confirmation
+  external_services: [Resend (email), Twilio (SMS)]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_PROD_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN]
+  tables_read: [accounts, profiles, phone_numbers]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: search-vapi-numbers
+  path: supabase/functions/search-vapi-numbers/index.ts
+  jwt: default_true
+  purpose: Search available phone numbers from Vapi/Twilio marketplace
+  method: GET
+  inputs:
+    query: [areaCode, state, capabilities]
+  outputs: "[{ number, areaCode, type, features }]"
+  external_services: [Vapi API]
+  env_vars: [VAPI_API_KEY, VAPI_BASE_URL]
+  tables_read: []
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: get-available-area-codes
+  path: supabase/functions/get-available-area-codes/index.ts
+  jwt: explicit_false
+  purpose: List available area codes for phone number selection
+  method: GET
+  inputs: {}
+  outputs: "[{ areaCode, state, availableCount }]"
+  external_services: [Vapi API or hardcoded list — UNKNOWN]
+  env_vars: [VAPI_API_KEY]
+  tables_read: []
+  tables_written: []
+  failure_paths: []
+
+- name: seed-pool
+  path: supabase/functions/seed-pool/index.ts
+  jwt: default_true
+  purpose: Pre-populate pool of available phone numbers for fast provisioning
+  method: POST
+  inputs: UNKNOWN (admin/cron invoked)
+  outputs: "{ seededCount }"
+  external_services: [Twilio API]
+  env_vars: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [phone_numbers]
+  failure_paths: [UNKNOWN]
+
+- name: sync-assistant-config
+  path: supabase/functions/sync-assistant-config/index.ts
+  jwt: default_true
+  purpose: Rebuild and push Vapi assistant prompt when account settings change
+  method: POST
+  inputs:
+    body: [accountId or assistantId]
+  outputs: sync status
+  external_services: [Vapi API]
+  env_vars: [VAPI_API_KEY, VAPI_BASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, assistants, state_recording_laws]
+  tables_written: [assistants]
+  failure_paths: [UNKNOWN]
+
+---
+
+## ONBOARDING & SIGNUP
+
+- name: complete-onboarding
+  path: supabase/functions/complete-onboarding/index.ts
+  jwt: explicit_true
+  purpose: Finalize account setup and trigger async resource provisioning
+  method: POST
+  inputs:
+    body:
+      - areaCode: 3-digit string
+      - selectedNumber: E.164 phone number
+      - companyName: string
+      - trade: plumbing|hvac|electrical|roofing|landscaping|painting|general_contractor|handyman|locksmith|pest_control
+      - assistantGender: string
+      - defaultAvailability: string
+      - timezone: string
+      - referralCode: string (optional)
+      - skipOnboarding: boolean (bypass for testing)
+  outputs: "{ ok: true, message: 'Onboarding complete...' }"
+  external_services: [invokes provision-resources edge function]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [profiles, referral_codes]
+  tables_written: [accounts, referrals, onboarding_events]
+  failure_paths:
+    - missing auth header → 401
+    - user not found → 401
+    - profile not found → 404
+    - account ownership mismatch → 403 "Unauthorized attempt" (SECURITY)
+    - missing required fields → 400
+    - invalid area code → 400
+    - provisioning invocation failure → 500
+  logs_events:
+    - onboarding_events table entries
+    - structured logs
+
+- name: free-trial-signup
+  path: supabase/functions/free-trial-signup/index.ts
+  jwt: explicit_false
+  purpose: Create free trial account during public signup flow
+  method: POST
+  inputs:
+    body: [email, password, companyName, trade, phone, areaCode]
+  outputs: "{ accountId, userId, email }"
+  external_services: [Supabase Auth, Resend (welcome email)]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_PROD_KEY]
+  tables_read: []
+  tables_written: [auth.users, profiles, accounts, trial_signups]
+  failure_paths:
+    - email already exists → error
+    - invalid fields → 400
+  logs_events: [structured logs]
+
+- name: create-trial
+  path: supabase/functions/create-trial/index.ts
+  jwt: explicit_false
+  purpose: Create/configure trial for an account (used by staff or programmatically)
+  method: POST
+  inputs:
+    body: [accountId, duration_days, call_limit]
+  outputs: trial configuration
+  external_services: [Supabase PostgreSQL, Resend — UNKNOWN if email sent]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, profiles]
+  tables_written: [accounts, trial_usage_summary]
+  failure_paths: [UNKNOWN]
+  notes: "TODO: retrieve email from wider scope variable"
+
+- name: finalize-trial
+  path: supabase/functions/finalize-trial/index.ts
+  jwt: default_true
+  purpose: Convert trial to paid or cancel on expiry (cron-invoked)
+  method: POST
+  inputs: UNKNOWN
+  outputs: conversion status
+  external_services: [Supabase PostgreSQL, Stripe API]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY]
+  tables_read: [accounts, trial_usage_summary]
+  tables_written: [accounts, subscriptions]
+  failure_paths: [UNKNOWN]
+
+- name: capture-signup-lead
+  path: supabase/functions/capture-signup-lead/index.ts
+  jwt: explicit_false
+  purpose: Capture lead from /start landing page for sales follow-up
+  method: POST
+  inputs:
+    body: [email, name, company, phone, trade]
+  outputs: "{ leadId }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [signup_leads]
+  failure_paths: []
+  logs_events: []
+
+- name: handle-referral-signup
+  path: supabase/functions/handle-referral-signup/index.ts
+  jwt: explicit_false
+  purpose: Track and reward referral signups
+  method: POST
+  inputs:
+    body: [referralCode, newAccountId]
+  outputs: referral credit status
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [referral_codes]
+  tables_written: [referrals]
+  failure_paths: [invalid code → no-op]
+  notes: "Credits referrer if referee converts; Stripe referral emails TODO per stripe-webhook code"
+
+- name: create-sales-account
+  path: supabase/functions/create-sales-account/index.ts
+  jwt: explicit_false
+  purpose: Staff tool — manually create account for customer
+  method: POST
+  inputs:
+    body: [companyName, email, trade, phone, salesRepName]
+  outputs: "{ accountId, credentials }"
+  external_services: [Supabase Auth, Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [auth.users, profiles, accounts]
+  failure_paths: [UNKNOWN]
+  notes: "⚠️ verify_jwt=false but function should be staff-only — no JWT enforcement at platform level"
+
+- name: booking-schedule
+  path: supabase/functions/booking-schedule/index.ts
+  jwt: explicit_false
+  purpose: INCOMPLETE — calendar booking endpoint stub
+  method: POST
+  inputs: UNKNOWN
+  outputs: UNKNOWN
+  external_services: []
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [appointments]
+  tables_written: []
+  failure_paths: []
+  notes: "TODO: Integrate with calendar API; TODO: Implement calendar integration"
+
+---
+
+## AUTHENTICATION & AUTHORIZATION
+
+- name: send-magic-link
+  path: supabase/functions/send-magic-link/index.ts
+  jwt: explicit_false
+  purpose: Send passwordless magic link login email
+  method: POST
+  inputs:
+    body: [email]
+  outputs: "{ ok: true }"
+  external_services: [Resend (email), Supabase Auth]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_PROD_KEY, AUTH_MAGIC_LINK_TTL_MINUTES]
+  tables_read: [profiles]
+  tables_written: [auth_tokens]
+  failure_paths:
+    - email not found → silent (anti-enumeration)
+  logs_events: [structured logs]
+
+- name: verify-magic-link
+  path: supabase/functions/verify-magic-link/index.ts
+  jwt: explicit_false
+  purpose: Verify magic link token and return Supabase session
+  method: POST
+  inputs:
+    body: [token]
+  outputs: "{ session: { access_token, refresh_token }, user: {...} }"
+  external_services: [Supabase Auth]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [auth_tokens, profiles]
+  tables_written: [auth_tokens (consumed)]
+  failure_paths:
+    - invalid/expired token → 401
+  logs_events: [structured logs]
+
+- name: verify-magic-debug
+  path: supabase/functions/verify-magic-debug/index.ts
+  jwt: explicit_false
+  purpose: DEV ONLY — debug magic link token details
+  method: POST
+  inputs: [token]
+  outputs: token details
+  external_services: []
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  notes: "⚠️ Should be disabled or restricted in production"
+
+- name: send-password-reset
+  path: supabase/functions/send-password-reset/index.ts
+  jwt: explicit_false
+  purpose: Send password reset email
+  method: POST
+  inputs:
+    body: [email]
+  outputs: "{ ok: true }"
+  external_services: [Resend, Supabase Auth]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_PROD_KEY]
+  tables_read: [profiles]
+  tables_written: []
+  failure_paths:
+    - email not found → silent (anti-enumeration)
+
+- name: send-verification-code
+  path: supabase/functions/send-verification-code/index.ts
+  jwt: explicit_false
+  purpose: Send 6-digit phone OTP for phone-based auth
+  method: POST
+  inputs:
+    body: [phone (E.164 format)]
+  outputs: "{ ok: true, expiresIn: 600 }"
+  external_services: [UNKNOWN — SMS NOT YET IMPLEMENTED]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [phone_verifications (upsert)]
+  failure_paths:
+    - invalid phone → 400
+  notes: "⚠️ TODO: actual SMS sending not implemented"
+
+- name: verify-code
+  path: supabase/functions/verify-code/index.ts
+  jwt: explicit_false
+  purpose: Verify 6-digit phone OTP
+  method: POST
+  inputs:
+    body: [phone, code]
+  outputs: "{ valid: true } or { valid: false, error: '...' }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [phone_verifications]
+  tables_written: []
+  failure_paths:
+    - expired code → "Code expired"
+    - wrong code → "Invalid code" (rate limited)
+    - too many attempts → blocked
+
+- name: accept-staff-invite
+  path: supabase/functions/accept-staff-invite/index.ts
+  jwt: explicit_false
+  purpose: Accept staff invitation token and create staff user credentials
+  method: POST
+  inputs:
+    body:
+      - token: invite token
+      - password: min 8 chars
+      - name: display name
+  outputs: "{ success: true, session: { access_token, refresh_token }, user: { id, email, name, role } }"
+  external_services: [Supabase Auth]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [profiles, staff_roles, auth_tokens]
+  tables_written: [auth.users, profiles, staff_roles, auth_tokens (consumed)]
+  failure_paths:
+    - missing token → 400
+    - invalid/expired token → 401
+    - password too short → 400
+    - missing name → 400
+    - user creation failure → 500
+  notes: Sets email_verified=true and requires_2fa=true on new staff accounts
+
+- name: validate-staff-invite
+  path: supabase/functions/validate-staff-invite/index.ts
+  jwt: explicit_false
+  purpose: Check if staff invite token is valid before display
+  method: POST
+  inputs: [token]
+  outputs: "{ valid: true, email, role } or { valid: false, error }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [auth_tokens]
+  tables_written: []
+  failure_paths: []
+
+- name: create-staff-invite
+  path: supabase/functions/create-staff-invite/index.ts
+  jwt: default_true
+  purpose: Generate invite token and send email to new staff member
+  method: POST
+  inputs:
+    body: [email, role]
+  outputs: "{ inviteToken, expiresAt }"
+  external_services: [Resend, Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_PROD_KEY, AUTH_INVITE_TTL_HOURS, SITE_URL]
+  tables_read: []
+  tables_written: [auth_tokens]
+  failure_paths: [UNKNOWN]
+
+- name: create-staff-user
+  path: supabase/functions/create-staff-user/index.ts
+  jwt: default_true
+  purpose: Create staff user directly with credentials (admin tool)
+  method: POST
+  inputs:
+    body: [email, password, name, role]
+  outputs: "{ userId }"
+  external_services: [Supabase Auth]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [auth.users, profiles, staff_roles]
+  failure_paths: [UNKNOWN]
+
+- name: list-staff-users
+  path: supabase/functions/list-staff-users/index.ts
+  jwt: default_true
+  purpose: List all staff members for admin dashboard
+  method: GET
+  inputs: {}
+  outputs: "[{ id, email, name, role, created_at, last_login }]"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [staff_roles, profiles]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: manage-staff-role
+  path: supabase/functions/manage-staff-role/index.ts
+  jwt: explicit_true
+  purpose: Promote/demote/remove staff roles (admin only)
+  method: POST
+  inputs:
+    body:
+      - userId: UUID
+      - newRole: string
+      - action: create | update | delete
+  outputs: updated role or deletion confirmation
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [staff_roles]
+  tables_written: [staff_roles, role_audit_log]
+  failure_paths:
+    - caller not admin → 403
+  logs_events: [role_audit_log entries]
+
+- name: manage-team-member
+  path: supabase/functions/manage-team-member/index.ts
+  jwt: default_true
+  purpose: Add/remove/update account team members (customer-facing)
+  method: POST
+  inputs:
+    body: [accountId, email, role (owner|admin|member)]
+  outputs: updated member list
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [account_members]
+  tables_written: [account_members]
+  failure_paths: [UNKNOWN]
+
+- name: require-step-up
+  path: supabase/functions/require-step-up/index.ts
+  jwt: default_true
+  purpose: Initiate step-up auth for sensitive actions (2FA/TOTP challenge)
+  method: POST
+  inputs:
+    body: [action (e.g. delete_account, change_billing)]
+  outputs: "{ challengeId, expiresIn }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [profiles]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: auth-send-email
+  path: supabase/functions/auth-send-email/index.ts
+  jwt: explicit_false
+  purpose: Supabase Auth Hook — route auth emails to correct templates via Resend
+  method: POST
+  inputs:
+    body: Supabase auth event (user_signup, user_invited, etc.)
+  outputs: "{ success: true }"
+  external_services: [Resend]
+  env_vars: [RESEND_PROD_KEY, EMAIL_FROM, SITE_URL]
+  tables_read: []
+  tables_written: []
+  failure_paths:
+    - Resend API error → 500
+  notes: Invoked by Supabase Auth, not by application code directly
+
+---
+
+## SMS & MESSAGING
+
+- name: handle-sms-inbound
+  path: supabase/functions/handle-sms-inbound/index.ts
+  jwt: explicit_false
+  purpose: Receive and process inbound SMS from Twilio/Vapi
+  method: POST
+  inputs: SMS webhook payload (from, to, body)
+  outputs: TwiML or SMS response
+  external_services: [Twilio]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN]
+  tables_read: [accounts, appointments]
+  tables_written: [sms_messages, appointments]
+  failure_paths: [UNKNOWN]
+  notes: "TODO: Integrate with Vapi for AI-generated responses"
+
+- name: send-sms-confirmation
+  path: supabase/functions/send-sms-confirmation/index.ts
+  jwt: explicit_false
+  purpose: Send appointment confirmation SMS to customer
+  method: POST
+  inputs:
+    body: [appointmentId or appointment details]
+  outputs: "{ messageId, status: 'sent' }"
+  external_services: [Twilio API]
+  env_vars: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [appointments, accounts]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+  notes: "TODO: Send actual SMS via Twilio/VAPI — may not be implemented"
+
+- name: send-onboarding-sms
+  path: supabase/functions/send-onboarding-sms/index.ts
+  jwt: explicit_false
+  purpose: Send onboarding instructions SMS to new customer
+  method: POST
+  inputs:
+    body: [accountId]
+  outputs: message confirmation
+  external_services: [Twilio API]
+  env_vars: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, profiles]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: send-forwarding-instructions
+  path: supabase/functions/send-forwarding-instructions/index.ts
+  jwt: explicit_false
+  purpose: Send SMS or email with call forwarding setup instructions
+  method: POST
+  inputs:
+    body: [accountId, method (sms|email)]
+  outputs: confirmation
+  external_services: [Resend, Twilio]
+  env_vars: [RESEND_PROD_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, phone_numbers]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: reminders-dispatcher
+  path: supabase/functions/reminders-dispatcher/index.ts
+  jwt: default_true
+  purpose: Send appointment reminder SMS/email (cron-invoked)
+  method: POST
+  inputs: UNKNOWN (cron-only)
+  outputs: "{ remindersSent }"
+  external_services: [Resend, Twilio]
+  env_vars: [RESEND_PROD_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [appointments, accounts, profiles]
+  tables_written: [sms_messages]
+  failure_paths: [UNKNOWN]
+  notes: Finds appointments in next 24 hours and dispatches reminders
+
+---
+
+## STRIPE BILLING & SUBSCRIPTIONS
+
+- name: stripe-webhook
+  path: supabase/functions/stripe-webhook/index.ts
+  jwt: explicit_false
+  purpose: Process Stripe webhook events for subscription and billing lifecycle
+  method: POST
+  inputs:
+    headers: [stripe-signature]
+    body: Stripe event JSON
+  outputs: "{ received: true } (200)"
+  external_services: [Stripe API (signature verification)]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, POSTHOG_API_KEY]
+  tables_read: [accounts (by stripe_customer_id)]
+  tables_written: [accounts, stripe_events, subscriptions]
+  failure_paths:
+    - invalid signature → 403
+    - unknown event type → 200 OK (ignored)
+    - customer not found → logged, no error
+  events_handled:
+    - checkout.session.completed → update plan_key, subscription_status, stripe_customer_id
+    - customer.subscription.updated → sync status and plan
+    - "customer.subscription.deleted → mark cancelled ⚠️ NO EMAIL SENT (risk C2)"
+    - "invoice.payment_failed → mark past_due ⚠️ NO EMAIL SENT (risk C1)"
+    - "invoice.upcoming → charge Stripe overage ⚠️ DOUBLE-BILLING RISK if webhook retries between Stripe call and DB update (risk C3)"
+  logs_events:
+    - stripe_events table (audit)
+    - PostHog billing analytics
+    - structured logs
+
+- name: create-upgrade-checkout
+  path: supabase/functions/create-upgrade-checkout/index.ts
+  jwt: default_true
+  purpose: Create Stripe Checkout session for plan upgrade
+  method: POST
+  inputs:
+    body: [accountId, planId, billingInterval]
+  outputs: "{ sessionId, url: 'https://checkout.stripe.com/...' }"
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY, STRIPE_PRICE_ID_*, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: []
+  failure_paths:
+    - no stripe_customer_id → 400
+    - invalid planId → 400
+  logs_events: [structured logs]
+
+- name: create-billing-portal-session
+  path: supabase/functions/create-billing-portal-session/index.ts
+  jwt: default_true
+  purpose: Create Stripe billing portal session for self-service account management
+  method: POST
+  inputs:
+    body: [accountId]
+  outputs: "{ url: 'https://billing.stripe.com/...' }"
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: []
+  failure_paths:
+    - no stripe_customer_id → 400
+
+- name: create-portal-session
+  path: supabase/functions/create-portal-session/index.ts
+  jwt: default_true
+  purpose: Alternative billing portal session endpoint (possible duplicate)
+  method: POST
+  inputs: UNKNOWN
+  outputs: portal URL
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY]
+  notes: "⚠️ Possible duplicate of create-billing-portal-session — verify"
+
+- name: stripe-setup-intent
+  path: supabase/functions/stripe-setup-intent/index.ts
+  jwt: default_true
+  purpose: Create Stripe SetupIntent for adding/updating payment method without subscription
+  method: POST
+  inputs:
+    body: [accountId]
+  outputs: "{ clientSecret, intentId }"
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: stripe-payment-method-default
+  path: supabase/functions/stripe-payment-method-default/index.ts
+  jwt: default_true
+  purpose: Set default payment method for Stripe customer
+  method: POST
+  inputs:
+    body: [accountId, paymentMethodId]
+  outputs: confirmation
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: stripe-subscription-cancel
+  path: supabase/functions/stripe-subscription-cancel/index.ts
+  jwt: default_true
+  purpose: Cancel Stripe subscription at period end (or immediately)
+  method: POST
+  inputs:
+    body: [subscriptionId, cancelAtPeriodEnd (default true)]
+  outputs: cancellation confirmation
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY]
+  tables_read: []
+  tables_written: []
+  failure_paths:
+    - subscription not found → 404
+
+- name: stripe-subscription-update
+  path: supabase/functions/stripe-subscription-update/index.ts
+  jwt: default_true
+  purpose: Update subscription (plan change, seat count)
+  method: POST
+  inputs:
+    body: [subscriptionId, newPlanId, quantity (optional)]
+  outputs: updated subscription
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY]
+  tables_read: []
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: cancel-subscription
+  path: supabase/functions/cancel-subscription/index.ts
+  jwt: default_true
+  purpose: Customer-facing subscription cancellation with optional feedback
+  method: POST
+  inputs:
+    body: [accountId, reason (optional)]
+  outputs: cancellation confirmation
+  external_services: [Stripe API, Resend — UNKNOWN if email sent]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: [accounts]
+  failure_paths: [UNKNOWN]
+
+- name: stripe-invoices-list
+  path: supabase/functions/stripe-invoices-list/index.ts
+  jwt: default_true
+  purpose: List past Stripe invoices for customer
+  method: GET
+  inputs:
+    query: [accountId, limit, offset]
+  outputs: "[{ id, date, amount, status, downloadUrl }]"
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: get-billing-summary
+  path: supabase/functions/get-billing-summary/index.ts
+  jwt: default_true
+  purpose: Fetch current billing status and usage for dashboard display
+  method: GET
+  inputs:
+    query: [accountId]
+  outputs: |
+    {
+      planKey, status, billingCycle: {start, end},
+      calls: {used, included, overage, cap},
+      nextBillingDate, amountDue
+    }
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, call_billing_ledger, billing_period_usage_summary]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: update-customer-info
+  path: supabase/functions/update-customer-info/index.ts
+  jwt: default_true
+  purpose: Update Stripe customer metadata (name, email, phone)
+  method: POST
+  inputs:
+    body: [accountId, name, email, phone]
+  outputs: confirmation
+  external_services: [Stripe API]
+  env_vars: [STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, profiles]
+  tables_written: [profiles, accounts]
+  failure_paths: [UNKNOWN]
+
+---
+
+## USAGE & BILLING AGGREGATION
+
+- name: sync-usage
+  path: supabase/functions/sync-usage/index.ts
+  jwt: explicit_true
+  purpose: Sync call usage from call_billing_ledger to account counters (cron)
+  method: POST
+  inputs:
+    body: [accountId (optional; omit to sync all)]
+  outputs: "{ accountsUpdated, totalCallsBilled }"
+  external_services: [Supabase PostgreSQL, Resend — UNKNOWN (TODO comment present)]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [call_billing_ledger, accounts]
+  tables_written: [accounts (calls_used_current_period, overage_calls_current_period)]
+  failure_paths: [UNKNOWN]
+  notes: "TODO: Integrate with Resend (appears twice in code)"
+
+- name: reset-monthly-usage
+  path: supabase/functions/reset-monthly-usage/index.ts
+  jwt: explicit_true
+  purpose: Reset monthly call counters at billing cycle boundary (cron)
+  method: POST
+  inputs:
+    body: [accountId (optional)]
+  outputs: "{ accountsReset, newBillingCycleStart }"
+  external_services: [Supabase PostgreSQL, Resend — UNKNOWN (TODO)]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts, subscriptions]
+  tables_written: [accounts]
+  failure_paths: [UNKNOWN]
+  notes: "TODO: Integrate with Resend"
+
+- name: monitor-alerts
+  path: supabase/functions/monitor-alerts/index.ts
+  jwt: default_true
+  purpose: Check usage thresholds and send alerts (cron)
+  method: POST
+  inputs: UNKNOWN (cron)
+  outputs: "{ alertsSent }"
+  external_services: [Resend, Twilio, PostHog]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_PROD_KEY, POSTHOG_API_KEY]
+  tables_read: [accounts, billing_period_usage_summary]
+  tables_written: [billing_period_usage_summary (notified_80_pct)]
+  failure_paths: [UNKNOWN]
+  notes: Sends 80% warning, 100% cap reached warning, overage started
+
+- name: detect-test-call-alert
+  path: supabase/functions/detect-test-call-alert/index.ts
+  jwt: default_true
+  purpose: Detect test calls and exclude from billing
+  method: POST
+  inputs: call metadata
+  outputs: classification result
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [call_logs]
+  tables_written: [call_billing_ledger]
+  failure_paths: [UNKNOWN]
+
+- name: posthog-signal
+  path: supabase/functions/posthog-signal/index.ts
+  jwt: default_true
+  purpose: Receive client analytics events and store in DB
+  method: POST
+  inputs:
+    body: PostHog event payload
+  outputs: "{ ok: true }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, POSTHOG_SIGNAL_SECRET]
+  tables_read: []
+  tables_written: [posthog_signals]
+  failure_paths: []
+
+---
+
+## EMAIL & NOTIFICATIONS
+
+- name: send-welcome-email
+  path: supabase/functions/send-welcome-email/index.ts
+  jwt: default_true
+  purpose: Send welcome email after account creation
+  method: POST
+  inputs:
+    body: [userId or auth event]
+  outputs: email confirmation
+  external_services: [Resend]
+  env_vars: [RESEND_PROD_KEY, EMAIL_FROM, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [profiles, accounts]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: resend-webhook
+  path: supabase/functions/resend-webhook/index.ts
+  jwt: explicit_false
+  purpose: Process Resend email delivery webhook events (delivered, bounced, etc.)
+  method: POST
+  inputs: Resend event payload with signature
+  outputs: "{ received: true }"
+  external_services: [Resend (signature verification)]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [email_logs]
+  failure_paths:
+    - invalid signature → 403
+
+---
+
+## JOBBER INTEGRATION
+
+- name: jobber-oauth-start
+  path: supabase/functions/jobber-oauth-start/index.ts
+  jwt: default_true
+  purpose: Initiate OAuth flow with Jobber (field service CRM)
+  method: GET
+  inputs:
+    query: [accountId]
+  outputs: "{ authUrl: 'https://jobber.com/oauth/authorize?...' }"
+  external_services: [Jobber OAuth]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [accounts]
+  tables_written: []
+  failure_paths: [UNKNOWN]
+
+- name: jobber-oauth-callback
+  path: supabase/functions/jobber-oauth-callback/index.ts
+  jwt: explicit_false
+  purpose: Handle Jobber OAuth callback; exchange code for tokens
+  method: GET
+  inputs:
+    query: [code, state]
+  outputs: redirect to dashboard success page
+  external_services: [Jobber OAuth token endpoint]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [integrations]
+  failure_paths:
+    - invalid state → 403
+    - missing code → 400
+
+- name: jobber-sync
+  path: supabase/functions/jobber-sync/index.ts
+  jwt: default_true
+  purpose: Periodically sync appointments from Jobber (cron)
+  method: POST
+  inputs: UNKNOWN (cron or accountId)
+  outputs: "{ syncedCount, errors }"
+  external_services: [Jobber API]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [integrations]
+  tables_written: [appointments]
+  failure_paths: [UNKNOWN]
+
+---
+
+## INTERNAL / ADMIN / DEBUG
+
+- name: ops-bridge
+  path: supabase/functions/ops-bridge/index.ts
+  jwt: default_true
+  purpose: Internal operations bridge for automated tasks
+  method: POST
+  inputs: [operation type and parameters — UNKNOWN]
+  outputs: operation result
+  external_services: [multiple — UNKNOWN]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: [multiple]
+  tables_written: [multiple]
+  failure_paths: [UNKNOWN]
+
+- name: cleanup-database
+  path: supabase/functions/cleanup-database/index.ts
+  jwt: default_true
+  purpose: Periodic cleanup of expired tokens, old logs, unused numbers (cron)
+  method: POST
+  inputs:
+    body: [retentionDays (optional)]
+  outputs: "{ tokensDeleted, logsDeleted, numbersReleased }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [auth_tokens, call_logs, phone_numbers]
+  failure_paths: [UNKNOWN]
+
+- name: call-logs-cleanup
+  path: supabase/functions/call-logs-cleanup/index.ts
+  jwt: default_true
+  purpose: Delete old call logs per retention policy (cron)
+  method: POST
+  inputs:
+    body: [retentionDays (default 90)]
+  outputs: "{ deletedCount }"
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  tables_read: []
+  tables_written: [call_logs]
+  failure_paths: [UNKNOWN]
+
+- name: debug-db
+  path: supabase/functions/debug-db/index.ts
+  jwt: explicit_false
+  purpose: DEV ONLY — execute arbitrary SQL queries for debugging
+  method: POST
+  inputs: [SQL query or accountId]
+  outputs: query results
+  external_services: [Supabase PostgreSQL]
+  env_vars: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY]
+  notes: "⚠️ CRITICAL: verify_jwt=false means this is publicly callable — must be disabled in production or restricted by internal IP/secret"
+
+- name: sentry-debug
+  path: supabase/functions/sentry-debug/index.ts
+  jwt: default_true
+  purpose: DEV ONLY — test Sentry error tracking
+  method: POST
+  inputs: UNKNOWN
+  outputs: Sentry event ID
+  external_services: [Sentry]
+  env_vars: [SENTRY_DSN]
+
+- name: sentry-test
+  path: supabase/functions/sentry-test/index.ts
+  jwt: default_true
+  purpose: DEV ONLY — test Sentry integration
+  method: POST
+  inputs: UNKNOWN
+  outputs: Sentry test status
+  external_services: [Sentry]
+  env_vars: [SENTRY_DSN]
+
+- name: assistant-chat
+  path: supabase/functions/assistant-chat/index.ts
+  jwt: default_true
+  purpose: UNKNOWN — possibly AI chat for assistant configuration
+  method: POST
+  inputs: UNKNOWN
+  outputs: UNKNOWN
+  external_services: [UNKNOWN]
+  env_vars: [UNKNOWN]
+  notes: "No config.toml entry; inherits default verify_jwt=true"
