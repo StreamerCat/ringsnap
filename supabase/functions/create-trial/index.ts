@@ -70,6 +70,7 @@ async function capturePostHogEvent(
       body: JSON.stringify({
         api_key: key,
         event,
+        distinct_id: distinctId,
         properties: {
           distinct_id: distinctId,
           ...props,
