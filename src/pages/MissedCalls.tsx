@@ -5,6 +5,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { capture } from "@/lib/analytics";
+import { trackPageLoad, trackFunnelEvent, trackClick } from "@/lib/sentry-tracking";
+import * as Sentry from "@sentry/react";
 import {
   PhoneMissed,
   PhoneCall,
@@ -38,15 +40,62 @@ const MobileFooterCTA = lazy(() =>
 
 const PAGE = "missed_calls_landing";
 
+const SECTIONS = [
+  "hero",
+  "pain",
+  "urgency",
+  "solution",
+  "trades",
+  "how_it_works",
+  "objections",
+  "calculator",
+  "cta",
+] as const;
+
 const MissedCalls = () => {
   const navigate = useNavigate();
   const calcRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const viewedSections = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    // Sentry: performance timing + funnel step
+    trackPageLoad("MissedCalls");
+    trackFunnelEvent("landing_page_view", { source: "missed_calls" });
+
+    // PostHog: page-specific event
     capture("page_viewed_missed_calls", { page: PAGE });
+
+    // Sentry: tag for session replay filtering
+    Sentry.setTag("landing_page", "missed_calls");
   }, []);
 
+  // Track section visibility via IntersectionObserver
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const sectionId = entry.target.getAttribute("data-section");
+          if (!sectionId) return;
+          if (entry.isIntersecting && !viewedSections.current.has(sectionId)) {
+            viewedSections.current.add(sectionId);
+            capture("section_viewed", { section: sectionId, page: PAGE });
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+
+    sectionRefs.current.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const registerSection = (id: string) => (el: HTMLElement | null) => {
+    if (el) sectionRefs.current.set(id, el);
+  };
+
   const goToTrial = (location: string) => {
+    trackClick(`start_free_trial_${location}`, { page: PAGE, cta_location: location });
     capture("cta_clicked", {
       cta_location: location,
       cta_text: "Start Free Trial",
@@ -57,6 +106,7 @@ const MissedCalls = () => {
   };
 
   const scrollToCalc = (location: string) => {
+    trackClick(`calculate_revenue_${location}`, { page: PAGE, cta_location: location });
     capture("cta_clicked", {
       cta_location: location,
       cta_text: "Calculate Missed Call Revenue",
@@ -136,7 +186,7 @@ const MissedCalls = () => {
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
         {/* ── HERO ── */}
-        <section className="relative min-h-[92vh] flex items-center overflow-hidden section-spacer pt-24">
+        <section ref={registerSection("hero")} data-section="hero" className="relative min-h-[92vh] flex items-center overflow-hidden section-spacer pt-24">
           <div className="absolute inset-0 -z-10">
             <div className="absolute inset-0 bg-gradient-to-br from-off-white to-cream/30" />
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-radial from-primary/8 to-transparent rounded-full -translate-y-1/4 translate-x-1/4 blur-3xl" />
@@ -190,7 +240,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── PAIN SECTION ── */}
-        <section className="section-spacer-compact bg-muted/30 border-t border-border/10">
+        <section ref={registerSection("pain")} data-section="pain" className="section-spacer-compact bg-muted/30 border-t border-border/10">
           <div className="site-container">
             <div className="max-w-2xl mx-auto text-center mb-12">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
@@ -238,7 +288,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── ECONOMIC URGENCY ── */}
-        <section className="section-spacer-compact border-t border-border/10">
+        <section ref={registerSection("urgency")} data-section="urgency" className="section-spacer-compact border-t border-border/10">
           <div className="site-container">
             <div className="max-w-2xl mx-auto text-center mb-10">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
@@ -275,7 +325,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── SOLUTION SECTION ── */}
-        <section className="section-spacer-compact bg-muted/30 border-t border-border/10">
+        <section ref={registerSection("solution")} data-section="solution" className="section-spacer-compact bg-muted/30 border-t border-border/10">
           <div className="site-container">
             <div className="max-w-2xl mx-auto text-center mb-12">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
@@ -327,7 +377,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── CONTRACTOR-SPECIFIC SECTION ── */}
-        <section className="section-spacer-compact border-t border-border/10">
+        <section ref={registerSection("trades")} data-section="trades" className="section-spacer-compact border-t border-border/10">
           <div className="site-container">
             <div className="max-w-3xl mx-auto text-center mb-10">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
@@ -362,7 +412,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── HOW IT WORKS ── */}
-        <section className="section-spacer-compact bg-muted/30 border-t border-border/10">
+        <section ref={registerSection("how_it_works")} data-section="how_it_works" className="section-spacer-compact bg-muted/30 border-t border-border/10">
           <div className="site-container">
             <div className="max-w-2xl mx-auto text-center mb-12">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
@@ -406,7 +456,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── OBJECTION REDUCER ── */}
-        <section className="section-spacer-compact border-t border-border/10">
+        <section ref={registerSection("objections")} data-section="objections" className="section-spacer-compact border-t border-border/10">
           <div className="site-container">
             <div className="max-w-3xl mx-auto text-center mb-10">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
@@ -447,7 +497,7 @@ const MissedCalls = () => {
         </section>
 
         {/* ── CALCULATOR ── */}
-        <div ref={calcRef} className="border-t border-border/10">
+        <div ref={(el) => { calcRef.current = el; registerSection("calculator")(el); }} data-section="calculator" className="border-t border-border/10">
           <Suspense
             fallback={
               <div className="w-full h-64 flex items-center justify-center">
@@ -462,7 +512,7 @@ const MissedCalls = () => {
         </div>
 
         {/* ── FINAL CTA ── */}
-        <section className="section-spacer-compact bg-primary/5 border-t border-primary/10">
+        <section ref={registerSection("cta")} data-section="cta" className="section-spacer-compact bg-primary/5 border-t border-primary/10">
           <div className="site-container">
             <div className="max-w-2xl mx-auto text-center">
               <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
