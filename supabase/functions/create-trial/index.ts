@@ -70,8 +70,11 @@ async function capturePostHogEvent(
       body: JSON.stringify({
         api_key: key,
         event,
-        distinct_id: distinctId,
-        properties: { ...props, $lib: 'edge-function' },
+        properties: {
+          distinct_id: distinctId,
+          ...props,
+          $lib: 'edge-function',
+        },
         timestamp: new Date().toISOString(),
       }),
     });
