@@ -48,6 +48,7 @@ const Plumbers = lazy(() => import("./pages/trades/Plumbers"));
 const HVAC = lazy(() => import("./pages/trades/HVAC"));
 const Electricians = lazy(() => import("./pages/trades/Electricians"));
 const Roofing = lazy(() => import("./pages/trades/Roofing"));
+const MissedCalls = lazy(() => import("./pages/MissedCalls"));
 const Difference = lazy(() => import("./pages/Difference"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Activation = lazy(() => import("./pages/Activation"));
@@ -216,6 +217,9 @@ const App = () => (
                 <Route path="/compare/ringsnap-vs-goodcall" element={<RingSnapVsGoodcall />} />
                 <Route path="/compare/ai-receptionist-vs-live-answering" element={<AiReceptionistVsLiveAnswering />} />
                 <Route path="/compare/best-ai-receptionist-home-services" element={<BestAiReceptionistHomeServices />} />
+                {/* Marketing landing pages */}
+                <Route path="/home-services-answering-service" element={<MissedCalls />} />
+                <Route path="/missed-calls" element={<MissedCalls />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
