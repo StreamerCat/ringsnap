@@ -51,6 +51,19 @@ export default function Terms() {
         />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://getringsnap.com/terms" />
+
+        <meta property="og:title" content="Terms of Service | RingSnap" />
+        <meta
+          property="og:description"
+          content="RingSnap Terms of Service for AI-powered phone answering, automation, scheduling, and telecommunications workflows."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://getringsnap.com/terms" />
+        <meta name="twitter:title" content="Terms of Service | RingSnap" />
+        <meta
+          name="twitter:description"
+          content="RingSnap Terms of Service for AI-powered phone answering, automation, scheduling, and telecommunications workflows."
+        />
       </Helmet>
 
       <SiteHeader />
