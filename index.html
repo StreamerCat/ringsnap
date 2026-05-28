@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Per-page title and description are owned by react-helmet-async; defaults here would render twice on prerendered pages. -->
     <title>RingSnap - AI Receptionist for Contractors | Never Miss a Call</title>
-    <meta name="description" content="AI receptionist that answers calls in under 2 rings. Try free for 3 days. Perfect for plumbers, electricians, HVAC contractors & more.">
     <meta name="author" content="RingSnap" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -21,26 +21,17 @@
     <noscript>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     </noscript>
-    
-    <meta property="og:type" content="website" />
+
+    <!-- Constants identical on every page; per-page tags stay in each Helmet block. -->
     <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png">
     <meta property="og:image:width" content="512">
     <meta property="og:image:height" content="512">
     <meta property="og:image:type" content="image/png">
     <meta property="og:site_name" content="RingSnap" />
-
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@ringsnap" />
     <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png">
-    
-    
-    
-    
-  <meta property="og:title" content="RingSnap - AI Receptionist for Contractors | Never Miss a Call">
-  <meta name="twitter:title" content="RingSnap - AI Receptionist for Contractors | Never Miss a Call">
-  <meta property="og:description" content="AI receptionist that answers calls in under 2 rings. Try free for 3 days. Perfect for plumbers, electricians, HVAC contractors &amp; more.">
-  <meta name="twitter:description" content="AI receptionist that answers calls in under 2 rings. Try free for 3 days. Perfect for plumbers, electricians, HVAC contractors &amp; more.">
-</head>
+  </head>
 
   <body>
     <div id="root"></div>

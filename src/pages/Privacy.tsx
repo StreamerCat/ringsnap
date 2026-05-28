@@ -38,6 +38,19 @@ export default function Privacy() {
         />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://getringsnap.com/privacy" />
+
+        <meta property="og:title" content="Privacy Policy | RingSnap" />
+        <meta
+          property="og:description"
+          content="RingSnap Privacy Policy for AI-powered telecommunications and call automation services."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://getringsnap.com/privacy" />
+        <meta name="twitter:title" content="Privacy Policy | RingSnap" />
+        <meta
+          name="twitter:description"
+          content="RingSnap Privacy Policy for AI-powered telecommunications and call automation services."
+        />
       </Helmet>
 
       <SiteHeader />

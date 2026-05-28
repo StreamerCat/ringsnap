@@ -51,6 +51,7 @@ const ROUTES = [
     // CRM page
     '/crm',
     // Comparison pages
+    '/compare',
     '/compare/ringsnap-vs-ruby',
     '/compare/ringsnap-vs-smith-ai',
     '/compare/ringsnap-vs-goodcall',
