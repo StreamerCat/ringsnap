@@ -87,7 +87,10 @@ async function capturePostHogException(
   tags: Record<string, unknown>,
   distinctId: string
 ): Promise<void> {
-  const e = err instanceof Error ? err : new Error(String(err));
+  const e =
+    err instanceof Error
+      ? err
+      : new Error(typeof err === "string" ? err : JSON.stringify(err));
   try {
     await posthog?.captureException(e, distinctId, {
       error_message: e.message,
@@ -111,10 +114,17 @@ function captureCreateTrialException(
   distinctId: string,
   context: Record<string, unknown> = {}
 ): void {
+  const errorMessage =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : JSON.stringify(err);
+
   capturePostHogException(err, {
     error_source: "create_trial",
     step,
-    error_message: err instanceof Error ? err.message : String(err),
+    error_message: errorMessage,
     ...context,
   }, distinctId);
 }
