@@ -1,6 +1,8 @@
 -- RPC: Securely fetch call logs without RLS recursion
 -- This function runs as SECURITY DEFINER (Service Role) but manually checks permission.
 
+DROP FUNCTION IF EXISTS public.get_recent_calls(uuid, integer);
+
 CREATE OR REPLACE FUNCTION public.get_recent_calls(p_account_id uuid, p_limit int DEFAULT 50)
 RETURNS TABLE (
     id uuid,
