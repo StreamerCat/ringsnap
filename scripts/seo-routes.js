@@ -33,6 +33,12 @@ export const INDEXABLE_ROUTES = [
   // CRM page
   { path: '/crm', changefreq: 'monthly', priority: '0.9' },
 
+  // SEO landing pages — problem-aware and general contractor keywords
+  { path: '/home-services-answering-service', changefreq: 'monthly', priority: '0.9' },
+  { path: '/contractor-answering-service', changefreq: 'monthly', priority: '0.9' },
+  { path: '/after-hours-answering-service', changefreq: 'monthly', priority: '0.9' },
+  { path: '/missed-call-recovery', changefreq: 'monthly', priority: '0.8' },
+
   // Comparison hub + pages
   { path: '/compare', changefreq: 'monthly', priority: '0.8' },
   { path: '/compare/ringsnap-vs-ruby', changefreq: 'monthly', priority: '0.8' },

@@ -55,8 +55,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     accentColor: "210 100% 50%", // Blue
     icon: "🔧",
     hero: {
-      headline: "Stop Bleeding $6,800/Month in Missed Plumbing Calls",
-      subheadline: "The Agent That Captures Every Emergency Call—And Books Them While You're Under the Sink",
+      headline: "AI Receptionist for Plumbers: Stop Losing $6,800/Month to Missed Calls",
+      subheadline: "Answers every emergency call in under 2 rings — burst pipes, sewer backups, and after-hours work booked while you're under the sink",
       transcriptBusiness: "Summit Plumbing",
       transcriptScenario: {
         ai1: "Thanks for calling Summit Plumbing. How can I help?",
@@ -121,9 +121,9 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "61%"
     },
     seo: {
-      title: "Virtual Answering Service for Plumbers | Never Miss Another Emergency Call",
-      description: "Stop losing $6,800/month to unanswered calls. RingSnap's Voice Agent answers in under 1 second, handles emergencies, and books jobs 24/7. Made for plumbers who never want to miss a call.",
-      keywords: "plumber answering service, plumbing call service, emergency plumber calls, virtual receptionist for plumbers, plumbing receptionist, 24/7 plumber phone, burst pipe calls, after hours plumbing",
+      title: "AI Receptionist for Plumbers | Plumbing Answering Service | RingSnap",
+      description: "Stop losing $6,800/month to unanswered calls. RingSnap's AI receptionist answers every plumbing call 24/7 — emergencies, drain clogs, and after-hours jobs booked automatically. Try free.",
+      keywords: "AI receptionist for plumbers, plumber answering service, plumbing answering service, virtual receptionist for plumbers, emergency plumber calls, after hours plumbing, burst pipe calls",
       canonical: "https://getringsnap.com/plumbers"
     }
   },
@@ -134,8 +134,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     accentColor: "0 70% 55%", // Red/Orange
     icon: "❄️",
     hero: {
-      headline: "Your HVAC Business Loses $8,200/Month When the Phone Rings and No One Answers",
-      subheadline: "The Agent That Captures Emergency Breakdowns AND Maintenance Calls—While You're in the Attic",
+      headline: "AI Receptionist for HVAC Contractors: Stop Losing $8,200/Month to Missed Calls",
+      subheadline: "Captures emergency breakdowns AND maintenance calls 24/7 — AC failures, furnace emergencies, and tune-up requests booked while you're in the attic",
       transcriptBusiness: "Arctic Heating & Cooling",
       transcriptScenario: {
         ai1: "Thanks for calling Arctic Heating & Cooling. How can I help?",
@@ -200,9 +200,9 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "58%"
     },
     seo: {
-      title: "Virtual Answering Service for HVAC Contractors | Capture Every Emergency Call",
-      description: "Stop losing $8,200/month to missed calls. RingSnap handles AC breakdowns, furnace emergencies, and maintenance calls 24/7. Answers in under 1 second. Sounds human.",
-      keywords: "HVAC answering service, AC repair calls, furnace emergency service, HVAC receptionist, 24/7 HVAC calls, air conditioning answering service, heating repair calls",
+      title: "AI Receptionist for HVAC | HVAC Answering Service | RingSnap",
+      description: "Stop losing $8,200/month to missed calls. RingSnap's AI receptionist handles AC breakdowns, furnace emergencies, and maintenance calls 24/7. Answers in under 2 rings. Try free.",
+      keywords: "AI receptionist for HVAC, HVAC answering service, HVAC call answering, virtual receptionist for HVAC contractors, AC repair calls, furnace emergency service, after hours HVAC calls",
       canonical: "https://getringsnap.com/hvac"
     }
   },
@@ -213,8 +213,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     accentColor: "45 100% 51%", // Yellow/Gold
     icon: "⚡",
     hero: {
-      headline: "Electricians: You're Losing $7,400/Month Because You Can't Answer While Working Hot",
-      subheadline: "The Agent That Books Emergency Calls AND Quotes—Even When You're in a Panel Box",
+      headline: "AI Receptionist for Electricians: Stop Losing $7,400/Month to Missed Calls",
+      subheadline: "Books emergency calls and quote requests 24/7 — sparking panels, outages, and upgrades captured even when you're in a panel box",
       transcriptBusiness: "Bolt Electric",
       transcriptScenario: {
         ai1: "Thanks for calling Bolt Electric. How can I help?",
@@ -279,9 +279,9 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "64%"
     },
     seo: {
-      title: "Virtual Answering Service for Electricians | Never Miss Emergency or Quote Calls",
-      description: "Stop losing $7,400/month to unanswered calls. RingSnap answers in under 1 second, triages electrical emergencies, and books jobs 24/7. Made for electricians who work hot.",
-      keywords: "electrician answering service, electrical emergency calls, panel upgrade quotes, electrician receptionist, 24/7 electrical service, sparking panel calls, electrical fire emergency",
+      title: "AI Receptionist for Electricians | Electrical Answering Service | RingSnap",
+      description: "Stop losing $7,400/month to unanswered calls. RingSnap's AI receptionist triages electrical emergencies, books panel upgrades, and handles calls 24/7. Made for electricians. Try free.",
+      keywords: "AI receptionist for electricians, electrician answering service, electrical answering service, virtual receptionist for electricians, electrical emergency calls, panel upgrade quotes, 24/7 electrical service",
       canonical: "https://getringsnap.com/electricians"
     }
   },
@@ -292,8 +292,8 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     accentColor: "25 85% 45%", // Rust/Brown
     icon: "🏠",
     hero: {
-      headline: "Roofing Contractors: Storm Season Brings $12K+ in Calls You're Missing on the Roof",
-      subheadline: "The Agent That Captures Emergency Leak Calls AND Inspection Requests—While You're 30 Feet Up",
+      headline: "AI Receptionist for Roofers: Stop Missing $12K+ in Storm Damage Calls",
+      subheadline: "Captures emergency leak calls AND inspection requests 24/7 — storm damage, insurance claims, and new jobs booked while you're 30 feet up",
       transcriptBusiness: "Summit Roofing & Repair",
       transcriptScenario: {
         ai1: "Thanks for calling Summit Roofing. How can I help?",
@@ -358,9 +358,9 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       emergencyRate: "45%"
     },
     seo: {
-      title: "Virtual Answering Service for Roofers | Capture Every Storm Damage & Leak Call",
-      description: "Stop losing $12,000/month in storm season. RingSnap answers in under 1 second, books emergency leak repairs and inspections 24/7. Made for roofing contractors.",
-      keywords: "roofing answering service, roof leak emergency, storm damage calls, roofing receptionist, 24/7 roofer calls, roof inspection booking, insurance claim calls",
+      title: "AI Receptionist for Roofers | Roofing Answering Service | RingSnap",
+      description: "Stop losing $12,000/month in storm season. RingSnap's AI receptionist books emergency leak repairs, inspections, and storm damage calls 24/7. Made for roofing contractors. Try free.",
+      keywords: "AI receptionist for roofers, roofing answering service, roofing call answering, virtual receptionist for roofers, roof leak emergency, storm damage calls, 24/7 roofer calls",
       canonical: "https://getringsnap.com/roofing"
     }
   }

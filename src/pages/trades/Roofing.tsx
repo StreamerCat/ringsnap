@@ -21,8 +21,55 @@ const breadcrumbSchema = {
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: "https://getringsnap.com/" },
-    { "@type": "ListItem", position: 2, name: "Roofing Answering Service", item: "https://getringsnap.com/roofing" },
+    { "@type": "ListItem", position: 2, name: "AI Receptionist for Roofers", item: "https://getringsnap.com/roofing" },
   ],
+};
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How does an AI receptionist help roofing contractors?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "RingSnap handles roofing calls the way a trained dispatcher would: emergency leaks get triaged immediately, storm damage calls are captured with full details (location, severity, insurance info), and inspection requests get booked while you're on a roof. You never miss a call when the weather turns."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Can RingSnap handle the surge of calls after a storm?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. Storm surges are a core use case. When your phone rings off the hook after heavy weather, RingSnap handles every concurrent call — triage, booking, and dispatching — without any hold times or voicemail. Every storm damage lead is captured and prioritized."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Can RingSnap capture insurance restoration leads?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. RingSnap collects insurance carrier, claim status, and inspection availability during the initial call — so you arrive at estimates with the information you need. Insurance restoration leads that used to fall through the cracks are now captured and scheduled automatically."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Does RingSnap help roofing companies book more inspections?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. Inspection booking is one of RingSnap's highest-value functions for roofers. Homeowners who call during active jobs or weekends get booked immediately while they're motivated — rather than leaving a voicemail that may not get returned for days."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "How quickly can a roofing company start using RingSnap?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "In about 10 minutes. Forward your existing business number to RingSnap and you're live. No hardware, no new number, no contracts. The 3-day free trial lets you capture real calls and verify the ROI before you pay anything."
+      }
+    }
+  ]
 };
 
 const Roofing = () => {
@@ -53,6 +100,7 @@ const Roofing = () => {
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
         <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">

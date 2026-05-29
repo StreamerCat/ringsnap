@@ -75,6 +75,11 @@ const AverageTicketPlanner = lazy(() => import("./pages/resources/AverageTicketP
 // CRM page
 const CRM = lazy(() => import("./pages/CRM"));
 
+// SEO landing pages
+const ContractorAnsweringService = lazy(() => import("./pages/ContractorAnsweringService"));
+const AfterHoursAnsweringService = lazy(() => import("./pages/AfterHoursAnsweringService"));
+const MissedCallRecovery = lazy(() => import("./pages/MissedCallRecovery"));
+
 // Comparison pages
 const RingSnapVsRuby = lazy(() => import("./pages/compare/RingSnapVsRuby"));
 const RingSnapVsSmithAi = lazy(() => import("./pages/compare/RingSnapVsSmithAi"));
@@ -220,6 +225,10 @@ const App = () => (
                 {/* Marketing landing pages */}
                 <Route path="/home-services-answering-service" element={<MissedCalls />} />
                 <Route path="/missed-calls" element={<MissedCalls />} />
+                {/* SEO landing pages */}
+                <Route path="/contractor-answering-service" element={<ContractorAnsweringService />} />
+                <Route path="/after-hours-answering-service" element={<AfterHoursAnsweringService />} />
+                <Route path="/missed-call-recovery" element={<MissedCallRecovery />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

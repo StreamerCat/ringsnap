@@ -21,8 +21,55 @@ const breadcrumbSchema = {
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: "https://getringsnap.com/" },
-    { "@type": "ListItem", position: 2, name: "Plumber Answering Service", item: "https://getringsnap.com/plumbers" },
+    { "@type": "ListItem", position: 2, name: "AI Receptionist for Plumbers", item: "https://getringsnap.com/plumbers" },
   ],
+};
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How does an AI receptionist help plumbers specifically?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "RingSnap is trained for plumbing calls: burst pipes, sewer backups, drain clogs, and after-hours emergencies. It triages urgency, gives callers immediate safety instructions (like shutting off the main water valve), and books the job automatically — all without you picking up the phone."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Will RingSnap work for after-hours plumbing emergencies?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. RingSnap answers 24/7 including nights, weekends, and holidays. After-hours emergency calls are a core use case — the system triages urgency, provides safety guidance, and routes life-threatening situations to you immediately. Routine calls get booked for the next available slot."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Can RingSnap handle price shoppers and quote requests?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. RingSnap captures quote requests, collects job details (type of work, property address, timeline), and schedules an estimate appointment. Price shoppers who would otherwise hang up are converted into scheduled consultations."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Does RingSnap integrate with plumbing dispatch software?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "RingSnap integrates with Jobber and logs all call details — job type, urgency level, customer contact, and full call transcript — directly to your account. Every call creates a lead record automatically so nothing falls through the cracks."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "How quickly can a plumbing company get set up with RingSnap?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Setup takes about 10 minutes. You forward your existing business number to RingSnap — no need to change your phone number or any hardware. You get a dedicated AI agent configured for plumbing calls, and a 3-day free trial to verify it works for your business."
+      }
+    }
+  ]
 };
 
 const Plumbers = () => {
@@ -53,6 +100,7 @@ const Plumbers = () => {
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
         <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">

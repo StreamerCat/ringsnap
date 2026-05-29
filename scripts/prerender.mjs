@@ -50,6 +50,11 @@ const ROUTES = [
     '/resources/increase-average-ticket',
     // CRM page
     '/crm',
+    // SEO landing pages
+    '/home-services-answering-service',
+    '/contractor-answering-service',
+    '/after-hours-answering-service',
+    '/missed-call-recovery',
     // Comparison pages
     '/compare',
     '/compare/ringsnap-vs-ruby',
