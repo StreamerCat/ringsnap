@@ -16,22 +16,21 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Enable source maps for production to allow Sentry to show readable stack traces
-    sourcemap: true,
+    // Hidden source maps: emit .map files for Sentry upload but omit the
+    // //# sourceMappingURL comment from served JS to reduce CDN/browser overhead.
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         manualChunks: {
           // Core React runtime — always needed
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          // Radix UI primitives — shared across most pages
+          // Only Radix primitives mounted at app root (Toaster, TooltipProvider).
+          // Other primitives (dialog, tabs, accordion, dropdown-menu, select) are
+          // only used inside route-level components and code-split naturally
+          // via React.lazy boundaries in App.tsx.
           ui: [
-            '@radix-ui/react-dialog',
             '@radix-ui/react-toast',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-dropdown-menu',
             '@radix-ui/react-tooltip',
-            '@radix-ui/react-select',
           ],
           // Charting — only loaded by dashboard/analytics pages
           charts: ['recharts'],
