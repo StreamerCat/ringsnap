@@ -10,154 +10,157 @@ import "./index.css";
 const environment = import.meta.env.MODE || "production";
 const release = import.meta.env.VITE_SENTRY_RELEASE || "unknown";
 
-// Initialize Sentry for error tracking
-Sentry.init({
-  // Use environment variable for DSN if available, otherwise fallback to hardcoded
-  dsn: import.meta.env.VITE_SENTRY_DSN || "https://1f6b5bec7383a2bdc6f65ec86bf977f0@o4510524163096576.ingest.us.sentry.io/4510524183609344",
-  environment,
-  release,
+// Defer Sentry initialization until after first render to avoid blocking the critical path.
+// Sentry SDK methods are safe no-ops before init() completes.
+function initSentry() {
+  Sentry.init({
+    // Use environment variable for DSN if available, otherwise fallback to hardcoded
+    dsn: import.meta.env.VITE_SENTRY_DSN || "https://1f6b5bec7383a2bdc6f65ec86bf977f0@o4510524163096576.ingest.us.sentry.io/4510524183609344",
+    environment,
+    release,
 
-  integrations: [
-    Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration({
-      // Mask all text and input content by default for privacy
-      maskAllText: true,
-      maskAllInputs: true,
-      // Block all media (images, videos, etc) for privacy
-      blockAllMedia: true,
-    }),
-    // Capture console errors automatically
-    Sentry.consoleLoggingIntegration({ levels: ["error"] }), // Only errors, not warns
-  ],
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({
+        // Mask all text and input content by default for privacy
+        maskAllText: true,
+        maskAllInputs: true,
+        // Block all media (images, videos, etc) for privacy
+        blockAllMedia: true,
+      }),
+      // Capture console errors automatically
+      Sentry.consoleLoggingIntegration({ levels: ["error"] }), // Only errors, not warns
+    ],
 
-  // Logging
-  _experiments: {
-    enableLogs: true,
-  },
+    // Logging
+    _experiments: {
+      enableLogs: true,
+    },
 
-  // Performance Monitoring - Low sampling for minimal overhead
-  tracesSampleRate: 0.03, // Sample 3% of transactions
+    // Performance Monitoring - Low sampling for minimal overhead
+    tracesSampleRate: 0.03, // Sample 3% of transactions
 
-  // Session Replay - Error-only to minimize noise and storage costs
-  replaysSessionSampleRate: 0, // Do not capture normal sessions
-  replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions with errors
+    // Session Replay - Error-only to minimize noise and storage costs
+    replaysSessionSampleRate: 0, // Do not capture normal sessions
+    replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions with errors
 
-  // Redact sensitive data before sending to Sentry
-  beforeSend(event, hint) {
-    // Redact sensitive fields from all contexts
-    const sensitivePatterns = [
-      "email",
-      "phone",
-      "token",
-      "secret",
-      "authorization",
-      "cookie",
-      "transcript",
-      "raw_audio",
-      "card",
-      "password",
-      "apikey",
-      "api_key",
-      "stripe_key",
-      "publishable_key",
-    ];
+    // Redact sensitive data before sending to Sentry
+    beforeSend(event, hint) {
+      // Redact sensitive fields from all contexts
+      const sensitivePatterns = [
+        "email",
+        "phone",
+        "token",
+        "secret",
+        "authorization",
+        "cookie",
+        "transcript",
+        "raw_audio",
+        "card",
+        "password",
+        "apikey",
+        "api_key",
+        "stripe_key",
+        "publishable_key",
+      ];
 
-    const redactObject = (obj: any): any => {
-      if (!obj || typeof obj !== "object") return obj;
+      const redactObject = (obj: any): any => {
+        if (!obj || typeof obj !== "object") return obj;
 
-      if (Array.isArray(obj)) {
-        return obj.map(item => redactObject(item));
-      }
-
-      const redacted: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        const keyLower = key.toLowerCase();
-        const shouldRedact = sensitivePatterns.some(pattern => keyLower.includes(pattern));
-
-        if (shouldRedact) {
-          redacted[key] = "[REDACTED]";
-        } else if (value && typeof value === "object") {
-          redacted[key] = redactObject(value);
-        } else {
-          redacted[key] = value;
+        if (Array.isArray(obj)) {
+          return obj.map(item => redactObject(item));
         }
+
+        const redacted: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          const keyLower = key.toLowerCase();
+          const shouldRedact = sensitivePatterns.some(pattern => keyLower.includes(pattern));
+
+          if (shouldRedact) {
+            redacted[key] = "[REDACTED]";
+          } else if (value && typeof value === "object") {
+            redacted[key] = redactObject(value);
+          } else {
+            redacted[key] = value;
+          }
+        }
+        return redacted;
+      };
+
+      // Redact request data
+      if (event.request) {
+        event.request = redactObject(event.request);
       }
-      return redacted;
-    };
 
-    // Redact request data
-    if (event.request) {
-      event.request = redactObject(event.request);
-    }
+      // Redact extra context
+      if (event.extra) {
+        event.extra = redactObject(event.extra);
+      }
 
-    // Redact extra context
-    if (event.extra) {
-      event.extra = redactObject(event.extra);
-    }
+      // Redact user data (keep only id)
+      if (event.user) {
+        const userId = event.user.id;
+        event.user = { id: userId };
+      }
 
-    // Redact user data (keep only id)
-    if (event.user) {
-      const userId = event.user.id;
-      event.user = { id: userId };
-    }
+      // Redact breadcrumbs
+      if (event.breadcrumbs) {
+        event.breadcrumbs = event.breadcrumbs.map(breadcrumb => ({
+          ...breadcrumb,
+          data: redactObject(breadcrumb.data),
+        }));
+      }
 
-    // Redact breadcrumbs
-    if (event.breadcrumbs) {
-      event.breadcrumbs = event.breadcrumbs.map(breadcrumb => ({
-        ...breadcrumb,
-        data: redactObject(breadcrumb.data),
-      }));
-    }
+      return event;
+    },
 
-    return event;
-  },
+    // Ignore common non-actionable errors
+    ignoreErrors: [
+      // Network errors (often not actionable)
+      "NetworkError",
+      "Network request failed",
+      "Failed to fetch",
+      "Load failed",
 
-  // Ignore common non-actionable errors
-  ignoreErrors: [
-    // Network errors (often not actionable)
-    "NetworkError",
-    "Network request failed",
-    "Failed to fetch",
-    "Load failed",
+      // Aborted requests (user navigated away)
+      "AbortError",
+      "The operation was aborted",
 
-    // Aborted requests (user navigated away)
-    "AbortError",
-    "The operation was aborted",
+      // ResizeObserver loop errors (benign browser quirk)
+      "ResizeObserver loop",
 
-    // ResizeObserver loop errors (benign browser quirk)
-    "ResizeObserver loop",
+      // Browser extension errors
+      "Extension context invalidated",
+      "chrome-extension://",
+      "moz-extension://",
 
-    // Browser extension errors
-    "Extension context invalidated",
-    "chrome-extension://",
-    "moz-extension://",
+      // Permissions errors (expected in some cases)
+      "NotAllowedError",
 
-    // Permissions errors (expected in some cases)
-    "NotAllowedError",
+      // Non-errors
+      "Non-Error",
+    ],
 
-    // Non-errors
-    "Non-Error",
-  ],
+    // Ignore errors from third-party scripts
+    denyUrls: [
+      // Browser extensions
+      /extensions\//i,
+      /^chrome:\/\//i,
+      /^moz-extension:\/\//i,
+    ],
+  });
 
-  // Ignore errors from third-party scripts
-  denyUrls: [
-    // Browser extensions
-    /extensions\//i,
-    /^chrome:\/\//i,
-    /^moz-extension:\/\//i,
-  ],
-});
+  // Global error handler to catch any unhandled errors
+  window.addEventListener('error', (event) => {
+    console.error('Global error caught:', event.error);
+    Sentry.captureException(event.error);
+  });
 
-// Global error handler to catch any unhandled errors
-window.addEventListener('error', (event) => {
-  console.error('Global error caught:', event.error);
-  Sentry.captureException(event.error);
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
-  Sentry.captureException(event.reason);
-});
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    Sentry.captureException(event.reason);
+  });
+}
 
 // Initialize PostHog analytics (non-blocking, additive alongside Sentry)
 // No-op if VITE_POSTHOG_KEY is not set
@@ -176,6 +179,14 @@ try {
       </HelmetProvider>
     </StrictMode>
   );
+
+  // Defer Sentry initialization until after first render. Use requestIdleCallback if available
+  // (with a 2s timeout fallback), otherwise use setTimeout to ensure it runs after React paint.
+  if ('requestIdleCallback' in window) {
+    (requestIdleCallback as any)(initSentry, { timeout: 2000 });
+  } else {
+    setTimeout(initSentry, 0);
+  }
 } catch (error) {
   console.error("Failed to render app:", error);
   // Show a visible error message in the DOM
