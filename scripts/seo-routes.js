@@ -8,6 +8,7 @@ export const INDEXABLE_ROUTES = [
   { path: '/hvac', changefreq: 'monthly', priority: '0.8' },
   { path: '/electricians', changefreq: 'monthly', priority: '0.8' },
   { path: '/roofing', changefreq: 'monthly', priority: '0.8' },
+  { path: '/handyman', changefreq: 'monthly', priority: '0.8' },
   { path: '/privacy', changefreq: 'yearly', priority: '0.5' },
   { path: '/terms', changefreq: 'yearly', priority: '0.5' },
 

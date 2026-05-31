@@ -28,6 +28,7 @@ const ROUTES = [
     '/hvac',
     '/electricians',
     '/roofing',
+    '/handyman',
     '/privacy',
     '/terms',
     // Resource Center

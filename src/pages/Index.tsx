@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteHeader } from "@/components/SiteHeader";
 import { trackFunnelEvent, trackPageLoad } from "@/lib/sentry-tracking";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, FileText, Calculator, Thermometer, Wrench, Zap, Home } from "lucide-react";
+import { ArrowRight, FileText, Calculator, Thermometer, Wrench, Zap, Home, Hammer } from "lucide-react";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -128,6 +128,14 @@ const Index = () => {
     "url": "https://getringsnap.com"
   };
 
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "RingSnap", "item": "https://getringsnap.com/" }
+    ]
+  };
+
   const faqStructuredData = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -208,6 +216,9 @@ const Index = () => {
         <script type="application/ld+json">
           {JSON.stringify(faqStructuredData)}
         </script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
       </Helmet>
 
       <SiteHeader />
@@ -270,12 +281,13 @@ const Index = () => {
                         RingSnap understands the calls your trade gets — emergencies, price shoppers, after-hours — and handles them the right way.
                       </p>
                     </div>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
                       {[
                         { href: "/plumbers", icon: Wrench, title: "AI Receptionist for Plumbers", desc: "Burst pipes, sewer backups, after-hours emergencies — captured and dispatched every time." },
                         { href: "/hvac", icon: Thermometer, title: "AI Receptionist for HVAC", desc: "AC breakdowns, furnace emergencies, and maintenance calls handled 24/7 — including weekends." },
                         { href: "/electricians", icon: Zap, title: "AI Receptionist for Electricians", desc: "Safety triage, panel upgrades, power outages — every call answered and prioritized correctly." },
                         { href: "/roofing", icon: Home, title: "AI Receptionist for Roofers", desc: "Storm damage, leak calls, and new estimates — never miss a job when the weather turns." },
+                        { href: "/handyman", icon: Hammer, title: "AI Receptionist for Handymen", desc: "Estimate requests, repair calls, and fix-it jobs booked while you're finishing the last one." },
                       ].map(({ href, icon: Icon, title, desc }) => (
                         <Link
                           key={href}
