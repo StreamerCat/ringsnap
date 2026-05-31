@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, ArrowRight, Shield, Clock, Phone, ClipboardList, Zap } from "lucide-react";
+import { CheckCircle2, ArrowRight, Shield, Clock, Phone, ClipboardList, Zap, Lightbulb } from "lucide-react";
 
 const ContractorFooter = lazy(() =>
   import("@/components/ContractorFooter").then((m) => ({ default: m.ContractorFooter }))
@@ -95,7 +95,7 @@ const criteria = [
     ringsnap: "Direct Jobber integration. More integrations in development.",
   },
   {
-    icon: Star,
+    icon: Lightbulb,
     title: "Trade-specific knowledge",
     desc: "A general AI doesn't know the difference between a tune-up call and a no-cool emergency in July. Contractor-specific AI handles your calls the way your best dispatcher would.",
     ringsnap: "Built for HVAC, plumbing, electrical, and roofing — not adapted from a generic template.",
