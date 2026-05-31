@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PhoneCall, CheckCircle } from "lucide-react";
@@ -23,6 +23,7 @@ const CONTROL_PAYLOAD: HeroCopyPayload = {
 
 export const ContractorHero = () => {
   const navigate = useNavigate();
+  const [showPulseAnimation, setShowPulseAnimation] = useState(false);
   const experiment = useCopyExperiment<HeroCopyPayload>(
     HOMEPAGE_HERO_EXPERIMENT_KEY,
     CONTROL_PAYLOAD,
@@ -43,6 +44,17 @@ export const ContractorHero = () => {
       { dedupKey: 'homepage_hero_viewed', dedupWindowMs: 60_000 },
     );
   }, [experiment.isReady, experiment.variant]);
+
+  // Defer pulse animation start to avoid blocking LCP. Use requestIdleCallback if available,
+  // otherwise setTimeout after 300ms to ensure animation doesn't fire during critical render.
+  useEffect(() => {
+    if ('requestIdleCallback' in window) {
+      (requestIdleCallback as any)(() => setShowPulseAnimation(true), { timeout: 1000 });
+    } else {
+      const timer = setTimeout(() => setShowPulseAnimation(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const scrollToVapiDemo = () => {
     document.getElementById('live-demo')?.scrollIntoView({
@@ -95,9 +107,7 @@ export const ContractorHero = () => {
             </h1>
 
             <div className="space-y-4">
-              <h2 className="text-h3" style={{
-                color: 'hsl(var(--charcoal) / 0.9)'
-              }}>
+              <h2 className="text-h3 text-charcoal/90">
                 {experiment.payload.subheadline}
               </h2>
             </div>
@@ -108,33 +118,22 @@ export const ContractorHero = () => {
                 <PhoneCall className="mr-2" />
                 {experiment.payload.cta}
               </Button>
-              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 transition-all hover:shadow-md" style={{
-                borderColor: 'hsl(var(--charcoal) / 0.3)',
-                color: 'hsl(var(--charcoal))'
-              }} onClick={scrollToVapiDemo}>
+              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 border-charcoal/30 text-charcoal transition-all hover:shadow-md" onClick={scrollToVapiDemo}>
                 Hear it Live
               </Button>
             </div>
 
             {/* Trust Badges */}
-            <div className="flex flex-wrap items-center gap-4 pt-6 border-t" style={{
-              borderColor: 'hsl(var(--charcoal) / 0.05)'
-            }}>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
-                color: 'hsl(var(--charcoal))'
-              }}>
+            <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-charcoal/5">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
                 <CheckCircle className="w-4 h-4 text-primary" />
                 <span className="font-medium">No contracts</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
-                color: 'hsl(var(--charcoal))'
-              }}>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
                 <CheckCircle className="w-4 h-4 text-primary" />
                 <span className="font-medium">Free trial</span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
-                color: 'hsl(var(--charcoal))'
-              }}>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
                 <PhoneCall className="w-4 h-4 text-primary" />
                 <span className="font-medium">All call types covered</span>
               </div>
@@ -174,14 +173,14 @@ export const ContractorHero = () => {
 
                 <div className="flex items-center gap-2 pt-4 border-t border-foreground/5">
                   <div className="flex items-center gap-1">
-                    <div className="w-1 h-4 gradient-core rounded animate-pulse" />
-                    <div className="w-1 h-6 gradient-core rounded animate-pulse" style={{
-                      animationDelay: '75ms'
+                    <div className={`w-1 h-4 gradient-core rounded ${showPulseAnimation ? 'animate-pulse' : ''}`} />
+                    <div className={`w-1 h-6 gradient-core rounded ${showPulseAnimation ? 'animate-pulse' : ''}`} style={{
+                      animationDelay: showPulseAnimation ? '75ms' : undefined
                     }} />
-                    <div className="w-1 h-4 gradient-core rounded animate-pulse" style={{
-                      animationDelay: '150ms'
+                    <div className={`w-1 h-4 gradient-core rounded ${showPulseAnimation ? 'animate-pulse' : ''}`} style={{
+                      animationDelay: showPulseAnimation ? '150ms' : undefined
                     }} />
-                    <div className="w-1 h-5 gradient-core rounded animate-pulse" />
+                    <div className={`w-1 h-5 gradient-core rounded ${showPulseAnimation ? 'animate-pulse' : ''}`} />
                   </div>
                   <span className="text-xs text-foreground/40">Call active • 0:47</span>
                 </div>
