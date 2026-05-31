@@ -48,6 +48,7 @@ const Plumbers = lazy(() => import("./pages/trades/Plumbers"));
 const HVAC = lazy(() => import("./pages/trades/HVAC"));
 const Electricians = lazy(() => import("./pages/trades/Electricians"));
 const Roofing = lazy(() => import("./pages/trades/Roofing"));
+const Handyman = lazy(() => import("./pages/trades/Handyman"));
 const MissedCalls = lazy(() => import("./pages/MissedCalls"));
 const Difference = lazy(() => import("./pages/Difference"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -192,6 +193,7 @@ const App = () => (
                 <Route path="/hvac" element={<HVAC />} />
                 <Route path="/electricians" element={<Electricians />} />
                 <Route path="/roofing" element={<Roofing />} />
+                <Route path="/handyman" element={<Handyman />} />
                 {/* Marketing landing pages */}
                 <Route path="/difference" element={<Difference />} />
                 <Route path="/pricing" element={<Pricing />} />

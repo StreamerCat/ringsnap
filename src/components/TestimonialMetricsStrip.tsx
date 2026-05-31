@@ -1,9 +1,9 @@
-import { Star } from "lucide-react";
+import { PhoneCall } from "lucide-react";
 
 const metricChips = [
-  { value: "980+", label: "Contractors served", helper: "Plumbing, HVAC, electrical & roofing" },
-  { value: "<1s", label: "Answer speed", helper: "Average time to pickup" },
-  { value: "95%", label: "Call capture rate", helper: "vs. 40% industry average" },
+  { value: "<2 rings", label: "Answer speed", helper: "Every inbound call, every time" },
+  { value: "24/7/365", label: "Coverage", helper: "Nights, weekends & holidays included" },
+  { value: "10 min", label: "Setup time", helper: "Forward your number and go live" },
 ];
 
 export const TestimonialMetricsStrip = () => (
@@ -12,10 +12,10 @@ export const TestimonialMetricsStrip = () => (
       <div className="max-w-5xl mx-auto flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 text-left">
           <div className="rounded-full bg-white p-3 shadow-sm">
-            <Star className="w-6 h-6 text-primary fill-primary" aria-hidden="true" />
+            <PhoneCall className="w-6 h-6 text-primary" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-primary">Trusted by 980+ Pros</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-primary">Built for home service contractors</p>
             <h2 className="text-2xl sm:text-3xl font-bold text-charcoal">
               "We stopped missing calls the first night. Paid for itself in 3 days."
             </h2>

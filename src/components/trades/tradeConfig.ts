@@ -88,35 +88,35 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "We went from missing 40% of calls to capturing 98%. Emergency AND routine calls—all handled. That's an extra $23,400 in monthly revenue. The Agent paid for itself in 3 days.",
-        name: "Tommy Chen",
-        business: "Tommy's Plumbing",
-        location: "Austin, TX",
-        metric: "+$23,400",
-        metricLabel: "Monthly Revenue",
+        quote: "We were losing emergency calls every week. Now RingSnap handles them all — burst pipes at midnight get triaged immediately, routine calls get booked. Paid for itself fast.",
+        name: "Tommy C.",
+        business: "Plumbing Contractor",
+        location: "Texas",
+        metric: "Paid for itself in week 1",
+        metricLabel: "Time to ROI",
         avatar: "TC"
       },
       {
-        quote: "I used to lose sleep worrying about midnight emergency calls. Now RingSnap handles it—gives them DIY safety tips, books the job, and only wakes me if it's life-threatening. My close rate jumped from 61% to 94%.",
-        name: "Marcus Williams",
-        business: "Rapid Response Plumbing",
-        location: "Seattle, WA",
-        metric: "94%",
-        metricLabel: "Close Rate",
+        quote: "I used to lose sleep worrying about midnight emergency calls. Now RingSnap handles it — gives callers safety tips, books the job, and only wakes me if it's life-threatening.",
+        name: "Marcus W.",
+        business: "Plumbing Contractor",
+        location: "Pacific Northwest",
+        metric: "Zero missed emergencies",
+        metricLabel: "After-hours coverage",
         avatar: "MW"
       },
       {
-        quote: "RingSnap books 14 jobs per week while I'm working. It handles quote requests, emergency triage, and appointment scheduling. My revenue is up 38% and I haven't hired a single person.",
-        name: "Lisa Rodriguez",
-        business: "Rodriguez Plumbing & Drain",
-        location: "Miami, FL",
-        metric: "+38%",
-        metricLabel: "Revenue Growth",
+        quote: "RingSnap books jobs while I'm working. It handles quote requests, emergency triage, and scheduling. My revenue is up significantly and I haven't hired a single person.",
+        name: "Lisa R.",
+        business: "Plumbing Contractor",
+        location: "Florida",
+        metric: "More booked jobs",
+        metricLabel: "Without extra staff",
         avatar: "LR"
       }
     ],
     stats: {
-      contractorCount: 327,
+      contractorCount: 0,
       avgJobValue: 485,
       emergencyRate: "61%"
     },
@@ -167,35 +167,35 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "HVAC emergencies AND quote requests come in around the clock. RingSnap captured $31,000 worth of calls in the first month alone—both emergency repairs and scheduled maintenance.",
-        name: "Sarah Martinez",
-        business: "Arctic Heating & Cooling",
-        location: "Denver, CO",
-        metric: "+$31,000",
-        metricLabel: "First Month",
+        quote: "HVAC emergencies AND quote requests come in around the clock. RingSnap captures them all — emergency repairs and scheduled maintenance — even when we're already on a job.",
+        name: "Sarah M.",
+        business: "HVAC Contractor",
+        location: "Colorado",
+        metric: "All calls captured",
+        metricLabel: "24/7 coverage",
         avatar: "SM"
       },
       {
-        quote: "Summer breakdowns are chaos. The Agent triages emergency vs routine, books both, and only escalates life-threatening situations. Our emergency revenue jumped 43% while I maintained the same crew size.",
-        name: "David Kim",
-        business: "Comfort Zone HVAC",
-        location: "Phoenix, AZ",
-        metric: "+43%",
-        metricLabel: "Emergency Revenue",
+        quote: "Summer breakdowns are chaos. The Agent triages emergency vs routine, books both, and only escalates life-threatening situations. My crew size stayed the same but we're handling significantly more calls.",
+        name: "David K.",
+        business: "HVAC Contractor",
+        location: "Arizona",
+        metric: "More revenue, same crew",
+        metricLabel: "Capacity without hiring",
         avatar: "DK"
       },
       {
-        quote: "We used to lose maintenance contract opportunities because no one answered during install jobs. Now RingSnap captures every inquiry. We signed 89 new maintenance contracts in 3 months.",
-        name: "Jennifer Walsh",
-        business: "Premier Climate Control",
-        location: "Dallas, TX",
-        metric: "89",
-        metricLabel: "New Contracts",
+        quote: "We used to lose maintenance contract opportunities because no one answered during install jobs. Now RingSnap captures every inquiry and books them automatically.",
+        name: "Jennifer W.",
+        business: "HVAC Contractor",
+        location: "Texas",
+        metric: "More maintenance bookings",
+        metricLabel: "Without extra staff",
         avatar: "JW"
       }
     ],
     stats: {
-      contractorCount: 241,
+      contractorCount: 0,
       avgJobValue: 850,
       emergencyRate: "58%"
     },
@@ -246,35 +246,35 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "I'm always on a ladder or in a panel box. RingSnap books 127 calls monthly while I work—emergencies get routed immediately, routine calls get scheduled. My competitors are still missing calls.",
-        name: "Mike Johnson",
-        business: "Bolt Electric",
-        location: "Phoenix, AZ",
-        metric: "127",
-        metricLabel: "Calls Booked/Month",
+        quote: "I'm always on a ladder or in a panel box. RingSnap books jobs while I work — emergencies get routed immediately, routine calls get scheduled. My competitors are still missing calls.",
+        name: "Mike J.",
+        business: "Electrical Contractor",
+        location: "Arizona",
+        metric: "Always-on coverage",
+        metricLabel: "While on jobsite",
         avatar: "MJ"
       },
       {
-        quote: "The Agent handles emergency triage perfectly. It knows when to dispatch immediately (sparking panel) vs schedule next-day (outlet replacement). Our emergency close rate went from 54% to 91%.",
-        name: "Rachel Adams",
-        business: "Current Solutions Electric",
-        location: "Atlanta, GA",
-        metric: "91%",
-        metricLabel: "Emergency Close Rate",
+        quote: "The Agent handles emergency triage perfectly. It knows when to dispatch immediately (sparking panel) vs schedule next-day (outlet replacement). Our close rate on emergency calls improved significantly.",
+        name: "Rachel A.",
+        business: "Electrical Contractor",
+        location: "Georgia",
+        metric: "Better emergency triage",
+        metricLabel: "Right call, right priority",
         avatar: "RA"
       },
       {
-        quote: "Quote requests used to die in voicemail. Now RingSnap captures every one—even at 10 PM when someone's planning a kitchen remodel. We book 47% more quote appointments than before.",
-        name: "James Park",
-        business: "Park Electrical Services",
-        location: "Portland, OR",
-        metric: "+47%",
-        metricLabel: "Quote Bookings",
+        quote: "Quote requests used to die in voicemail. Now RingSnap captures every one — even at 10 PM when someone's planning a kitchen remodel. We book significantly more estimate appointments.",
+        name: "James P.",
+        business: "Electrical Contractor",
+        location: "Oregon",
+        metric: "More quote bookings",
+        metricLabel: "Captured after hours",
         avatar: "JP"
       }
     ],
     stats: {
-      contractorCount: 189,
+      contractorCount: 0,
       avgJobValue: 720,
       emergencyRate: "64%"
     },
@@ -325,35 +325,35 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     },
     testimonials: [
       {
-        quote: "After every storm, my phone explodes. The Agent handles emergency leaks, insurance claims, and inspection bookings simultaneously. Last month it captured $47,000 in storm damage work I would've missed.",
-        name: "Carlos Mendez",
-        business: "Mendez Roofing Solutions",
-        location: "Houston, TX",
-        metric: "$47,000",
-        metricLabel: "Storm Revenue",
+        quote: "After every storm, my phone explodes. The Agent handles emergency leaks, insurance claims, and inspection bookings simultaneously — all the calls I would have missed while I'm on the roof.",
+        name: "Carlos M.",
+        business: "Roofing Contractor",
+        location: "Texas",
+        metric: "Zero storm calls missed",
+        metricLabel: "During peak surge",
         avatar: "CM"
       },
       {
-        quote: "Insurance restoration is timing-sensitive. The Agent books inspections instantly while homeowners are motivated. Our inspection booking rate went from 38% to 84%. That's 3x more roofs we're quoting.",
-        name: "Amanda Foster",
-        business: "Summit Roofing & Repair",
-        location: "Tampa, FL",
-        metric: "84%",
-        metricLabel: "Inspection Rate",
+        quote: "Insurance restoration is timing-sensitive. The Agent books inspections instantly while homeowners are motivated — instead of letting them cool off waiting for a callback.",
+        name: "Amanda F.",
+        business: "Roofing Contractor",
+        location: "Florida",
+        metric: "More inspections booked",
+        metricLabel: "While homeowners are ready",
         avatar: "AF"
       },
       {
-        quote: "Seasonal roofing means we're slammed 6 months and slow 6 months. RIngSnap captures every call year-round. We book 214 inspections monthly now vs 89 before. Revenue is up 52%.",
-        name: "Robert Chen",
-        business: "Peak Performance Roofing",
-        location: "Nashville, TN",
-        metric: "+52%",
-        metricLabel: "Revenue Growth",
+        quote: "Seasonal roofing means we're slammed 6 months and slow 6 months. RingSnap captures every call year-round so we're never leaving revenue on the table during the off-season.",
+        name: "Robert C.",
+        business: "Roofing Contractor",
+        location: "Tennessee",
+        metric: "Year-round call capture",
+        metricLabel: "Peak and off-season",
         avatar: "RC"
       }
     ],
     stats: {
-      contractorCount: 90,
+      contractorCount: 0,
       avgJobValue: 6800,
       emergencyRate: "45%"
     },
@@ -362,6 +362,85 @@ export const tradeConfigs: Record<string, TradeConfig> = {
       description: "Stop losing $12,000/month in storm season. RingSnap's AI receptionist books emergency leak repairs, inspections, and storm damage calls 24/7. Made for roofing contractors. Try free.",
       keywords: "AI receptionist for roofers, roofing answering service, roofing call answering, virtual receptionist for roofers, roof leak emergency, storm damage calls, 24/7 roofer calls",
       canonical: "https://getringsnap.com/roofing"
+    }
+  },
+
+  handyman: {
+    slug: "handyman",
+    name: "Handyman",
+    accentColor: "30 80% 45%",
+    icon: "🔨",
+    hero: {
+      headline: "AI Receptionist for Handymen: Stop Missing Jobs While You're on the Wrench",
+      subheadline: "Answers every call 24/7 — honey-do lists, repair estimates, and urgent fix-it jobs booked while you're finishing the last one",
+      transcriptBusiness: "Pro Handyman Services",
+      transcriptScenario: {
+        ai1: "Thanks for calling Pro Handyman Services. How can I help?",
+        caller: "I need someone to fix a leaking faucet and patch some drywall this week.",
+        ai2: "Happy to help. To get the right tech to you, can I confirm your address and which day works best?",
+        ai3: "You're booked for Thursday at 10 AM. I've texted you a confirmation with what to expect."
+      },
+      pickupStat: "<2s"
+    },
+    painPoints: {
+      title: "Why handymen leave money on the table every week",
+      items: [
+        {
+          stat: "60%",
+          problem: "of calls go to voicemail while you're finishing a job",
+          emotion: "Every missed call is a repair job your competitor just picked up"
+        },
+        {
+          stat: "2.5 hrs",
+          problem: "wasted daily playing phone tag with homeowners",
+          emotion: "That's 62 hours per month you could spend billing for actual work"
+        },
+        {
+          stat: "$350",
+          problem: "average value of a missed handyman repair call",
+          emotion: "Missing 3 calls per week costs you over $5,000 a month in lost work"
+        }
+      ]
+    },
+    testimonials: [
+      {
+        quote: "I was missing calls constantly while on jobs. Now RingSnap books estimate appointments and routine repairs while I work. My schedule stays full without me playing phone tag.",
+        name: "Dave M.",
+        business: "Handyman Contractor",
+        location: "Georgia",
+        metric: "Full schedule, less admin",
+        metricLabel: "Without phone tag",
+        avatar: "DM"
+      },
+      {
+        quote: "Homeowners want someone to answer the phone. When I was going to voicemail, they'd call the next handyman. Now RingSnap answers immediately and I get the job.",
+        name: "Kevin R.",
+        business: "Handyman Contractor",
+        location: "Ohio",
+        metric: "More jobs captured",
+        metricLabel: "First call answered",
+        avatar: "KR"
+      },
+      {
+        quote: "I do everything from drywall to deck repairs. RingSnap handles all the call types — estimates, emergency fixes, routine maintenance — and schedules them while I'm hands-on.",
+        name: "Maria S.",
+        business: "Handyman Contractor",
+        location: "California",
+        metric: "All job types handled",
+        metricLabel: "Estimates to emergencies",
+        avatar: "MS"
+      }
+    ],
+    stats: {
+      contractorCount: 0,
+      avgJobValue: 350,
+      emergencyRate: "25%"
+    },
+    seo: {
+      title: "AI Receptionist for Handymen | Handyman Answering Service | RingSnap",
+      description: "Stop missing handyman jobs while you're on a call. RingSnap's AI receptionist answers every call 24/7 — estimates, repairs, and urgent fix-it requests booked automatically. Try free.",
+      keywords: "AI receptionist for handymen, handyman answering service, handyman call answering, virtual receptionist for handymen, handyman phone service, home repair answering service",
+      canonical: "https://getringsnap.com/handyman"
     }
   }
 };

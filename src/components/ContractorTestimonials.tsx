@@ -1,36 +1,33 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Star, TrendingUp } from "lucide-react";
+import { TrendingUp, Quote } from "lucide-react";
 
 export const ContractorTestimonials = () => {
   const testimonials = [
     {
-      quote: "We were missing 60% of after-hours calls. First month with RingSnap we booked 11 jobs we would've lost — that's $23,400 recovered in 30 days.",
-      name: "Tommy Chen",
-      business: "Tommy's Plumbing",
-      location: "Austin, TX",
-      metric: "+$23,400 MRR",
-      metricLabel: "Monthly Revenue",
+      quote: "We were missing most of our after-hours calls. First month with RingSnap we booked jobs we would've lost — paid for itself in the first week.",
+      name: "Tommy C.",
+      tradeRegion: "Plumbing · Texas",
+      metric: "Paid for itself in week 1",
+      metricLabel: "Time to ROI",
       avatar: "TC",
       trade: "Plumbing"
     },
     {
-      quote: "HVAC emergencies at 2am, quote requests on Sundays — RingSnap handles them all. $31,000 captured in the first month. My dispatcher now only deals with jobs already booked.",
-      name: "Sarah Martinez",
-      business: "Arctic Heating & Cooling",
-      location: "Denver, CO",
-      metric: "+$31,000",
-      metricLabel: "First Month",
+      quote: "HVAC emergencies at 2am, quote requests on Sundays — RingSnap handles them all. My dispatcher now only deals with jobs already booked.",
+      name: "Sarah M.",
+      tradeRegion: "HVAC · Colorado",
+      metric: "Zero missed calls",
+      metricLabel: "After-hours coverage",
       avatar: "SM",
       trade: "HVAC"
     },
     {
-      quote: "I'm always on a ladder or in a panel box. Can't answer calls while I'm working. RingSnap books 127 jobs a month while I'm heads-down. My competitors are still going to voicemail.",
-      name: "Mike Johnson",
-      business: "Bolt Electric",
-      location: "Phoenix, AZ",
-      metric: "127 calls",
-      metricLabel: "Booked/Month",
+      quote: "I'm always on a ladder or in a panel box — can't answer calls while I'm working. RingSnap books jobs while I'm heads-down. My competitors are still going to voicemail.",
+      name: "Mike J.",
+      tradeRegion: "Electrical · Arizona",
+      metric: "Always-on coverage",
+      metricLabel: "While on jobsite",
       avatar: "MJ",
       trade: "Electrical"
     }
@@ -44,7 +41,7 @@ export const ContractorTestimonials = () => {
           <div className="w-10 h-1 bg-primary mx-auto mb-4 rounded-full"></div>
           <h2 className="text-h2 mb-4">What contractors say after their first month</h2>
           <p className="text-body-default text-muted-foreground">
-            Real numbers from real contractors in plumbing, HVAC, and electrical. No actors, no aggregated stats.
+            Stories from plumbing, HVAC, and electrical contractors who switched from voicemail to RingSnap.
           </p>
         </div>
 
@@ -52,23 +49,19 @@ export const ContractorTestimonials = () => {
           {testimonials.map((testimonial, index) => (
             <Card key={index} className="card-tier-1">
               <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                {/* Star Rating */}
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 sm:w-5 h-4 sm:h-5 fill-primary text-primary" />
-                  ))}
-                </div>
+                {/* Quote icon instead of star rating */}
+                <Quote className="w-6 h-6 text-primary/40" aria-hidden="true" />
 
                 {/* Quote */}
                 <blockquote className="text-xs sm:text-sm leading-relaxed">
                   "{testimonial.quote}"
                 </blockquote>
 
-                {/* Metric Badge */}
+                {/* Outcome Badge */}
                 <div className="p-3 sm:p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xl sm:text-2xl font-bold text-primary text-metric">{testimonial.metric}</div>
+                      <div className="text-base sm:text-lg font-bold text-primary">{testimonial.metric}</div>
                       <div className="text-xs text-muted-foreground">{testimonial.metricLabel}</div>
                     </div>
                     <TrendingUp className="w-6 sm:w-8 h-6 sm:h-8 text-primary" />
@@ -84,8 +77,7 @@ export const ContractorTestimonials = () => {
                   </Avatar>
                   <div>
                     <div className="font-semibold">{testimonial.name}</div>
-                    <div className="text-sm text-muted-foreground">{testimonial.business}</div>
-                    <div className="text-xs text-muted-foreground">{testimonial.location} · {testimonial.trade}</div>
+                    <div className="text-xs text-muted-foreground">{testimonial.tradeRegion}</div>
                   </div>
                 </div>
               </CardContent>
@@ -93,16 +85,10 @@ export const ContractorTestimonials = () => {
           ))}
         </div>
 
-        {/* Trust Bar */}
-        <div className="max-w-2xl mx-auto mt-12 text-center">
-          <p className="text-muted-foreground mb-4">Trusted by contractors across the US</p>
-          <div className="flex flex-wrap justify-center gap-8 text-sm font-medium">
-            <span>🔧 327 Plumbers</span>
-            <span>❄️ 241 HVAC</span>
-            <span>⚡ 189 Electricians</span>
-            <span>🏠 90 Roofing</span>
-          </div>
-        </div>
+        {/* Disclaimer */}
+        <p className="text-center text-xs text-muted-foreground/60 mt-8">
+          Representative customer outcomes. Individual results vary based on call volume, trade, and market.
+        </p>
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PhoneCall, CheckCircle, Star } from "lucide-react";
+import { PhoneCall, CheckCircle, Clock } from "lucide-react";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { TradeConfig } from "./tradeConfig";
@@ -86,8 +86,8 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                 {/* Trust Badges */}
                 <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-charcoal/5">
                   <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
-                    <Star className="w-4 h-4 fill-current text-primary" />
-                    <span className="font-medium">5-star rated</span>
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="font-medium">Answers in under 2 rings</span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
                     <CheckCircle className="w-4 h-4 text-primary" />
@@ -95,7 +95,7 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm text-charcoal">
                     <PhoneCall className="w-4 h-4 text-primary" />
-                    <span className="font-medium">{config.stats.contractorCount}+ contractors trust us</span>
+                    <span className="font-medium">No contracts · Cancel anytime</span>
                   </div>
                 </div>
               </div>
@@ -146,8 +146,8 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
 
               <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-white rounded-full shadow-2xl border border-charcoal/20">
                 <div className="text-center">
-                  <span className="text-2xl font-bold text-metric text-primary">95%</span>
-                  <span className="text-sm text-foreground/60 ml-2">vs. your 55%</span>
+                  <span className="text-2xl font-bold text-metric text-primary">{config.hero.pickupStat}</span>
+                  <span className="text-sm text-foreground/60 ml-2">answer time</span>
                 </div>
               </div>
             </div>

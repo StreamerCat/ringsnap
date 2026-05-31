@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PhoneCall, CheckCircle, Star } from "lucide-react";
+import { PhoneCall, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { capture } from "@/lib/analytics";
 import { useCopyExperiment } from "@/hooks/useCopyExperiment";
@@ -123,8 +123,8 @@ export const ContractorHero = () => {
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
                 color: 'hsl(var(--charcoal))'
               }}>
-                <Star className="w-4 h-4 text-primary fill-primary" />
-                <span className="font-medium">5-star rated</span>
+                <CheckCircle className="w-4 h-4 text-primary" />
+                <span className="font-medium">No contracts</span>
               </div>
               <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-cream/50 text-sm" style={{
                 color: 'hsl(var(--charcoal))'
