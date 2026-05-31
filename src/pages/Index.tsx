@@ -8,7 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteHeader } from "@/components/SiteHeader";
 import { trackFunnelEvent, trackPageLoad } from "@/lib/sentry-tracking";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, FileText, Calculator, Thermometer, Wrench, Zap } from "lucide-react";
+import { ArrowRight, FileText, Calculator, Thermometer, Wrench, Zap, Home } from "lucide-react";
 
 const CallValueCalculator = lazy(() => import("@/components/CallValueCalculator").then(m => ({ default: m.CallValueCalculator })));
 const SolutionDemo = lazy(() => import("@/components/SolutionDemo").then(m => ({ default: m.SolutionDemo })));
@@ -95,14 +95,6 @@ const Index = () => {
         "availability": "https://schema.org/InStock"
       }
     ],
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.9",
-      "reviewCount": "247",
-      "bestRating": "5",
-      "worstRating": "1"
-    },
-
     "image": "https://getringsnap.com/android-chrome-512x512.png",
     "featureList": [
       "Answers in under 1 second",
@@ -178,17 +170,17 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>RingSnap: The 24/7 Virtual Receptionist for Contractors</title>
+        <title>AI Receptionist for Contractors | 24/7 Call Answering | RingSnap</title>
         <meta
           name="description"
-          content="Never miss a call. Book jobs 24/7. RingSnap's virtual receptionist answers in under 1 second with professional call handling. Try free for 3 days."
+          content="Stop missing calls. RingSnap's AI receptionist answers every call for HVAC, plumbing, electrical, and roofing contractors — 24/7, after hours, in under 2 rings. Try free for 3 days."
         />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://getringsnap.com/" />
 
         {/* Open Graph */}
-        <meta property="og:title" content="RingSnap: The 24/7 Virtual Receptionist" />
-        <meta property="og:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
+        <meta property="og:title" content="AI Receptionist for Contractors | RingSnap" />
+        <meta property="og:description" content="Stop missing calls. RingSnap answers every call for HVAC, plumbing, electrical, and roofing contractors — 24/7, after hours, in under 2 rings." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://getringsnap.com/" />
         <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
@@ -199,8 +191,8 @@ const Index = () => {
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="RingSnap: The 24/7 Virtual Receptionist" />
-        <meta name="twitter:description" content="Never miss a call. Book jobs 24/7. Professional call handling for contractors." />
+        <meta name="twitter:title" content="AI Receptionist for Contractors | RingSnap" />
+        <meta name="twitter:description" content="Stop missing calls. RingSnap answers every call for HVAC, plumbing, electrical, and roofing contractors — 24/7, after hours." />
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
         {/* Structured Data */}
@@ -266,6 +258,41 @@ const Index = () => {
                 <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
                   <div className="site-container max-w-4xl text-center">
                     <PricingTeaserCard headingLevel="h2" />
+                  </div>
+                </section>
+
+                {/* Trade-specific landing pages */}
+                <section aria-labelledby="trades-heading" className="section-spacer-compact bg-muted/30 border-t border-border/5">
+                  <div className="site-container">
+                    <div className="text-center mb-6">
+                      <h2 id="trades-heading" className="text-2xl sm:text-3xl font-bold mb-3">Built for your trade</h2>
+                      <p className="text-muted-foreground max-w-xl mx-auto text-sm">
+                        RingSnap understands the calls your trade gets — emergencies, price shoppers, after-hours — and handles them the right way.
+                      </p>
+                    </div>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { href: "/plumbers", icon: Wrench, title: "AI Receptionist for Plumbers", desc: "Burst pipes, sewer backups, after-hours emergencies — captured and dispatched every time." },
+                        { href: "/hvac", icon: Thermometer, title: "AI Receptionist for HVAC", desc: "AC breakdowns, furnace emergencies, and maintenance calls handled 24/7 — including weekends." },
+                        { href: "/electricians", icon: Zap, title: "AI Receptionist for Electricians", desc: "Safety triage, panel upgrades, power outages — every call answered and prioritized correctly." },
+                        { href: "/roofing", icon: Home, title: "AI Receptionist for Roofers", desc: "Storm damage, leak calls, and new estimates — never miss a job when the weather turns." },
+                      ].map(({ href, icon: Icon, title, desc }) => (
+                        <Link
+                          key={href}
+                          to={href}
+                          className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Icon className="h-5 w-5 text-primary" />
+                          </div>
+                          <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                            See how it works <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </section>
 

@@ -21,8 +21,55 @@ const breadcrumbSchema = {
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: "https://getringsnap.com/" },
-    { "@type": "ListItem", position: 2, name: "HVAC Answering Service", item: "https://getringsnap.com/hvac" },
+    { "@type": "ListItem", position: 2, name: "AI Receptionist for HVAC", item: "https://getringsnap.com/hvac" },
   ],
+};
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How does an AI receptionist help HVAC contractors specifically?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "RingSnap is trained for HVAC calls: AC breakdowns, furnace failures, gas leaks, and maintenance requests. It triages urgency, handles emergency dispatch instantly, and books routine maintenance calls — all without you leaving the jobsite."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Will RingSnap work for after-hours HVAC emergencies?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. HVAC emergencies don't wait for business hours. RingSnap answers 24/7, triages the severity (no AC in 100°F heat is different from a minor leak), and routes genuine emergencies to your on-call tech immediately. All other calls get booked for the next available slot."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Can RingSnap handle HVAC maintenance contract inquiries?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. RingSnap captures every maintenance inquiry — tune-ups, filter service, seasonal inspections — and books them directly. Maintenance contract opportunities that used to go to voicemail now turn into scheduled appointments."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Does RingSnap integrate with HVAC field service software?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "RingSnap integrates with Jobber and logs every call — job type, urgency, customer contact info, and full transcript — automatically to your account. You'll see every call, booking, and customer interaction in one place."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "How long does it take to set up RingSnap for an HVAC business?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Setup takes about 10 minutes. Forward your existing business number to RingSnap — no new phone number, no hardware, no IT required. You start a 3-day free trial and can verify it works before committing."
+      }
+    }
+  ]
 };
 
 const HVAC = () => {
@@ -53,6 +100,7 @@ const HVAC = () => {
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
         <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">

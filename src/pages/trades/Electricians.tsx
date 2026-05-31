@@ -21,8 +21,55 @@ const breadcrumbSchema = {
   "@type": "BreadcrumbList",
   itemListElement: [
     { "@type": "ListItem", position: 1, name: "Home", item: "https://getringsnap.com/" },
-    { "@type": "ListItem", position: 2, name: "Electrician Answering Service", item: "https://getringsnap.com/electricians" },
+    { "@type": "ListItem", position: 2, name: "AI Receptionist for Electricians", item: "https://getringsnap.com/electricians" },
   ],
+};
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How does an AI receptionist help electricians specifically?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "RingSnap is trained to handle electrical calls: sparking panels, power outages, tripped breakers, and panel upgrade inquiries. It triages safety-critical emergencies immediately and routes them to your on-call electrician, while scheduling routine work automatically — even when you're on a jobsite."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Can RingSnap handle electrical emergency calls at 2am?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. RingSnap answers 24/7 including nights and weekends. For genuine electrical emergencies (sparking panel, smell of burning, no power with medical equipment in use), the system dispatches immediately and alerts your on-call tech. Non-urgent calls get booked for the next business slot."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Does RingSnap understand electrical safety triage?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. RingSnap is trained to ask the right questions: Is there a burning smell? Are there visible sparks? Is the situation life-threatening? Based on the answers, it escalates urgent calls immediately and handles routine calls — panel upgrades, outlet replacements — without pulling you off a job."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "Can RingSnap capture panel upgrade quote requests?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. Panel upgrade inquiries that used to sit in voicemail are now captured, qualified, and booked as estimate appointments automatically. RingSnap collects panel size, square footage, and homeowner timeline so you arrive prepared."
+      }
+    },
+    {
+      "@type": "Question",
+      name: "How long does setup take for an electrical contracting business?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "About 10 minutes. You forward your existing business number to RingSnap — no hardware, no new phone number, no IT setup. A 3-day free trial lets you verify the system works for your specific call types before committing."
+      }
+    }
+  ]
 };
 
 const Electricians = () => {
@@ -53,6 +100,7 @@ const Electricians = () => {
         <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
 
         <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
 
       <main className="pb-[calc(5rem+var(--safe-bottom))] md:pb-0">
