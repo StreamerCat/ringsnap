@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, ArrowRight, Star, Shield, Clock, Phone, ClipboardList, Zap } from "lucide-react";
+import { CheckCircle2, ArrowRight, Shield, Clock, Phone, ClipboardList, Zap } from "lucide-react";
 
 const ContractorFooter = lazy(() =>
   import("@/components/ContractorFooter").then((m) => ({ default: m.ContractorFooter }))
@@ -193,12 +193,12 @@ const BestAiReceptionistHomeServices = () => {
 
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-primary fill-primary" />
-                <span>4.9/5 contractor rating</span>
+                <Clock className="w-4 h-4 text-primary" />
+                <span>Answers in under 2 rings</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" />
-                <span>Live in 10 minutes</span>
+                <span>24/7/365 availability</span>
               </div>
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-primary" />
