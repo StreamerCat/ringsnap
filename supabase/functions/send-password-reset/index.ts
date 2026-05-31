@@ -69,9 +69,10 @@ serve(async (req) => {
 
     // Generate password reset link
     // SITE_URL must be set as a Supabase secret (e.g. https://getringsnap.com).
-    // Also add https://getringsnap.com/auth/password?mode=reset to Supabase Auth
-    // → URL Configuration → Additional Redirect URLs, otherwise Supabase strips
-    // the path and redirects to the bare domain instead of the reset page.
+    // The redirectTo URL must be in Supabase Auth → URL Configuration →
+    // Additional Redirect URLs (e.g. https://getringsnap.com/auth/password),
+    // otherwise Supabase strips the path and redirects to the bare domain.
+    // /auth/password and /reset-password both render the PasswordReset component.
     const siteUrl = Deno.env.get("SITE_URL") || "https://getringsnap.com";
     console.log("[send-password-reset] Generating recovery link via admin.generateLink");
     const { data, error } = await supabase.auth.admin.generateLink({
