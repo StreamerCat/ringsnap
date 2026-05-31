@@ -82,10 +82,10 @@ export async function redirectToRoleDashboard(userId: string): Promise<string> {
     role = await getUserRole(userId);
   } catch (error) {
     // The staff_roles query failed (likely RLS recursion in the database).
-    // We cannot safely determine the user's role, so send them to the home
-    // page rather than silently mis-routing them to the customer dashboard.
-    console.error('[redirectToRoleDashboard] Role check failed — cannot determine dashboard:', error);
-    return '/';
+    // New users typically won't have a staff_roles entry, so treat as customer
+    // and route to onboarding to complete their signup flow.
+    console.error('[redirectToRoleDashboard] Role check failed — defaulting to customer onboarding:', error);
+    return '/onboarding-chat';
   }
 
   // For customers, check onboarding status
