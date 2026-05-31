@@ -36,6 +36,7 @@ const AdminControl = lazy(() => import("./pages/AdminControl"));
 const TeamManagement = lazy(() => import("./pages/TeamManagement"));
 const TrialConfirmation = lazy(() => import("./pages/TrialConfirmation"));
 const AuthLogin = lazy(() => import("./pages/AuthLogin"));
+const AuthPassword = lazy(() => import("./pages/AuthPassword"));
 const MagicCallback = lazy(() => import("./pages/MagicCallback"));
 const StaffInvite = lazy(() => import("./pages/StaffInvite"));
 const PasswordReset = lazy(() => import("./pages/PasswordReset"));
@@ -162,6 +163,7 @@ const App = () => (
                 <Route path="/auth/login" element={<AuthLogin />} />
                 <Route path="/signin" element={<AuthLogin />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/password" element={<AuthPassword />} />
                 <Route path="/auth/magic-callback" element={<MagicCallback />} />
                 <Route path="/auth/staff-invite" element={<StaffInvite />} />
                 {/* Settings */}
