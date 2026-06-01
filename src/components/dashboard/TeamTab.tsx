@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ export function TeamTab({ accountId }: TeamTabProps) {
     const [inviteRole, setInviteRole] = useState("member");
 
     // Load team members
-    const loadMembers = async () => {
+    const loadMembers = useCallback(async () => {
         try {
             // 1. Fetch members
             const { data: membersData, error: membersError } = await supabase
@@ -98,12 +98,12 @@ export function TeamTab({ accountId }: TeamTabProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [accountId]);
 
     // Fixed: was incorrectly using useState instead of useEffect
     useEffect(() => {
         loadMembers();
-    }, [accountId]);
+    }, [loadMembers]);
 
     const handleInviteMember = async () => {
         if (!inviteEmail || !inviteName) {

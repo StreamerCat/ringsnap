@@ -107,6 +107,9 @@ export function PaymentMethodUpdateDialog({ open, onOpenChange, accountId, onSuc
         } else {
             setClientSecret(null);
         }
+        // Fetch only when the dialog opens for an account; onOpenChange/toast
+        // are stable callbacks intentionally excluded to avoid refetch loops.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, accountId]);
 
     return (

@@ -226,6 +226,10 @@ export function ProvisioningStatus({
       if (timeoutId) clearTimeout(timeoutId);
       channel.unsubscribe();
     };
+    // handleStatusUpdate is intentionally omitted; the realtime+poll effect is
+    // keyed on the inputs above and recreating it on every render would churn
+    // the subscription. The latest handler is captured via closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, pollingInterval, disabled, showProgress, onComplete, onError, realtimeConnected]);
 
   const handleRetry = async () => {

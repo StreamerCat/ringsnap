@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export function CalendarTab({ calls }: CalendarTabProps) {
     }, [allEvents]);
 
     // Get events for a specific date
-    const getEventsForDate = (date: Date): AppointmentEvent[] => {
+    const getEventsForDate = useCallback((date: Date): AppointmentEvent[] => {
         return scheduledEvents.filter((e) => {
             if (!e.start) return false;
             return (
@@ -53,7 +53,7 @@ export function CalendarTab({ calls }: CalendarTabProps) {
                 e.start.getDate() === date.getDate()
             );
         });
-    };
+    }, [scheduledEvents]);
 
     // Get event count for a date (for calendar dots)
     const getEventCountForDate = (date: Date): number => {
@@ -67,7 +67,7 @@ export function CalendarTab({ calls }: CalendarTabProps) {
             if (!a.start || !b.start) return 0;
             return a.start.getTime() - b.start.getTime();
         });
-    }, [selectedDate, scheduledEvents]);
+    }, [selectedDate, getEventsForDate]);
 
     // Week view: get the week containing selected date
     const currentWeekDates = useMemo(() => {

@@ -27,6 +27,9 @@ export default function SetupStatus() {
         clearInterval(pollingInterval);
       }
     };
+    // Run the auth/status check once on mount; checkAuth and pollingInterval
+    // are intentionally omitted to keep this a one-time initializer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAuth = async () => {

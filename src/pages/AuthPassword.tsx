@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -22,11 +22,7 @@ export default function AuthPassword() {
 
   const mode = searchParams.get("mode");
 
-  useEffect(() => {
-    validateRecoveryLink();
-  }, [searchParams]);
-
-  const validateRecoveryLink = async () => {
+  const validateRecoveryLink = useCallback(async () => {
     try {
       const token = searchParams.get("token");
       const type = searchParams.get("type");
@@ -46,7 +42,11 @@ export default function AuthPassword() {
       setLinkValid(false);
       setIsValidatingLink(false);
     }
-  };
+  }, [searchParams]);
+
+  useEffect(() => {
+    validateRecoveryLink();
+  }, [validateRecoveryLink]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();

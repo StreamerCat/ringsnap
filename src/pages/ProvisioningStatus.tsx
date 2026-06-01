@@ -239,6 +239,10 @@ export default function ProvisioningStatus() {
             if (timerRef.current) clearInterval(timerRef.current);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
+        // accountId/handleReadyNavigation are intentionally omitted; the poller
+        // restarts only on navigate/status changes and reads the latest values
+        // via closure to avoid tearing down the polling interval each render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate, status]);
 
     return (

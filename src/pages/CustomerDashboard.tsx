@@ -139,6 +139,9 @@ export default function CustomerDashboard() {
         supabase.removeChannel(subscription);
       }
     };
+    // Keyed on account?.id only. loadDashboardData/navigate are intentionally
+    // omitted so this init+subscription effect doesn't re-run on tab changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.id]);
 
   // Polling for provisioning status
@@ -169,6 +172,9 @@ export default function CustomerDashboard() {
     return () => {
       if (pollingInterval) clearInterval(pollingInterval);
     };
+    // loadDashboardData intentionally omitted: poll restarts only when the
+    // provisioning-related account fields change, not on loader identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, account?.provisioning_status, account?.vapi_phone_number]);
 
   const loadDashboardData = async (userId: string) => {
@@ -411,6 +417,9 @@ export default function CustomerDashboard() {
       if (burstTimeout) clearTimeout(burstTimeout);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // Keyed on account?.id only; loadDashboardData is intentionally omitted to
+    // avoid tearing down the realtime subscription on unrelated re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.id]);
   const calculateRemainingMinutes = () => {
     if (!account) return 0;

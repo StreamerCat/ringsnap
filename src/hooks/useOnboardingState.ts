@@ -145,6 +145,7 @@ export function useOnboardingState(accountId: string | null): UseOnboardingState
         // However, if we put [state.onboarding_completed_at] it might not update frequently enough if we don't poll.
         // We rely on refreshState being stable.
         // Actually, simple interval with state check inside is safer for React hooks unless we use a ref.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state?.onboarding_completed_at, state?.recommended_next_step, refreshState]);
 
     // Track state transitions
@@ -162,6 +163,8 @@ export function useOnboardingState(accountId: string | null): UseOnboardingState
                 data: { verified_at: state.test_call_verified_at }
             });
         }
+        // Only react to the verified-at transition, not every state field.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state?.test_call_verified_at]);
 
     return {
