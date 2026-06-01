@@ -18,11 +18,56 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "supabase";
 import { withSentryEdge, captureEdgeError, redact } from "../_shared/sentry.ts";
 import { logInfo, logError } from "../_shared/logging.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+
+const ALLOWED_ROLES = ["platform_owner", "platform_admin"];
 
 serve(
   withSentryEdge({ functionName: "sentry-test" }, async (req, ctx) => {
+    if (req.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // ── Auth gate ──────────────────────────────────────────────
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: staffRole } = await supabase
+      .from("staff_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!staffRole || !ALLOWED_ROLES.includes(staffRole.role)) {
+      return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ── End auth gate ──────────────────────────────────────────
+
     const baseLog = { functionName: ctx.functionName, correlationId: ctx.correlationId };
 
     logInfo("Sentry test function started", baseLog);

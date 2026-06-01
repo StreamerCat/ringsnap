@@ -1,12 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "supabase";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const FUNCTION_NAME = "test-vapi-integration";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ROLES = ["platform_owner", "platform_admin"];
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
@@ -14,6 +12,43 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // ── Auth gate ──────────────────────────────────────────────
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser(
+    authHeader.replace("Bearer ", "")
+  );
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: staffRole } = await supabase
+    .from("staff_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!staffRole || !ALLOWED_ROLES.includes(staffRole.role)) {
+    return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  // ── End auth gate ──────────────────────────────────────────
 
   const VAPI_API_KEY = Deno.env.get('VAPI_API_KEY');
   
