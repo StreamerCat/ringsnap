@@ -4,9 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
-    Phone, PhoneCall, MessageSquare, Calendar, Users, TrendingUp, Clock, ArrowRight, ChevronRight
+    Phone, PhoneCall, MessageSquare, Calendar, Users, TrendingUp, Clock, ArrowRight, ChevronRight, CheckCircle2, Circle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 import {
     sanitizeCallText,
     deriveTopicLabels,
@@ -184,8 +185,41 @@ export function InboxTab({ calls, companyName }: InboxTabProps) {
                         ))}
                     </div>
                     {calls.length === 0 && (
-                        <div className="p-8 text-center text-muted-foreground">
-                            No calls yet. Your call log will appear here.
+                        <div className="p-6 space-y-4">
+                            <p className="text-center font-medium">Getting started with RingSnap</p>
+                            <div className="space-y-3 max-w-sm mx-auto">
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium">Account created</p>
+                                        <p className="text-xs text-muted-foreground">You're all set up and ready to go.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <Circle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium">Make a test call</p>
+                                        <p className="text-xs text-muted-foreground">Call your RingSnap number to hear your AI receptionist in action.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <Circle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium">Set up call forwarding</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Forward your business line so RingSnap answers when you can't.{' '}
+                                            <Link to="/dashboard?tab=phone-numbers" className="text-primary hover:underline">View setup instructions</Link>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <Circle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium">Wait for your first real call</p>
+                                        <p className="text-xs text-muted-foreground">Your call log will appear here as calls come in.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </CardContent>

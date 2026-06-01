@@ -2,7 +2,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CreditCard, AlertCircle, Loader2, ExternalLink, Sparkles, Calendar, Clock, TrendingUp, Moon } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CreditCard, AlertCircle, Loader2, ExternalLink, Sparkles, Calendar, Clock, TrendingUp, Moon, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -32,6 +42,7 @@ interface BillingTabProps {
 export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefresh }: BillingTabProps) {
     const { toast } = useToast();
     const [cancelingSubscription, setCancelingSubscription] = useState(false);
+    const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
     const [updateCardOpen, setUpdateCardOpen] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethodInfo | null>(null);
@@ -108,12 +119,12 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
     }, [account?.id]);
 
     const handleCancelSubscription = async () => {
-        const message = isTrialing
-            ? "Are you sure you want to cancel your trial? Your phone number will be released."
-            : "Are you sure you want to cancel? Your subscription stays active until end of billing period.";
         trackClick("cancel_subscription_initiated", { is_trial: isTrialing });
-        if (!window.confirm(message)) return;
+        setCancelDialogOpen(true);
+    };
 
+    const executeCancellation = async () => {
+        setCancelDialogOpen(false);
         setCancelingSubscription(true);
         try {
             const functionName = isTrialing ? "cancel-subscription" : "stripe-subscription-cancel";
@@ -152,6 +163,34 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
                 accountId={account.id}
                 onSuccess={() => { fetchBillingSummary(); toast({ title: "Payment method updated" }); }}
             />
+
+            {/* Cancel Subscription Dialog */}
+            <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-destructive" />
+                            {isTrialing ? "Cancel Trial?" : "Cancel Subscription?"}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            {isTrialing ? (
+                                <span>Your trial will end immediately and your RingSnap phone number will be released. You won't be charged.</span>
+                            ) : (
+                                <span>Your subscription will remain active until the end of your current billing period. After that, calls will stop being answered and your number will be released.</span>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep My Plan</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={executeCancellation}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {isTrialing ? "Cancel Trial" : "Cancel Subscription"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* ── 4a/4c: Plan & Usage Card ─────────────────────────────────────── */}
             <Card className="border-2">
