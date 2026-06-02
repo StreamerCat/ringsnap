@@ -166,7 +166,6 @@ export const CallValueCalculator = ({
       type: "applyPreset",
       preset: presetKey
     });
-    setIsAdvancedOpen(false);
   };
   const handleSliderChange = (field: keyof CalculatorState) => (value: number[]) => {
     dispatch({
@@ -179,45 +178,45 @@ export const CallValueCalculator = ({
     event.preventDefault();
     setFormState("submitted");
   };
-  const renderResultsCard = (className = "") => <Card className={`border border-slate-800 bg-slate-950 text-white shadow-xl ${className}`.trim()}>
+  const renderResultsCard = (className = "") => <Card className={`border border-slate-200 bg-white shadow-sm ${className}`.trim()}>
     <CardHeader className="space-y-3">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/60">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-primary">
         <AlertTriangle className="h-4 w-4" /> Recovered revenue snapshot
       </div>
-      <CardTitle className="text-3xl font-bold">
+      <CardTitle className="text-3xl font-bold text-slate-900">
         ${numberFormatter.format(metrics.recoveredRevenue)}
-        <span className="block text-base font-medium text-white/70">Booked back every month</span>
+        <span className="block text-base font-medium text-muted-foreground">Booked back every month</span>
       </CardTitle>
-      <CardDescription className="text-white/75">
+      <CardDescription>
         {numberFormatter.format(metrics.missedCalls)} missed calls leak ${numberFormatter.format(metrics.lostRevenue)} in booked work today.
       </CardDescription>
     </CardHeader>
     <CardContent className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Recovered revenue</div>
-          <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.recoveredRevenue)}</div>
-          <div className="mt-1 text-[11px] text-white/60">Captured by RingSnap AI follow-up</div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recovered revenue</div>
+          <div className="mt-1 text-xl font-semibold text-slate-900">${numberFormatter.format(metrics.recoveredRevenue)}</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">Captured by RingSnap AI follow-up</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Net profit lift</div>
-          <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.netGain)}</div>
-          <div className="mt-1 text-[11px] text-white/60">ROI: {metrics.roi}% vs. subscription</div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Net profit lift</div>
+          <div className="mt-1 text-xl font-semibold text-slate-900">${numberFormatter.format(metrics.netGain)}</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">ROI: {metrics.roi}% vs. subscription</div>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Break-even pace</div>
-          <div className="mt-1 text-xl font-semibold text-white">{metrics.paybackDays} days</div>
-          <div className="mt-1 text-[11px] text-white/60">≈ {breakEvenJobs} booked jobs</div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Break-even pace</div>
+          <div className="mt-1 text-xl font-semibold text-slate-900">{metrics.paybackDays} days</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">≈ {breakEvenJobs} booked jobs</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Monthly plan</div>
-          <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.aiCost)}/mo</div>
-          <div className="mt-1 text-[11px] text-white/60">24/7 coverage included</div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Monthly plan</div>
+          <div className="mt-1 text-xl font-semibold text-slate-900">${numberFormatter.format(metrics.aiCost)}/mo</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">24/7 coverage included</div>
         </div>
       </div>
-      <ul className="space-y-2 text-sm text-white/70">
+      <ul className="space-y-2 text-sm text-muted-foreground">
         <li className="flex items-start gap-2">
           <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
           <span>High-intent callers get quotes, scheduling links, and follow-ups automatically.</span>
@@ -235,7 +234,7 @@ export const CallValueCalculator = ({
         <Button
           onClick={() => onPdfDownload?.(metrics)}
           size="lg"
-          className="w-full rounded-lg bg-white text-slate-900 hover:bg-slate-100 border-2 border-slate-700 mb-4"
+          className="w-full rounded-lg border-2 border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100 mb-4"
         >
           <Download className="mr-2 h-5 w-5" />
           Download ROI Report PDF
@@ -243,10 +242,10 @@ export const CallValueCalculator = ({
       )}
       <form className="space-y-4" onSubmit={handleFormSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="roi-email" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
+          <Label htmlFor="roi-email" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600">
             Email my ROI teardown
           </Label>
-          <Input id="roi-email" type="email" required placeholder="you@company.com" value={email} onChange={event => setEmail(event.target.value)} className="h-11 rounded-lg border-slate-700 bg-slate-900 text-white placeholder:text-white/50 focus-visible:ring-primary" />
+          <Input id="roi-email" type="email" required placeholder="you@company.com" value={email} onChange={event => setEmail(event.target.value)} className="h-11 rounded-lg" />
         </div>
         <Button type="submit" size="lg" className="w-full rounded-lg bg-primary text-white hover:bg-primary/90">
           Send me the ROI report <ArrowRight className="ml-2 h-5 w-5" />
@@ -254,11 +253,11 @@ export const CallValueCalculator = ({
         {formState === "submitted" ? <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary">
           <CheckCircle2 className="h-4 w-4" />
           We just sent the launch kit—check your inbox for scripts, cadences, and ROI math.
-        </div> : <p className="text-xs text-white/60">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>}
+        </div> : <p className="text-xs text-muted-foreground">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>}
       </form>
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
-        <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
-        <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-white/60">Bryan — Owner, Precision Plumbing</p>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <p className="text-sm font-semibold text-slate-900">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
+        <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Bryan — Owner, Precision Plumbing</p>
       </div>
     </CardContent>
   </Card>;
