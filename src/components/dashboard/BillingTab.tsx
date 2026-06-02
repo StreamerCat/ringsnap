@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CreditCard, AlertCircle, Loader2, ExternalLink, Sparkles, Calendar, Clock, TrendingUp, Moon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
@@ -87,7 +87,7 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
             : account.current_period_end)
         : null;
 
-    const fetchBillingSummary = async () => {
+    const fetchBillingSummary = useCallback(async () => {
         setLoadingPaymentMethod(true);
         try {
             const { data, error } = await supabase.functions.invoke("get-billing-summary", {
@@ -101,11 +101,11 @@ export function BillingTab({ account, trialDaysRemaining, creditsBalance, onRefr
         } finally {
             setLoadingPaymentMethod(false);
         }
-    };
+    }, [account?.id]);
 
     useEffect(() => {
         if (account?.id) fetchBillingSummary();
-    }, [account?.id]);
+    }, [account?.id, fetchBillingSummary]);
 
     const handleCancelSubscription = async () => {
         const message = isTrialing

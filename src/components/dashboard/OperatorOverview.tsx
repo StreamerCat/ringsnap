@@ -88,6 +88,9 @@ export function OperatorOverview({ accountId }: { accountId: string }) {
       if (burstTimeout) clearTimeout(burstTimeout);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
+    // loadOperatorData is intentionally omitted: the poller is keyed on
+    // accountId and should not restart when the loader identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
 
   const loadOperatorData = async () => {

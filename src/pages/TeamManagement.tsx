@@ -38,6 +38,8 @@ const TeamManagement = () => {
 
   useEffect(() => {
     checkAccess();
+    // Run the access check once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAccess = async () => {

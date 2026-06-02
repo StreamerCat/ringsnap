@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,7 @@ export default function SecuritySettings() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     try {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
@@ -51,7 +47,11 @@ export default function SecuritySettings() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();

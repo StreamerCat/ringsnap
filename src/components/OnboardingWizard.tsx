@@ -280,7 +280,7 @@ export function OnboardingWizard({
     [form]
   );
 
-  const validateStep = async (step: number): Promise<boolean> => {
+  const validateStep = useCallback(async (step: number): Promise<boolean> => {
     const values = form.getValues();
 
     try {
@@ -328,7 +328,7 @@ export function OnboardingWizard({
     }
 
     return false;
-  };
+  }, [form, phoneProvisioningComplete]);
 
   const handleContinue = async () => {
     const isValid = await validateStep(currentStep);
@@ -400,7 +400,7 @@ export function OnboardingWizard({
         await handleSubmit(values);
       }
     },
-    [handleSubmit, phoneProvisioningComplete]
+    [handleSubmit, validateStep]
   );
 
   const handleOpenChange = (nextOpen: boolean) => {

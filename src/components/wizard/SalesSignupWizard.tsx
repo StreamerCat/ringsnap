@@ -83,7 +83,7 @@ function WizardInner() {
         console.error("Failed to restore progress:", err);
       }
     }
-  }, []);
+  }, [form]);
 
   // Warn before leaving if form has data
   useEffect(() => {
