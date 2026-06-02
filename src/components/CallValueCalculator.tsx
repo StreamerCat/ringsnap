@@ -213,7 +213,8 @@ export const CallValueCalculator = ({
       capture('roi_lead_captured', eventProps);
     } catch (err) {
       console.error('[CallValueCalculator] lead capture failed', err);
-      setFormState("submitted");
+      setFormState("error");
+      toast.error('Something went wrong. Please try again.');
       capture('roi_lead_capture_failed', { error: String(err) });
     }
   };
@@ -292,6 +293,9 @@ export const CallValueCalculator = ({
         {formState === "submitted" ? <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary">
           <CheckCircle2 className="h-4 w-4" />
           We just sent the launch kit—check your inbox for scripts, cadences, and ROI math.
+        </div> : formState === "error" ? <div className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+          <AlertTriangle className="h-4 w-4" />
+          Something went wrong—please try again.
         </div> : <p className="text-xs text-muted-foreground">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>}
       </form>
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
