@@ -39,6 +39,9 @@ export default function ProvisioningStatus() {
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
     const [accountId, setAccountId] = useState<string | null>(null);
+    // Assistant is created before the phone number; when it's ready but no number is
+    // active yet, we're in the graceful "securing your number" backfill state.
+    const [assistantReady, setAssistantReady] = useState(false);
 
     // One-time guard for Sentry breadcrumb
     const sentryLoggedRef = useRef(false);
@@ -111,6 +114,7 @@ export default function ProvisioningStatus() {
                     if (account && active) {
                         const currentElapsed = Date.now() - startTime;
                         setElapsedTime(currentElapsed);
+                        setAssistantReady(!!account.vapi_assistant_id);
 
                         // PRIMARY: provisioning_status is the source of truth
                         // We also accept 'active' as completed (set by standalone provision_number job)
@@ -277,7 +281,9 @@ export default function ProvisioningStatus() {
                                     </p>
                                 </div>
                                 <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-xs">
-                                    Thinking... Provisioning phone number...
+                                    {assistantReady
+                                        ? "Your AI assistant is ready — securing your dedicated phone number..."
+                                        : "Thinking... Provisioning phone number..."}
                                 </div>
                                 {/* Manual Refresh Button */}
                                 <Button

@@ -3,15 +3,19 @@
  * 
  * Shown on the Phones tab when provisioning failed or onboarding is incomplete.
  * Surfaces provisioning_jobs.error if available and provides recovery CTAs.
+ *
+ * States:
+ * - awaiting_number / still provisioning → friendly blue "securing your number" panel
+ *   (assistant is already live; the number backfills automatically once available).
+ * - failed / failed_permanent → red recovery panel with a working retry.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useOnboardingState } from "@/hooks/useOnboardingState";
-import { AlertTriangle, RefreshCw, Phone, ExternalLink } from "lucide-react";
+import { AlertTriangle, RefreshCw, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 
 interface OnboardingRecoveryPanelProps {
     accountId: string;
@@ -26,70 +30,57 @@ interface ProvisioningJob {
 }
 
 export function OnboardingRecoveryPanel({ accountId }: OnboardingRecoveryPanelProps) {
-    const navigate = useNavigate();
     const { state, loading, refreshState } = useOnboardingState(accountId);
     const [provisioningJob, setProvisioningJob] = useState<ProvisioningJob | null>(null);
     const [retrying, setRetrying] = useState(false);
 
-    // Fetch latest provisioning job for error details
-    useEffect(() => {
+    // Fetch latest provisioning job for status + error details
+    const fetchJob = useCallback(async () => {
         if (!accountId) return;
-
-        supabase
+        const { data } = await supabase
             .from('provisioning_jobs')
             .select('id, status, error, attempts, created_at')
             .eq('account_id', accountId)
             .order('created_at', { ascending: false })
             .limit(1)
-            .maybeSingle()
-            .then(({ data }) => {
-                if (data) setProvisioningJob(data);
-            });
+            .maybeSingle();
+        if (data) setProvisioningJob(data);
     }, [accountId]);
+
+    useEffect(() => {
+        fetchJob();
+    }, [fetchJob]);
 
     // Don't show if loading, or if onboarding is complete with active number
     if (loading || !state) return null;
-    if (state.has_active_primary_number && state.recommended_next_step === 'complete') return null;
+    if (state.has_active_primary_number) return null;
 
-    // Show if: provisioning failed OR no active number despite completed status
-    const showPanel =
-        provisioningJob?.status === 'failed' ||
-        (!state.has_active_primary_number && state.provisioning_status === 'completed');
+    const status = provisioningJob?.status;
+    const isHardFailure = status === 'failed' || status === 'failed_permanent';
+    const isAwaitingNumber = status === 'awaiting_number';
+    // "completed" with no active number is an anomaly worth surfacing for retry.
+    const completedButNoNumber = state.provisioning_status === 'completed';
 
-    if (!showPanel && state.has_active_primary_number) return null;
-
-    // If still provisioning, show a different message
-    if (!state.has_active_primary_number && state.provisioning_status !== 'completed') {
-        return (
-            <Alert className="mb-6 border-blue-200 bg-blue-50">
-                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                <AlertTitle className="text-blue-800">Setting up your phone number</AlertTitle>
-                <AlertDescription className="text-blue-700">
-                    We're provisioning your dedicated RingSnap line. This usually takes less than a minute.
-                </AlertDescription>
-            </Alert>
-        );
-    }
+    const handleCheckAgain = async () => {
+        await Promise.all([refreshState(), fetchJob()]);
+    };
 
     const handleRetry = async () => {
         if (!provisioningJob) return;
         setRetrying(true);
 
         try {
-            // Reset job status and trigger retry
-            await supabase
-                .from('provisioning_jobs')
-                .update({ status: 'queued', attempts: 0, error: null })
-                .eq('id', provisioningJob.id);
-
-            // Trigger the provisioning function
+            // The function (service_role) resets the job's retry state server-side.
+            // The browser client only has SELECT on provisioning_jobs (RLS), so we do
+            // NOT attempt a direct UPDATE here — it would be silently dropped.
             await supabase.functions.invoke('provision-vapi', {
                 body: { jobId: provisioningJob.id }
             });
 
-            // Refresh state after a delay
+            // Refresh state after a short delay to reflect the new attempt.
             setTimeout(() => {
                 refreshState();
+                fetchJob();
                 setRetrying(false);
             }, 3000);
         } catch (err) {
@@ -98,6 +89,41 @@ export function OnboardingRecoveryPanel({ accountId }: OnboardingRecoveryPanelPr
         }
     };
 
+    // Graceful in-progress states: initial provisioning OR number backfill pending.
+    // The AI assistant is already created; only the dedicated number is outstanding.
+    if (!isHardFailure && !completedButNoNumber) {
+        return (
+            <Alert className="mb-6 border-blue-200 bg-blue-50">
+                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                <AlertTitle className="text-blue-800">
+                    {isAwaitingNumber
+                        ? "Your AI assistant is ready — securing your number"
+                        : "Setting up your phone number"}
+                </AlertTitle>
+                <AlertDescription className="space-y-3 text-blue-700">
+                    <p>
+                        {isAwaitingNumber
+                            ? "Your AI assistant is live and ready to take calls. We're securing your dedicated phone number now — this can take a few minutes. We'll text and email you the moment it's live."
+                            : "We're provisioning your dedicated RingSnap line. This usually takes less than a minute."}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={isAwaitingNumber ? handleRetry : handleCheckAgain}
+                            disabled={retrying}
+                            className="bg-white"
+                        >
+                            <RefreshCw className={`mr-2 h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
+                            {retrying ? 'Checking...' : (isAwaitingNumber ? 'Check / retry now' : 'Check again')}
+                        </Button>
+                    </div>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    // Hard failure (or completed-without-number anomaly): red recovery panel.
     return (
         <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
