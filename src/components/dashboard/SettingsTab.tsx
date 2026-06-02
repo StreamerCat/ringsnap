@@ -11,7 +11,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { CallRecordingConsentDialog } from "@/components/CallRecordingConsentDialog";
-import { Sparkles, Check, Loader2, Bell, PhoneCall, AlertTriangle } from "lucide-react";
+import { Sparkles, Check, Loader2, Bell, PhoneCall, AlertTriangle, Link as LinkIcon, Shield, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { featureFlags } from "@/lib/featureFlags";
 import { trackOnboardingEvent } from "@/lib/sentry-tracking";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
 
     // 4e: Call Handling Preferences state
     const currentPlan = getDashboardPlanByKey(account.plan_key || account.plan_type);
+    const isCallBased = currentPlan?.billingUnit === 'call';
     const [overflowBehavior, setOverflowBehavior] = useState<"always_answer" | "soft_cap" | "hard_cap">(
         account.overflow_behavior || "always_answer"
     );
@@ -281,7 +283,7 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                         Call Handling Preferences
                     </CardTitle>
                     <CardDescription>
-                        What happens when you reach your monthly minutes?
+                        What happens when you reach your monthly {isCallBased ? 'call limit' : 'minutes'}?
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -324,13 +326,13 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                                 className="mt-1"
                             />
                             <div className="flex-1">
-                                <p className="font-medium text-sm">Answer up to extra minutes, then pause</p>
+                                <p className="font-medium text-sm">Answer up to extra {isCallBased ? 'calls' : 'minutes'}, then pause</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                     Set a buffer. We'll answer up to your limit, then route to voicemail.
                                 </p>
                                 {overflowBehavior === "soft_cap" && (
                                     <div className="mt-2 flex items-center gap-2">
-                                        <Label className="text-xs whitespace-nowrap">Buffer minutes:</Label>
+                                        <Label className="text-xs whitespace-nowrap">Buffer {isCallBased ? 'calls' : 'minutes'}:</Label>
                                         <Input
                                             type="number"
                                             min={10}
@@ -340,7 +342,10 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                                             className="h-7 w-24 text-sm"
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            ≈ ${((softCapBuffer) * (currentPlan?.overageRate ?? 0.28)).toFixed(2)} extra
+                                            ≈ ${(isCallBased
+                                                ? (softCapBuffer) * (currentPlan?.overageRateCalls ?? 1.10)
+                                                : (softCapBuffer) * (currentPlan?.overageRate ?? 0.28)
+                                            ).toFixed(2)} extra
                                         </span>
                                     </div>
                                 )}
@@ -361,9 +366,9 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                                 className="mt-1"
                             />
                             <div>
-                                <p className="font-medium text-sm">Stop at my included minutes</p>
+                                <p className="font-medium text-sm">Stop at my included {isCallBased ? 'calls' : 'minutes'}</p>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    Calls route to voicemail once your included minutes are used.
+                                    Calls route to voicemail once your included {isCallBased ? 'calls are' : 'minutes are'} used.
                                     Not recommended for emergency-prone trades (HVAC, plumbing, electrical).
                                 </p>
                             </div>
@@ -389,9 +394,14 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                     {currentPlan && (
                         <p className="text-xs text-muted-foreground mt-2">
                             As a safety guardrail, we pause calls if your overage reaches{" "}
-                            <strong>{currentPlan.systemCeilingMinutes} minutes</strong> above your plan (about{" "}
-                            <strong>${(currentPlan.systemCeilingMinutes * currentPlan.overageRate).toFixed(0)} extra</strong>).
-                            You'll be alerted immediately if this happens.
+                            {isCallBased ? (
+                                <><strong>{currentPlan.maxOverageCalls} calls</strong> above your plan (about{" "}
+                                <strong>${(currentPlan.maxOverageCalls * currentPlan.overageRateCalls).toFixed(0)} extra</strong>).</>
+                            ) : (
+                                <><strong>{currentPlan.systemCeilingMinutes} minutes</strong> above your plan (about{" "}
+                                <strong>${(currentPlan.systemCeilingMinutes * currentPlan.overageRate).toFixed(0)} extra</strong>).</>
+                            )}
+                            {" "}You'll be alerted immediately if this happens.
                         </p>
                     )}
                 </CardContent>
@@ -660,6 +670,53 @@ export function SettingsTab({ account, onUpdateAccount, recordingState, onOpenUp
                     <Button onClick={handleSaveBusinessDetails} disabled={savingBusinessDetails}>
                         {savingBusinessDetails ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Business Details"}
                     </Button>
+                </CardContent>
+            </Card>
+
+            {/* Integrations */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <LinkIcon className="h-5 w-5 text-primary" />
+                        Integrations
+                    </CardTitle>
+                    <CardDescription>
+                        Connect RingSnap to your field service software.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Link
+                        to="/settings/integrations/jobber"
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                        <div>
+                            <p className="font-medium text-sm">Jobber</p>
+                            <p className="text-xs text-muted-foreground">Sync leads and appointments to Jobber automatically.</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </Link>
+                </CardContent>
+            </Card>
+
+            {/* Account & Security */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-primary" />
+                        Account & Security
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Link
+                        to="/settings/security"
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                        <div>
+                            <p className="font-medium text-sm">Security Settings</p>
+                            <p className="text-xs text-muted-foreground">Change password, view active sessions, and manage authentication.</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </Link>
                 </CardContent>
             </Card>
         </div>
