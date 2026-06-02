@@ -22,10 +22,24 @@ ALTER TABLE public.phone_numbers
 -- =============================================================================
 
 -- Backfill provider_phone_number_id from vapi_phone_id (primary source)
-UPDATE public.phone_numbers
-SET provider_phone_number_id = vapi_phone_id
-WHERE provider_phone_number_id IS NULL 
-  AND vapi_phone_id IS NOT NULL;
+-- Check if vapi_phone_id exists first (may have been consolidated into vapi_id)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'phone_numbers'
+    AND column_name = 'vapi_phone_id'
+  ) THEN
+    UPDATE public.phone_numbers
+    SET provider_phone_number_id = vapi_phone_id
+    WHERE provider_phone_number_id IS NULL
+      AND vapi_phone_id IS NOT NULL;
+    RAISE NOTICE 'Backfilled provider_phone_number_id from vapi_phone_id';
+  ELSE
+    RAISE NOTICE 'vapi_phone_id column does not exist, skipping (already consolidated into vapi_id)';
+  END IF;
+END $$;
 
 -- Also check vapi_id column if it exists in some environments
 DO $$
@@ -94,12 +108,12 @@ CREATE INDEX IF NOT EXISTS idx_phone_numbers_e164
 -- =============================================================================
 
 CREATE OR REPLACE VIEW public.phone_number_identity AS
-SELECT 
+SELECT
   id AS internal_id,
   account_id,
   COALESCE(e164_number, phone_number) AS e164,
   provider_phone_number_id AS vapi_phone_id,
-  vapi_phone_id AS legacy_vapi_phone_id,
+  vapi_id AS legacy_vapi_id,
   twilio_phone_number_sid AS twilio_sid,
   status,
   is_primary,
@@ -113,8 +127,19 @@ COMMENT ON VIEW public.phone_number_identity IS
 -- PHASE 6: Add deprecation notices
 -- =============================================================================
 
-COMMENT ON COLUMN public.phone_numbers.vapi_phone_id IS 
-  'DEPRECATED: Use provider_phone_number_id instead. Kept for backward compatibility.';
+-- Only add comment if vapi_phone_id still exists (may have been consolidated in earlier migrations)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'phone_numbers'
+    AND column_name = 'vapi_phone_id'
+  ) THEN
+    EXECUTE 'COMMENT ON COLUMN public.phone_numbers.vapi_phone_id IS
+      ''DEPRECATED: Use provider_phone_number_id instead. Kept for backward compatibility.''';
+  END IF;
+END $$;
 
 -- Add comment on vapi_id if it exists
 DO $$
