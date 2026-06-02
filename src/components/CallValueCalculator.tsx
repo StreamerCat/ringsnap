@@ -5,9 +5,11 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { DollarSign, TrendingUp, AlertTriangle, PhoneCall, ArrowRight, Sparkles, ShieldCheck, Clock3, CheckCircle2, Download } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, PhoneCall, ArrowRight, Sparkles, ShieldCheck, Clock3, CheckCircle2, Download, Loader2 } from "lucide-react";
+import { capture } from "@/lib/analytics";
+import { captureSignupLead } from "@/lib/api/leads";
+import { toast } from "sonner";
 type CalculatorState = {
   calls: number;
   answerRate: number;
@@ -105,7 +107,7 @@ export const CallValueCalculator = ({
 
   const [selectedPreset, setSelectedPreset] = useState<keyof typeof tradePresets>(getPresetKey(preselectedTrade));
   const [email, setEmail] = useState("");
-  const [formState, setFormState] = useState<"idle" | "submitted">("idle");
+  const [formState, setFormState] = useState<"idle" | "submitting" | "submitted" | "error">("idle");
 
   const [inputs, dispatch] = useReducer(calculatorReducer, tradePresets[selectedPreset].defaults, defaults => ({
     ...defaults
@@ -174,9 +176,46 @@ export const CallValueCalculator = ({
       value: value[0]
     });
   };
-  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setFormState("submitted");
+    if (!email.trim()) return;
+    setFormState("submitting");
+
+    const eventProps = {
+      email: email.trim().toLowerCase(),
+      trade: selectedPreset,
+      monthly_calls: inputs.calls,
+      answer_rate: inputs.answerRate,
+      job_value: inputs.jobValue,
+      recovered_revenue: metrics.recoveredRevenue,
+      net_gain: metrics.netGain,
+      roi: metrics.roi,
+    };
+
+    capture('roi_report_requested', eventProps);
+
+    try {
+      await captureSignupLead({
+        email: email.trim().toLowerCase(),
+        source: 'roi_calculator',
+        signup_flow: 'roi-report',
+        metadata: {
+          trade: selectedPreset,
+          monthly_calls: inputs.calls,
+          answer_rate: inputs.answerRate,
+          job_value: inputs.jobValue,
+          recovered_revenue: metrics.recoveredRevenue,
+          net_gain: metrics.netGain,
+          roi: metrics.roi,
+        },
+      });
+      setFormState("submitted");
+      capture('roi_lead_captured', eventProps);
+    } catch (err) {
+      console.error('[CallValueCalculator] lead capture failed', err);
+      setFormState("submitted");
+      capture('roi_lead_capture_failed', { error: String(err) });
+    }
   };
   const renderResultsCard = (className = "") => <Card className={`border border-slate-200 bg-white shadow-sm ${className}`.trim()}>
     <CardHeader className="space-y-3">
@@ -245,10 +284,10 @@ export const CallValueCalculator = ({
           <Label htmlFor="roi-email" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600">
             Email my ROI teardown
           </Label>
-          <Input id="roi-email" type="email" required placeholder="you@company.com" value={email} onChange={event => setEmail(event.target.value)} className="h-11 rounded-lg" />
+          <Input id="roi-email" type="email" required placeholder="you@company.com" value={email} onChange={event => setEmail(event.target.value)} className="h-11 rounded-lg" disabled={formState === "submitting" || formState === "submitted"} />
         </div>
-        <Button type="submit" size="lg" className="w-full rounded-lg bg-primary text-white hover:bg-primary/90">
-          Send me the ROI report <ArrowRight className="ml-2 h-5 w-5" />
+        <Button type="submit" size="lg" className="w-full rounded-lg bg-primary text-white hover:bg-primary/90" disabled={formState === "submitting" || formState === "submitted"}>
+          {formState === "submitting" ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Sending...</> : <>Send me the ROI report <ArrowRight className="ml-2 h-5 w-5" /></>}
         </Button>
         {formState === "submitted" ? <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-primary">
           <CheckCircle2 className="h-4 w-4" />

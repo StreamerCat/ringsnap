@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { jsPDF } from 'jspdf';
 import { Helmet } from 'react-helmet-async';
+import { capture } from "@/lib/analytics";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { SalesPasswordGate } from "@/components/SalesPasswordGate";
@@ -8,6 +9,8 @@ import { CallValueCalculator } from "@/components/CallValueCalculator";
 import { VoiceDemoWidget } from "@/components/VoiceDemoWidget";
 import { SalesSignupForm } from "@/components/SalesSignupForm";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import RSLogo from "@/assets/RS_logo_color.svg";
 
@@ -19,6 +22,12 @@ export default function Sales() {
   const [showSignupModal, setShowSignupModal] = useState(false);
 
   const handlePdfDownload = (metrics: any) => {
+    capture('roi_pdf_downloaded', {
+      company_name: companyName,
+      recovered_revenue: metrics.recoveredRevenue,
+      net_gain: metrics.netGain,
+      roi: metrics.roi,
+    });
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -122,6 +131,18 @@ export default function Sales() {
 
         {/* ROI Calculator Section */}
         <section className="bg-background">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 pb-4">
+            <div className="flex items-center gap-3 max-w-sm">
+              <Label htmlFor="company-name" className="text-sm font-semibold text-slate-700 whitespace-nowrap">Company name</Label>
+              <Input
+                id="company-name"
+                placeholder="e.g. Precision Plumbing"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="h-10 rounded-lg"
+              />
+            </div>
+          </div>
           <CallValueCalculator
             showPdfDownload={true}
             companyName={companyName}
