@@ -11,7 +11,7 @@ vi.mock("@/lib/auth/redirects", () => ({
 }));
 
 describe("AuthLogin", () => {
-  it("renders the magic link form by default", async () => {
+  it("renders the password form by default", async () => {
     render(
       <HelmetProvider>
         <MemoryRouter>
@@ -22,10 +22,10 @@ describe("AuthLogin", () => {
 
     expect(await screen.findByText("Welcome Back")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.getByText("Send me a sign-in link")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
   });
 
-  it("shows password form when switching mode", async () => {
+  it("shows magic link form when switching mode", async () => {
     render(
       <HelmetProvider>
         <MemoryRouter>
@@ -36,9 +36,9 @@ describe("AuthLogin", () => {
 
     expect(await screen.findByText("Welcome Back")).toBeInTheDocument();
     await act(async () => {
-      fireEvent.click(screen.getByText("Sign in with password instead"));
+      fireEvent.click(screen.getByText("Use email link instead"));
     });
-    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByText("Send me a sign-in link")).toBeInTheDocument();
   });
 });
 

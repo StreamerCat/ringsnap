@@ -22,7 +22,7 @@ export default function AuthLogin() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [authMode, setAuthMode] = useState<AuthMode>("magic");
+  const [authMode, setAuthMode] = useState<AuthMode>("password");
 
   const checkIfAlreadyLoggedIn = useCallback(async () => {
     try {
@@ -131,18 +131,31 @@ export default function AuthLogin() {
         body: { email: email.toLowerCase().trim() }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Try to extract the actual error message from the response
+        let errorBody: string | undefined;
+        try {
+          const ctx = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            errorBody = body?.error;
+          }
+        } catch { /* ignore parse errors */ }
+        throw new Error(errorBody || error.message);
+      }
       if (data?.error) throw new Error(data.error);
 
       setMagicLinkSent(true);
       toast.success("Sign-in link sent! Check your email.");
     } catch (error: any) {
       console.error("Magic link error:", error);
-      const isRateLimit = error?.status === 429 || error?.message?.includes("rate limit");
+      const msg = error?.message || "";
+      const isRateLimit = error?.status === 429 || msg.includes("rate limit") || msg.includes("Too many");
       if (isRateLimit) {
         toast.error("Too many attempts. Please try again later.");
       } else {
-        toast.error(error?.message || "Failed to send sign-in link. Please try again.");
+        toast.error("Email sign-in link is temporarily unavailable. Please use password login.");
+        setAuthMode("password");
       }
     } finally {
       setIsLoading(false);
@@ -156,29 +169,37 @@ export default function AuthLogin() {
     }
 
     setIsLoading(true);
+    const normalizedEmail = email.toLowerCase().trim();
+
     try {
-      // Send magic link that redirects to security settings for password reset
+      // Try magic link first (redirects to security settings for password change)
       const { data, error } = await supabase.functions.invoke("send-magic-link", {
-        body: {
-          email: email.toLowerCase().trim(),
-          redirectTo: "/settings/security"
-        }
+        body: { email: normalizedEmail, redirectTo: "/settings/security" }
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) {
+        // Magic link unavailable — fall back to send-password-reset
+        console.warn("Magic link unavailable for reset, falling back to send-password-reset");
+        const { data: resetData, error: resetError } = await supabase.functions.invoke("send-password-reset", {
+          body: { email: normalizedEmail }
+        });
+        if (resetError) throw resetError;
+        if (resetData?.error) throw new Error(resetData.error);
+      }
 
       setResetEmailSent(true);
       toast.success("Reset link sent! Check your email.");
     } catch (error: any) {
       console.error("Reset password error:", error);
 
-      const isRateLimit = error?.status === 429 || error?.message?.includes("rate limit");
-      const isNetwork = error?.message?.includes("network") || error?.message?.includes("fetch");
+      const msg = error?.message || "";
+      const isRateLimit = error?.status === 429 || msg.includes("rate limit") || msg.includes("Too many");
+      const isNetwork = msg.includes("network") || msg.includes("fetch");
 
       if (isRateLimit || isNetwork) {
-        toast.error(error?.message || "Function temporarily unavailable. Please try again later.");
+        toast.error("Too many attempts. Please try again later.");
       } else {
+        // Security: don't reveal if user exists
         setResetEmailSent(true);
         toast.success("If an account exists, a reset link has been sent.");
       }
