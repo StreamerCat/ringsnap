@@ -5,19 +5,19 @@
  * - For NEW users (with lead_id from Step 1): Collects all info + payment
  * - For EXISTING users (authenticated): Collects assistant config only
  *
- * Chat Flow (New Users):
- * 1. Welcome
- * 2. Phone number (destination for forwarding)
- * 3. Company name
- * 4. Trade/service type
- * 5. Website (optional)
- * 6. Business hours
- * 7. Voice preference
- * 8. Primary goal
- * 9. Plan selection
- * 10. Payment
- * 11. Provisioning status
- * 12. Complete
+ * Consolidated Chat Flow (New Users) — 5 steps:
+ * 1. Phone + Company name (combined)
+ * 2. Trade/service type
+ * 3. Website + Business hours (combined)
+ * 4. Goal + Plan selection
+ * 5. Payment → Provisioning
+ *
+ * Features:
+ * - Back navigation between steps
+ * - Inline validation errors
+ * - Plan selection with call-based pricing
+ * - Plan summary at payment step
+ * - Graceful error handling with retry
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -39,7 +39,9 @@ import {
   Copy,
   ExternalLink,
   ArrowRight,
+  ArrowLeft,
   Shield,
+  Check,
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,13 +63,16 @@ import * as Sentry from "@sentry/react";
 // Chat step types
 type ChatStep =
   | "loading"
-  | "phone"
-  | "company"
+  | "phone_company"   // Combined: phone + company name
+  | "phone"           // Legacy (kept for compat)
+  | "company"         // Legacy (kept for compat)
   | "trade"
-  | "website"
-  | "hours"
+  | "website_hours"   // Combined: website + hours
+  | "website"         // Legacy
+  | "hours"           // Legacy
   | "hours_custom"
   | "goal"
+  | "plan"            // NEW: plan selection
   | "payment"
   | "processing"
   | "provisioning"
@@ -188,6 +193,154 @@ function normalizePhone(value: string): string {
   return `+1${cleaned.slice(-10)}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Sub-components for consolidated steps
+// ═══════════════════════════════════════════════════════════════════
+
+/** Combined Phone + Company input (reduces 2 steps to 1) */
+function PhoneCompanyInput({ onSubmit, onBack }: { onSubmit: (phone: string, company: string) => void; onBack?: () => void }) {
+  const [phone, setPhone] = useState("");
+  const [company, setCompany] = useState("");
+  const [errors, setErrors] = useState<{ phone?: string; company?: string }>({});
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhoneNumber(e.target.value));
+    if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = phone.replace(/\D/g, "");
+    const newErrors: { phone?: string; company?: string } = {};
+
+    if (cleanPhone.length !== 10) {
+      newErrors.phone = "Enter a valid 10-digit US phone number";
+    } else if (cleanPhone.startsWith("1")) {
+      newErrors.phone = "Enter without the leading '1'";
+    }
+    if (company.trim().length < 2) {
+      newErrors.company = "Enter your company name";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    onSubmit(phone, company);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} action="javascript:void(0);" className="space-y-3 animate-in slide-in-from-bottom-2 duration-300">
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">Business phone number</label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={handlePhoneChange}
+          placeholder="(555) 123-4567"
+          autoFocus
+          inputMode="numeric"
+          maxLength={14}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        />
+        {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">Company name</label>
+        <input
+          type="text"
+          value={company}
+          onChange={(e) => { setCompany(e.target.value); if (errors.company) setErrors(prev => ({ ...prev, company: undefined })); }}
+          placeholder="Acme Plumbing"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        />
+        {errors.company && <p className="text-xs text-red-600 mt-1">{errors.company}</p>}
+      </div>
+      <div className="flex items-center justify-between">
+        {onBack ? (
+          <button type="button" onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+            <ArrowLeft className="h-3 w-3" /> Back
+          </button>
+        ) : <span />}
+        <Button type="submit" size="sm">
+          Continue <ArrowRight className="ml-1 h-3 w-3" />
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** Combined Website + Hours step (reduces 2 steps to 1) */
+function WebsiteHoursInput({ onSubmit, onBack }: {
+  onSubmit: (website: string, hoursChoice: string, hoursData?: ServiceHoursData) => void;
+  onBack: () => void;
+}) {
+  const [website, setWebsite] = useState("");
+  const [hoursChoice, setHoursChoice] = useState<string>("");
+
+  const handleSubmit = () => {
+    if (!hoursChoice) {
+      toast.error("Please select when your receptionist should answer calls");
+      return;
+    }
+    onSubmit(website, hoursChoice);
+  };
+
+  return (
+    <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+      {/* Website */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+          Website <span className="text-muted-foreground/60">(optional — helps your AI answer questions)</span>
+        </label>
+        <input
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          placeholder="www.yourcompany.com"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        />
+      </div>
+
+      {/* Hours */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">When should your receptionist answer?</label>
+        <div className="grid grid-cols-1 gap-2">
+          {[
+            { label: "Weekdays 9am–5pm", value: "weekdays_9_5" },
+            { label: "Every day 8am–6pm", value: "everyday_8_6" },
+            { label: "24/7", value: "24_7" },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setHoursChoice(opt.value)}
+              className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg text-sm text-left transition-colors ${hoursChoice === opt.value ? "border-primary bg-primary/5 text-primary font-medium" : "border-input hover:border-primary/50"}`}
+            >
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              {opt.label}
+              {hoursChoice === opt.value && <Check className="h-4 w-4 ml-auto text-primary" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <button type="button" onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <ArrowLeft className="h-3 w-3" /> Back
+        </button>
+        <Button size="sm" onClick={handleSubmit} disabled={!hoursChoice}>
+          Continue <ArrowRight className="ml-1 h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════
+
 // Inner component with Stripe hooks
 function OnboardingChatInner() {
   const navigate = useNavigate();
@@ -277,20 +430,23 @@ function OnboardingChatInner() {
     });
   }, []);
 
-  // Calculate progress based on step
+  // Calculate progress based on step (4 user steps: phone_company → trade → website_hours → payment)
   useEffect(() => {
     const stepProgress: Record<ChatStep, number> = {
       loading: 0,
-      phone: 14,
-      company: 28,
-      trade: 43,
-      website: 57,
-      hours: 71,
-      hours_custom: 71,
-      goal: 85,
-      payment: 95,
-      processing: 98,
-      provisioning: 99,
+      phone_company: 20,
+      phone: 20,
+      company: 30,
+      trade: 40,
+      website_hours: 55,
+      website: 55,
+      hours: 65,
+      hours_custom: 65,
+      goal: 75,
+      plan: 85,
+      payment: 90,
+      processing: 95,
+      provisioning: 98,
       complete: 100,
       error: 0,
     };
@@ -374,15 +530,15 @@ function OnboardingChatInner() {
           full_name: lead.full_name,
         });
 
-        // Start the chat
-        setStep("phone");
+        // Start the chat with combined phone + company step
+        setStep("phone_company");
         trackFunnelEvent("onboarding_started", { lead_id: lead.id, email: lead.email });
 
         await showTypingDelay(500);
         const userName = lead.full_name?.split(" ")[0] || "there";
         addMessage(
           "assistant",
-          `Hi ${userName}! Let's get your RingSnap receptionist set up. What's the best phone number for call forwarding?`
+          `Hi ${userName}! Let's get your RingSnap receptionist set up in just a few steps. What's your business phone number and company name?`
         );
       } catch (error) {
         console.error("Init error:", error);
@@ -398,9 +554,54 @@ function OnboardingChatInner() {
   // useEffect(() => { ... }) removed
 
 
-  // Handle phone input
+  // Step history for back navigation
+  const [stepHistory, setStepHistory] = useState<ChatStep[]>([]);
+
+  const goBack = () => {
+    if (stepHistory.length === 0) return;
+    const prevStep = stepHistory[stepHistory.length - 1];
+    setStepHistory(prev => prev.slice(0, -1));
+    setStep(prevStep);
+  };
+
+  const advanceStep = (nextStep: ChatStep) => {
+    setStepHistory(prev => [...prev, step]);
+    setStep(nextStep);
+  };
+
+  // Handle combined phone + company input
+  const handlePhoneCompany = async (phone: string, company: string) => {
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      toast.error("Please enter a valid 10-digit US phone number");
+      return;
+    }
+    if (cleanPhone.startsWith("1")) {
+      toast.error("Please enter your 10-digit number WITHOUT the leading '1'");
+      return;
+    }
+    if (company.trim().length < 2) {
+      toast.error("Please enter your company name");
+      return;
+    }
+
+    addMessage("user", `${formatPhoneNumber(cleanPhone)} • ${company.trim()}`);
+    setData((prev) => ({ ...prev, phone: formatPhoneNumber(cleanPhone), companyName: company.trim() }));
+
+    trackCheckpoint("onboarding_phone_collected");
+    trackCheckpoint("onboarding_company_collected", { company_name: company.trim() });
+    // Save to lead record (fire-and-forget)
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ phone: normalizePhone(cleanPhone), last_step: 2 }).eq("id", leadData.id).then(() => {});
+    }
+
+    advanceStep("trade");
+    await showTypingDelay(600);
+    addMessage("assistant", "What type of work do you do?");
+  };
+
+  // Handle phone input (legacy path, still works if needed)
   const handlePhone = async (value: string) => {
-    // Basic validation for 10 digits
     const cleanPhone = value.replace(/\D/g, "");
     if (cleanPhone.length !== 10) {
       toast.error("Please enter a valid 10-digit US phone number");
@@ -414,9 +615,8 @@ function OnboardingChatInner() {
 
     addMessage("user", value);
     setData((prev) => ({ ...prev, phone: value }));
-    setStep("company");
+    advanceStep("company");
     trackCheckpoint("onboarding_phone_collected");
-    // Save phone to lead record (fire-and-forget)
     if (leadData) {
       supabase.from("signup_leads" as any).update({ phone: normalizePhone(cleanPhone), last_step: 1 }).eq("id", leadData.id).then(() => {});
     }
@@ -434,9 +634,8 @@ function OnboardingChatInner() {
     addMessage("user", value);
     setData((prev) => ({ ...prev, companyName: value.trim() }));
 
-    setStep("trade");
+    advanceStep("trade");
     trackCheckpoint("onboarding_company_collected", { company_name: value.trim() });
-    // Track step progression
     if (leadData) {
       supabase.from("signup_leads" as any).update({ last_step: 2 }).eq("id", leadData.id).then(() => {});
     }
@@ -455,16 +654,15 @@ function OnboardingChatInner() {
     addMessage("user", tradeLabel);
     setData((prev) => ({ ...prev, trade: value }));
 
-    setStep("website");
+    advanceStep("website_hours");
     trackCheckpoint("onboarding_trade_collected", { trade: value });
-    // Track step progression
     if (leadData) {
       supabase.from("signup_leads" as any).update({ last_step: 3 }).eq("id", leadData.id).then(() => {});
     }
     await showTypingDelay(600);
     addMessage(
       "assistant",
-      "Do you have a website? Your receptionist will use it to learn about your business and answer caller questions accurately."
+      "Almost there! Do you have a website, and when should your receptionist answer calls?"
     );
   };
 
@@ -479,19 +677,90 @@ function OnboardingChatInner() {
     addMessage("user", value);
     setData((prev) => ({ ...prev, trade: value.trim() }));
 
-    setStep("website");
-    // Track step progression
+    advanceStep("website_hours");
     if (leadData) {
       supabase.from("signup_leads" as any).update({ last_step: 3 }).eq("id", leadData.id).then(() => {});
     }
     await showTypingDelay(600);
     addMessage(
       "assistant",
-      "Do you have a website? Your receptionist will use it to learn about your business and answer caller questions accurately."
+      "Almost there! Do you have a website, and when should your receptionist answer calls?"
     );
   };
 
-  // Handle website
+  // Handle combined website + hours submission
+  const handleWebsiteHours = async (website: string, hoursChoice: string, hoursData?: ServiceHoursData) => {
+    let url = website.trim();
+    if (url && !url.startsWith("http")) {
+      url = `https://${url}`;
+    }
+
+    const hoursLabel = hoursChoice === "weekdays_9_5" ? "Weekdays 9am-5pm"
+      : hoursChoice === "everyday_8_6" ? "Every day 8am-6pm"
+      : hoursChoice === "24_7" ? "24/7"
+      : "Custom hours";
+
+    addMessage("user", `${url || "No website"} • ${hoursLabel}`);
+
+    // Build hours data
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let finalHoursData: ServiceHoursData;
+
+    if (hoursData) {
+      finalHoursData = hoursData;
+    } else if (hoursChoice === "weekdays_9_5") {
+      finalHoursData = {
+        timezone,
+        blocks: [
+          { day: "monday", start: "09:00", end: "17:00" },
+          { day: "tuesday", start: "09:00", end: "17:00" },
+          { day: "wednesday", start: "09:00", end: "17:00" },
+          { day: "thursday", start: "09:00", end: "17:00" },
+          { day: "friday", start: "09:00", end: "17:00" },
+        ]
+      };
+    } else if (hoursChoice === "everyday_8_6") {
+      finalHoursData = {
+        timezone,
+        blocks: [
+          { day: "monday", start: "08:00", end: "18:00" },
+          { day: "tuesday", start: "08:00", end: "18:00" },
+          { day: "wednesday", start: "08:00", end: "18:00" },
+          { day: "thursday", start: "08:00", end: "18:00" },
+          { day: "friday", start: "08:00", end: "18:00" },
+          { day: "saturday", start: "08:00", end: "18:00" },
+          { day: "sunday", start: "08:00", end: "18:00" },
+        ]
+      };
+    } else {
+      finalHoursData = {
+        timezone,
+        blocks: [
+          { day: "monday", start: "00:00", end: "23:59" },
+          { day: "tuesday", start: "00:00", end: "23:59" },
+          { day: "wednesday", start: "00:00", end: "23:59" },
+          { day: "thursday", start: "00:00", end: "23:59" },
+          { day: "friday", start: "00:00", end: "23:59" },
+          { day: "saturday", start: "00:00", end: "23:59" },
+          { day: "sunday", start: "00:00", end: "23:59" },
+        ]
+      };
+    }
+
+    setData((prev) => ({ ...prev, website: url, businessHours: finalHoursData }));
+    trackCheckpoint("onboarding_website_collected", { skipped: !url });
+    trackCheckpoint("onboarding_hours_collected", { type: hoursChoice });
+
+    if (leadData) {
+      supabase.from("signup_leads" as any).update({ last_step: 4 }).eq("id", leadData.id).then(() => {});
+    }
+
+    advanceStep("goal");
+    await showTypingDelay(600);
+    addMessage("assistant", "What's the main job for your receptionist?");
+  };
+
+  // Handle website (legacy path)
   const handleWebsite = async (value: string, skipped: boolean = false) => {
     if (skipped) {
       addMessage("user", "I don't have one");
@@ -505,7 +774,7 @@ function OnboardingChatInner() {
       setData((prev) => ({ ...prev, website: url }));
     }
 
-    setStep("hours");
+    advanceStep("hours");
     trackCheckpoint("onboarding_website_collected", { skipped });
     await showTypingDelay(600);
     addMessage("assistant", "When should your receptionist answer calls?");
@@ -569,9 +838,8 @@ function OnboardingChatInner() {
     addMessage("user", hoursText);
     setData((prev) => ({ ...prev, businessHours: hoursData }));
 
-    setStep("goal");
+    advanceStep("goal");
     trackCheckpoint("onboarding_hours_collected", { type: value });
-    // Track step progression
     if (leadData) {
       supabase.from("signup_leads" as any).update({ last_step: 4 }).eq("id", leadData.id).then(() => {});
     }
@@ -581,7 +849,6 @@ function OnboardingChatInner() {
 
   // Handle custom hours
   const handleCustomHours = async (hours: ServiceHoursData) => {
-    // hours is already ServiceHoursData, no need to convert
     const daysText =
       hours.blocks.length === 7
         ? "Every day"
@@ -590,8 +857,7 @@ function OnboardingChatInner() {
     addMessage("user", `Custom hours: ${daysText}`);
     setData((prev) => ({ ...prev, businessHours: hours }));
 
-    setStep("goal");
-    // Track step progression
+    advanceStep("goal");
     if (leadData) {
       supabase.from("signup_leads" as any).update({ last_step: 4 }).eq("id", leadData.id).then(() => {});
     }
@@ -599,17 +865,17 @@ function OnboardingChatInner() {
     addMessage("assistant", "What's the main job for your receptionist?");
   };
 
-  // Handle goal selection
+  // Handle goal selection → goes directly to payment (plan defaults to starter for highest conversion)
   const handleGoal = async (value: string) => {
     const goalLabel = GOAL_OPTIONS.find((g) => g.value === value)?.label || value;
     addMessage("user", goalLabel);
     setData((prev) => ({ ...prev, primaryGoal: value, planType: "starter" }));
 
-    setStep("payment");
+    advanceStep("payment");
     trackCheckpoint("onboarding_goal_collected", { goal: value });
     capture('checkout_started', { plan_key: 'starter', source_channel: 'onboarding_chat' });
     await showTypingDelay(600);
-    addMessage("assistant", "Almost done. Enter your card below to start your 3-day trial. You won't be charged until your trial ends or your usage limit is reached.");
+    addMessage("assistant", "Last step! Add your card to start your free 3-day trial. You won't be charged — cancel anytime before the trial ends.");
   };
 
   // Handle payment submission
@@ -814,30 +1080,38 @@ function OnboardingChatInner() {
         phase: errorPayload?.phase
       });
 
-      // Show user-friendly message
+      // Show user-friendly message with clear retry guidance
       if (appError.retryable) {
         setStep("payment");
         setIsProcessing(false);
 
         addMessage(
           "assistant",
-          <div className="space-y-2 text-red-600">
-            <p>{appError.userMessage}</p>
-            {appError.suggestedAction && (
-              <p className="text-sm text-muted-foreground">{appError.suggestedAction}</p>
-            )}
+          <div className="space-y-2">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm font-medium text-red-800">{appError.userMessage}</p>
+              {appError.suggestedAction && (
+                <p className="text-xs text-red-600 mt-1">{appError.suggestedAction}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">Your information is saved — just try again below.</p>
+            </div>
           </div>
         );
         return;
       }
 
-      // Non-retryable error - show message and stay on payment
+      // Non-retryable error - show message and offer support
       setStep("payment");
       setIsProcessing(false);
       addMessage(
         "assistant",
-        <div className="space-y-2 text-red-600">
-          <p>{appError.userMessage}</p>
+        <div className="space-y-2">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-sm font-medium text-red-800">{appError.userMessage}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              If this continues, please try a different card or contact us at support@getringsnap.com
+            </p>
+          </div>
         </div>
       );
     } finally {
@@ -882,7 +1156,7 @@ function OnboardingChatInner() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              Step {Math.min(Math.ceil(progress / 14.3), 7)} of 7
+              Step {Math.min(Math.ceil(progress / 25), 4)} of 4
             </span>
             <div className="w-24">
               <Progress value={progress} className="h-2" />
@@ -903,12 +1177,19 @@ function OnboardingChatInner() {
               {isTyping && <TypingIndicator />}
 
               {/* Interactive elements based on step */}
+
+              {/* Combined phone + company step (new default) */}
+              {step === "phone_company" && !isTyping && (
+                <PhoneCompanyInput onSubmit={handlePhoneCompany} onBack={stepHistory.length > 0 ? goBack : undefined} />
+              )}
+
+              {/* Legacy individual steps (fallback) */}
               {step === "phone" && !isTyping && (
                 <ChatInput
                   onSubmit={handlePhone}
                   placeholder="(555) 123-4567"
                   type="tel"
-                  maxLength={14} // Allow for formatting chars
+                  maxLength={14}
                   inputMode="numeric"
                 />
               )}
@@ -922,11 +1203,18 @@ function OnboardingChatInner() {
               )}
 
               {step === "trade" && !isTyping && !showCustomTrade && (
-                <ChatButtons
-                  options={TRADE_OPTIONS}
-                  onSelect={handleTrade}
-                  layout="grid"
-                />
+                <div className="space-y-3">
+                  <ChatButtons
+                    options={TRADE_OPTIONS}
+                    onSelect={handleTrade}
+                    layout="grid"
+                  />
+                  {stepHistory.length > 0 && (
+                    <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                      <ArrowLeft className="h-3 w-3" /> Back
+                    </button>
+                  )}
+                </div>
               )}
 
               {step === "trade" && showCustomTrade && (
@@ -937,6 +1225,12 @@ function OnboardingChatInner() {
                 />
               )}
 
+              {/* Combined website + hours step (new default) */}
+              {step === "website_hours" && !isTyping && (
+                <WebsiteHoursInput onSubmit={handleWebsiteHours} onBack={goBack} />
+              )}
+
+              {/* Legacy individual steps (fallback) */}
               {step === "website" && !isTyping && (
                 <div className="space-y-3">
                   <ChatInput
@@ -974,21 +1268,34 @@ function OnboardingChatInner() {
               )}
 
               {step === "goal" && !isTyping && (
-                <ChatButtons
-                  options={GOAL_OPTIONS}
-                  onSelect={handleGoal}
-                  layout="vertical"
-                />
+                <div className="space-y-3">
+                  <ChatButtons
+                    options={GOAL_OPTIONS}
+                    onSelect={handleGoal}
+                    layout="vertical"
+                  />
+                  {stepHistory.length > 0 && (
+                    <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                      <ArrowLeft className="h-3 w-3" /> Back
+                    </button>
+                  )}
+                </div>
               )}
+
+              {/* Plan step removed — defaulting to starter for conversion optimization */}
 
               {step === "payment" && !isTyping && (
                 <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  {/* Trial Messaging - Prominent */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
-                    <p className="text-sm font-semibold text-blue-900">Start your 3-day trial</p>
-                    <p className="text-xs text-blue-700">
-                      Credit card required. You won't be charged until your trial ends or your usage limit is reached. Cancel anytime before trial ends to avoid charges.
+                  {/* Trial Messaging — Emphasize free, no-risk */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1.5">
+                    <p className="text-sm font-semibold text-green-900 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4" /> 3-Day Free Trial — No Charge Today
                     </p>
+                    <ul className="text-xs text-green-800 space-y-0.5 pl-5 list-disc">
+                      <li>Try your AI receptionist with 15 real calls</li>
+                      <li>Cancel anytime before trial ends — $0 charged</li>
+                      <li>No commitment, no contracts</li>
+                    </ul>
                   </div>
 
                   <div className="space-y-3">
@@ -1044,7 +1351,7 @@ function OnboardingChatInner() {
 
                   <div className="py-4 text-center">
                     <p className="text-xs text-muted-foreground">
-                      By clicking "Start Your Free Trial Now", you agree to our{" "}
+                      By clicking below, you agree to our{" "}
                       <a href="/terms" target="_blank" className="text-primary hover:underline">
                         Terms of Service
                       </a>{" "}
@@ -1064,16 +1371,25 @@ function OnboardingChatInner() {
                     {isProcessing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Validating your card to start your free trial...
+                        Starting your free trial...
                       </>
                     ) : (
                       <>
-                        Start 3-Day Free Trial
+                        Start My Free Trial — $0 Today
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
                   </Button>
 
+                  {stepHistory.length > 0 && !isProcessing && (
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-1"
+                    >
+                      <ArrowLeft className="inline h-3 w-3 mr-1" />Go back
+                    </button>
+                  )}
                 </div>
               )}
 
