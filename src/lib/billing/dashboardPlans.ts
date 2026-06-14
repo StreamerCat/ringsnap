@@ -264,12 +264,20 @@ export function isProvisioningInProgress(
     account: { provisioning_status?: string | null }
 ): boolean {
     const status = account.provisioning_status;
-    return status === "pending" || status === "processing";
+    return status === "pending" || status === "processing" || status === "failed_retryable";
 }
 
-/** Check if provisioning failed */
+/** Check if provisioning failed permanently */
 export function isProvisioningFailed(
     account: { provisioning_status?: string | null }
 ): boolean {
-    return account.provisioning_status === "failed";
+    const status = account.provisioning_status;
+    return status === "failed" || status === "failed_manual_action_required";
+}
+
+/** Check if provisioning is partially complete (assistant ready, phone pending) */
+export function isPartiallyProvisioned(
+    account: { provisioning_status?: string | null }
+): boolean {
+    return account.provisioning_status === "partially_provisioned";
 }

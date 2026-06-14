@@ -896,7 +896,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
       fallback_phone: profileData?.phone || "",
     };
 
-    // Check if assistant already exists (idempotency)
+    // ── Step A: Vapi Assistant (idempotent) ──────────────────────
     let vapiAssistantId: string;
     let vapiAssistantDbId: string;
 
@@ -909,18 +909,36 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiAssistantId = existingAssistant.vapi_assistant_id;
       vapiAssistantDbId = existingAssistant.id;
     } else {
-      const assistantResult = await createVapiAssistant(
-        supabase, // Pass supabase client
-        job.account_id,
-        metadata,
-        correlationId,
-        testConfig
-      );
-      vapiAssistantId = assistantResult.vapiAssistantId;
-      vapiAssistantDbId = assistantResult.vapiAssistantDbId;
+      try {
+        const assistantResult = await createVapiAssistant(
+          supabase,
+          job.account_id,
+          metadata,
+          correlationId,
+          testConfig
+        );
+        vapiAssistantId = assistantResult.vapiAssistantId;
+        vapiAssistantDbId = assistantResult.vapiAssistantDbId;
+      } catch (assistantErr: any) {
+        // Assistant creation failed — store structured error and re-throw
+        await supabase.from("provisioning_jobs").update({
+          provisioning_step: "assistant_creation",
+          error_code: "VAPI_ASSISTANT_FAILED",
+          error_details: {
+            message: assistantErr.message?.substring(0, 500),
+            timestamp: new Date().toISOString(),
+          },
+        }).eq("id", job.id);
+        throw assistantErr;
+      }
     }
 
-    // Check if phone already exists (idempotency)
+    // Save assistant ID to account immediately (partial progress)
+    await supabase.from("accounts").update({
+      vapi_assistant_id: vapiAssistantId,
+    }).eq("id", job.account_id);
+
+    // ── Step B: Phone Provisioning (idempotent, may fail independently) ──
     let phoneE164: string;
     let vapiPhoneId: string;
     let phoneDbId: string;
@@ -935,29 +953,98 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiPhoneId = existingPhone.vapi_phone_id;
       phoneDbId = existingPhone.id;
     } else {
-      const phoneResult = await provisionVapiPhone(
-        supabase, // Pass supabase client
-        job.account_id,
-        vapiAssistantId,
-        metadata,
-        correlationId,
-        testConfig
-      );
-      phoneE164 = phoneResult.phoneE164;
-      vapiPhoneId = phoneResult.vapiPhoneId;
-      phoneDbId = phoneResult.phoneDbId;
+      try {
+        const phoneResult = await provisionVapiPhone(
+          supabase,
+          job.account_id,
+          vapiAssistantId,
+          metadata,
+          correlationId,
+          testConfig
+        );
+        phoneE164 = phoneResult.phoneE164;
+        vapiPhoneId = phoneResult.vapiPhoneId;
+        phoneDbId = phoneResult.phoneDbId;
+      } catch (phoneErr: any) {
+        // Phone provisioning failed but assistant succeeded → partially_provisioned
+        const newAttempts = (job.attempts || 0) + 1;
+        const shouldRetry = newAttempts < MAX_RETRY_ATTEMPTS;
+
+        const errorCode = phoneErr.message?.includes("Twilio")
+          ? "TWILIO_PROVISIONING_FAILED"
+          : "VAPI_PHONE_FAILED";
+
+        const accountStatus = shouldRetry
+          ? "partially_provisioned"
+          : "failed_manual_action_required";
+
+        logWarn("Phone provisioning failed, assistant succeeded — partial provisioning", {
+          ...baseLogOptions,
+          context: {
+            vapiAssistantId,
+            errorCode,
+            accountStatus,
+            attempts: newAttempts,
+            willRetry: shouldRetry,
+          },
+        });
+
+        // Update job with structured error
+        await supabase.from("provisioning_jobs").update({
+          status: shouldRetry ? "failed" : "failed_permanent",
+          attempts: newAttempts,
+          error: phoneErr.message?.substring(0, 500) || "Phone provisioning failed",
+          error_code: errorCode,
+          error_details: {
+            message: phoneErr.message?.substring(0, 500),
+            step: "phone_provisioning",
+            assistant_succeeded: true,
+            vapi_assistant_id: vapiAssistantId,
+            timestamp: new Date().toISOString(),
+          },
+          provisioning_step: "phone_provisioning",
+          updated_at: new Date().toISOString(),
+        }).eq("id", job.id);
+
+        // Update account to partially_provisioned
+        await supabase.rpc("update_provisioning_lifecycle", {
+          p_account_id: job.account_id,
+          p_status: accountStatus,
+          p_error: `Phone provisioning failed (attempt ${newAttempts}/${MAX_RETRY_ATTEMPTS}): ${phoneErr.message?.substring(0, 200)}`,
+        });
+
+        // Track partial provisioning
+        trackEvent(supabase, job.account_id, job.user_id, "provisioning_partial", {
+          job_id: job.id,
+          error: phoneErr.message,
+          error_code: errorCode,
+          assistant_created: true,
+          attempt: newAttempts,
+        });
+        capturePostHog("provisioning_partial", job.user_id || job.account_id, {
+          account_id: job.account_id,
+          job_id: job.id,
+          error_code: errorCode,
+          attempt: newAttempts,
+          assistant_succeeded: true,
+        });
+
+        // Send admin notification for provisioning failure
+        await sendProvisioningFailureAdmin(supabase, job, phoneErr, errorCode, newAttempts, baseLogOptions);
+
+        return; // Exit — don't continue to the "fully completed" path
+      }
     }
 
-    // Update account with provisioning results
+    // ── Both steps succeeded: full provisioning complete ──────────
     const { error: accountUpdateError } = await supabase.from("accounts").update({
       vapi_assistant_id: vapiAssistantId,
       vapi_phone_number: phoneE164,
       phone_number_e164: phoneE164,
-      vapi_phone_number_id: phoneDbId, // Correct: Use internal UUID for the foreign key
+      vapi_phone_number_id: phoneDbId,
       phone_number_status: "active",
-      provisioning_status: "completed", // Set directly to avoid silent RPC failures
+      provisioning_status: "completed",
       phone_provisioned_at: new Date().toISOString(),
-      // notification_sms_phone: metadata.fallback_phone || null, 
     }).eq("id", job.account_id);
 
     if (accountUpdateError) {
@@ -968,7 +1055,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       throw new Error(`Failed to update account: ${accountUpdateError.message}`);
     }
 
-    // Update provisioning lifecycle to completed
     const { error: lifecycleError } = await supabase.rpc("update_provisioning_lifecycle", {
       p_account_id: job.account_id,
       p_status: "completed",
@@ -981,7 +1067,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       });
     }
 
-    // Update user's onboarding status to active (hybrid onboarding flow)
     if (job.user_id) {
       await supabase.from("profiles").update({
         onboarding_status: "active",
@@ -993,7 +1078,6 @@ async function processJob(job: any, supabase: any): Promise<void> {
       });
     }
 
-    // Mark job as completed
     await supabase.from("provisioning_jobs").update({
       status: "completed",
       vapi_assistant_id: vapiAssistantId,
@@ -1001,6 +1085,9 @@ async function processJob(job: any, supabase: any): Promise<void> {
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       error: null,
+      error_code: null,
+      error_details: {},
+      provisioning_step: null,
     }).eq("id", job.id);
 
     logInfo("Provisioning job completed successfully", {
@@ -1076,6 +1163,9 @@ async function processJob(job: any, supabase: any): Promise<void> {
     const newAttempts = (job.attempts || 0) + 1;
     const shouldRetry = newAttempts < MAX_RETRY_ATTEMPTS;
 
+    // Derive error code from error message
+    const errorCode = deriveErrorCode(error);
+
     logError("Provisioning job failed", {
       ...baseLogOptions,
       error,
@@ -1083,30 +1173,35 @@ async function processJob(job: any, supabase: any): Promise<void> {
         jobId: job.id,
         attempts: newAttempts,
         willRetry: shouldRetry,
+        errorCode,
       },
     });
 
     if (shouldRetry) {
-      // Calculate retry delay with exponential backoff
       const retryAfter = calculateRetryDelay(newAttempts);
 
       await supabase.from("provisioning_jobs").update({
         status: "failed",
         attempts: newAttempts,
         error: error.message?.substring(0, 500) || "Unknown error",
+        error_code: errorCode,
+        error_details: {
+          message: error.message?.substring(0, 500),
+          timestamp: new Date().toISOString(),
+        },
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
 
-      // Update account status
       await supabase.rpc("update_provisioning_lifecycle", {
         p_account_id: job.account_id,
-        p_status: "failed",
+        p_status: "failed_retryable",
         p_error: `Provisioning failed (attempt ${newAttempts}/${MAX_RETRY_ATTEMPTS}): ${error.message}`,
       });
 
       trackEvent(supabase, job.account_id, job.user_id, "provisioning_failed", {
         job_id: job.id,
         error: error.message,
+        error_code: errorCode,
         attempt: newAttempts,
         is_permanent: false
       });
@@ -1116,19 +1211,25 @@ async function processJob(job: any, supabase: any): Promise<void> {
         status: "failed_permanent",
         attempts: newAttempts,
         error: error.message?.substring(0, 500) || "Unknown error",
+        error_code: errorCode,
+        error_details: {
+          message: error.message?.substring(0, 500),
+          timestamp: new Date().toISOString(),
+          permanent: true,
+        },
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
 
-      // Update account status
       await supabase.rpc("update_provisioning_lifecycle", {
         p_account_id: job.account_id,
-        p_status: "failed",
+        p_status: "failed_manual_action_required",
         p_error: `Provisioning failed permanently after ${MAX_RETRY_ATTEMPTS} attempts: ${error.message}`,
       });
 
       trackEvent(supabase, job.account_id, job.user_id, "provisioning_failed", {
         job_id: job.id,
         error: error.message,
+        error_code: errorCode,
         attempt: newAttempts,
         is_permanent: true
       });
@@ -1136,23 +1237,160 @@ async function processJob(job: any, supabase: any): Promise<void> {
         account_id: job.account_id,
         job_id: job.id,
         error: error.message,
+        error_code: errorCode,
         attempt: newAttempts,
         is_permanent: true,
       });
 
-      // Update user's onboarding status to provision_failed (hybrid onboarding flow)
       if (job.user_id) {
         await supabase.from("profiles").update({
           onboarding_status: "provision_failed",
         }).eq("id", job.user_id);
       }
 
+      // Send admin notification for permanent failure
+      await sendProvisioningFailureAdmin(supabase, job, error, errorCode, newAttempts, baseLogOptions);
+
       logError("Provisioning job failed permanently", {
         ...baseLogOptions,
         error,
-        context: { jobId: job.id, maxAttempts: MAX_RETRY_ATTEMPTS },
+        context: { jobId: job.id, maxAttempts: MAX_RETRY_ATTEMPTS, errorCode },
       });
     }
+  }
+}
+
+/**
+ * Derive a machine-readable error code from an error message
+ */
+function deriveErrorCode(error: any): string {
+  const msg = (error?.message || "").toLowerCase();
+  if (msg.includes("twilio") && msg.includes("suspended")) return "TWILIO_SUSPENDED";
+  if (msg.includes("twilio")) return "TWILIO_PROVISIONING_FAILED";
+  if (msg.includes("vapi") && msg.includes("assistant")) return "VAPI_ASSISTANT_FAILED";
+  if (msg.includes("vapi") && msg.includes("phone")) return "VAPI_PHONE_FAILED";
+  if (msg.includes("vapi") && msg.includes("import")) return "VAPI_IMPORT_FAILED";
+  if (msg.includes("area code")) return "AREA_CODE_UNAVAILABLE";
+  if (msg.includes("account not found")) return "ACCOUNT_NOT_FOUND";
+  if (msg.includes("credentials")) return "MISSING_CREDENTIALS";
+  return "UNKNOWN_ERROR";
+}
+
+/**
+ * Send admin notification when provisioning fails permanently or needs manual action
+ */
+async function sendProvisioningFailureAdmin(
+  supabase: any,
+  job: any,
+  error: any,
+  errorCode: string,
+  attempts: number,
+  baseLogOptions: any
+): Promise<void> {
+  try {
+    // 1. Create admin alert in DB
+    await supabase.from("call_pattern_alerts").insert({
+      account_id: job.account_id,
+      alert_type: "provisioning_failure",
+      alert_details: {
+        function_name: FUNCTION_NAME,
+        job_id: job.id,
+        error_code: errorCode,
+        error_message: error?.message?.substring(0, 500),
+        attempts,
+        user_id: job.user_id,
+        timestamp: new Date().toISOString(),
+        action_required: "Manual rerun via admin panel or rerun-provisioning endpoint",
+      },
+      resolved: false,
+    });
+
+    // 2. Send Slack notification
+    const slackUrl = Deno.env.get("SLACK_SIGNUP_WEBHOOK_URL");
+    if (slackUrl) {
+      // Fetch account details for notification
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("company_name, trade")
+        .eq("id", job.account_id)
+        .maybeSingle();
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email, name")
+        .eq("id", job.user_id)
+        .maybeSingle();
+
+      await fetch(slackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blocks: [
+            {
+              type: "header",
+              text: {
+                type: "plain_text",
+                text: "Provisioning Failed — Action Required",
+                emoji: true,
+              },
+            },
+            {
+              type: "section",
+              fields: [
+                { type: "mrkdwn", text: `*Company:*\n${account?.company_name || "Unknown"}` },
+                { type: "mrkdwn", text: `*Contact:*\n${profile?.name || "Unknown"} (${profile?.email || "N/A"})` },
+              ],
+            },
+            {
+              type: "section",
+              fields: [
+                { type: "mrkdwn", text: `*Error:*\n\`${errorCode}\`` },
+                { type: "mrkdwn", text: `*Attempts:*\n${attempts}/${MAX_RETRY_ATTEMPTS}` },
+              ],
+            },
+            {
+              type: "context",
+              elements: [
+                { type: "mrkdwn", text: `Account: \`${job.account_id}\` | Job: \`${job.id}\`` },
+              ],
+            },
+          ],
+        }),
+      });
+    }
+
+    // 3. Send admin email notification
+    const adminEmail = Deno.env.get("ADMIN_NOTIFICATION_EMAIL");
+    const resendKey = Deno.env.get("RESEND_PROD_KEY");
+    if (adminEmail && resendKey) {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "RingSnap Alerts <alerts@getringsnap.com>",
+          to: adminEmail,
+          subject: `Provisioning Failed: ${errorCode} — Action Required`,
+          html: `
+            <h2>Provisioning Failure</h2>
+            <p><strong>Account ID:</strong> ${job.account_id}</p>
+            <p><strong>Error Code:</strong> ${errorCode}</p>
+            <p><strong>Attempts:</strong> ${attempts}/${MAX_RETRY_ATTEMPTS}</p>
+            <p><strong>Error:</strong> ${error?.message?.substring(0, 300) || "Unknown"}</p>
+            <p>Use the admin panel or call rerun-provisioning to retry.</p>
+          `,
+        }),
+      });
+    }
+
+    logInfo("Admin provisioning failure notification sent", baseLogOptions);
+  } catch (notifyErr: any) {
+    logWarn("Failed to send admin provisioning failure notification (non-critical)", {
+      ...baseLogOptions,
+      error: notifyErr,
+    });
   }
 }
 
