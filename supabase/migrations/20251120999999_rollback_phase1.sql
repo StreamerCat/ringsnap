@@ -122,7 +122,8 @@ ALTER TABLE public.profiles DROP COLUMN IF EXISTS signup_channel;
 -- STEP 7: Drop new tables (WARNING: Data loss)
 -- ==============================================================================
 
-DROP TABLE IF EXISTS public.provisioning_state_transitions CASCADE;
+-- Keep provisioning_state_transitions — later migrations (20260311) add RLS policies to it.
+-- DROP TABLE IF EXISTS public.provisioning_state_transitions CASCADE;
 DROP TABLE IF EXISTS public.orphaned_stripe_resources CASCADE;
 
 -- ==============================================================================

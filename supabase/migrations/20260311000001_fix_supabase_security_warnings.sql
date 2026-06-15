@@ -416,23 +416,48 @@ GRANT SELECT ON public.phone_number_identity TO authenticated, service_role;
 -- Using ALTER FUNCTION to safely set search_path without recreating function bodies.
 -- =============================================================================
 
--- Functions with known signatures (from migration files):
-
-ALTER FUNCTION public.profiles_set_updated_at()
-  SET search_path = 'public';
-
-ALTER FUNCTION public.create_profile_if_missing_on_auth_user_insert()
-  SET search_path = 'public';
-
-ALTER FUNCTION public.is_within_service_hours(UUID, TIMESTAMPTZ)
-  SET search_path = 'public';
-
--- create_account_transaction: find the function dynamically since its signature
--- may vary (signup_channel_type was rolled back and replaced with TEXT in some envs)
+-- Dynamically ALTER all public functions that exist to set search_path.
+-- Some functions may not exist in fresh CI builds (dropped by rollback migrations
+-- or never created by any migration), so we use dynamic SQL to skip missing ones.
 DO $$
 DECLARE
+  v_func TEXT;
+  v_funcs TEXT[] := ARRAY[
+    'profiles_set_updated_at()',
+    'create_profile_if_missing_on_auth_user_insert()',
+    'is_within_service_hours(UUID, TIMESTAMPTZ)',
+    'get_pool_stats()',
+    'get_recent_calls(UUID, INTEGER)',
+    'sync_phone_legacy_status()',
+    'allocate_phone_number_from_pool(UUID, INTERVAL)',
+    'record_stripe_event(TEXT, TEXT, JSONB, TEXT, TEXT)',
+    'get_calls_today(UUID)',
+    'mark_stripe_event_processed(TEXT, UUID, TEXT)',
+    'create_auth_user_internal(TEXT, TEXT, JSONB)',
+    'refresh_user_jwt(UUID)',
+    'cleanup_expired_auth_tokens()',
+    'cleanup_old_rate_limits()',
+    'log_auth_event(UUID, UUID, TEXT, JSONB, INET, TEXT, BOOLEAN)',
+    'check_rate_limit(TEXT, TEXT, INTEGER, INTEGER)',
+    'get_user_primary_role(UUID)',
+    'get_user_account_id(UUID)',
+    'custom_access_token_hook(JSONB)',
+    'has_role(UUID, TEXT)',
+    'has_any_role(UUID, TEXT[])',
+    'has_account_access(UUID, UUID)'
+  ];
   r RECORD;
 BEGIN
+  FOREACH v_func IN ARRAY v_funcs LOOP
+    BEGIN
+      EXECUTE format('ALTER FUNCTION public.%s SET search_path = ''public''', v_func);
+      RAISE NOTICE 'Fixed search_path for public.%', v_func;
+    EXCEPTION WHEN undefined_function THEN
+      RAISE NOTICE 'Skipping missing function: public.%', v_func;
+    END;
+  END LOOP;
+
+  -- create_account_transaction: signature may vary (signup_channel_type was rolled back)
   FOR r IN
     SELECT oid::regprocedure::text AS sig
     FROM pg_proc
@@ -442,71 +467,8 @@ BEGIN
     EXECUTE format('ALTER FUNCTION %s SET search_path = ''public''', r.sig);
     RAISE NOTICE 'Fixed search_path for %', r.sig;
   END LOOP;
-END $$;
 
-ALTER FUNCTION public.get_pool_stats()
-  SET search_path = 'public';
-
-ALTER FUNCTION public.get_recent_calls(UUID, INTEGER)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.sync_phone_legacy_status()
-  SET search_path = 'public';
-
-ALTER FUNCTION public.allocate_phone_number_from_pool(UUID, INTERVAL)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.record_stripe_event(TEXT, TEXT, JSONB, TEXT, TEXT)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.get_calls_today(UUID)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.mark_stripe_event_processed(TEXT, UUID, TEXT)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.create_auth_user_internal(TEXT, TEXT, JSONB)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.refresh_user_jwt(UUID)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.cleanup_expired_auth_tokens()
-  SET search_path = 'public';
-
-ALTER FUNCTION public.cleanup_old_rate_limits()
-  SET search_path = 'public';
-
-ALTER FUNCTION public.log_auth_event(UUID, UUID, TEXT, JSONB, INET, TEXT, BOOLEAN)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.check_rate_limit(TEXT, TEXT, INTEGER, INTEGER)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.get_user_primary_role(UUID)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.get_user_account_id(UUID)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.custom_access_token_hook(JSONB)
-  SET search_path = 'public';
-
--- has_role has two overloads: (UUID, TEXT) from jwt_claims_and_rbac and (UUID, app_role) from earlier
-ALTER FUNCTION public.has_role(UUID, TEXT)
-  SET search_path = 'public';
-
-ALTER FUNCTION public.has_any_role(UUID, TEXT[])
-  SET search_path = 'public';
-
-ALTER FUNCTION public.has_account_access(UUID, UUID)
-  SET search_path = 'public';
-
--- For create_account_minimal: dynamically find and fix any matching signature
-DO $$
-DECLARE
-  r RECORD;
-BEGIN
+  -- create_account_minimal: signature may vary
   FOR r IN
     SELECT oid::regprocedure::text AS sig
     FROM pg_proc
