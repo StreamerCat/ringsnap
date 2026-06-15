@@ -22,10 +22,11 @@ BEGIN
     SET vapi_id = vapi_phone_id
     WHERE vapi_id IS NULL AND vapi_phone_id IS NOT NULL;
 
-    -- Drop the duplicate column
-    ALTER TABLE public.phone_numbers DROP COLUMN IF EXISTS vapi_phone_id;
+    -- Keep vapi_phone_id column — later migrations (20251222, 20251226,
+    -- 20251230) use it as the canonical Vapi phone identifier.
+    -- Data is synced to vapi_id above for backward compatibility.
 
-    RAISE NOTICE 'Consolidated vapi_phone_id into vapi_id';
+    RAISE NOTICE 'Synced vapi_phone_id data into vapi_id (keeping both columns)';
   ELSE
     RAISE NOTICE 'vapi_phone_id column does not exist, skipping';
   END IF;
