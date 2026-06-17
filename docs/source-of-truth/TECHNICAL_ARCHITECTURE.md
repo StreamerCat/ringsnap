@@ -273,6 +273,8 @@ Phone OTP (PARTIAL):
 4. Prompt includes state-specific recording disclosure if `call_recording_enabled = true`
 5. `sync-assistant-config` edge function can re-sync prompt to Vapi when settings change
 
+**Graceful number backfill (✅ CONFIRMED — `provision-vapi/index.ts`):** the Vapi assistant is created first and persisted to `accounts.vapi_assistant_id` *before* the Twilio number step. The phone step runs in its own try/catch: if it fails (Twilio outage, empty pool, transient error) the account is **not** marked `failed`. Instead `phone_number_status='pending'`, `provisioning_status` stays `provisioning`, and the job moves to a non-terminal `awaiting_number` status. The every-minute cron poller re-attempts `awaiting_number` jobs on a fixed cadence (~2 min, **no permanent give-up**); `processJob` is idempotent so only the number step re-runs. Once a number binds, the account completes normally and `notify_number_ready` fires. The UI (`OnboardingRecoveryPanel`, `ProvisioningStatus`) shows a friendly "assistant ready — securing your number" state; red "failed" is reserved for true permanent failures (assistant/account errors → `failed` → `failed_permanent` after 5 attempts).
+
 ### Call Authorization (✅ CONFIRMED — `authorize-call/index.ts`)
 Called by Vapi BEFORE answering each call:
 - Checks account status (active/suspended/cancelled/trial)

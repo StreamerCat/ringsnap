@@ -67,6 +67,12 @@ const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
 const VAPI_BASE_URL = "https://api.vapi.ai";
 const MAX_RETRY_ATTEMPTS = 5;
 const JOBS_PER_BATCH = 10;
+// Cadence for re-attempting phone-number backfill on jobs in the non-terminal
+// `awaiting_number` state (assistant ready, number not yet available). Unlike the
+// `failed` retry path, this has NO permanent give-up: it keeps trying on a fixed
+// cadence until a pool/Twilio number becomes available.
+const AWAITING_NUMBER_STATUS = "awaiting_number";
+const AWAITING_NUMBER_RETRY_MS = 2 * 60 * 1000;
 const TRIAL_DAYS = parseInt(Deno.env.get("TRIAL_DAYS") || "3", 10);
 const TRIAL_PHONE_RETENTION_DAYS = parseInt(Deno.env.get("TRIAL_PHONE_RETENTION_DAYS") || "10", 10);
 
@@ -728,6 +734,61 @@ async function provisionVapiPhone(
 }
 
 /**
+ * Partial-success handler: the Vapi assistant is ready but a phone number could not
+ * be secured (Twilio outage, empty pool, transient API error, missing creds, etc.).
+ *
+ * Instead of failing the whole account, we keep it usable and mark the job as
+ * `awaiting_number` — a non-terminal state the cron poller keeps retrying (number
+ * backfill) until a number becomes available. The account is left in a friendly
+ * "provisioning / number pending" state (NOT `failed`), so the UI shows progress
+ * rather than an error.
+ */
+async function handlePhoneBackfillPending(
+  supabase: any,
+  job: any,
+  vapiAssistantId: string,
+  phoneError: any,
+  baseLogOptions: any,
+): Promise<void> {
+  const errorMessage = (phoneError?.message || String(phoneError) || "Unknown telephony error").substring(0, 500);
+
+  logWarn("Phone provisioning deferred — assistant ready, number pending backfill", {
+    ...baseLogOptions,
+    context: { jobId: job.id, error: errorMessage },
+  });
+
+  // Keep the account usable: assistant linked, number marked pending. Set the
+  // provisioning_status directly (avoids silent RPC enum failures) to a non-failed
+  // value so get_onboarding_state reports a "provisioning" (not failed) state.
+  const { error: accountUpdateError } = await supabase.from("accounts").update({
+    vapi_assistant_id: vapiAssistantId,
+    phone_number_status: "pending",
+    provisioning_status: "provisioning",
+  }).eq("id", job.account_id);
+
+  if (accountUpdateError) {
+    logError("Failed to set account to number-pending state", {
+      ...baseLogOptions,
+      error: accountUpdateError,
+    });
+  }
+
+  // Mark the job awaiting_number (non-terminal). Do NOT increment attempts toward the
+  // permanent-failure cap — number backfill is not a provisioning failure.
+  await supabase.from("provisioning_jobs").update({
+    status: AWAITING_NUMBER_STATUS,
+    vapi_assistant_id: vapiAssistantId,
+    error: `Awaiting phone number: ${errorMessage}`,
+    updated_at: new Date().toISOString(),
+  }).eq("id", job.id);
+
+  trackEvent(supabase, job.account_id, job.user_id, "provisioning_number_pending", {
+    job_id: job.id,
+    error: errorMessage,
+  });
+}
+
+/**
  * Process a single provisioning job
  */
 async function processJob(job: any, supabase: any): Promise<void> {
@@ -920,6 +981,22 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiAssistantDbId = assistantResult.vapiAssistantDbId;
     }
 
+    // Persist the assistant linkage on the account as soon as it exists, independent
+    // of the phone step. This guarantees a number-provisioning failure never loses the
+    // assistant and the account can be completed later via number backfill.
+    {
+      const { error: assistantPersistError } = await supabase
+        .from("accounts")
+        .update({ vapi_assistant_id: vapiAssistantId })
+        .eq("id", job.account_id);
+      if (assistantPersistError) {
+        logWarn("Failed to persist assistant id on account (non-critical)", {
+          ...baseLogOptions,
+          error: assistantPersistError,
+        });
+      }
+    }
+
     // Check if phone already exists (idempotency)
     let phoneE164: string;
     let vapiPhoneId: string;
@@ -935,17 +1012,24 @@ async function processJob(job: any, supabase: any): Promise<void> {
       vapiPhoneId = existingPhone.vapi_phone_id;
       phoneDbId = existingPhone.id;
     } else {
-      const phoneResult = await provisionVapiPhone(
-        supabase, // Pass supabase client
-        job.account_id,
-        vapiAssistantId,
-        metadata,
-        correlationId,
-        testConfig
-      );
-      phoneE164 = phoneResult.phoneE164;
-      vapiPhoneId = phoneResult.vapiPhoneId;
-      phoneDbId = phoneResult.phoneDbId;
+      try {
+        const phoneResult = await provisionVapiPhone(
+          supabase, // Pass supabase client
+          job.account_id,
+          vapiAssistantId,
+          metadata,
+          correlationId,
+          testConfig
+        );
+        phoneE164 = phoneResult.phoneE164;
+        vapiPhoneId = phoneResult.vapiPhoneId;
+        phoneDbId = phoneResult.phoneDbId;
+      } catch (phoneError: any) {
+        // Assistant is ready but we couldn't secure a number. Defer to backfill
+        // (non-terminal awaiting_number state) instead of failing the account.
+        await handlePhoneBackfillPending(supabase, job, vapiAssistantId, phoneError, baseLogOptions);
+        return;
+      }
     }
 
     // Update account with provisioning results
@@ -1268,6 +1352,28 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // A manual trigger is an explicit user-initiated retry. Reset the retry state
+      // server-side (service_role bypasses RLS — the browser client cannot do this)
+      // so a fresh attempt runs even if the job previously hit failed/failed_permanent
+      // or is awaiting_number. This replaces the dead, RLS-blocked frontend UPDATE.
+      {
+        const { error: resetError } = await supabase.from("provisioning_jobs").update({
+          attempts: 0,
+          error: null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", job.id);
+        if (resetError) {
+          logWarn("Failed to reset job retry state on manual trigger (non-critical)", {
+            ...baseLogOptions,
+            error: resetError,
+            context: { jobId: job.id },
+          });
+        } else {
+          job.attempts = 0;
+          job.error = null;
+        }
+      }
+
       // Process immediately
       try {
         await processJob(job, supabase);
@@ -1333,6 +1439,36 @@ Deno.serve(async (req: Request) => {
 
         // Add ready retries to batch until full
         jobsToProcess = [...jobsToProcess, ...readyRetries.slice(0, remainingSlots)];
+      }
+    }
+
+    // Step 2c: Backfill numbers for AWAITING_NUMBER jobs (assistant ready, number
+    // pending). This path has NO permanent give-up — it keeps re-attempting the phone
+    // step on a fixed cadence until a pool/Twilio number is available. processJob is
+    // idempotent: the existing assistant is skipped and only the number step re-runs.
+    if (jobsToProcess.length < JOBS_PER_BATCH) {
+      const remainingSlots = JOBS_PER_BATCH - jobsToProcess.length;
+
+      const { data: awaitingJobs, error: awaitingError } = await supabase
+        .from("provisioning_jobs")
+        .select("*")
+        .eq("status", AWAITING_NUMBER_STATUS)
+        .order("updated_at", { ascending: true }) // Oldest waiters first
+        .limit(remainingSlots * 2);
+
+      if (!awaitingError && awaitingJobs) {
+        const now = Date.now();
+        const readyBackfills = awaitingJobs.filter((job: any) => {
+          if (!job.updated_at) return true;
+          const lastUpdate = new Date(job.updated_at).getTime();
+          return (now - lastUpdate) > AWAITING_NUMBER_RETRY_MS;
+        });
+        jobsToProcess = [...jobsToProcess, ...readyBackfills.slice(0, remainingSlots)];
+      } else if (awaitingError) {
+        logWarn("Failed to fetch awaiting_number jobs (non-critical)", {
+          ...baseLogOptions,
+          error: awaitingError,
+        });
       }
     }
 
