@@ -18,6 +18,40 @@ Deno.serve(async (req) => {
       }
     );
 
+    // ── Auth gate (platform_owner only) ────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: staffRole } = await supabase
+      .from("staff_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "platform_owner")
+      .single();
+
+    if (!staffRole) {
+      return new Response(JSON.stringify({ error: "Forbidden: platform_owner role required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ── End auth gate ──────────────────────────────────────────
+
     const keepUserId = '9bb89fc3-926f-4ce4-9f85-19a6269a0c85';
     const results: any = {
       step1_current_users: null,
@@ -124,7 +158,7 @@ Deno.serve(async (req) => {
     console.error('Error during cleanup:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: errorMessage, stack: error instanceof Error ? error.stack : undefined }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

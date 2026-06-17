@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ROLES = ["platform_owner", "platform_admin"];
 
 serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -14,6 +12,39 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_URL')!,
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         );
+
+        // ── Auth gate ──────────────────────────────────────────────
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser(
+            authHeader.replace("Bearer ", "")
+        );
+        if (userError || !user) {
+            return new Response(JSON.stringify({ error: "Invalid token" }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        const { data: staffRole } = await supabase
+            .from("staff_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .single();
+
+        if (!staffRole || !ALLOWED_ROLES.includes(staffRole.role)) {
+            return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+        // ── End auth gate ──────────────────────────────────────────
 
         // Config: Default to DRY RUN for safety
         const { dryRun = true, allowlist = [] } = await req.json().catch(() => ({}));

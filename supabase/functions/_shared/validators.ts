@@ -137,9 +137,11 @@ export function tryFormatPhoneE164(
  */
 export function generateReferralCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid ambiguous chars (0, O, I, 1)
+  const randomBytes = new Uint8Array(8);
+  crypto.getRandomValues(randomBytes);
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(randomBytes[i] % chars.length);
   }
   return code;
 }
@@ -148,7 +150,9 @@ export function generateReferralCode(): string {
  * Generate 6-digit verification code
  */
 export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const randomBytes = new Uint32Array(1);
+  crypto.getRandomValues(randomBytes);
+  return (100000 + (randomBytes[0] % 900000)).toString();
 }
 
 /**

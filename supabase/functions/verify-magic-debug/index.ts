@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
 
+const ALLOWED_ROLES = ["platform_owner", "platform_admin"];
+
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -12,6 +14,36 @@ serve(async (req) => {
   }
 
   const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+  // ── Auth gate ──────────────────────────────────────────────
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+      status: 401, headers: jsonHeaders,
+    });
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser(
+    authHeader.replace("Bearer ", "")
+  );
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401, headers: jsonHeaders,
+    });
+  }
+
+  const { data: staffRole } = await supabase
+    .from("staff_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!staffRole || !ALLOWED_ROLES.includes(staffRole.role)) {
+    return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+      status: 403, headers: jsonHeaders,
+    });
+  }
+  // ── End auth gate ──────────────────────────────────────────
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -120,7 +152,6 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: err?.message || "Unexpected error",
-        debug: { stack: err?.stack }
       }),
       { status: 500, headers: jsonHeaders }
     );

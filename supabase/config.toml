@@ -4,7 +4,7 @@ project_id = "rmyvvbqnccpfeyowidrq"
 # Old Lovable.ai project: lytnlrkdccqmxgdmdxef
 
 [functions.test-vapi-integration]
-verify_jwt = false
+verify_jwt = true
 
 [functions.free-trial-signup]
 verify_jwt = false
@@ -73,7 +73,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.verify-magic-debug]
-verify_jwt = false
+verify_jwt = true
 
 [functions.accept-staff-invite]
 verify_jwt = false
@@ -97,7 +97,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.debug-db]
-verify_jwt = false
+verify_jwt = true
 
 [functions.vapi-tools-appointments]
 verify_jwt = false
@@ -116,3 +116,12 @@ verify_jwt = false
 
 [functions.jobber-oauth-callback]
 verify_jwt = false
+
+[functions.sentry-debug]
+verify_jwt = true
+
+[functions.sentry-test]
+verify_jwt = true
+
+[functions.seed-pool]
+verify_jwt = true

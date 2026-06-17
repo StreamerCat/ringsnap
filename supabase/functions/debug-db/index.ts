@@ -7,6 +7,8 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ALLOWED_ROLES = ["platform_owner", "platform_admin"];
+
 serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -15,6 +17,39 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         const supabase = createClient(supabaseUrl, supabaseKey);
 
+        // ── Auth gate ──────────────────────────────────────────────
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser(
+            authHeader.replace("Bearer ", "")
+        );
+        if (userError || !user) {
+            return new Response(JSON.stringify({ error: "Invalid token" }), {
+                status: 401,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
+        const { data: staffRole } = await supabase
+            .from("staff_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .single();
+
+        if (!staffRole || !ALLOWED_ROLES.includes(staffRole.role)) {
+            return new Response(JSON.stringify({ error: "Forbidden: admin role required" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+        // ── End auth gate ──────────────────────────────────────────
+
         const url = new URL(req.url);
         let accountId = url.searchParams.get("account_id");
         const email = url.searchParams.get("email");
@@ -22,6 +57,13 @@ serve(async (req) => {
         if (!accountId && email) {
             const { data: profile } = await supabase.from("profiles").select("account_id").eq("email", email).maybeSingle();
             if (profile) accountId = profile.account_id;
+        }
+
+        if (!accountId) {
+            return new Response(JSON.stringify({ error: "account_id or email required" }), {
+                status: 400,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
         }
 
         const action = url.searchParams.get("action");
