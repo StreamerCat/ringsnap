@@ -1,4 +1,4 @@
-import { PostHog } from "npm:posthog-node";
+import { PostHog } from "npm:posthog-node@5";
 
 const posthogApiKey = Deno.env.get("POSTHOG_API_KEY");
 
