@@ -162,6 +162,15 @@ const GOAL_OPTIONS: ChatButtonOption[] = [
   },
 ];
 
+// Step-to-prompt mapping for auto-collapse (prevents stale message on back nav)
+const STEP_PROMPTS: Partial<Record<ChatStep, string>> = {
+  phone_company: "What's your business phone number and company name?",
+  trade: "What type of work do you do?",
+  website_hours: "Almost there! Do you have a website, and when are you open for jobs?",
+  goal: "What's the main job for your receptionist?",
+  payment: "Last step! Add your card to start your free 3-day trial. You won't be charged — cancel anytime before the trial ends.",
+};
+
 // Stripe card element options
 const CARD_ELEMENT_OPTIONS = {
   hidePostalCode: true,
@@ -1244,7 +1253,7 @@ function OnboardingChatInner() {
                 <CompletedStepsSummary data={data} step={step} onEdit={goBack} />
               )}
 
-              {/* During active input steps: show only the last assistant message (single-focus) */}
+              {/* During active input steps: show step-specific prompt (single-focus) */}
               {/* During terminal steps (processing, provisioning, complete): show all messages */}
               {["processing", "provisioning", "complete", "error"].includes(step) ? (
                 messages.map((msg) => (
@@ -1252,6 +1261,19 @@ function OnboardingChatInner() {
                 ))
               ) : (
                 (() => {
+                  // Use step prompt mapping to always show correct prompt (fixes stale msg on back nav)
+                  const promptText = STEP_PROMPTS[step];
+                  if (promptText) {
+                    return (
+                      <ChatMessage
+                        id={`prompt-${step}`}
+                        role="assistant"
+                        content={promptText}
+                        timestamp={new Date()}
+                      />
+                    );
+                  }
+                  // Fallback: show last assistant message for unmapped steps
                   const lastAssistantMsg = [...messages].reverse().find(m => m.role === "assistant");
                   if (lastAssistantMsg) {
                     return <ChatMessage key={lastAssistantMsg.id} {...lastAssistantMsg} />;
