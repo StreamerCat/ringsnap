@@ -5,18 +5,23 @@
  * - For NEW users (with lead_id from Step 1): Collects all info + payment
  * - For EXISTING users (authenticated): Collects assistant config only
  *
- * Consolidated Chat Flow (New Users) — 5 steps:
+ * Consolidated Chat Flow (New Users) — 4 visible steps:
  * 1. Phone + Company name (combined)
  * 2. Trade/service type
  * 3. Website + Business hours (combined)
- * 4. Goal + Plan selection
- * 5. Payment → Provisioning
+ * 4. Goal → Payment (plan defaults to starter)
+ *
+ * UX Design: Auto-collapse
+ * - Previous steps collapse into a compact chip bar ("Your info so far")
+ * - Only the current question + form is visible (single-focus)
+ * - Green dots on chips indicate saved progress
+ * - "Edit previous answers" link always visible for back navigation
  *
  * Features:
  * - Back navigation between steps
  * - Inline validation errors
- * - Plan selection with call-based pricing
- * - Plan summary at payment step
+ * - Plan defaults to starter (highest conversion)
+ * - Clear trial messaging (no charge, cancel anytime)
  * - Graceful error handling with retry
  */
 
@@ -280,7 +285,7 @@ function WebsiteHoursInput({ onSubmit, onBack }: {
 
   const handleSubmit = () => {
     if (!hoursChoice) {
-      toast.error("Please select when your receptionist should answer calls");
+      toast.error("Please select when you're open for jobs");
       return;
     }
     onSubmit(website, hoursChoice);
@@ -304,7 +309,7 @@ function WebsiteHoursInput({ onSubmit, onBack }: {
 
       {/* Hours */}
       <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">When should your receptionist answer?</label>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">When are you open for jobs?</label>
         <div className="grid grid-cols-1 gap-2">
           {[
             { label: "Weekdays 9am–5pm", value: "weekdays_9_5" },
@@ -332,6 +337,70 @@ function WebsiteHoursInput({ onSubmit, onBack }: {
         <Button size="sm" onClick={handleSubmit} disabled={!hoursChoice}>
           Continue <ArrowRight className="ml-1 h-3 w-3" />
         </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Compact summary of completed steps — auto-collapse design */
+function CompletedStepsSummary({ data, step, onEdit }: {
+  data: OnboardingData;
+  step: ChatStep;
+  onEdit: () => void;
+}) {
+  const completedItems: { label: string; value: string }[] = [];
+
+  // Phone + Company
+  if (data.phone && data.companyName) {
+    completedItems.push({ label: "Business", value: `${data.companyName} • ${data.phone}` });
+  }
+
+  // Trade
+  if (data.trade && step !== "trade" && step !== "phone_company") {
+    const tradeLabel = TRADE_OPTIONS.find(t => t.value === data.trade)?.label || data.trade;
+    completedItems.push({ label: "Trade", value: tradeLabel });
+  }
+
+  // Website + Hours
+  if (data.businessHours && step !== "website_hours" && step !== "trade" && step !== "phone_company") {
+    let websiteStr = "No website";
+    if (data.website) {
+      try { websiteStr = new URL(data.website).hostname; } catch { websiteStr = data.website; }
+    }
+    completedItems.push({ label: "Details", value: websiteStr });
+  }
+
+  // Goal
+  if (data.primaryGoal && step === "payment") {
+    const goalLabel = GOAL_OPTIONS.find(g => g.value === data.primaryGoal)?.label || data.primaryGoal;
+    completedItems.push({ label: "Goal", value: goalLabel });
+  }
+
+  if (completedItems.length === 0) return null;
+
+  return (
+    <div className="bg-muted/40 border border-border/50 rounded-lg px-3 py-2.5 mb-4 animate-in fade-in duration-300">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Your info so far</span>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-[11px] text-primary hover:underline"
+        >
+          Edit previous answers
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {completedItems.map((item) => (
+          <span
+            key={item.label}
+            className="inline-flex items-center gap-1 bg-background border border-border/60 rounded-full px-2.5 py-0.5 text-xs text-foreground"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" />
+            <span className="font-medium text-muted-foreground">{item.label}:</span>
+            <span className="truncate max-w-[140px]">{item.value}</span>
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -662,7 +731,7 @@ function OnboardingChatInner() {
     await showTypingDelay(600);
     addMessage(
       "assistant",
-      "Almost there! Do you have a website, and when should your receptionist answer calls?"
+      "Almost there! Do you have a website, and when are you open for jobs?"
     );
   };
 
@@ -684,7 +753,7 @@ function OnboardingChatInner() {
     await showTypingDelay(600);
     addMessage(
       "assistant",
-      "Almost there! Do you have a website, and when should your receptionist answer calls?"
+      "Almost there! Do you have a website, and when are you open for jobs?"
     );
   };
 
@@ -777,7 +846,7 @@ function OnboardingChatInner() {
     advanceStep("hours");
     trackCheckpoint("onboarding_website_collected", { skipped });
     await showTypingDelay(600);
-    addMessage("assistant", "When should your receptionist answer calls?");
+    addMessage("assistant", "When are you open for jobs?");
   };
 
   // Handle hours selection
@@ -1170,9 +1239,26 @@ function OnboardingChatInner() {
         <Card className="min-h-[60vh] flex flex-col">
           <CardContent className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="space-y-3">
-              {messages.map((msg) => (
-                <ChatMessage key={msg.id} {...msg} />
-              ))}
+              {/* Auto-collapse: show completed steps as compact chips */}
+              {step !== "processing" && step !== "provisioning" && step !== "complete" && (
+                <CompletedStepsSummary data={data} step={step} onEdit={goBack} />
+              )}
+
+              {/* During active input steps: show only the last assistant message (single-focus) */}
+              {/* During terminal steps (processing, provisioning, complete): show all messages */}
+              {["processing", "provisioning", "complete", "error"].includes(step) ? (
+                messages.map((msg) => (
+                  <ChatMessage key={msg.id} {...msg} />
+                ))
+              ) : (
+                (() => {
+                  const lastAssistantMsg = [...messages].reverse().find(m => m.role === "assistant");
+                  if (lastAssistantMsg) {
+                    return <ChatMessage key={lastAssistantMsg.id} {...lastAssistantMsg} />;
+                  }
+                  return null;
+                })()
+              )}
 
               {isTyping && <TypingIndicator />}
 
