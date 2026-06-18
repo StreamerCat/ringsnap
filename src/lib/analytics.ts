@@ -11,7 +11,7 @@
  * Cost guardrails enforced here:
  *   - autocapture: false (targeted events only)
  *   - (manual page_viewed via RouteTracker in App.tsx)
- *   - Session replay: 10% sampling only on /start, /onboarding-chat, /activation (decided once at init)
+ *   - Session replay: 100% sampling site-wide (all visitors); inputs masked for PII protection
  *   - No network capture, no console log capture
  *   - All calls are no-ops if VITE_POSTHOG_KEY is not set (safe in CI and local dev)
  *
@@ -35,11 +35,11 @@ const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
 const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) || 'https://us.i.posthog.com';
 
 /**
- * Paths where session replay is enabled (10% sampling).
- * All other paths: replay explicitly disabled.
+ * Session replay is enabled site-wide at 100% sampling to capture signup and onboarding flows.
+ * All visitors (anonymous and authenticated) are recorded.
+ * PII is protected via maskAllInputs: true on all form fields.
  */
-const REPLAY_PATHS = ['/start', '/onboarding-chat', '/onboarding', '/activation'];
-const REPLAY_SAMPLE_RATE = 0.1;
+const REPLAY_SAMPLE_RATE = 1.0;
 
 
 function safePostHogCall(action: string, fn: () => void): void {
@@ -81,9 +81,6 @@ export function initAnalytics(): void {
     return;
   }
 
-  const currentPath = window.location.pathname;
-  const isReplayPath = REPLAY_PATHS.some(p => currentPath.startsWith(p));
-
   safePostHogCall('init', () => posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
 
@@ -94,19 +91,16 @@ export function initAnalytics(): void {
       }
     },
 
-    // Session replay config — keep cost throttle intact: 10% sampling on replay paths only
+    // Session replay — site-wide at 100% to capture all signup/onboarding traffic
     session_recording: {
-      maskAllInputs: true,      // PII protection — always mask inputs
-      maskAllText: false,        // Keep text visible for UX analysis
+      maskAllInputs: true,   // PII protection — always mask form inputs
+      maskAllText: false,    // Keep text visible for UX analysis
     },
-    enable_recording_console_log: false as any,  // no console log capture
-    capture_performance: false as any,            // no network capture
+    enable_recording_console_log: false as any,
+    capture_performance: false as any,
 
-    // Replay is decided once at initialization and is not toggled on route changes.
-    // This avoids recorder teardown/startup during browser back/forward transitions.
-    // Cost control is preserved: non-replay pages are hard-disabled and replay pages stay at 10%.
-    disable_session_recording: !isReplayPath,
-    session_recording_sample_rate: isReplayPath ? REPLAY_SAMPLE_RATE : 0,
+    disable_session_recording: false,
+    session_recording_sample_rate: REPLAY_SAMPLE_RATE,
 
     // Targeted events only — no autocapture to stay under 40-event budget
     autocapture: false,
