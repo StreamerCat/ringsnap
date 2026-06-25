@@ -14,6 +14,8 @@
  *   - Session replay: 100% sampling site-wide (all visitors); inputs masked for PII protection
  *   - No network capture, no console log capture
  *   - All calls are no-ops if VITE_POSTHOG_KEY is not set (safe in CI and local dev)
+ *   - Internal traffic filtered: @getringsnap.com emails are opted out on identify()
+ *     IP 73.153.203.93 should be excluded via PostHog project-level property filter settings
  *
  * Feature flag stubs (inactive in Phase 1 — requires PostHog UI to activate):
  *   - hero-headline-test
@@ -90,6 +92,9 @@ export function initAnalytics(): void {
         console.log('[Analytics] PostHog initialized in debug mode');
       }
     },
+
+    // Only create person profiles for identified users — avoids inflating MAU with anonymous visitors
+    person_profiles: 'identified_only' as any,
 
     // Session replay — site-wide at 100% to capture all signup/onboarding traffic
     session_recording: {
@@ -199,7 +204,15 @@ export function identify(
   setOnceProps?: Record<string, unknown>
 ): void {
   if (!POSTHOG_KEY) return;
-  safePostHogCall('identify', () => posthog.identify(userId, setProps, setOnceProps));
+  safePostHogCall('identify', () => {
+    // Opt out internal @getringsnap.com traffic so it never appears in recordings or funnels
+    const email = setProps?.email as string | undefined;
+    if (email?.toLowerCase().includes('@getringsnap.com')) {
+      posthog.opt_out_capturing();
+      return;
+    }
+    posthog.identify(userId, setProps, setOnceProps);
+  });
 }
 
 /**
@@ -216,6 +229,27 @@ export function group(
 ): void {
   if (!POSTHOG_KEY) return;
   safePostHogCall('group', () => posthog.group(groupType, groupKey, groupProps));
+}
+
+/**
+ * Capture an exception in PostHog. Always re-throw the original error after calling this —
+ * never use it to swallow errors. Sentry remains the authoritative error tracker;
+ * this gives PostHog the ability to correlate errors with session recordings and funnels.
+ *
+ * @example
+ * try {
+ *   await createTrial(userId)
+ * } catch (err) {
+ *   captureException(err, { error_source: 'create_trial', user_id: userId })
+ *   throw err
+ * }
+ */
+export function captureException(
+  error: unknown,
+  properties?: Record<string, unknown>
+): void {
+  if (!POSTHOG_KEY) return;
+  safePostHogCall('captureException', () => (posthog as any).captureException(error, properties));
 }
 
 /**

@@ -52,7 +52,7 @@ import { ChatInput } from "@/components/onboarding-chat/ChatInput";
 import { ServiceHoursEditor, ServiceHoursData } from "@/components/onboarding-chat/ServiceHoursEditor";
 import { extractUserError, logClientError } from "@/lib/errors";
 import { trackFunnelEvent, trackCheckpoint, trackConversion, trackFormEvent, trackTiming } from "@/lib/sentry-tracking";
-import { capture, identify, IS_DEV } from "@/lib/analytics";
+import { capture, captureException, identify, IS_DEV } from "@/lib/analytics";
 import { getExperimentAttribution } from "@/lib/experimentAttribution";
 import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
@@ -812,6 +812,12 @@ function OnboardingChatInner() {
         email: leadData.email,
         correlationId: errorPayload?.correlationId,
         phase: errorPayload?.phase
+      });
+
+      captureException(error, {
+        error_source: 'trial_creation',
+        error_phase: errorPayload?.phase ?? 'unknown',
+        is_retryable: appError.retryable,
       });
 
       // Show user-friendly message

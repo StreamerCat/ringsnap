@@ -27,7 +27,7 @@ import { supabase } from '@/lib/supabase';
 import { captureSignupLead } from '@/lib/api/leads';
 import { useUser } from '@/lib/auth/useUser';
 import { trackFunnelEvent, trackFormEvent, trackPageLoad } from '@/lib/sentry-tracking';
-import { capture, identify, IS_DEV } from '@/lib/analytics';
+import { capture, captureException, identify, IS_DEV } from '@/lib/analytics';
 import * as Sentry from '@sentry/react';
 
 // Store lead_id in localStorage for persistence
@@ -119,6 +119,7 @@ export default function Start() {
           return;
         } catch (error) {
           console.error('[Start] Session check failed, clearing invalid session:', error);
+          captureException(error, { error_source: 'start_session_check' });
           // If profile check fails (e.g. invalid token, network), sign out so they can use the form
           await supabase.auth.signOut();
           if (mounted) setIsCheckingStatus(false);
