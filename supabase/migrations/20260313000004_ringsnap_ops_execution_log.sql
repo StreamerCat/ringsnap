@@ -53,7 +53,7 @@ CREATE POLICY "staff_view_ops_exec_log"
     EXISTS (
       SELECT 1 FROM staff_roles
       WHERE user_id = auth.uid()
-        AND role IN ('admin', 'owner', 'billing')
+        AND role::text IN ('admin', 'platform_owner', 'platform_admin', 'billing')
     )
   );
 

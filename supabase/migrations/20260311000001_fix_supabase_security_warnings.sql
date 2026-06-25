@@ -457,7 +457,7 @@ BEGIN
     END;
   END LOOP;
 
-  -- create_account_transaction: signature may vary (signup_channel_type was rolled back)
+  -- create_account_transaction: signature may vary due to prior rollbacks
   FOR r IN
     SELECT oid::regprocedure::text AS sig
     FROM pg_proc

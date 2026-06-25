@@ -1657,16 +1657,22 @@ Deno.serve(async (req: Request) => {
 
     // PostHog: trial_started + trial_plan_preselected (best-effort, fire-and-forget)
     capturePostHogEvent("trial_started", currentUserId ?? data.email ?? "anonymous", {
-      plan_type: normalizedPlanKey,
-      source: data.source ?? "website",
+      plan_key: normalizedPlanKey,
+      source_channel: data.source ?? "website",
       account_id: currentAccountId,
+      subscription_id: stripeSubscriptionId,
       billing_call_based: true,
       trial_live_calls_limit: 15,
       selected_post_trial_plan: selectedPostTrialPlan,
       $lib: "edge-function",
+      $set: {
+        billing_status: "trial",
+        plan_key: normalizedPlanKey,
+        account_id: currentAccountId,
+      },
     });
     capturePostHogEvent("trial_plan_preselected", currentUserId ?? data.email ?? "anonymous", {
-      selected_plan: selectedPostTrialPlan,
+      plan_key: selectedPostTrialPlan,
       preselect_reason: preselectReason,
       account_id: currentAccountId,
       trade: data.trade,
@@ -2186,8 +2192,8 @@ Deno.serve(async (req: Request) => {
 
     // PostHog server-side conversion event — fire-and-forget
     capturePostHogEvent('trial_created', currentUserId ?? data.email ?? 'anonymous', {
-      plan_type: data.planType,
-      source: data.source ?? 'website',
+      plan_key: normalizedPlanKey,
+      source_channel: data.source ?? 'website',
       account_id: currentAccountId,
       subscription_id: subscription.id,
       $lib: 'edge-function',

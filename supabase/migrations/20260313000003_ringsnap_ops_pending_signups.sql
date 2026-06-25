@@ -85,7 +85,7 @@ CREATE POLICY "staff_view_pending_signups"
     EXISTS (
       SELECT 1 FROM staff_roles
       WHERE user_id = auth.uid()
-        AND role IN ('admin', 'owner', 'sales', 'support')
+        AND role::text IN ('admin', 'platform_owner', 'platform_admin', 'sales', 'support')
     )
   );
 

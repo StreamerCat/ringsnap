@@ -1003,6 +1003,20 @@ serve(async (req) => {
           context: { customerId }
         });
 
+        // PostHog: payment_failed (server-side, authoritative signal)
+        {
+          const pfIdentity = await getPostHogIdentityContext(supabase, customerId);
+          if (pfIdentity.distinctId && pfIdentity.accountId) {
+            await capturePostHog('payment_failed', pfIdentity.distinctId, {
+              account_id: pfIdentity.accountId,
+              plan_key: pfIdentity.planKey,
+              amount_due: (invoice as any).amount_due ?? null,
+              attempt_count: (invoice as any).attempt_count ?? null,
+              billing_reason: (invoice as any).billing_reason ?? null,
+            });
+          }
+        }
+
         // Send payment-failed email — best effort, never throws
         try {
           const { data: pfAccount } = await supabase
@@ -1080,14 +1094,28 @@ serve(async (req) => {
         const planKey = subscription.metadata?.plan_key || identity.planKey || null;
 
         if (identity.distinctId && identity.accountId) {
+          const { data: deletedAcct } = await supabase
+            .from('accounts')
+            .select('calls_used_current_period, trial_start_date')
+            .eq('id', identity.accountId)
+            .maybeSingle();
+
+          const daysSinceTrialStart = deletedAcct?.trial_start_date
+            ? Math.floor((Date.now() - new Date(deletedAcct.trial_start_date).getTime()) / 86400000)
+            : null;
+
           await capturePostHog('subscription_canceled', identity.distinctId, {
             plan_key: planKey,
+            subscription_id: subscription.id,
             canceled_at: canceledAtIso,
             account_id: identity.accountId,
+            source_channel: subscription.metadata?.source ?? null,
+            cancellation_reason: subscription.cancellation_details?.reason ?? 'user_requested',
+            days_since_trial_start: daysSinceTrialStart,
+            calls_made: deletedAcct?.calls_used_current_period ?? null,
             $set: {
               billing_status: 'cancelled',
             },
-            source: 'stripe_webhook',
           });
         }
 
@@ -1258,14 +1286,15 @@ serve(async (req) => {
 
             await capturePostHog('subscription_activated', identity.distinctId, {
               plan_key: planKey,
+              subscription_id: subscription.id,
               trial_end_date: trialEndDate,
               billing_status: 'active',
               account_id: identity.accountId,
+              source_channel: subscription.metadata?.source ?? null,
               $set: {
                 billing_status: 'active',
                 plan_key: planKey,
               },
-              source: 'stripe_webhook',
             });
           }
 
@@ -1274,14 +1303,29 @@ serve(async (req) => {
               ? new Date(subscription.canceled_at * 1000).toISOString()
               : new Date().toISOString();
 
+            // Fetch account data for churn context
+            const { data: cancelAcct } = await supabase
+              .from('accounts')
+              .select('calls_used_current_period, trial_start_date')
+              .eq('id', identity.accountId)
+              .maybeSingle();
+
+            const daysSinceTrialStart = cancelAcct?.trial_start_date
+              ? Math.floor((Date.now() - new Date(cancelAcct.trial_start_date).getTime()) / 86400000)
+              : null;
+
             await capturePostHog('subscription_canceled', identity.distinctId, {
               plan_key: planKey,
+              subscription_id: subscription.id,
               canceled_at: canceledAtIso,
               account_id: identity.accountId,
+              source_channel: subscription.metadata?.source ?? null,
+              cancellation_reason: subscription.cancellation_details?.reason ?? 'user_requested',
+              days_since_trial_start: daysSinceTrialStart,
+              calls_made: cancelAcct?.calls_used_current_period ?? null,
               $set: {
                 billing_status: 'cancelled',
               },
-              source: 'stripe_webhook',
             });
           }
         }
@@ -1403,11 +1447,12 @@ serve(async (req) => {
             // Uses resolvedAccountId as distinct_id; stripe customer as fallback
             await capturePostHog('checkout_completed', resolvedAccountId || customerId as string, {
               plan_key: planKey || 'night_weekend',
+              subscription_id: subscriptionId,
               amount: (session.amount_total || 0) / 100,
               trial: !!trialStart,
               account_id: resolvedAccountId,
               stripe_session_id: session.id,
-              source: 'stripe_webhook',
+              source_channel: session.metadata?.signup_source ?? null,
             });
           }
         }
