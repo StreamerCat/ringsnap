@@ -95,12 +95,12 @@ export function initAnalytics(): void {
     session_recording: {
       maskAllInputs: true,   // PII protection — always mask form inputs
       maskAllText: false,    // Keep text visible for UX analysis
+      sampleRate: REPLAY_SAMPLE_RATE,
     },
     enable_recording_console_log: true as any,
     capture_performance: true as any,
 
     disable_session_recording: false,
-    session_recording_sample_rate: REPLAY_SAMPLE_RATE,
 
     // Targeted events only — no autocapture to stay under 40-event budget
     autocapture: false,
