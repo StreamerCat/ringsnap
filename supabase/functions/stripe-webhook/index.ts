@@ -1010,9 +1010,9 @@ serve(async (req) => {
             await capturePostHog('payment_failed', pfIdentity.distinctId, {
               account_id: pfIdentity.accountId,
               plan_key: pfIdentity.planKey,
-              failure_code: (invoice as any).last_payment_error?.code ?? null,
-              failure_message: (invoice as any).last_payment_error?.message ?? null,
               amount_due: (invoice as any).amount_due ?? null,
+              attempt_count: (invoice as any).attempt_count ?? null,
+              billing_reason: (invoice as any).billing_reason ?? null,
             });
           }
         }
@@ -1096,7 +1096,7 @@ serve(async (req) => {
         if (identity.distinctId && identity.accountId) {
           const { data: deletedAcct } = await supabase
             .from('accounts')
-            .select('signup_source, calls_used_current_period, trial_start_date')
+            .select('calls_used_current_period, trial_start_date')
             .eq('id', identity.accountId)
             .maybeSingle();
 
@@ -1109,7 +1109,7 @@ serve(async (req) => {
             subscription_id: subscription.id,
             canceled_at: canceledAtIso,
             account_id: identity.accountId,
-            source_channel: deletedAcct?.signup_source ?? null,
+            source_channel: subscription.metadata?.source ?? null,
             cancellation_reason: subscription.cancellation_details?.reason ?? 'user_requested',
             days_since_trial_start: daysSinceTrialStart,
             calls_made: deletedAcct?.calls_used_current_period ?? null,
@@ -1284,20 +1284,13 @@ serve(async (req) => {
               ? new Date(subscription.trial_end * 1000).toISOString()
               : null;
 
-            // Fetch account source_channel for attribution
-            const { data: acctSource } = await supabase
-              .from('accounts')
-              .select('signup_source, calls_used_current_period')
-              .eq('id', identity.accountId)
-              .maybeSingle();
-
             await capturePostHog('subscription_activated', identity.distinctId, {
               plan_key: planKey,
               subscription_id: subscription.id,
               trial_end_date: trialEndDate,
               billing_status: 'active',
               account_id: identity.accountId,
-              source_channel: acctSource?.signup_source ?? null,
+              source_channel: subscription.metadata?.source ?? null,
               $set: {
                 billing_status: 'active',
                 plan_key: planKey,
@@ -1313,7 +1306,7 @@ serve(async (req) => {
             // Fetch account data for churn context
             const { data: cancelAcct } = await supabase
               .from('accounts')
-              .select('signup_source, calls_used_current_period, trial_start_date')
+              .select('calls_used_current_period, trial_start_date')
               .eq('id', identity.accountId)
               .maybeSingle();
 
@@ -1326,7 +1319,7 @@ serve(async (req) => {
               subscription_id: subscription.id,
               canceled_at: canceledAtIso,
               account_id: identity.accountId,
-              source_channel: cancelAcct?.signup_source ?? null,
+              source_channel: subscription.metadata?.source ?? null,
               cancellation_reason: subscription.cancellation_details?.reason ?? 'user_requested',
               days_since_trial_start: daysSinceTrialStart,
               calls_made: cancelAcct?.calls_used_current_period ?? null,
