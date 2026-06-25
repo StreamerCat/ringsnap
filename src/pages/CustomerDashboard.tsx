@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { featureFlags } from "@/lib/featureFlags";
 import { getRoleDashboardUrl } from "@/lib/auth/redirects";
-import { isProvisioningInProgress, isProvisioned, getDashboardPlanByKey } from "@/lib/billing/dashboardPlans";
+import { isProvisioningInProgress, isProvisioned, isPartiallyProvisioned, getDashboardPlanByKey } from "@/lib/billing/dashboardPlans";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { setUserContext, trackPageLoad, trackClick } from "@/lib/sentry-tracking";
 import { capture, identify, group, resetAnalytics, IS_DEV } from "@/lib/analytics";
@@ -28,6 +28,7 @@ import { SettingsTab } from "@/components/dashboard/SettingsTab";
 import { BillingTab } from "@/components/dashboard/BillingTab";
 import { ReferralsTab } from "@/components/dashboard/ReferralsTab";
 import { ProvisioningBanner } from "@/components/dashboard/ProvisioningBanner";
+import { AgentActivationPending } from "@/components/dashboard/AgentActivationPending";
 import { InboxTab } from "@/components/dashboard/InboxTab";
 import { ScheduleTab } from "@/components/dashboard/ScheduleTab";
 
@@ -513,8 +514,15 @@ export default function CustomerDashboard() {
         {/* Onboarding Guardrail - New System */}
         {account?.id && <OnboardingUiGuardrail accountId={account.id} />}
 
+        {/* Agent Activation Pending — shown when assistant is ready but phone is pending */}
+        {account?.id && isPartiallyProvisioned(account) && (
+          <AgentActivationPending account={account} />
+        )}
+
         {/* Provisioning Banner - shows when provisioning incomplete */}
-        <ProvisioningBanner account={account} />
+        {!isPartiallyProvisioned(account || {}) && (
+          <ProvisioningBanner account={account} />
+        )}
 
         {/* Usage Warning */}
         {usagePercent >= 80 && (

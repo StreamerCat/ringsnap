@@ -35,7 +35,7 @@ function setActivationSeen(accountId: string | null): void {
 
 export default function ProvisioningStatus() {
     const navigate = useNavigate();
-    const [status, setStatus] = useState<"pending" | "ready" | "failed" | "timeout">("pending");
+    const [status, setStatus] = useState<"pending" | "ready" | "failed" | "timeout" | "partial">("pending");
     const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -178,11 +178,26 @@ export default function ProvisioningStatus() {
                             return;
                         }
 
-                        // Check for failed state
-                        if (account.provisioning_status?.startsWith("failed")) {
+                        // Check for partially provisioned (assistant ready, phone pending)
+                        if (account.provisioning_status === "partially_provisioned") {
+                            setStatus("partial");
+                            if (timerRef.current) clearInterval(timerRef.current);
+                            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                            // Auto-redirect to dashboard where AgentActivationPending shows
+                            setTimeout(() => {
+                                navigate("/dashboard?provisioning=partial", { replace: true });
+                            }, 2000);
+                            return;
+                        }
+
+                        // Check for permanently failed state
+                        if (account.provisioning_status === "failed" || account.provisioning_status === "failed_manual_action_required") {
                             setStatus("failed");
                             if (timerRef.current) clearInterval(timerRef.current);
                             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                        } else if (account.provisioning_status === "failed_retryable") {
+                            // Retryable failure — keep polling, it will auto-retry
+                            setStatus("pending");
                         } else {
                             setStatus("pending");
 
@@ -410,17 +425,37 @@ export default function ProvisioningStatus() {
                             </div>
                         )}
 
+                        {status === "partial" && (
+                            <div className="space-y-4 animate-in fade-in duration-500">
+                                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <CheckCircle2 className="h-8 w-8 text-blue-600" />
+                                </div>
+                                <h2 className="text-xl font-semibold text-blue-900">
+                                    Your AI Receptionist is Ready to Preview
+                                </h2>
+                                <p className="text-slate-600 text-sm">
+                                    We&apos;re finishing activation and will notify you as soon as your agent is live.
+                                    In the meantime, you can preview your assistant in the dashboard.
+                                </p>
+                                <div className="flex justify-center">
+                                    <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                                    <span className="ml-2 text-sm text-blue-700">Redirecting to dashboard...</span>
+                                </div>
+                            </div>
+                        )}
+
                         {status === "failed" && (
                             <div className="space-y-4 animate-in fade-in duration-300">
                                 <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
                                     <AlertCircle className="h-8 w-8 text-red-600" />
                                 </div>
                                 <h2 className="text-xl font-semibold text-red-900">
-                                    We hit a snag
+                                    We&apos;re Working On It
                                 </h2>
                                 <p className="text-slate-600">
-                                    Something did not complete as expected. We are reviewing this now.
-                                    You will receive an email with next steps within 10 minutes.
+                                    Your account is being prepared. We captured your setup and will finish
+                                    activating your phone number shortly. You&apos;ll receive an email when
+                                    everything is ready.
                                 </p>
                             </div>
                         )}

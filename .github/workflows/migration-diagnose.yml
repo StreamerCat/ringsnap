@@ -21,9 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
+      - uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: 20
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase@2.107.0
 
       - name: Configure Local Env (dummy values)
         run: |

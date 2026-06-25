@@ -141,11 +141,23 @@ function AccountDetailModal({
         )}
         <div>
           <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Provisioning</p>
-          <p className={`text-xs font-mono ${account.provisioning_status === "failed" ? "text-red-400" : "text-gray-400"}`}>
-            {account.provisioning_status ?? "—"}
-          </p>
+          <ProvisioningStatusBadge status={account.provisioning_status} />
+          {(account.provisioning_status === "failed" ||
+            account.provisioning_status === "failed_manual_action_required" ||
+            account.provisioning_status === "partially_provisioned" ||
+            account.provisioning_status === "failed_retryable") && account.id && (
+            <AdminRetryProvisioningButton accountId={account.id} />
+          )}
         </div>
       </div>
+
+      {/* Provisioning error */}
+      {account.provisioning_error && (
+        <div className="bg-red-950/30 border border-red-800/40 rounded p-3">
+          <p className="text-xs text-red-400 font-semibold mb-1">Provisioning Error</p>
+          <p className="text-xs text-red-300 font-mono break-all">{account.provisioning_error}</p>
+        </div>
+      )}
 
       {/* Stripe IDs */}
       {(account.stripe_customer_id || account.stripe_subscription_id) && (
@@ -194,6 +206,63 @@ function AccountDetailModal({
         </div>
       )}
     </div>
+  );
+}
+
+function ProvisioningStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <span className="text-xs font-mono text-gray-500">—</span>;
+  const s = status.toLowerCase();
+  if (s === "completed" || s === "active") {
+    return <Badge className="bg-emerald-900/60 text-emerald-400 border border-emerald-700/40 text-xs">{status}</Badge>;
+  }
+  if (s === "partially_provisioned") {
+    return <Badge className="bg-blue-900/60 text-blue-400 border border-blue-700/40 text-xs">partial</Badge>;
+  }
+  if (s === "failed_retryable") {
+    return <Badge className="bg-amber-900/60 text-amber-400 border border-amber-700/40 text-xs">retrying</Badge>;
+  }
+  if (s === "failed" || s === "failed_manual_action_required") {
+    return <Badge className="bg-red-900/60 text-red-400 border border-red-700/40 text-xs">action needed</Badge>;
+  }
+  if (s === "pending" || s === "processing") {
+    return <Badge className="bg-yellow-900/60 text-yellow-400 border border-yellow-700/40 text-xs">{status}</Badge>;
+  }
+  return <span className="text-xs font-mono text-gray-400">{status}</span>;
+}
+
+function AdminRetryProvisioningButton({ accountId }: { accountId: string }) {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleRetry = async () => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.functions.invoke("rerun-provisioning", {
+        body: { accountId, force: true },
+      });
+      if (error) throw error;
+      toast({ title: "Provisioning retry triggered", description: `Job: ${data?.job?.id || "queued"}` });
+    } catch (err: any) {
+      toast({ title: "Retry failed", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleRetry}
+      disabled={loading}
+      className="mt-1 text-xs h-6 px-2 border-amber-700 text-amber-400 hover:bg-amber-900/30"
+    >
+      <Loader2 className={`h-3 w-3 mr-1 ${loading ? "animate-spin" : "hidden"}`} />
+      {loading ? "Retrying…" : "Retry Provisioning"}
+    </Button>
   );
 }
 

@@ -26,27 +26,39 @@ async function log(msg, type = 'info') {
     console.log(`${LOG_PREFIX} ${icon} ${msg}`);
 }
 
+async function createTestUser(tag) {
+    const email = `e2e-${tag}-${TEST_RUN_ID}@example.com`;
+    const { data, error } = await supabase.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        password: 'testPassword123!',
+    });
+    if (error) throw new Error(`Failed to create user: ${error.message}`);
+    return data.user.id;
+}
+
 async function createTestAccount(tag, zip = '90210') {
+    const userId = await createTestUser(tag);
     const accountId = randomUUID();
     const { error } = await supabase.from('accounts').insert({
         id: accountId,
         company_name: `E2E Test ${tag} ${TEST_RUN_ID}`,
         trade: 'Plumbing',
         zip_code: zip,
-        billing_email: `test-${tag}-${TEST_RUN_ID}@example.com`,
         provisioning_status: 'pending'
     });
     if (error) throw new Error(`Failed to create account: ${error.message}`);
-    return accountId;
+    return { accountId, userId };
 }
 
-async function createProvisioningJob(accountId, testConfig = {}) {
+async function createProvisioningJob(accountId, userId, testConfig = {}) {
     const jobId = randomUUID();
     const { error } = await supabase.from('provisioning_jobs').insert({
         id: jobId,
         account_id: accountId,
+        user_id: userId,
         status: 'queued',
-        job_type: 'provision_vapi',
+        job_type: 'provision_phone',
         attempts: 0,
         test_mode: true,
         test_config: testConfig
@@ -55,7 +67,7 @@ async function createProvisioningJob(accountId, testConfig = {}) {
     return jobId;
 }
 
-async function waitForJobCompletion(jobId, maxAttempts = 30) {
+async function waitForJobCompletion(jobId, maxAttempts = 30, { retryWorker = false } = {}) {
     for (let i = 0; i < maxAttempts; i++) {
         const { data, error } = await supabase
             .from('provisioning_jobs')
@@ -67,7 +79,12 @@ async function waitForJobCompletion(jobId, maxAttempts = 30) {
 
         if (data.status === 'completed') return data;
         if (data.status === 'failed_permanent') throw new Error(`Job failed permanently: ${data.error}`);
-        // If we are expecting a retry failure, we might see 'failed' momentarily, but we want final state
+
+        // Re-invoke worker for failed retry jobs (worker doesn't auto-poll)
+        if (retryWorker && data.status === 'failed' && data.attempts > 0) {
+            log(`Re-invoking worker for retry (attempt ${data.attempts})...`);
+            await invokeProvisionWorker();
+        }
 
         await new Promise(r => setTimeout(r, 1000));
     }
@@ -80,13 +97,14 @@ async function waitForJobCompletion(jobId, maxAttempts = 30) {
 async function runHappyPathTest() {
     log("Starting Test 1: Happy Path (Mock Provider)...");
 
-    const accountId = await createTestAccount('happy');
-    const jobId = await createProvisioningJob(accountId, {
+    const { accountId, userId } = await createTestAccount('happy');
+    const jobId = await createProvisioningJob(accountId, userId, {
         mock_provider: true
     });
 
     log(`Created Account ${accountId} and Job ${jobId}`);
 
+    await invokeProvisionWorker();
     const job = await waitForJobCompletion(jobId);
     log("Job completed!");
 
@@ -106,16 +124,17 @@ async function runHappyPathTest() {
 async function runRetryTest() {
     log("Starting Test 2: Retry Logic (Simulated Failure)...");
 
-    const accountId = await createTestAccount('retry');
+    const { accountId, userId } = await createTestAccount('retry');
     // Simulate 1 failure. The worker should retry and succeed on attempt 2 (which is index 1 or 2 depending on logic)
-    const jobId = await createProvisioningJob(accountId, {
+    const jobId = await createProvisioningJob(accountId, userId, {
         mock_provider: true,
         simulate_failure_attempts: 1
     });
 
     log(`Created Account ${accountId} and Job ${jobId} (expect 1 failure)`);
 
-    const job = await waitForJobCompletion(jobId);
+    await invokeProvisionWorker();
+    const job = await waitForJobCompletion(jobId, 30, { retryWorker: true });
 
     if (job.attempts < 1) throw new Error(`Job should have at least 1 attempt, got ${job.attempts}`);
 
@@ -147,7 +166,7 @@ async function runPoolTest() {
         e164_number: poolPhone310,
         area_code: targetArea,
         status: 'released',
-        lifecycle_status: 'available',
+        lifecycle_status: 'pool',
         is_test_number: true,
         provider: 'twilio',
         vapi_phone_id: `pool-mock-310-${Date.now()}`,
@@ -158,10 +177,10 @@ async function runPoolTest() {
     if (poolError310) throw new Error(`Failed to seed pool 310: ${poolError310.message}`);
     log(`Seeded pool number 310: ${poolPhone310} (ID: ${poolRow310.id})`);
 
-    const accountId = await createTestAccount('pool', '90210'); // 90210 -> 310
+    const { accountId, userId } = await createTestAccount('pool', '90210'); // 90210 -> 310
 
     // Create Job
-    const jobId = await createProvisioningJob(accountId, {
+    const jobId = await createProvisioningJob(accountId, userId, {
         mock_provider: true
     });
 
@@ -191,8 +210,8 @@ async function runIdempotencyTest() {
     log("Starting Test 4: Idempotency (Run Twice)...");
 
     // Setup
-    const accountId = await createTestAccount('idemp');
-    const jobId = await createProvisioningJob(accountId, { mock_provider: true });
+    const { accountId, userId } = await createTestAccount('idemp');
+    const jobId = await createProvisioningJob(accountId, userId, { mock_provider: true });
 
     // Run 1
     log("Running worker (Attempt 1)...");
@@ -213,7 +232,7 @@ async function runIdempotencyTest() {
     // If we want to test that re-running the *provisioning logic* (e.g. if job failed but committed rows, or race condition) is safe,
     // we should create a NEW job for the same account.
 
-    const jobId2 = await createProvisioningJob(accountId, { mock_provider: true });
+    const jobId2 = await createProvisioningJob(accountId, userId, { mock_provider: true });
     log(`Created duplicate job ${jobId2} for same account`);
 
     await invokeProvisionWorker();
@@ -234,12 +253,8 @@ async function main() {
 
     try {
         await runHappyPathTest();
-        // Trigger worker for happy path too (although waitFor might catch it if cron runs, explicit is safer)
-        await invokeProvisionWorker();
 
         await runRetryTest();
-        // Trigger worker for retry
-        await invokeProvisionWorker();
 
         await runPoolTest();
         await runIdempotencyTest();
