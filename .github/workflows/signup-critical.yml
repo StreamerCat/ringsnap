@@ -30,9 +30,8 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
+      - name: Install Supabase CLI
+        run: npm install -g supabase@2.107.0
 
       - name: Lint Migrations
         run: bash .github/scripts/lint-migrations.sh
