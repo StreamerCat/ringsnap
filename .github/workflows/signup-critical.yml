@@ -80,6 +80,15 @@ jobs:
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
           echo "service_key=$SERVICE_KEY" >> "$GITHUB_OUTPUT"
 
+      - name: Serve Edge Functions with env vars
+        run: |
+          # supabase start doesn't inject supabase/.env into the edge runtime.
+          # Re-serve functions with --env-file so edge functions see STRIPE/VAPI keys.
+          nohup supabase functions serve --env-file supabase/.env > /tmp/edge-functions.log 2>&1 &
+          sleep 5
+          cat /tmp/edge-functions.log || true
+          echo "Edge functions re-served with env vars"
+
       - name: Health Check (Verify Local Execution)
         run: |
           API_URL="${{ steps.supabase.outputs.api_url }}"

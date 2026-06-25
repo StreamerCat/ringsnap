@@ -46,10 +46,10 @@ describe('Onboarding State Persistence', () => {
         if (accountError) throw accountError;
         accountId = account.id;
 
-        // 3. Link Profile
+        // 3. Link Profile (upsert because handle_new_user_signup trigger already created one)
         const { error: profileError } = await adminClient
             .from('profiles')
-            .insert({
+            .upsert({
                 id: userId,
                 account_id: accountId,
                 email: testEmail,
@@ -62,7 +62,8 @@ describe('Onboarding State Persistence', () => {
             .from('phone_numbers')
             .insert({
                 account_id: accountId,
-                phone_number: '+15550001234',
+                phone_number: `+1555${timestamp.toString().slice(-7)}`,
+                area_code: '555',
                 status: 'active',
                 is_primary: true,
                 provider: 'vapi',
@@ -133,7 +134,7 @@ describe('Onboarding State Persistence', () => {
         // Verify Persistence in DB
         const { data: account } = await adminClient
             .from('accounts')
-            .select('test_call_verified_at')
+            .select('test_call_verified_at, onboarding_completed_at')
             .eq('id', accountId)
             .single();
 
