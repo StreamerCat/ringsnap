@@ -548,8 +548,8 @@ async function provisionVapiPhone(
 
   let vapiPhone: any;
 
-  if (isTestMode) {
-    // MOCK Vapi Response for Test Mode
+  if (isTestMode || testConfig?.mock_provider) {
+    // MOCK Vapi Response for Test Mode or Mock Provider
     logInfo("Test Mode: Mocking Vapi Import (Skipping actual API call)", baseLogOptions);
     vapiPhone = {
       id: poolVapiPhoneId || `test-vapi-phone-${Date.now()}`,
@@ -785,7 +785,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
     // NOTE: is_test_account removed from select - column may not exist yet
     const { data: accountData, error: accountError } = await supabase
       .from("accounts")
-      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code, subscription_status, trial_active, trial_expires_at")
+      .select("company_name, trade, service_area, business_hours, emergency_policy, company_website, assistant_gender, wants_advanced_voice, zip_code, subscription_status, trial_active, trial_end_date")
       .eq("id", job.account_id)
       .single();
 
@@ -798,8 +798,8 @@ async function processJob(job: any, supabase: any): Promise<void> {
     const canceledStatuses = ["canceled", "cancelled", "unpaid"];
     const isCanceled = canceledStatuses.includes(accountData.subscription_status || "");
     const isTrialExpired = accountData.trial_active === false &&
-      accountData.trial_expires_at &&
-      new Date(accountData.trial_expires_at) < new Date() &&
+      accountData.trial_end_date &&
+      new Date(accountData.trial_end_date) < new Date() &&
       !["active", "trialing"].includes(accountData.subscription_status || "");
 
     if (isCanceled || isTrialExpired) {
@@ -808,7 +808,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
         context: {
           subscription_status: accountData.subscription_status,
           trial_active: accountData.trial_active,
-          trial_expires_at: accountData.trial_expires_at,
+          trial_end_date: accountData.trial_end_date,
           reason: isCanceled ? "canceled" : "trial_expired",
         },
       });
@@ -1560,10 +1560,12 @@ Deno.serve(async (req: Request) => {
           // If no updated_at, assume ready
           if (!job.updated_at) return true;
 
+          // Test-mode jobs skip backoff delay entirely
+          if (job.test_mode) return true;
+
           const lastUpdate = new Date(job.updated_at).getTime();
           const attempts = job.attempts || 0;
           // Calculate backoff: 2^attempts minutes
-          // We add a small buffer (e.g. 5 seconds) to be safe
           const requiredDelayMs = Math.pow(2, attempts) * 60 * 1000;
 
           return (now - lastUpdate) > requiredDelayMs;

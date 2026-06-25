@@ -1,5 +1,5 @@
 
-import { parsePhoneNumber, CountryCode } from "https://esm.sh/libphonenumber-js@1.10.44";
+import { parsePhoneNumber, type CountryCode } from "npm:libphonenumber-js@1.10.44";
 
 export interface AreaCodePreference {
     areaCode: string;
