@@ -125,12 +125,14 @@ export function initAnalytics(): void {
  */
 function getStandardProps(): Record<string, string | undefined> {
   const params = new URLSearchParams(window.location.search);
+  // Note: PostHog auto-captures $referrer — do not add a custom `referrer` prop here (would duplicate it)
   return {
     page_path: window.location.pathname,
-    referrer: document.referrer || undefined,
     utm_source: params.get('utm_source') ?? undefined,
     utm_medium: params.get('utm_medium') ?? undefined,
     utm_campaign: params.get('utm_campaign') ?? undefined,
+    // source_channel: canonical attribution field — derived from utm_source when present
+    source_channel: params.get('utm_source') ?? undefined,
     environment: IS_DEV ? 'development' : 'production',
     app_surface: window.location.pathname.startsWith('/dashboard') ? 'app' : 'marketing',
   };
