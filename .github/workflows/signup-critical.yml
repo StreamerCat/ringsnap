@@ -70,7 +70,7 @@ jobs:
         run: |
           START_OUT=$(supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector 2>&1)
           echo "$START_OUT"
-          API_URL=$(echo "$START_OUT" | grep -oE 'http://127\.0\.0\.1:[0-9]+' | head -1)
+          API_URL=$(echo "$START_OUT" | grep "Project URL" | grep -oE 'http://[0-9.:]+')
           ANON_KEY=$(echo "$START_OUT" | grep -oE 'sb_publishable_[A-Za-z0-9_-]+')
           SERVICE_KEY=$(echo "$START_OUT" | grep -oE 'sb_secret_[A-Za-z0-9_-]+')
           if [[ -z "$API_URL" || -z "$ANON_KEY" || -z "$SERVICE_KEY" ]]; then
