@@ -11,7 +11,7 @@ SET
 WHERE status = 'active'
   AND is_primary = true
   AND activated_at IS NULL
-  AND (provider_phone_number_id IS NOT NULL OR vapi_phone_id IS NOT NULL);
+  AND provider_phone_number_id IS NOT NULL;
 
 -- Step 2: Log suspicious records (active but no provider ID) for inspection
 -- DO NOT auto-fix these - they need manual review
@@ -23,8 +23,7 @@ BEGIN
   FROM public.phone_numbers
   WHERE status = 'active'
     AND is_primary = true
-    AND provider_phone_number_id IS NULL
-    AND vapi_phone_id IS NULL;
+    AND provider_phone_number_id IS NULL;
   
   IF suspicious_count > 0 THEN
     RAISE NOTICE 'Found % suspicious phone_numbers records (active primary but no provider ID)', suspicious_count;
