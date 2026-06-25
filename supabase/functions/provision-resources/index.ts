@@ -16,6 +16,21 @@ const corsHeaders = {
 const VAPI_API_KEY = Deno.env.get('VAPI_API_KEY');
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
 const RESEND_API_KEY = Deno.env.get('RESEND_PROD_KEY');
+const POSTHOG_API_KEY = Deno.env.get('POSTHOG_API_KEY');
+const POSTHOG_HOST = 'https://us.i.posthog.com';
+
+async function phCapture(distinctId: string, event: string, properties: Record<string, unknown>): Promise<void> {
+  if (!POSTHOG_API_KEY || !distinctId) return;
+  try {
+    await fetch(`${POSTHOG_HOST}/capture/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: POSTHOG_API_KEY, distinct_id: distinctId, event, properties }),
+    });
+  } catch {
+    // Non-blocking — never let analytics failures break provisioning
+  }
+}
 
 serve(async (req) => {
   const correlationId = extractCorrelationId(req);
@@ -26,7 +41,12 @@ serve(async (req) => {
   }
 
   let currentAccountId: string | null = null;
+  let currentUserId: string | null = null;
+  let currentPlanKey: string | null = null;
+  let currentAreaCode: string | null = null;
+  let provisioningStage: 'number_search' | 'number_purchase' | 'configure' | null = null;
   let obs: ReturnType<typeof createObservabilityContext> | null = null;
+  const provisioningStartMs = Date.now();
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -80,6 +100,9 @@ serve(async (req) => {
       throw new Error(`Account not found: ${accountError?.message}`);
     }
 
+    currentUserId = account.user_id || null;
+    currentPlanKey = account.plan_type || 'starter';
+
     let areaCode = requestedAreaCode;
     if (!areaCode && zipCode) {
       areaCode = getAreaCodeFromZip(zipCode);
@@ -93,6 +116,8 @@ serve(async (req) => {
     if (!areaCode) {
       throw new Error('Area code could not be determined from zip code, request, or account record');
     }
+
+    currentAreaCode = areaCode;
 
     logInfo('Using selected area code', {
       ...baseLogOptions,
@@ -134,6 +159,8 @@ serve(async (req) => {
         accountId,
         context: { areaCode }
       });
+
+      provisioningStage = 'number_search';
 
       // Option A: Try with area code first, fallback to no area code if unavailable
       let phoneResponse = await fetch('https://api.vapi.ai/phone-number', {
@@ -222,6 +249,7 @@ serve(async (req) => {
         }
       }
 
+      provisioningStage = 'number_purchase';
       const phoneData = await phoneResponse.json();
       vapiPhoneId = phoneData.id;
       phoneNumber = phoneData.number;
@@ -253,6 +281,7 @@ serve(async (req) => {
         context: { vapiAssistantId }
       });
     } else if (VAPI_API_KEY) {
+      provisioningStage = 'configure';
       const voiceId = account.assistant_gender === 'male' ? 'michael' : 'sarah';
 
       const { data: recordingLaw } = await supabase
@@ -464,6 +493,18 @@ serve(async (req) => {
       ...baseLogOptions,
       accountId
     });
+
+    if (currentUserId) {
+      await phCapture(currentUserId, 'provisioning_succeeded', {
+        elapsed_ms: Date.now() - provisioningStartMs,
+        attempt_count: 1,
+        area_code: phoneNumber ? phoneNumber.slice(2, 5) : currentAreaCode,
+        phone_number: phoneNumber,
+        account_id: accountId,
+        plan_key: currentPlanKey,
+        environment: 'production',
+      });
+    }
 
     // 8. Send onboarding SMS if phone is provided (non-blocking)
     if (phone && phoneNumber && vapiPhoneId) {
@@ -679,6 +720,26 @@ serve(async (req) => {
       error
     });
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    const elapsedMs = Date.now() - provisioningStartMs;
+
+    if (currentUserId) {
+      await phCapture(currentUserId, 'provisioning_failed', {
+        elapsed_ms: elapsedMs,
+        account_id: currentAccountId,
+        environment: 'production',
+        error_message: errorMessage,
+        provisioning_stage: provisioningStage,
+        area_code_requested: currentAreaCode,
+        plan_key: currentPlanKey,
+      });
+      await phCapture(currentUserId, 'error_encountered', {
+        flow: 'provisioning',
+        error_code: 'server_error',
+        failure_reason: errorMessage,
+        page_path: '/onboarding/setup',
+        account_id: currentAccountId,
+      });
+    }
 
     // Log system event: provisioning failed (if obs context available)
     if (obs) {
