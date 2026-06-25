@@ -84,6 +84,21 @@ export default function Start() {
     capture('form_started', { form_id: 'signup_step1', funnel_step: 'step1_lead_capture' });
   };
 
+  const handleFieldFocus = (fieldName: string) => {
+    handleFormStart();
+    capture('form_field_focused', { field_name: fieldName, form: 'trial_signup' });
+  };
+
+  const handleFieldAbandon = (fieldName: string, value: string) => {
+    if (value.length === 0) {
+      capture('form_field_abandoned', { field_name: fieldName, field_value_length: 0, form: 'trial_signup' });
+    }
+  };
+
+  const handleValidationError = (fieldName: string, errorMessage: string) => {
+    capture('form_validation_error', { field_name: fieldName, error_message: errorMessage, form: 'trial_signup' });
+  };
+
   // Get existing lead_id from URL or localStorage
   const existingLeadId = normalizeLeadId(searchParams.get('lead_id')) || getStoredLeadId();
 
@@ -192,22 +207,26 @@ export default function Start() {
 
     // Validation
     if (!trimmedName) {
+      handleValidationError('name', 'Name is required');
       toast.error('Please enter your name');
       return;
     }
 
     if (!validateName(trimmedName)) {
+      handleValidationError('name', 'Name should only contain letters and spaces');
       toast.error('Name should only contain letters and spaces');
       return;
     }
 
     if (!trimmedEmail) {
+      handleValidationError('email', 'Email is required');
       toast.error('Please enter your email');
       return;
     }
 
     if (!validateEmail(trimmedEmail)) {
       trackFormEvent('signup_form', 'validation_error', { field: 'email' });
+      handleValidationError('email', 'Invalid email address');
       toast.error('Please enter a valid email address');
       return;
     }
@@ -361,7 +380,8 @@ export default function Start() {
                       placeholder="John Smith"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      onFocus={handleFormStart}
+                      onFocus={() => handleFieldFocus('name')}
+                      onBlur={(e) => handleFieldAbandon('name', e.target.value)}
                       disabled={isSubmitting}
                       className="h-12 text-base"
                       autoComplete="name"
@@ -377,7 +397,8 @@ export default function Start() {
                       placeholder="john@acmeplumbing.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      onFocus={handleFormStart}
+                      onFocus={() => handleFieldFocus('email')}
+                      onBlur={(e) => handleFieldAbandon('email', e.target.value)}
                       disabled={isSubmitting}
                       className="h-12 text-base"
                       autoComplete="email"

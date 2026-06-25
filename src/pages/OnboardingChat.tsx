@@ -610,6 +610,8 @@ function OnboardingChatInner() {
 
         // Start the chat with combined phone + company step
         setStep("phone_company");
+        capture('onboarding_step_viewed', { step_name: 'phone_company', step_index: 1, total_steps: 5 });
+        stepStartedAtRef.current = Date.now();
         trackFunnelEvent("onboarding_started", { lead_id: lead.id, email: lead.email });
 
         await showTypingDelay(500);
@@ -635,6 +637,13 @@ function OnboardingChatInner() {
   // Step history for back navigation
   const [stepHistory, setStepHistory] = useState<ChatStep[]>([]);
 
+  // Step analytics tracking
+  const ONBOARDING_STEPS: ChatStep[] = ['phone_company', 'trade', 'website_hours', 'goal', 'payment'];
+  const TOTAL_STEPS = ONBOARDING_STEPS.length;
+  const stepStartedAtRef = useRef<number>(Date.now());
+
+  const getStepIndex = (s: ChatStep) => ONBOARDING_STEPS.indexOf(s) + 1;
+
   const goBack = () => {
     if (stepHistory.length === 0) return;
     const prevStep = stepHistory[stepHistory.length - 1];
@@ -643,6 +652,24 @@ function OnboardingChatInner() {
   };
 
   const advanceStep = (nextStep: ChatStep) => {
+    const stepIndex = getStepIndex(step);
+    if (stepIndex > 0) {
+      capture('onboarding_step_completed', {
+        step_name: step,
+        step_index: stepIndex,
+        total_steps: TOTAL_STEPS,
+        time_on_step_ms: Date.now() - stepStartedAtRef.current,
+      });
+    }
+    const nextIndex = getStepIndex(nextStep);
+    if (nextIndex > 0) {
+      capture('onboarding_step_viewed', {
+        step_name: nextStep,
+        step_index: nextIndex,
+        total_steps: TOTAL_STEPS,
+      });
+    }
+    stepStartedAtRef.current = Date.now();
     setStepHistory(prev => [...prev, step]);
     setStep(nextStep);
   };

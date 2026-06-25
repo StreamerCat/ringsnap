@@ -9,6 +9,7 @@ import { featureFlags } from "@/lib/featureFlags";
 import { Helmet } from "react-helmet-async";
 import * as Sentry from "@sentry/react";
 import { capture } from "@/lib/analytics";
+import { useFeatureFlagEnabled } from "posthog-js/react";
 
 const TIMEOUT_MS = 60000; // 60 seconds
 const STUCK_THRESHOLD_MS = 30000; // Log to Sentry after 30s
@@ -39,9 +40,14 @@ export default function ProvisioningStatus() {
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
     const [accountId, setAccountId] = useState<string | null>(null);
+    const [fallbackDismissed, setFallbackDismissed] = useState(false);
+
+    const showFallback = useFeatureFlagEnabled('provisioning-fallback-ui');
 
     // One-time guard for Sentry breadcrumb
     const sentryLoggedRef = useRef(false);
+    // Poll attempt counter
+    const pollCountRef = useRef(0);
 
     // Copy phone number to clipboard
     const copyPhoneNumber = () => {
@@ -217,10 +223,14 @@ export default function ProvisioningStatus() {
         };
 
         // Initial check
+        pollCountRef.current += 1;
         checkStatus();
 
         // Poll every 5s
-        timerRef.current = setInterval(checkStatus, 5000);
+        timerRef.current = setInterval(() => {
+            pollCountRef.current += 1;
+            checkStatus();
+        }, 5000);
 
         // Set timeout to handle long provisioning
         timeoutRef.current = setTimeout(() => {
@@ -230,7 +240,23 @@ export default function ProvisioningStatus() {
                 capture("provisioning_timeout", {
                     elapsed_ms: TIMEOUT_MS,
                     account_id: accountId,
+                    attempt_count: pollCountRef.current,
+                    twilio_error_code: null,
+                    twilio_error_message: null,
+                    provisioning_stage: null,
+                    area_code_requested: null,
+                    plan_key: null,
                 });
+                capture("error_encountered", {
+                    flow: "provisioning",
+                    error_code: "timeout",
+                    failure_reason: "Provisioning timeout",
+                    page_path: "/setup/assistant",
+                    account_id: accountId,
+                });
+                if (showFallback) {
+                    capture("provisioning_fallback_shown", { account_id: accountId });
+                }
             }
         }, TIMEOUT_MS);
 
@@ -292,7 +318,41 @@ export default function ProvisioningStatus() {
                             </div>
                         )}
 
-                        {status === "timeout" && (
+                        {status === "timeout" && showFallback && !fallbackDismissed && (
+                            <div className="space-y-4 animate-in fade-in duration-500">
+                                <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+                                    <AlertCircle className="h-8 w-8 text-amber-600" />
+                                </div>
+                                <h2 className="text-xl font-semibold text-amber-900">
+                                    Taking longer than expected
+                                </h2>
+                                <p className="text-slate-600 text-sm">
+                                    We're on it. You'll receive an email as soon as your number is ready — usually within 10 minutes.
+                                </p>
+                                <div className="flex gap-2 justify-center">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            capture("provisioning_fallback_dismissed", { account_id: accountId });
+                                            setFallbackDismissed(true);
+                                        }}
+                                    >
+                                        Got it
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleManualRefresh}
+                                    >
+                                        <RefreshCw className="h-4 w-4 mr-2" />
+                                        Refresh
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {status === "timeout" && (!showFallback || fallbackDismissed) && (
                             <div className="space-y-4 animate-in fade-in duration-500">
                                 <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
                                     <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
