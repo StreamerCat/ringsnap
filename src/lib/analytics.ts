@@ -12,7 +12,7 @@
  *   - autocapture: false (targeted events only)
  *   - (manual page_viewed via RouteTracker in App.tsx)
  *   - Session replay: 100% sampling site-wide (all visitors); inputs masked for PII protection
- *   - Network capture and console log capture enabled (surfaces API failures + JS errors in session recordings)
+ *   - Network capture enabled (capture_performance); console log capture disabled — raw PII logged outside IS_DEV guards
  *   - All calls are no-ops if VITE_POSTHOG_KEY is not set (safe in CI and local dev)
  *
  * Feature flag stubs (inactive in Phase 1 — requires PostHog UI to activate):
@@ -97,7 +97,7 @@ export function initAnalytics(): void {
       maskAllText: false,    // Keep text visible for UX analysis
       sampleRate: REPLAY_SAMPLE_RATE,
     },
-    enable_recording_console_log: true as any,
+    enable_recording_console_log: false as any,
     capture_performance: true as any,
 
     disable_session_recording: false,

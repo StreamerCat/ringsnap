@@ -723,13 +723,11 @@ serve(async (req) => {
     const elapsedMs = Date.now() - provisioningStartMs;
 
     if (currentUserId) {
-      await phCapture(currentUserId, 'provisioning_timeout', {
+      await phCapture(currentUserId, 'provisioning_failed', {
         elapsed_ms: elapsedMs,
         account_id: currentAccountId,
         environment: 'production',
-        twilio_error_code: null,
-        twilio_error_message: errorMessage,
-        attempt_count: 1,
+        error_message: errorMessage,
         provisioning_stage: provisioningStage,
         area_code_requested: currentAreaCode,
         plan_key: currentPlanKey,
