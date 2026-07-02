@@ -27,6 +27,21 @@ Live audit + fixes performed against Supabase project rmyvvbqnccpfeyowidrq.
 
 ## Blockers (need Josh — cannot be done from this session)
 
+- [ ] **Free an edge-function slot** — the project is at the 100-function cap
+      (PaymentRequired on any deploy, even redeploys of existing functions).
+      Either disable the spend cap / upgrade, or delete a few of the ~16 stale
+      one-off debug functions in the dashboard (safe candidates, all deployed
+      ad-hoc in Nov 2025–Jan 2026 and unreferenced in the repo:
+      `invoke-send-magic-link-and-reset`, `send-magic-link-diagnostic`,
+      `send-password-reset-diagnostic`, `send-password-reset-inspect`,
+      `run-send-password-reset-diagnostic`, `run-send-password-reset-diagnostic-2`,
+      `invoke-send-password-reset-diagnostic`, `debug-stripe-check`,
+      `create-trial-source-dump`, `smoke-test`, `test-phone-lookup`,
+      `test-webhook-lookup`, `check-vapi-status`, `repair-assistant-schema`,
+      `apply-schema`). Once one slot is free, redeploy `outbound-audit` from the
+      repo (it now includes the Vapi tool sync mode) and run
+      `POST {"action":"sync","dryRun":true}` then `{"dryRun":false}`.
+
 - [ ] **Set `TWILIO_PHONE_NUMBER` Supabase secret** — it is missing; this is the
       confirmed root cause of the SMS failure. Likely value: +16504126726
       (the outbound number). `supabase secrets set TWILIO_PHONE_NUMBER=+1650...`
