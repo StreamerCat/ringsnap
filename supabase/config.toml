@@ -116,3 +116,19 @@ verify_jwt = false
 
 [functions.jobber-oauth-callback]
 verify_jwt = false
+
+# ── Cold outbound pipeline (Sarah / Vapi outbound agent) ─────────────────────
+# These are called by Vapi function tools, which must send
+# "Authorization: Bearer <anon key>" in the tool's server headers.
+
+[functions.agent-trial-checkout]
+verify_jwt = true
+
+[functions.send-outbound-link]
+verify_jwt = true
+
+[functions.add-outbound-dnc]
+verify_jwt = true
+
+[functions.outbound-audit]
+verify_jwt = true
