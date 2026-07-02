@@ -72,6 +72,31 @@ Live audit + fixes performed against Supabase project rmyvvbqnccpfeyowidrq.
       calling region's timezone) and express the Schedule Trigger in local time,
       instead of a fixed UTC cron that drifts an hour across DST.
 
+## Manual Vapi wiring spec (alternative to the sync function)
+
+If you'd rather wire the tools in the Vapi dashboard than free a function slot,
+configure the assistant (`e2329175-069b-457f-8984-0f2e62742ed8`) with exactly
+these four tools and REMOVE the existing `create_trial` tool (it points at the
+product create-trial function — the outbound agent must never call it):
+
+Every function tool needs this server header (anon key is publishable, from
+Supabase dashboard → Settings → API):
+`Authorization: Bearer <anon key>`
+
+1. `create_agent_trial` → `https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/agent-trial-checkout`
+   Parameters: contactName, contactEmail, contactMobile (required),
+   businessName, planKey (enum: night_weekend | lite | core | pro)
+2. `send_link` → `https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/send-outbound-link`
+   Parameters: contactMobile (required), contactName, businessName
+3. `add_to_dnc` → `https://rmyvvbqnccpfeyowidrq.supabase.co/functions/v1/add-outbound-dnc`
+   Parameters: contactMobile (required), businessName, reason
+4. `end_call` → built-in End Call tool (no server config)
+
+Exact JSON schemas for 1–3 are in
+`supabase/functions/outbound-audit/index.ts` (`desiredFunctionTools`).
+Verify afterward by POSTing `{}` to `/functions/v1/outbound-audit` with the
+anon-key Authorization header and checking `referencedTools`.
+
 ## Deferred
 
 - [ ] `claude-proxy` CORS function for the lead acquisition app — does not
