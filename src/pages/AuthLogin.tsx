@@ -13,6 +13,28 @@ import { redirectToRoleDashboard } from "@/lib/auth/redirects";
 
 type AuthMode = "password" | "magic";
 
+/** Extract the real error message from a Supabase FunctionsHttpError. */
+async function extractFunctionError(error: any): Promise<string> {
+  try {
+    const ctx = error?.context;
+    // context is the raw Response object from the edge function
+    if (ctx && typeof ctx.json === "function") {
+      const body = await ctx.json();
+      if (body?.error) return body.error;
+    }
+  } catch {
+    // json() may fail if body is not JSON or was already consumed
+    try {
+      const ctx = error?.context;
+      if (ctx && typeof ctx.text === "function") {
+        const text = await ctx.text();
+        if (text) return text;
+      }
+    } catch { /* ignore */ }
+  }
+  return error?.message || "Unknown error";
+}
+
 export default function AuthLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -132,16 +154,9 @@ export default function AuthLogin() {
       });
 
       if (error) {
-        // Try to extract the actual error message from the response
-        let errorBody: string | undefined;
-        try {
-          const ctx = (error as any).context;
-          if (ctx && typeof ctx.json === "function") {
-            const body = await ctx.json();
-            errorBody = body?.error;
-          }
-        } catch { /* ignore parse errors */ }
-        throw new Error(errorBody || error.message);
+        // Extract the actual error from the edge function response
+        const serverError = await extractFunctionError(error);
+        throw new Error(serverError);
       }
       if (data?.error) throw new Error(data.error);
 
@@ -179,11 +194,15 @@ export default function AuthLogin() {
 
       if (error || data?.error) {
         // Magic link unavailable — fall back to send-password-reset
-        console.warn("Magic link unavailable for reset, falling back to send-password-reset");
+        const reason = error ? await extractFunctionError(error) : data?.error;
+        console.warn("Magic link unavailable for reset, falling back to send-password-reset:", reason);
         const { data: resetData, error: resetError } = await supabase.functions.invoke("send-password-reset", {
           body: { email: normalizedEmail }
         });
-        if (resetError) throw resetError;
+        if (resetError) {
+          const resetReason = await extractFunctionError(resetError);
+          throw new Error(resetReason);
+        }
         if (resetData?.error) throw new Error(resetData.error);
       }
 
