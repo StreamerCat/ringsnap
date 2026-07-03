@@ -90,6 +90,21 @@ function respondError(toolCallId: string, message: string): Response {
   return respond(toolCallId, message);
 }
 
+// The Supabase anon key is public (shipped in the frontend bundle), so
+// verify_jwt alone does not authenticate Vapi. Vapi sends this header when
+// the tool's server.secret is set; fail closed if the secret isn't configured.
+function requireVapiSecret(req: Request): Response | null {
+  const expected = Deno.env.get("OUTBOUND_TOOL_SECRET");
+  const provided = req.headers.get("x-vapi-secret");
+  if (!expected || !provided || provided !== expected) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return null;
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -103,6 +118,9 @@ Deno.serve(async (req: Request) => {
       },
     });
   }
+
+  const unauthorized = requireVapiSecret(req);
+  if (unauthorized) return unauthorized;
 
   let toolCallId = "unknown";
 

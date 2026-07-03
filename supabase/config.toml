@@ -118,8 +118,11 @@ verify_jwt = false
 verify_jwt = false
 
 # ── Cold outbound pipeline (Sarah / Vapi outbound agent) ─────────────────────
-# These are called by Vapi function tools, which must send
-# "Authorization: Bearer <anon key>" in the tool's server headers.
+# These are called by Vapi function tools. Each tool's server config must send
+# "Authorization: Bearer <anon key>" (satisfies the gateway's verify_jwt; the
+# anon key is public so it is NOT authentication) AND set server.secret so
+# Vapi sends x-vapi-secret, which the functions check against the
+# OUTBOUND_TOOL_SECRET Supabase secret (fail closed).
 
 [functions.agent-trial-checkout]
 verify_jwt = true

@@ -10,7 +10,8 @@
  *  - Vapi outbound phone number binding
  *  - Twilio from-number ownership/SMS capability + recent message statuses/error codes
  *
- * Sync mode (POST {"action":"sync","dryRun":true|false}): idempotently wires the
+ * Sync mode (POST {"action":"sync","dryRun":true|false}, requires the
+ * x-vapi-secret header matching OUTBOUND_TOOL_SECRET): idempotently wires the
  * Sarah assistant's Vapi tools —
  *      create_agent_trial -> agent-trial-checkout
  *      send_link          -> send-outbound-link
@@ -53,9 +54,13 @@ function sanitizeTool(t: any) {
 // ── Sync mode ─────────────────────────────────────────────────────────────────
 
 // deno-lint-ignore no-explicit-any
-function desiredFunctionTools(functionsBase: string, authHeader: string): any[] {
+function desiredFunctionTools(functionsBase: string, authHeader: string, toolSecret: string): any[] {
+  // secret: Vapi sends it as the x-vapi-secret header, which the outbound
+  // functions require (the anon Authorization header only satisfies the
+  // gateway's verify_jwt — it is public and does not authenticate Vapi).
   const server = (fn: string) => ({
     url: `${functionsBase}/${fn}`,
+    secret: toolSecret,
     headers: { Authorization: authHeader },
   });
   return [
@@ -122,7 +127,15 @@ function desiredFunctionTools(functionsBase: string, authHeader: string): any[] 
   ];
 }
 
-async function runSync(dryRun: boolean): Promise<Response> {
+async function runSync(req: Request, dryRun: boolean): Promise<Response> {
+  // Sync mutates Vapi config — require the private tool secret. The anon key
+  // that satisfies verify_jwt is public, so it must not gate this path.
+  const toolSecret = Deno.env.get("OUTBOUND_TOOL_SECRET");
+  const provided = req.headers.get("x-vapi-secret");
+  if (!toolSecret || !provided || provided !== toolSecret) {
+    return json({ error: "unauthorized: sync requires the x-vapi-secret header matching OUTBOUND_TOOL_SECRET" }, 401);
+  }
+
   const vapiKey = Deno.env.get("VAPI_API_KEY");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -155,24 +168,22 @@ async function runSync(dryRun: boolean): Promise<Response> {
 
     const finalToolIds: string[] = [];
 
-    for (const desired of desiredFunctionTools(functionsBase, authHeader)) {
+    for (const desired of desiredFunctionTools(functionsBase, authHeader, toolSecret)) {
       const name = desired.function.name;
       const existing = byName.get(name);
       if (existing) {
-        const urlOk = existing?.server?.url === desired.server.url;
-        const hasAuthHeader = Boolean(existing?.server?.headers?.Authorization);
-        if (urlOk && hasAuthHeader) {
-          actions.push({ tool: name, action: "unchanged", id: existing.id });
-        } else {
-          actions.push({ tool: name, action: "update", id: existing.id, serverUrl: desired.server.url });
-          if (!dryRun) {
-            const pRes = await fetch(`${VAPI_BASE}/tool/${existing.id}`, {
-              method: "PATCH",
-              headers: vapiHeaders,
-              body: JSON.stringify({ function: desired.function, server: desired.server }),
-            });
-            if (!pRes.ok) return json({ error: `tool ${name} update failed: ${pRes.status} ${await pRes.text()}`, actions }, 502);
-          }
+        // Always PATCH: Vapi may not return server.secret / header values on
+        // GET, so a "looks configured" tool can still carry a stale secret or
+        // Authorization value. An unconditional PATCH is idempotent and
+        // guarantees the live config matches the desired one.
+        actions.push({ tool: name, action: "update", id: existing.id, serverUrl: desired.server.url });
+        if (!dryRun) {
+          const pRes = await fetch(`${VAPI_BASE}/tool/${existing.id}`, {
+            method: "PATCH",
+            headers: vapiHeaders,
+            body: JSON.stringify({ function: desired.function, server: desired.server }),
+          });
+          if (!pRes.ok) return json({ error: `tool ${name} update failed: ${pRes.status} ${await pRes.text()}`, actions }, 502);
         }
         finalToolIds.push(existing.id);
       } else {
@@ -366,6 +377,6 @@ Deno.serve(async (req: Request) => {
     // no body — default to audit
   }
 
-  if (action === "sync") return await runSync(dryRun);
+  if (action === "sync") return await runSync(req, dryRun);
   return await runAudit();
 });
