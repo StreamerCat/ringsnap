@@ -132,6 +132,12 @@ Deno.serve(async (req: Request) => {
           phone: lead.phone,
           status: "failed",
         });
+        // Move off status "new" so a persistently failing number doesn't
+        // keep winning the head of the queue on every cron run.
+        await supabase
+          .from("outbound_leads")
+          .update({ status: "call_failed", updated_at: new Date().toISOString() })
+          .eq("id", lead.id);
         results.push({ leadId: lead.id, phone: lead.phone, status: "failed" });
       }
     } catch (err) {
@@ -141,6 +147,10 @@ Deno.serve(async (req: Request) => {
         phone: lead.phone,
         status: "error",
       });
+      await supabase
+        .from("outbound_leads")
+        .update({ status: "call_failed", updated_at: new Date().toISOString() })
+        .eq("id", lead.id);
       results.push({ leadId: lead.id, phone: lead.phone, status: "error" });
     }
   }
