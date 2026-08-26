@@ -9,7 +9,7 @@
 -- CRON_SECRET edge function secret.
 --
 -- Both secrets (edge_function_url, cron_secret) must be set once via:
---   select vault.create_secret('https://<project-ref>.functions.supabase.co/trigger-outbound-calls', 'outbound_trigger_url');
+--   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/trigger-outbound-calls', 'outbound_trigger_url');
 --   select vault.create_secret('<same value as CRON_SECRET edge function secret>', 'outbound_trigger_cron_secret');
 -- (Run manually in the SQL editor — never commit the actual values.)
 

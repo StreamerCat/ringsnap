@@ -97,6 +97,22 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
+    // ── Claim the lead before dialing so a concurrent/overlapping cron run
+    // can't select and dial the same row twice.
+    const { data: claimed, error: claimError } = await supabase
+      .from("outbound_leads")
+      .update({ status: "calling", updated_at: new Date().toISOString() })
+      .eq("id", lead.id)
+      .eq("status", "new")
+      .select("id");
+
+    if (claimError || !claimed || claimed.length === 0) {
+      // Already claimed by another run, or the update itself failed —
+      // either way, don't dial.
+      results.push({ leadId: lead.id, phone: lead.phone, status: "skipped_unclaimed" });
+      continue;
+    }
+
     try {
       const vapiRes = await fetch("https://api.vapi.ai/call", {
         method: "POST",
@@ -114,16 +130,15 @@ Deno.serve(async (req: Request) => {
       const vapiBody = await vapiRes.json();
 
       if (vapiRes.ok) {
-        await supabase.from("outbound_call_log").insert({
+        // Lead was already claimed into "calling" above; nothing further
+        // to update on the lead row.
+        const { error: logError } = await supabase.from("outbound_call_log").insert({
           lead_id: lead.id,
           phone: lead.phone,
           vapi_call_id: vapiBody?.id ?? null,
           status: "initiated",
         });
-        await supabase
-          .from("outbound_leads")
-          .update({ status: "calling", updated_at: new Date().toISOString() })
-          .eq("id", lead.id);
+        if (logError) console.error("[trigger-outbound-calls] Failed to log call:", logError);
         results.push({ leadId: lead.id, phone: lead.phone, status: "initiated" });
       } else {
         console.error("[trigger-outbound-calls] Vapi call failed:", vapiBody);
@@ -132,12 +147,13 @@ Deno.serve(async (req: Request) => {
           phone: lead.phone,
           status: "failed",
         });
-        // Move off status "new" so a persistently failing number doesn't
+        // Move off "calling" so a persistently failing number doesn't
         // keep winning the head of the queue on every cron run.
-        await supabase
+        const { error: releaseError } = await supabase
           .from("outbound_leads")
           .update({ status: "call_failed", updated_at: new Date().toISOString() })
           .eq("id", lead.id);
+        if (releaseError) console.error("[trigger-outbound-calls] Failed to release lead:", releaseError);
         results.push({ leadId: lead.id, phone: lead.phone, status: "failed" });
       }
     } catch (err) {
@@ -147,10 +163,11 @@ Deno.serve(async (req: Request) => {
         phone: lead.phone,
         status: "error",
       });
-      await supabase
+      const { error: releaseError } = await supabase
         .from("outbound_leads")
         .update({ status: "call_failed", updated_at: new Date().toISOString() })
         .eq("id", lead.id);
+      if (releaseError) console.error("[trigger-outbound-calls] Failed to release lead:", releaseError);
       results.push({ leadId: lead.id, phone: lead.phone, status: "error" });
     }
   }
