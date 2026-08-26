@@ -27,6 +27,9 @@
  */
 
 import { createClient } from "supabase";
+import { logInfo, logError, extractCorrelationId } from "../_shared/logging.ts";
+
+const FUNCTION_NAME = "add-outbound-dnc";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -43,8 +46,8 @@ function respond(toolCallId: string, result: string): Response {
   );
 }
 
-function respondError(toolCallId: string, message: string): Response {
-  console.error("[add-outbound-dnc] Error:", message);
+function respondError(toolCallId: string, message: string, correlationId: string): Response {
+  logError("add-outbound-dnc error", { functionName: FUNCTION_NAME, correlationId, context: { message } });
   return respond(toolCallId, message);
 }
 
@@ -62,16 +65,18 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const correlationId = extractCorrelationId(req);
+
   // ── Auth: this is a public verify_jwt=false endpoint, so require Vapi's
   // configured tool secret header — otherwise anyone who finds the URL could
   // mark arbitrary numbers dnc or spam outbound_leads with junk rows.
   const vapiToolSecret = Deno.env.get("VAPI_TOOL_SECRET");
   if (!vapiToolSecret) {
-    console.error("[add-outbound-dnc] VAPI_TOOL_SECRET not configured — refusing to run");
-    return respondError("unknown", "Something went wrong on our end.");
+    logError("VAPI_TOOL_SECRET not configured — refusing to run", { functionName: FUNCTION_NAME, correlationId });
+    return respondError("unknown", "Something went wrong on our end.", correlationId);
   }
   if (req.headers.get("x-vapi-secret") !== vapiToolSecret) {
-    return respondError("unknown", "Unauthorized.");
+    return respondError("unknown", "Unauthorized.", correlationId);
   }
 
   let toolCallId = "unknown";
@@ -93,7 +98,7 @@ Deno.serve(async (req: Request) => {
     const { contactMobile, reason } = args;
 
     if (!contactMobile) {
-      return respondError(toolCallId, "I don't have a number to flag — can you confirm the mobile number?");
+      return respondError(toolCallId, "I don't have a number to flag — can you confirm the mobile number?", correlationId);
     }
 
     const phone = normalizePhone(String(contactMobile));
@@ -112,7 +117,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (lookupError) {
-      return respondError(toolCallId, "I couldn't update our records just now — please try again.");
+      return respondError(toolCallId, "I couldn't update our records just now — please try again.", correlationId);
     }
 
     let writeError;
@@ -133,14 +138,14 @@ Deno.serve(async (req: Request) => {
     }
 
     if (writeError) {
-      console.error("[add-outbound-dnc] Failed to write dnc status:", writeError);
-      return respondError(toolCallId, "I couldn't update our records just now — please try again.");
+      logError("Failed to write dnc status", { functionName: FUNCTION_NAME, correlationId, error: writeError });
+      return respondError(toolCallId, "I couldn't update our records just now — please try again.", correlationId);
     }
 
-    console.info("[add-outbound-dnc] Marked DNC:", {
-      phone,
-      reason: reason ?? null,
-      vapi_call_id: vapiCallId,
+    logInfo("Marked DNC", {
+      functionName: FUNCTION_NAME,
+      correlationId,
+      context: { phone, reason: reason ?? null, vapi_call_id: vapiCallId },
     });
 
     // ── 3. Return result to Vapi ──────────────────────────────────────────────
@@ -148,10 +153,11 @@ Deno.serve(async (req: Request) => {
     return respond(toolCallId, "Got it — that number has been added to our do-not-call list and won't be contacted again.");
 
   } catch (err: unknown) {
-    console.error("[add-outbound-dnc] Unhandled error:", err);
+    logError("Unhandled error", { functionName: FUNCTION_NAME, correlationId, error: err });
     return respondError(
       toolCallId,
-      "Something went wrong updating our records, but I've noted it — I'll make sure this number isn't called again."
+      "Something went wrong updating our records, but I've noted it — I'll make sure this number isn't called again.",
+      correlationId
     );
   }
 });

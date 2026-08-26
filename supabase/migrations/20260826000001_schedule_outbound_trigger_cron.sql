@@ -13,20 +13,35 @@
 --   select vault.create_secret('<same value as CRON_SECRET edge function secret>', 'outbound_trigger_cron_secret');
 -- (Run manually in the SQL editor — never commit the actual values.)
 
-create extension if not exists pg_cron with schema extensions;
-create extension if not exists pg_net with schema extensions;
+-- Wrapped in DO blocks (matching 20251210120000_add_provision_vapi_cron.sql
+-- and 20251210000001_auto_trigger_provision_worker.sql) so this migration
+-- still succeeds where pg_cron isn't available, e.g. local CI.
+DO $ext$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+  CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'pg_cron/pg_net extension not available, skipping cron setup: %', SQLERRM;
+END $ext$;
 
-select cron.schedule(
-  'trigger-outbound-calls',
-  '*/15 * * * *',
-  $$
-  select net.http_post(
-    url := (select decrypted_secret from vault.decrypted_secrets where name = 'outbound_trigger_url'),
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'outbound_trigger_cron_secret')
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    PERFORM cron.schedule(
+      'trigger-outbound-calls',
+      '*/15 * * * *',
+      $cron$
+      select net.http_post(
+        url := (select decrypted_secret from vault.decrypted_secrets where name = 'outbound_trigger_url'),
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'outbound_trigger_cron_secret')
+        ),
+        body := '{}'::jsonb
+      );
+      $cron$
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'Failed to schedule trigger-outbound-calls cron job: %', SQLERRM;
+END $do$;

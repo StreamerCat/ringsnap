@@ -19,7 +19,9 @@
  */
 
 import { createClient } from "supabase";
+import { logInfo, logError, extractCorrelationId } from "../_shared/logging.ts";
 
+const FUNCTION_NAME = "trigger-outbound-calls";
 const VAPI_ASSISTANT_ID = "e2329175-069b-457f-8984-0f2e62742ed8";
 const VAPI_PHONE_NUMBER_ID = "7c61b25d-d31f-4216-b5fb-1a877f5cf2be";
 const DEFAULT_BATCH_SIZE = 3;
@@ -42,10 +44,12 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const correlationId = extractCorrelationId(req);
+
   // ── Auth: shared secret, not a user JWT ─────────────────────────────────────
   const cronSecret = Deno.env.get("CRON_SECRET");
   if (!cronSecret) {
-    console.error("[trigger-outbound-calls] CRON_SECRET not configured — refusing to run");
+    logError("CRON_SECRET not configured — refusing to run", { functionName: FUNCTION_NAME, correlationId });
     return jsonResponse({ error: "not configured" }, 500);
   }
   if (req.headers.get("x-cron-secret") !== cronSecret) {
@@ -69,7 +73,7 @@ Deno.serve(async (req: Request) => {
     .limit(batchSize);
 
   if (leadsError) {
-    console.error("[trigger-outbound-calls] Failed to fetch leads:", leadsError);
+    logError("Failed to fetch leads", { functionName: FUNCTION_NAME, correlationId, error: leadsError });
     return jsonResponse({ error: "failed to fetch leads" }, 500);
   }
 
@@ -79,7 +83,7 @@ Deno.serve(async (req: Request) => {
 
   const vapiKey = Deno.env.get("VAPI_API_KEY");
   if (isLive && !vapiKey) {
-    console.error("[trigger-outbound-calls] OUTBOUND_DIALER_LIVE=true but VAPI_API_KEY missing");
+    logError("OUTBOUND_DIALER_LIVE=true but VAPI_API_KEY missing", { functionName: FUNCTION_NAME, correlationId });
     return jsonResponse({ error: "live mode requested but VAPI_API_KEY not set" }, 500);
   }
 
@@ -132,16 +136,18 @@ Deno.serve(async (req: Request) => {
       if (vapiRes.ok) {
         // Lead was already claimed into "calling" above; nothing further
         // to update on the lead row.
-        const { error: logError } = await supabase.from("outbound_call_log").insert({
+        const { error: insertError } = await supabase.from("outbound_call_log").insert({
           lead_id: lead.id,
           phone: lead.phone,
           vapi_call_id: vapiBody?.id ?? null,
           status: "initiated",
         });
-        if (logError) console.error("[trigger-outbound-calls] Failed to log call:", logError);
+        if (insertError) {
+          logError("Failed to log call", { functionName: FUNCTION_NAME, correlationId, error: insertError });
+        }
         results.push({ leadId: lead.id, phone: lead.phone, status: "initiated" });
       } else {
-        console.error("[trigger-outbound-calls] Vapi call failed:", vapiBody);
+        logError("Vapi call failed", { functionName: FUNCTION_NAME, correlationId, context: { vapiBody } });
         await supabase.from("outbound_call_log").insert({
           lead_id: lead.id,
           phone: lead.phone,
@@ -153,11 +159,18 @@ Deno.serve(async (req: Request) => {
           .from("outbound_leads")
           .update({ status: "call_failed", updated_at: new Date().toISOString() })
           .eq("id", lead.id);
-        if (releaseError) console.error("[trigger-outbound-calls] Failed to release lead:", releaseError);
+        if (releaseError) {
+          logError("Failed to release lead", { functionName: FUNCTION_NAME, correlationId, error: releaseError });
+        }
         results.push({ leadId: lead.id, phone: lead.phone, status: "failed" });
       }
     } catch (err) {
-      console.error("[trigger-outbound-calls] Unhandled error dialing lead:", lead.id, err);
+      logError("Unhandled error dialing lead", {
+        functionName: FUNCTION_NAME,
+        correlationId,
+        error: err,
+        context: { leadId: lead.id },
+      });
       await supabase.from("outbound_call_log").insert({
         lead_id: lead.id,
         phone: lead.phone,
@@ -167,10 +180,14 @@ Deno.serve(async (req: Request) => {
         .from("outbound_leads")
         .update({ status: "call_failed", updated_at: new Date().toISOString() })
         .eq("id", lead.id);
-      if (releaseError) console.error("[trigger-outbound-calls] Failed to release lead:", releaseError);
+      if (releaseError) {
+        logError("Failed to release lead", { functionName: FUNCTION_NAME, correlationId, error: releaseError });
+      }
       results.push({ leadId: lead.id, phone: lead.phone, status: "error" });
     }
   }
+
+  logInfo("Run complete", { functionName: FUNCTION_NAME, correlationId, context: { mode: isLive ? "live" : "dry_run", called: results.length } });
 
   return jsonResponse({ mode: isLive ? "live" : "dry_run", called: results.length, results });
 });
