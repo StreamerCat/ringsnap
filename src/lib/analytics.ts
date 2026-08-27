@@ -21,6 +21,8 @@
  *   - onboarding-flow-test
  *
  * Naming convention for flags: kebab-case, [surface]-[element]-[test/rollout]
+ *
+ * Self-driving experiments: Enabled via @posthog/react wrapper + surveys
  */
 
 import posthog from 'posthog-js';
@@ -72,6 +74,11 @@ function safePostHogGet<T>(action: string, fn: () => T): T | undefined {
  * Initialize PostHog. Call once at app startup (src/main.tsx), after Sentry.init().
  * Non-blocking — PostHog loads asynchronously via its `loaded` callback.
  * No-op if VITE_POSTHOG_KEY is not set.
+ * 
+ * Enables:
+ *   - Self-driving experiments (via feature flags)
+ *   - Session replay and recording
+ *   - Surveys and in-app messaging
  */
 export function initAnalytics(): void {
   if (!POSTHOG_KEY) {
@@ -89,6 +96,7 @@ export function initAnalytics(): void {
         ph.debug();
         console.log('[Analytics] PostHog initialized in debug mode');
       }
+      // Self-driving: flags are now ready for evaluation
     },
 
     // Session replay — site-wide at 100% to capture all signup/onboarding traffic
@@ -108,6 +116,11 @@ export function initAnalytics(): void {
 
     // Manual $pageview fired by RouteTracker in App.tsx; automatic $pageleave enabled
     persistence: 'localStorage+cookie',
+
+    // Self-driving: enable surveys and in-app messaging
+    surveys: {
+      autoCapture: true,  // Auto-capture survey interactions
+    },
   }));
 
   if (typeof window !== 'undefined') {
@@ -194,6 +207,8 @@ export function capture(
  *
  * $set properties (updated on re-identify):
  *   plan_key, billing_status, account_id, last_active_at
+ *
+ * Note: Re-identifying updates experiment variant evaluation for that user.
  */
 export function identify(
   userId: string,
@@ -207,6 +222,8 @@ export function identify(
 /**
  * Associate a user with a group (account).
  * Call on login if multi-user accounts are active.
+ *
+ * Used by self-driving experiments to segment by account/organization.
  *
  * @example
  * group('account', accountId, { plan_key: 'core' });
@@ -243,12 +260,15 @@ export function updateReplayForPath(path: string): void {
 }
 
 // ============================================================================
-// Feature flags
+// Feature flags (for self-driving experiments)
 // ============================================================================
 
 /**
  * Get a PostHog feature flag value (server-evaluated).
  * Returns undefined if PostHog is not initialized.
+ *
+ * Self-driving experiments: Flags are evaluated server-side based on user properties,
+ * experiment definitions in PostHog, and your targeting rules.
  *
  * Inactive Phase 1 flag stubs (require PostHog UI to activate):
  *   - 'hero-headline-test'
@@ -259,6 +279,9 @@ export function updateReplayForPath(path: string): void {
  *
  * @example
  * const variant = getFeatureFlag('hero-headline-test');
+ * if (variant === 'variant-a') return <HeroHeadlineA />;
+ * if (variant === 'variant-b') return <HeroHeadlineB />;
+ * return <HeroHeadlineControl />;
  */
 export function getFeatureFlag(flagKey: string): string | boolean | undefined {
   if (!POSTHOG_KEY) return undefined;
@@ -269,9 +292,13 @@ export function getFeatureFlag(flagKey: string): string | boolean | undefined {
  * React hook for PostHog feature flags.
  * Returns the flag value (re-evaluates when flags are refreshed).
  *
+ * Use this in components to gate experiment variants and self-driving features.
+ *
  * @example
  * const variant = useFeatureFlag('pricing-layout-test');
  * if (variant === 'compact') return <CompactPricing />;
+ * if (variant === 'standard') return <StandardPricing />;
+ * return <DefaultPricing />;
  */
 export function useFeatureFlag(flagKey: string): string | boolean | undefined {
   if (!POSTHOG_KEY) return undefined;
@@ -279,6 +306,50 @@ export function useFeatureFlag(flagKey: string): string | boolean | undefined {
   // posthog.getFeatureFlag is synchronous after flags load; no state needed
   // for more complex cases (flag loading state), wrap in usePostHog from posthog-js/react
   return safePostHogGet('useFeatureFlag', () => posthog.getFeatureFlag(flagKey));
+}
+
+/**
+ * Get the experiment variant for a flag.
+ * Used by self-driving to expose which variant group the user is in.
+ *
+ * @example
+ * const variant = getExperimentVariant('pricing-layout-test');
+ * console.log(`User is in ${variant} variant of pricing-layout-test`);
+ */
+export function getExperimentVariant(flagKey: string): string | boolean | undefined {
+  if (!POSTHOG_KEY) return undefined;
+  return safePostHogGet('getExperimentVariant', () => posthog.getExperimentVariant(flagKey));
+}
+
+// ============================================================================
+// Surveys (self-driving in-app messaging)
+// ============================================================================
+
+/**
+ * Manually trigger a survey by ID (if not auto-shown by PostHog).
+ * Useful for gating surveys behind user state or conditions.
+ *
+ * @example
+ * if (user.hasCompleted30DayTrial) {
+ *   showSurvey('survey-7c9c2e2d');
+ * }
+ */
+export function showSurvey(surveyId: string): void {
+  if (!POSTHOG_KEY) return;
+  safePostHogCall('showSurvey', () => {
+    posthog.surveys.showSurvey?.(surveyId);
+  });
+}
+
+/**
+ * Close all open surveys.
+ * Useful for forcing survey dismissal on navigation or state changes.
+ */
+export function closeSurveys(): void {
+  if (!POSTHOG_KEY) return;
+  safePostHogCall('closeSurveys', () => {
+    posthog.surveys.close?.();
+  });
 }
 
 // ============================================================================
@@ -313,5 +384,9 @@ export function useRouteTracking(pathname: string): void {
  * Direct access to the posthog instance.
  * Prefer the wrapper functions above. Use this only for advanced cases
  * (e.g., $set_once properties in identify, or posthog.onFeatureFlags callback).
+ *
+ * For self-driving features:
+ *   - posthog.onFeatureFlags(callback) — re-evaluate when flags change
+ *   - posthog.surveys — direct survey API access
  */
 export { posthog };
