@@ -917,9 +917,6 @@ Deno.serve(async (req: Request) => {
         ...baseLogOptions,
         context: { errors: zodError.errors, rawLeadId: rawData.leadId },
       });
-      captureCreateTrialException(zodError, "validate_input_schema", attemptedSignupData.email ?? "anonymous", {
-        validation_errors: zodError?.errors,
-      });
 
       return new Response(
         JSON.stringify({
