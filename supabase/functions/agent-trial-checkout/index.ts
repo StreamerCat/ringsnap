@@ -415,11 +415,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    await captureServerEvent("outbound_trial_creation_succeeded", distinctId, {
+    // NOT outbound_trial_creation_succeeded: a checkout session being created
+    // and texted doesn't mean the prospect completed it. That event is
+    // reserved for stripe-webhook, fired only after create-trial has
+    // actually created the account — otherwise abandoned checkout links
+    // would count as conversions here, and completed ones would be
+    // double-counted between this event and the webhook's.
+    await captureServerEvent("outbound_checkout_link_sent", distinctId, {
       signup_channel: "outbound_agent",
       call_id: vapiCallId,
       function_name: "agent-trial-checkout",
-      outcome: "trial_created",
+      outcome: "checkout_link_sent",
       plan_key: planKey,
       sms_sent: smsSent,
       duration_ms: Date.now() - _attemptStartedAt,

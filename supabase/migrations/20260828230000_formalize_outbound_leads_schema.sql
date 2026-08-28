@@ -71,8 +71,23 @@ CREATE TABLE IF NOT EXISTS public.outbound_checkout_log (
   plan_key TEXT,
   checkout_url TEXT,
   status TEXT NOT NULL,
+  account_id UUID,
+  retry_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- account_id/retry_count support retry-outbound-account-creation's durable
+-- retry sweep for checkouts whose create-trial adoption failed (a failure
+-- stripe-webhook can no longer recover on its own once record_stripe_event
+-- has marked the originating Stripe event id as seen).
+ALTER TABLE public.outbound_checkout_log ADD COLUMN IF NOT EXISTS account_id UUID;
+ALTER TABLE public.outbound_checkout_log ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_outbound_checkout_log_status
+  ON public.outbound_checkout_log (status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_outbound_checkout_log_stripe_session_id
+  ON public.outbound_checkout_log (stripe_session_id);
 
 CREATE TABLE IF NOT EXISTS public.outbound_sms_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

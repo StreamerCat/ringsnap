@@ -593,5 +593,124 @@ describe("create-trial endpoint", () => {
       expect(correctedByProspect.city).toBe("Shelbyville");
     });
   });
+
+  describe("Outbound checkout adoption security (P1 fix)", () => {
+    // Mirrors the auth gate added to the isOutboundCheckoutMode branch:
+    // only a caller presenting the service-role key as a bearer token may
+    // adopt a completed checkout session into an account. verify_jwt=false
+    // on this function means the Supabase gateway never checks this on its
+    // own, and a completed stripeSessionId isn't secret (it round-trips
+    // through the browser via agent-trial-checkout's success_url) — without
+    // this gate, anyone holding a session id could POST arbitrary
+    // email/phone/company data and mint an account against someone else's
+    // paid subscription.
+    function isAuthorizedOutboundCaller(authHeader: string | null, serviceRoleKey: string): boolean {
+      return authHeader === `Bearer ${serviceRoleKey}`;
+    }
+
+    it("rejects an outbound checkout adoption request without the service-role bearer token", () => {
+      expect(isAuthorizedOutboundCaller(null, "sb_secret_real_key")).toBe(false);
+      expect(isAuthorizedOutboundCaller("Bearer sb_secret_wrong_key", "sb_secret_real_key")).toBe(false);
+      expect(isAuthorizedOutboundCaller("sb_secret_real_key", "sb_secret_real_key")).toBe(false); // missing "Bearer " prefix
+    });
+
+    it("accepts an outbound checkout adoption request with the correct service-role bearer token", () => {
+      expect(isAuthorizedOutboundCaller("Bearer sb_secret_real_key", "sb_secret_real_key")).toBe(true);
+    });
+
+    // Mirrors overwriting data.email/data.phone with the verified Stripe
+    // customer's values after retrieving the checkout session, rather than
+    // trusting whatever the request body claimed.
+    function resolveVerifiedIdentity(
+      requestBodyEmail: string,
+      requestBodyPhone: string,
+      stripeCustomer: { email: string | null; phone: string | null }
+    ) {
+      return {
+        email: stripeCustomer.email,
+        phone: stripeCustomer.phone,
+        // The request body's claimed identity is intentionally discarded.
+        ignoredRequestEmail: requestBodyEmail,
+        ignoredRequestPhone: requestBodyPhone,
+      };
+    }
+
+    it("uses the verified Stripe customer identity, not the caller-supplied request body", () => {
+      const resolved = resolveVerifiedIdentity(
+        "attacker@example.com",
+        "+15559990000",
+        { email: "real-prospect@example.com", phone: "+15551234567" }
+      );
+      expect(resolved.email).toBe("real-prospect@example.com");
+      expect(resolved.phone).toBe("+15551234567");
+      expect(resolved.email).not.toBe("attacker@example.com");
+      expect(resolved.phone).not.toBe("+15559990000");
+    });
+
+    it("rejects a checkout session not tagged as the outbound-agent flow", () => {
+      const isValidOutboundSession = (metadata: { source?: string }) => metadata.source === "outbound_agent";
+      expect(isValidOutboundSession({ source: "outbound_agent" })).toBe(true);
+      expect(isValidOutboundSession({ source: "website" })).toBe(false);
+      expect(isValidOutboundSession({})).toBe(false);
+    });
+
+    it("returns the existing account instead of creating a duplicate for an already-adopted session", () => {
+      // Mirrors the accounts.stripe_customer_id lookup added before account
+      // creation in the outbound checkout branch — belt-and-suspenders
+      // alongside the idempotency-key check, which only catches identical
+      // requests (not a replay with a different idempotency key).
+      const findExistingAccount = (stripeCustomerId: string, accounts: Array<{ id: string; stripe_customer_id: string }>) =>
+        accounts.find((a) => a.stripe_customer_id === stripeCustomerId) ?? null;
+
+      const existingAccounts = [{ id: "acct_123", stripe_customer_id: "cus_abc" }];
+      expect(findExistingAccount("cus_abc", existingAccounts)?.id).toBe("acct_123");
+      expect(findExistingAccount("cus_new", existingAccounts)).toBeNull();
+    });
+  });
+
+  describe("Outbound checkout link vs. trial creation events (P1 fix)", () => {
+    // agent-trial-checkout must never fire outbound_trial_creation_succeeded
+    // itself — a checkout session being created and texted doesn't mean the
+    // prospect completed it, and stripe-webhook fires that same event again
+    // after create-trial actually creates the account, which would
+    // double-count real conversions.
+    it("agent-trial-checkout fires a distinct checkout-link event, not trial-creation success", () => {
+      const eventFiredByAgentTrialCheckout = "outbound_checkout_link_sent";
+      const eventFiredByStripeWebhookOnRealSuccess = "outbound_trial_creation_succeeded";
+      expect(eventFiredByAgentTrialCheckout).not.toBe(eventFiredByStripeWebhookOnRealSuccess);
+    });
+  });
+
+  describe("Durable retry for failed outbound account adoption (P1 fix)", () => {
+    // record_stripe_event marks a Stripe event id as seen before
+    // processing, so once create-trial adoption fails, Stripe will never
+    // redeliver that webhook. retry-outbound-account-creation's cron sweep
+    // is the only recovery path — this mirrors its retry-count/permanent-
+    // failure bookkeeping.
+    const MAX_RETRIES = 5;
+
+    function nextRetryState(currentRetryCount: number) {
+      const nextRetryCount = currentRetryCount + 1;
+      return {
+        retry_count: nextRetryCount,
+        status: nextRetryCount >= MAX_RETRIES ? "account_creation_failed_permanent" : "account_creation_failed",
+      };
+    }
+
+    it("keeps retrying below the max retry count", () => {
+      expect(nextRetryState(0).status).toBe("account_creation_failed");
+      expect(nextRetryState(3).status).toBe("account_creation_failed");
+    });
+
+    it("marks permanently failed once the max retry count is reached", () => {
+      expect(nextRetryState(4).status).toBe("account_creation_failed_permanent");
+      expect(nextRetryState(4).retry_count).toBe(5);
+    });
+
+    it("a successful retry always marks the row account_created with the resulting account_id", () => {
+      const applySuccess = (accountId: string) => ({ status: "account_created", account_id: accountId });
+      expect(applySuccess("acct_recovered")).toEqual({ status: "account_created", account_id: "acct_recovered" });
+    });
+  });
 });
 

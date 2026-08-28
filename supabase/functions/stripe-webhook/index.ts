@@ -1546,6 +1546,12 @@ serve(async (req) => {
                   duration_ms: durationMs,
                   account_linked: true,
                 });
+                // Marks the row so retry-outbound-account-creation's cron
+                // sweep never picks this session up again.
+                await supabase
+                  .from('outbound_checkout_log')
+                  .update({ status: 'account_created', account_id: resultBody.accountId })
+                  .eq('stripe_session_id', session.id);
               } else {
                 logError('create-trial rejected outbound checkout adoption', {
                   ...baseLogOptions,
@@ -1561,6 +1567,15 @@ serve(async (req) => {
                   vapi_call_id: vapiCallIdMeta,
                   duration_ms: durationMs,
                 });
+                // record_stripe_event above already marked this Stripe event
+                // id as seen, so a Stripe-side retry will never redeliver
+                // it — this status is what lets retry-outbound-account-
+                // creation's cron sweep pick the session back up instead of
+                // silently leaving a paid subscription with no account.
+                await supabase
+                  .from('outbound_checkout_log')
+                  .update({ status: 'account_creation_failed' })
+                  .eq('stripe_session_id', session.id);
               }
             } catch (invokeErr) {
               logError('Failed to invoke create-trial for outbound checkout', {
@@ -1577,6 +1592,10 @@ serve(async (req) => {
                 vapi_call_id: vapiCallIdMeta,
                 duration_ms: Date.now() - createTrialStart,
               });
+              await supabase
+                .from('outbound_checkout_log')
+                .update({ status: 'account_creation_failed' })
+                .eq('stripe_session_id', session.id);
             }
           }
         }

@@ -1156,6 +1156,32 @@ Deno.serve(async (req: Request) => {
       phase = "outbound_checkout_verify";
       if (!stripe) throw new Error("Stripe not initialized");
 
+      // This path bypasses the normal Stripe customer/payment-method/
+      // subscription creation, so it must not be reachable by an arbitrary
+      // caller: verify_jwt=false on this function means the gateway does
+      // not check the Authorization header at all, and a completed
+      // stripeSessionId isn't secret (it round-trips through the browser
+      // in agent-trial-checkout's success_url). Without this check, anyone
+      // who obtained a completed session id could call create-trial
+      // directly with a different email/phone/company and mint an account
+      // against someone else's paid subscription. Only stripe-webhook (the
+      // sole legitimate caller, invoking server-to-server with the service
+      // role key) is expected to pass this.
+      const outboundAuthHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+      if (outboundAuthHeader !== `Bearer ${supabaseServiceRoleKey}`) {
+        logError("Unauthorized outbound checkout adoption attempt", {
+          ...baseLogOptions,
+          context: { stripeSessionId: data.stripeSessionId },
+        });
+        captureCreateTrialException(new Error("Unauthorized outbound checkout adoption attempt"), "outbound_checkout_auth", "anonymous", {
+          stripe_session_id: data.stripeSessionId,
+        });
+        return new Response(
+          JSON.stringify({ success: false, error: "Unauthorized", errorCode: "UNAUTHORIZED" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       try {
         const checkoutSession = await stripe.checkout.sessions.retrieve(data.stripeSessionId!, {
           expand: ["subscription", "customer"],
@@ -1170,11 +1196,52 @@ Deno.serve(async (req: Request) => {
         if (typeof checkoutSession.subscription === "string" || !checkoutSession.subscription) {
           throw new Error("Checkout session has no expanded subscription");
         }
+        if (checkoutSession.metadata?.source !== "outbound_agent") {
+          throw new Error("Checkout session was not created by the outbound agent flow");
+        }
 
         customer = checkoutSession.customer;
         subscription = checkoutSession.subscription;
         stripeCustomerId = customer.id;
         stripeSubscriptionId = subscription.id;
+
+        // Identity comes from the verified Stripe objects, never from the
+        // request body — a caller (even an authorized internal one with a
+        // bug upstream) cannot bind this session's paid subscription to an
+        // email/phone of its own choosing.
+        const verifiedEmail = checkoutSession.customer_details?.email || customer.email;
+        const verifiedPhone = customer.phone;
+        if (!verifiedEmail) {
+          throw new Error("Checkout session has no verified customer email");
+        }
+        if (!verifiedPhone) {
+          throw new Error("Checkout session has no verified customer phone");
+        }
+        data.email = verifiedEmail;
+        data.phone = verifiedPhone;
+
+        // Reject replaying an already-adopted session against a different
+        // account (belt-and-suspenders alongside the idempotency-key check
+        // above, which only protects identical requests).
+        const { data: alreadyAdopted } = await supabase
+          .from("accounts")
+          .select("id")
+          .eq("stripe_customer_id", stripeCustomerId)
+          .maybeSingle();
+        if (alreadyAdopted) {
+          logWarn("Outbound checkout session's Stripe customer already has an account", {
+            ...baseLogOptions,
+            context: { stripeSessionId: data.stripeSessionId, stripeCustomerId, existingAccountId: alreadyAdopted.id },
+          });
+          return new Response(
+            JSON.stringify({
+              success: true,
+              accountId: alreadyAdopted.id,
+              message: "Account already exists for this checkout session.",
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         logInfo("Adopted outbound checkout session", {
           ...baseLogOptions,
