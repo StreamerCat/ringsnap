@@ -204,10 +204,22 @@ const createTrialSchema = z.object({
   // Accept new plan keys AND legacy keys (all new signups default to night_weekend)
   planType: z.enum(["night_weekend", "lite", "core", "pro", "starter", "professional", "premium"])
     .default("night_weekend"),
-  paymentMethodId: z.string().min(1, "Payment method required"),
+  // Required for the website/sales flows (a real Stripe payment method is attached here).
+  // Optional for the outbound-agent flow, which instead passes stripeSessionId — the
+  // prospect already completed a hosted Stripe Checkout (with card) via the SMS link
+  // sent by agent-trial-checkout, so there's no raw payment method to attach here.
+  paymentMethodId: z.string().min(1, "Payment method required").optional(),
+
+  // Outbound-agent flow only: an already-completed Stripe Checkout Session to adopt
+  // instead of creating a new Stripe customer/subscription. See "OUTBOUND CHECKOUT MODE" below.
+  stripeSessionId: z.string().optional(),
+  // Optional passthrough for correlating back to the originating outbound call.
+  vapiCallId: z.string().optional(),
+  // Outbound leads carry a known state (from the lead record) rather than a zip code.
+  billingState: z.string().length(2).optional(),
 
   // Source tracking (CRITICAL - differentiates flows)
-  source: z.enum(["website", "sales"]).default("website"),
+  source: z.enum(["website", "sales", "outbound_agent"]).default("website"),
   salesRepName: z.string().max(100).optional(),
 
   // Optional metadata
@@ -222,6 +234,14 @@ const createTrialSchema = z.object({
   teamSize: z.string().max(50).optional(),
   coveragePreference: z.enum(["after_hours_only", "24_7"]).optional(),
   selectedPostTrialPlan: z.enum(["night_weekend", "lite", "core", "pro"]).optional(),
+}).superRefine((val, ctx) => {
+  if (!val.paymentMethodId && !val.stripeSessionId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either paymentMethodId or stripeSessionId is required",
+      path: ["paymentMethodId"],
+    });
+  }
 });
 
 /**
@@ -988,6 +1008,11 @@ Deno.serve(async (req: Request) => {
     // Bypass mode: Skip Stripe (used by test mode or explicit bypass)
     const isBypassMode = isTestMode || data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
 
+    // Outbound checkout mode: the prospect already completed a hosted Stripe Checkout
+    // (card collected there, not on the call — see agent-trial-checkout). Adopt the
+    // existing customer/subscription instead of creating new Stripe objects.
+    const isOutboundCheckoutMode = data.source === "outbound_agent" && !!data.stripeSessionId;
+
     // Log mode clearly for debugging
     logInfo(`Trial creation mode: ${isTestMode ? "TEST" : "LIVE"}`, {
       ...baseLogOptions,
@@ -1126,6 +1151,58 @@ Deno.serve(async (req: Request) => {
       subscription = { id: `sub_bypass_${Date.now()}`, status: 'active' };
       stripeCustomerId = customer.id;
       stripeSubscriptionId = subscription.id;
+    } else if (isOutboundCheckoutMode) {
+      // Outbound Checkout Adoption Flow
+      phase = "outbound_checkout_verify";
+      if (!stripe) throw new Error("Stripe not initialized");
+
+      try {
+        const checkoutSession = await stripe.checkout.sessions.retrieve(data.stripeSessionId!, {
+          expand: ["subscription", "customer"],
+        });
+
+        if (checkoutSession.payment_status !== "paid" && checkoutSession.status !== "complete") {
+          throw new Error(`Checkout session not completed (status=${checkoutSession.status}, payment_status=${checkoutSession.payment_status})`);
+        }
+        if (typeof checkoutSession.customer === "string" || !checkoutSession.customer) {
+          throw new Error("Checkout session has no expanded customer");
+        }
+        if (typeof checkoutSession.subscription === "string" || !checkoutSession.subscription) {
+          throw new Error("Checkout session has no expanded subscription");
+        }
+
+        customer = checkoutSession.customer;
+        subscription = checkoutSession.subscription;
+        stripeCustomerId = customer.id;
+        stripeSubscriptionId = subscription.id;
+
+        logInfo("Adopted outbound checkout session", {
+          ...baseLogOptions,
+          context: {
+            stripeSessionId: data.stripeSessionId,
+            customerId: customer.id,
+            subscriptionId: subscription.id,
+            subscriptionStatus: subscription.status,
+          },
+        });
+      } catch (e: any) {
+        logError("Failed to verify outbound checkout session", {
+          ...baseLogOptions,
+          error: e,
+          context: { phase, stripeSessionId: data.stripeSessionId },
+        });
+        captureCreateTrialException(e, "outbound_checkout_verify", data.email ?? "anonymous", {
+          user_email: data.email,
+          stripe_session_id: data.stripeSessionId,
+        });
+
+        const errorResponse = mapStripeErrorToUserError(e, phase, correlationId, request_id);
+        const status = ENABLE_STRUCTURED_TRIAL_ERRORS ? 400 : 200;
+        return new Response(JSON.stringify(errorResponse), {
+          status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
     } else {
       // Real Stripe Flow
       if (!stripe) throw new Error("Stripe not initialized");
@@ -1256,7 +1333,7 @@ Deno.serve(async (req: Request) => {
 
     const tempPassword = generateSecurePassword();
     const trialEndDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    const billingState = data.zipCode ? getStateFromZip(data.zipCode) : "CA";
+    const billingState = data.billingState || (data.zipCode ? getStateFromZip(data.zipCode) : "CA");
 
     let businessHoursValue = null;
     if (data.businessHours) {
@@ -1325,6 +1402,11 @@ Deno.serve(async (req: Request) => {
       service_area: data.serviceArea || null,
       emergency_policy: data.emergencyPolicy || null,
       billing_state: billingState,
+      // accounts.signup_channel is a free TEXT column (its old enum type was
+      // dropped by the 20251120999999 rollback migration). Only set it
+      // explicitly for the outbound-agent flow; other sources leave it
+      // unset, matching existing (pre-this-change) behavior.
+      ...(data.source === "outbound_agent" ? { signup_channel: "outbound_agent" } : {}),
     };
 
     // Normalize assistant_gender to match SQL constraint (male|female)

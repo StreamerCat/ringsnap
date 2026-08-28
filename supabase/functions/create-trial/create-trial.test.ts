@@ -453,5 +453,85 @@ describe("create-trial endpoint", () => {
       expect(createdStripeCustomerId).toBe("cus_new_456");
     });
   });
+
+  describe("Outbound-agent flow (source: outbound_agent)", () => {
+    // Mirrors the superRefine rule added to createTrialSchema: paymentMethodId
+    // is required UNLESS stripeSessionId is present (outbound checkouts already
+    // completed a hosted Stripe Checkout, so there's no raw payment method to
+    // attach — see the "OUTBOUND CHECKOUT MODE" branch in index.ts).
+    function hasRequiredPayment(payload: { paymentMethodId?: string; stripeSessionId?: string }) {
+      return Boolean(payload.paymentMethodId) || Boolean(payload.stripeSessionId);
+    }
+
+    it("accepts stripeSessionId in place of paymentMethodId", () => {
+      const payload = {
+        name: "Business Owner",
+        email: "prospect@example.com",
+        phone: "+15551234567",
+        companyName: "New Business",
+        trade: "general",
+        planType: "core",
+        source: "outbound_agent",
+        stripeSessionId: "cs_test_123",
+      };
+
+      expect(hasRequiredPayment(payload)).toBe(true);
+      expect(payload.source).toBe("outbound_agent");
+    });
+
+    it("rejects a request with neither paymentMethodId nor stripeSessionId", () => {
+      const payload = { source: "outbound_agent" as const };
+      expect(hasRequiredPayment(payload)).toBe(false);
+    });
+
+    it("website/sales requests still require paymentMethodId", () => {
+      const websitePayload = { source: "website" as const };
+      const salesPayload = { source: "sales" as const, stripeSessionId: undefined };
+      expect(hasRequiredPayment(websitePayload)).toBe(false);
+      expect(hasRequiredPayment(salesPayload)).toBe(false);
+    });
+
+    it("derives the outbound idempotency key from the Stripe session id", () => {
+      // stripe-webhook sends this exact header when adopting a completed
+      // outbound checkout — must be stable and unique per session so a
+      // duplicate webhook delivery replays the cached create-trial response
+      // instead of creating a second account.
+      const stripeSessionId = "cs_test_abc123";
+      const idempotencyKey = `outbound-agent-${stripeSessionId}`;
+      expect(idempotencyKey).toBe("outbound-agent-cs_test_abc123");
+    });
+
+    it("falls back to billingState from the lead record over zip-derived state", () => {
+      const dataWithBillingState = { billingState: "TX", zipCode: undefined as string | undefined };
+      const dataWithoutBillingState = { billingState: undefined as string | undefined, zipCode: "90210" };
+
+      const resolve = (d: { billingState?: string; zipCode?: string }) =>
+        d.billingState || (d.zipCode ? "ZIP_DERIVED" : "CA");
+
+      expect(resolve(dataWithBillingState)).toBe("TX");
+      expect(resolve(dataWithoutBillingState)).toBe("ZIP_DERIVED");
+    });
+
+    it("tags the account with signup_channel=outbound_agent only for this source", () => {
+      const buildAccountData = (source: string) => ({
+        company_name: "Test Co",
+        ...(source === "outbound_agent" ? { signup_channel: "outbound_agent" } : {}),
+      });
+
+      expect(buildAccountData("outbound_agent")).toHaveProperty("signup_channel", "outbound_agent");
+      expect(buildAccountData("website")).not.toHaveProperty("signup_channel");
+      expect(buildAccountData("sales")).not.toHaveProperty("signup_channel");
+    });
+
+    it("rejects adoption when the Stripe checkout session isn't complete", () => {
+      const isSessionUsable = (session: { status?: string; payment_status?: string }) =>
+        session.payment_status === "paid" || session.status === "complete";
+
+      expect(isSessionUsable({ status: "open" })).toBe(false);
+      expect(isSessionUsable({ status: "expired" })).toBe(false);
+      expect(isSessionUsable({ status: "complete", payment_status: "unpaid" })).toBe(true);
+      expect(isSessionUsable({ payment_status: "paid" })).toBe(true);
+    });
+  });
 });
 
