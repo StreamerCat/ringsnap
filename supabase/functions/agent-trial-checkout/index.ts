@@ -133,11 +133,15 @@ Deno.serve(async (req: Request) => {
   }
 
   let toolCallId = "unknown";
+  // Hoisted so the outer catch can still tag a failure with the correct
+  // distinct id / call_id — a Stripe error thrown after this is parsed
+  // must not lose call correlation just because it's now in the catch.
+  let vapiCallId: string | null = null;
 
   try {
     const body = await req.json();
     const toolCall = body?.message?.toolCallList?.[0];
-    const vapiCallId = body?.message?.call?.id ?? null;
+    vapiCallId = body?.message?.call?.id ?? null;
 
     if (!toolCall) {
       return respond("unknown", "No tool call found in request.");
@@ -329,6 +333,7 @@ Deno.serve(async (req: Request) => {
 
     // Upsert lead record (find existing by phone or create new)
     let leadId: string | null = null;
+    let dbLoggingFailed = false;
     try {
       const { data: existingLead } = await supabase
         .from("outbound_leads")
@@ -396,6 +401,7 @@ Deno.serve(async (req: Request) => {
       // Non-fatal for the caller (checkout was created, SMS sent) but this
       // is the step that actually records the lead→trial conversion, so it
       // must be visible in monitoring rather than only console.error.
+      dbLoggingFailed = true;
       console.error("[agent-trial-checkout] DB logging failed:", dbErr);
       await captureServerException(dbErr, distinctId, {
         signup_channel: "outbound_agent",
@@ -421,6 +427,11 @@ Deno.serve(async (req: Request) => {
     // actually created the account — otherwise abandoned checkout links
     // would count as conversions here, and completed ones would be
     // double-counted between this event and the webhook's.
+    //
+    // Skipped when DB logging just failed above: firing both the failure
+    // event and this one for the same attempt would double-count it and
+    // corrupt the succeeded/(succeeded+failed) success-rate metric.
+    if (!dbLoggingFailed) {
     await captureServerEvent("outbound_checkout_link_sent", distinctId, {
       signup_channel: "outbound_agent",
       call_id: vapiCallId,
@@ -430,6 +441,7 @@ Deno.serve(async (req: Request) => {
       sms_sent: smsSent,
       duration_ms: Date.now() - _attemptStartedAt,
     });
+    }
     await flushServerAnalytics();
 
     // ── 5. Return result to Vapi ──────────────────────────────────────────────
@@ -455,14 +467,22 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: unknown) {
     console.error("[agent-trial-checkout] Unhandled error:", err);
-    const distinctId = toolCallId;
+    // Matches the distinct id used by every other event in this function —
+    // without this, a Stripe error thrown here would be tagged under a
+    // different distinct id and with no call_id/vapi_call_id, making it
+    // unjoinable to the originating call.
+    const distinctId = vapiCallId ?? toolCallId;
     await captureServerException(err, distinctId, {
       signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
       function_name: "agent-trial-checkout",
       failure_stage: "unhandled",
     });
     await captureServerEvent("outbound_trial_creation_failed", distinctId, {
       signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
       function_name: "agent-trial-checkout",
       outcome: "trial_failed",
       failure_stage: "unhandled",

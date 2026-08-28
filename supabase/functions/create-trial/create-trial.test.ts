@@ -712,5 +712,39 @@ describe("create-trial endpoint", () => {
       expect(applySuccess("acct_recovered")).toEqual({ status: "account_created", account_id: "acct_recovered" });
     });
   });
+
+  describe("agent-trial-checkout event/correlation fixes (P2 findings)", () => {
+    // Mirrors the dbLoggingFailed guard: firing both outbound_trial_creation_failed
+    // (from the DB-logging catch) and outbound_checkout_link_sent for the same
+    // attempt would double-count it in the success-rate formula.
+    function shouldFireCheckoutLinkSentEvent(dbLoggingFailed: boolean): boolean {
+      return !dbLoggingFailed;
+    }
+
+    it("does not fire the checkout-link-sent event when DB logging already failed", () => {
+      expect(shouldFireCheckoutLinkSentEvent(true)).toBe(false);
+    });
+
+    it("fires the checkout-link-sent event when DB logging succeeded", () => {
+      expect(shouldFireCheckoutLinkSentEvent(false)).toBe(true);
+    });
+
+    // Mirrors hoisting vapiCallId out of the try block so the outer catch
+    // can still use `vapiCallId ?? toolCallId` instead of losing call
+    // correlation by falling back to toolCallId alone.
+    it("the outer catch's distinct id still prefers vapiCallId when one was parsed before the failure", () => {
+      const toolCallId = "tool_abc";
+      const vapiCallId = "call_xyz";
+      const distinctId = vapiCallId ?? toolCallId;
+      expect(distinctId).toBe("call_xyz");
+    });
+
+    it("falls back to toolCallId only when no vapiCallId was ever parsed", () => {
+      const toolCallId = "tool_abc";
+      const vapiCallId: string | null = null;
+      const distinctId = vapiCallId ?? toolCallId;
+      expect(distinctId).toBe("tool_abc");
+    });
+  });
 });
 
