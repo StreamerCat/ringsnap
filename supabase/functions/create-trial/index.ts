@@ -117,6 +117,26 @@ function captureCreateTrialException(
     error_message: err instanceof Error ? err.message : String(err),
     ...context,
   }, distinctId);
+
+  // Additive: a distinct error_encountered event per failure point. `step`
+  // is already a distinct string per call site (e.g.
+  // "stripe_customer_create", "validation_phone",
+  // "supabase_insert_account"), so it doubles as failure_stage without
+  // needing to touch every catch block individually — every call site that
+  // already reports here gets this for free.
+  const e = err instanceof Error ? err : new Error(String(err));
+  capturePostHogEvent("error_encountered", distinctId, {
+    environment: Deno.env.get("NODE_ENV") === "production" ? "production" : Deno.env.get("NODE_ENV") ?? "development",
+    flow: "create_trial",
+    function_name: FUNCTION_NAME,
+    failure_stage: step,
+    error_code: (err as { name?: string; code?: string })?.name ?? (err as { name?: string; code?: string })?.code ?? "UnknownError",
+    failure_reason: e.message,
+    correlation_id: (context.correlation_id as string | undefined) ?? null,
+    lead_id: (context.lead_id as string | undefined) ?? null,
+    account_id: (context.account_id as string | undefined) ?? null,
+    retry_count: (context.retry_count as number | undefined) ?? 0,
+  });
 }
 
 const FUNCTION_NAME = "create-trial";

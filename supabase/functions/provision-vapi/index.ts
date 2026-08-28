@@ -53,7 +53,14 @@ async function capturePostHog(event: string, distinctId: string, props: Record<s
         api_key: key,
         event,
         distinct_id: distinctId,
-        properties: { ...props, $lib: "provision-vapi" },
+        properties: {
+          // Additive default — every existing call site gets this without
+          // needing to be touched individually; explicit `environment` in
+          // props (none currently pass one) would still take precedence.
+          environment: Deno.env.get("NODE_ENV") === "production" ? "production" : Deno.env.get("NODE_ENV") ?? "development",
+          ...props,
+          $lib: "provision-vapi",
+        },
         timestamp: new Date().toISOString(),
       }),
     });
@@ -747,6 +754,8 @@ async function processJob(job: any, supabase: any): Promise<void> {
     },
   });
 
+  const provisioningStartedAt = Date.now();
+
   try {
     // Mark job as processing
     await supabase.from("provisioning_jobs").update({
@@ -763,6 +772,10 @@ async function processJob(job: any, supabase: any): Promise<void> {
       account_id: job.account_id,
       job_id: job.id,
       attempt: job.attempts || 1,
+      correlation_id: correlationId,
+      // Not tracked on provisioning_jobs today — pass null rather than
+      // adding a DB lookup/restructure to obtain it.
+      source_channel: job.source_channel ?? job.signup_channel ?? null,
     });
 
     // CHECK FOR SIMULATED FAILURE (E2E TESTING)
@@ -929,6 +942,16 @@ async function processJob(job: any, supabase: any): Promise<void> {
             timestamp: new Date().toISOString(),
           },
         }).eq("id", job.id);
+        capturePostHog("provisioning_failed", job.user_id || job.account_id, {
+          account_id: job.account_id,
+          job_id: job.id,
+          correlation_id: correlationId,
+          source_channel: job.source_channel ?? job.signup_channel ?? null,
+          failure_stage: "vapi_agent_create",
+          error_code: assistantErr?.name ?? assistantErr?.code ?? "VAPI_ASSISTANT_FAILED",
+          failure_reason: assistantErr?.message ?? String(assistantErr),
+          duration_ms: Date.now() - provisioningStartedAt,
+        });
         throw assistantErr;
       }
     }
@@ -1028,6 +1051,16 @@ async function processJob(job: any, supabase: any): Promise<void> {
           attempt: newAttempts,
           assistant_succeeded: true,
         });
+        capturePostHog("provisioning_failed", job.user_id || job.account_id, {
+          account_id: job.account_id,
+          job_id: job.id,
+          correlation_id: correlationId,
+          source_channel: job.source_channel ?? job.signup_channel ?? null,
+          failure_stage: "twilio_number_purchase",
+          error_code: errorCode,
+          failure_reason: phoneErr?.message ?? String(phoneErr),
+          duration_ms: Date.now() - provisioningStartedAt,
+        });
 
         // Send admin notification for provisioning failure
         await sendProvisioningFailureAdmin(supabase, job, phoneErr, errorCode, newAttempts, baseLogOptions);
@@ -1114,6 +1147,9 @@ async function processJob(job: any, supabase: any): Promise<void> {
       job_id: job.id,
       phone_number: phoneE164,
       attempts: job.attempts || 1,
+      correlation_id: correlationId,
+      source_channel: job.source_channel ?? job.signup_channel ?? null,
+      duration_ms: Date.now() - provisioningStartedAt,
     });
 
     // Notify customer via email + SMS that their number is ready
@@ -1205,6 +1241,20 @@ async function processJob(job: any, supabase: any): Promise<void> {
         attempt: newAttempts,
         is_permanent: false
       });
+      // Previously missing: only the permanent-failure branch below fired
+      // this to PostHog, so retryable failures were invisible there.
+      capturePostHog("provisioning_failed", job.user_id || job.account_id, {
+        account_id: job.account_id,
+        job_id: job.id,
+        correlation_id: correlationId,
+        source_channel: job.source_channel ?? job.signup_channel ?? null,
+        failure_stage: errorCode.toLowerCase(),
+        error_code: errorCode,
+        failure_reason: error?.message ?? String(error),
+        attempt: newAttempts,
+        is_permanent: false,
+        duration_ms: Date.now() - provisioningStartedAt,
+      });
     } else {
       // Permanent failure
       await supabase.from("provisioning_jobs").update({
@@ -1240,6 +1290,11 @@ async function processJob(job: any, supabase: any): Promise<void> {
         error_code: errorCode,
         attempt: newAttempts,
         is_permanent: true,
+        correlation_id: correlationId,
+        source_channel: job.source_channel ?? job.signup_channel ?? null,
+        failure_stage: errorCode.toLowerCase(),
+        failure_reason: error?.message ?? String(error),
+        duration_ms: Date.now() - provisioningStartedAt,
       });
 
       if (job.user_id) {
