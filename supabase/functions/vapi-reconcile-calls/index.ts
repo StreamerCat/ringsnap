@@ -70,22 +70,19 @@ Deno.serve(async (req) => {
         }
 
         if (!ourNumbers || ourNumbers.length === 0) {
+            // Don't bail out here: an empty/all-unassigned phone_numbers table
+            // is exactly the scenario where every active Vapi number would be
+            // orphaned, and we still need to fetch Vapi's calls below to be
+            // able to detect and report that.
             console.log(JSON.stringify({
-                event: "reconcile_skipped",
-                reason: "no_phone_numbers",
+                event: "reconcile_no_mapped_numbers",
+                reason: "no_phone_numbers_with_account",
             }));
-            return new Response(JSON.stringify({
-                status: "skipped",
-                reason: "No phone numbers in database"
-            }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-            });
         }
 
         // Build lookup map by vapi phone id
         const phoneMap = new Map<string, { accountId: string; phoneNumberId: string }>();
-        for (const num of ourNumbers) {
+        for (const num of ourNumbers ?? []) {
             const vapiId = num.vapi_phone_id || num.provider_phone_number_id;
             if (vapiId) {
                 phoneMap.set(vapiId, {
