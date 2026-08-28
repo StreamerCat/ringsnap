@@ -57,7 +57,7 @@ async function capturePostHog(event: string, distinctId: string, props: Record<s
           // Additive default — every existing call site gets this without
           // needing to be touched individually; explicit `environment` in
           // props (none currently pass one) would still take precedence.
-          environment: Deno.env.get("NODE_ENV") === "production" ? "production" : Deno.env.get("NODE_ENV") ?? "development",
+          environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
           ...props,
           $lib: "provision-vapi",
         },
@@ -952,6 +952,11 @@ async function processJob(job: any, supabase: any): Promise<void> {
           failure_reason: assistantErr?.message ?? String(assistantErr),
           duration_ms: Date.now() - provisioningStartedAt,
         });
+        // Marks this error as already reported so the outer catch below
+        // (which every rethrow reaches) doesn't emit a second
+        // provisioning_failed for the same attempt with a less specific
+        // failure_stage.
+        assistantErr.__provisioningFailedAlreadyEmitted = true;
         throw assistantErr;
       }
     }
@@ -1056,7 +1061,12 @@ async function processJob(job: any, supabase: any): Promise<void> {
           job_id: job.id,
           correlation_id: correlationId,
           source_channel: job.source_channel ?? job.signup_channel ?? null,
-          failure_stage: "twilio_number_purchase",
+          // This catch wraps the entire provisionVapiPhone call (pooled-
+          // number binding, Twilio purchase, Vapi import, DB persist), so
+          // failure_stage is derived from the already-computed errorCode
+          // rather than hardcoded to one substep — a failed Vapi import or
+          // DB insert would otherwise be misreported as a Twilio problem.
+          failure_stage: errorCode.toLowerCase(),
           error_code: errorCode,
           failure_reason: phoneErr?.message ?? String(phoneErr),
           duration_ms: Date.now() - provisioningStartedAt,
@@ -1243,18 +1253,23 @@ async function processJob(job: any, supabase: any): Promise<void> {
       });
       // Previously missing: only the permanent-failure branch below fired
       // this to PostHog, so retryable failures were invisible there.
-      capturePostHog("provisioning_failed", job.user_id || job.account_id, {
-        account_id: job.account_id,
-        job_id: job.id,
-        correlation_id: correlationId,
-        source_channel: job.source_channel ?? job.signup_channel ?? null,
-        failure_stage: errorCode.toLowerCase(),
-        error_code: errorCode,
-        failure_reason: error?.message ?? String(error),
-        attempt: newAttempts,
-        is_permanent: false,
-        duration_ms: Date.now() - provisioningStartedAt,
-      });
+      // Skipped when a more specific inner catch (e.g. assistant creation)
+      // already emitted provisioning_failed for this exact error before
+      // rethrowing — avoids double-counting one failed attempt as two.
+      if (!error.__provisioningFailedAlreadyEmitted) {
+        capturePostHog("provisioning_failed", job.user_id || job.account_id, {
+          account_id: job.account_id,
+          job_id: job.id,
+          correlation_id: correlationId,
+          source_channel: job.source_channel ?? job.signup_channel ?? null,
+          failure_stage: errorCode.toLowerCase(),
+          error_code: errorCode,
+          failure_reason: error?.message ?? String(error),
+          attempt: newAttempts,
+          is_permanent: false,
+          duration_ms: Date.now() - provisioningStartedAt,
+        });
+      }
     } else {
       // Permanent failure
       await supabase.from("provisioning_jobs").update({
@@ -1283,19 +1298,23 @@ async function processJob(job: any, supabase: any): Promise<void> {
         attempt: newAttempts,
         is_permanent: true
       });
-      capturePostHog("provisioning_failed", job.user_id || job.account_id, {
-        account_id: job.account_id,
-        job_id: job.id,
-        error: error.message,
-        error_code: errorCode,
-        attempt: newAttempts,
-        is_permanent: true,
-        correlation_id: correlationId,
-        source_channel: job.source_channel ?? job.signup_channel ?? null,
-        failure_stage: errorCode.toLowerCase(),
-        failure_reason: error?.message ?? String(error),
-        duration_ms: Date.now() - provisioningStartedAt,
-      });
+      // Skipped when a more specific inner catch already emitted
+      // provisioning_failed for this exact error before rethrowing.
+      if (!error.__provisioningFailedAlreadyEmitted) {
+        capturePostHog("provisioning_failed", job.user_id || job.account_id, {
+          account_id: job.account_id,
+          job_id: job.id,
+          error: error.message,
+          error_code: errorCode,
+          attempt: newAttempts,
+          is_permanent: true,
+          correlation_id: correlationId,
+          source_channel: job.source_channel ?? job.signup_channel ?? null,
+          failure_stage: errorCode.toLowerCase(),
+          failure_reason: error?.message ?? String(error),
+          duration_ms: Date.now() - provisioningStartedAt,
+        });
+      }
 
       if (job.user_id) {
         await supabase.from("profiles").update({

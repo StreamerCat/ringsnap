@@ -256,7 +256,12 @@ export default function Start() {
       app_surface: 'marketing',
       page_path: window.location.pathname,
     });
-    sessionStorage.setItem('trial_submit_at', String(Date.now()));
+    try {
+      sessionStorage.setItem('trial_submit_at', String(Date.now()));
+    } catch {
+      // Best-effort — storage can throw (blocked/private browsing) and
+      // must never abort a valid submission.
+    }
 
     try {
       if (IS_DEV) console.log('[Start] Capturing lead:', { name: trimmedName, email: trimmedEmail });

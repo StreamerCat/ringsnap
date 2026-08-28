@@ -124,19 +124,36 @@ function captureCreateTrialException(
   // "supabase_insert_account"), so it doubles as failure_stage without
   // needing to touch every catch block individually — every call site that
   // already reports here gets this for free.
-  const e = err instanceof Error ? err : new Error(String(err));
-  capturePostHogEvent("error_encountered", distinctId, {
-    environment: Deno.env.get("NODE_ENV") === "production" ? "production" : Deno.env.get("NODE_ENV") ?? "development",
-    flow: "create_trial",
-    function_name: FUNCTION_NAME,
-    failure_stage: step,
-    error_code: (err as { name?: string; code?: string })?.name ?? (err as { name?: string; code?: string })?.code ?? "UnknownError",
-    failure_reason: e.message,
-    correlation_id: (context.correlation_id as string | undefined) ?? null,
-    lead_id: (context.lead_id as string | undefined) ?? null,
-    account_id: (context.account_id as string | undefined) ?? null,
-    retry_count: (context.retry_count as number | undefined) ?? 0,
-  });
+  //
+  // Excludes routine, expected control-flow rejections (invalid phone,
+  // disposable email, rate limiting, account-already-exists) — these are
+  // handled 400/409/429 responses, not operational failures, and firing
+  // error_encountered for every one of them would make the event useless
+  // for alerting ("3+ failures in 15 minutes" would trip on normal traffic).
+  if (!isExpectedValidationRejection(step)) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    capturePostHogEvent("error_encountered", distinctId, {
+      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+      flow: "create_trial",
+      function_name: FUNCTION_NAME,
+      failure_stage: step,
+      error_code: (err as { name?: string; code?: string })?.name ?? (err as { name?: string; code?: string })?.code ?? "UnknownError",
+      failure_reason: e.message,
+      correlation_id: (context.correlation_id as string | undefined) ?? null,
+      lead_id: (context.lead_id as string | undefined) ?? null,
+      account_id: (context.account_id as string | undefined) ?? null,
+      retry_count: (context.retry_count as number | undefined) ?? 0,
+    });
+  }
+}
+
+/** Steps representing expected/handled request rejections, not operational failures. */
+function isExpectedValidationRejection(step: string): boolean {
+  return (
+    step.startsWith("validation_") ||
+    step === "validate_input_json_parse" ||
+    step === "validate_input_schema"
+  );
 }
 
 const FUNCTION_NAME = "create-trial";
@@ -1833,7 +1850,7 @@ Deno.serve(async (req: Request) => {
       billing_call_based: true,
       trial_live_calls_limit: 15,
       selected_post_trial_plan: selectedPostTrialPlan,
-      environment: Deno.env.get("NODE_ENV") === "production" ? "production" : Deno.env.get("NODE_ENV") ?? "development",
+      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
       $lib: "edge-function",
       $set: {
         billing_status: "trial",
@@ -2366,7 +2383,7 @@ Deno.serve(async (req: Request) => {
       source_channel: data.source ?? 'website',
       account_id: currentAccountId,
       subscription_id: subscription.id,
-      environment: Deno.env.get('NODE_ENV') === 'production' ? 'production' : Deno.env.get('NODE_ENV') ?? 'development',
+      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
       $lib: 'edge-function',
     });
 
