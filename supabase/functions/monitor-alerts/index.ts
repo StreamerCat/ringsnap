@@ -40,10 +40,46 @@ serve(async (req) => {
 
         if (jobsError) throw jobsError;
 
+        // 3. Check for unmapped Vapi webhooks (orphaned/unprovisioned phone numbers).
+        // Baseline is ~2/day; a threshold of 10 per lookback window catches a
+        // stuck number well before it racks up hundreds of failed calls.
+        const UNMAPPED_WEBHOOK_THRESHOLD = 10;
+        const { data: unmappedWebhooks, error: unmappedError } = await supabase
+            .from('call_webhook_inbox')
+            .select('provider_phone_number_id')
+            .eq('reason', 'unmapped_account')
+            .eq('resolved', false)
+            .gte('received_at', thresholdDate);
+
+        if (unmappedError) throw unmappedError;
+
         const issues = [
             ...(failedEvents || []).map(e => `Provisioning Failed Event: ${JSON.stringify(e.metadata)}`),
-            ...(failedJobs || []).map(j => `Provisioning Job Failed: ID ${j.id} - ${j.error}`)
+            ...(failedJobs || []).map(j => `Provisioning Job Failed: ID ${j.id} - ${j.error}`),
         ];
+
+        if (unmappedWebhooks && unmappedWebhooks.length >= UNMAPPED_WEBHOOK_THRESHOLD) {
+            const distinctNumbers = [...new Set(unmappedWebhooks.map(w => w.provider_phone_number_id))];
+            issues.push(
+                `Unmapped Vapi Webhooks: ${unmappedWebhooks.length} in the last ${lookbackMinutes}m ` +
+                `across ${distinctNumbers.length} number(s): ${distinctNumbers.slice(0, 5).join(', ')}`
+            );
+        }
+
+        // 4. Surface orphaned Vapi numbers found by vapi-reconcile-calls (numbers
+        // Vapi is routing calls to that have no matching phone_numbers row).
+        const { data: orphanReports, error: orphanError } = await supabase
+            .from('call_webhook_inbox')
+            .select('payload, error')
+            .eq('reason', 'orphaned_phone_numbers_report')
+            .eq('resolved', false)
+            .gte('received_at', thresholdDate);
+
+        if (orphanError) throw orphanError;
+
+        if (orphanReports && orphanReports.length > 0) {
+            issues.push(...orphanReports.map(r => `Orphaned Phone Numbers: ${r.error}`));
+        }
 
         if (issues.length > 0) {
             const message = `[ALERT] System detected ${issues.length} critical issues in the last ${lookbackMinutes} minutes:\n${issues.join('\n')}`;

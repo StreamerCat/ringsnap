@@ -21,6 +21,10 @@
  *         contactEmail: string,
  *         contactMobile: string,
  *         businessName: string,
+ *         city: string,   (optional — the agent should read back the lead's
+ *                          known city from call variables and confirm/correct
+ *                          it with the prospect; see trigger-outbound-calls)
+ *         state: string,  (optional — same as city; 2-letter or full name, both accepted)
  *         planKey: "night_weekend" | "lite" | "core" | "pro"  (optional, defaults to "core")
  *       }
  *     }]
@@ -33,6 +37,7 @@
 
 import { createClient } from "supabase";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
+import { captureServerEvent, captureServerException, flushServerAnalytics } from "../_shared/server-analytics.ts";
 
 // ── Plan config (mirrors plans table) ────────────────────────────────────────
 
@@ -77,6 +82,29 @@ function normalizePhone(raw: string): string {
   const withCountry = digits.length === 10 ? "1" + digits : digits;
   return "+" + withCountry;
 }
+
+/** Normalize a spoken/typed state to a 2-letter USPS code, or undefined if unusable. */
+function normalizeState(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (trimmed.length === 2) return trimmed.toUpperCase();
+  const byName = US_STATE_NAME_TO_ABBR[trimmed.toLowerCase()];
+  return byName;
+}
+
+const US_STATE_NAME_TO_ABBR: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+  colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
+  hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA",
+  kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
+  massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO",
+  montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ",
+  "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", ohio: "OH",
+  oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+  "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+  virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY",
+  "district of columbia": "DC",
+};
 
 function respond(toolCallId: string, result: string): Response {
   return new Response(
@@ -123,11 +151,15 @@ Deno.serve(async (req: Request) => {
   if (unauthorized) return unauthorized;
 
   let toolCallId = "unknown";
+  // Hoisted so the outer catch can still tag a failure with the correct
+  // distinct id / call_id — a Stripe error thrown after this is parsed
+  // must not lose call correlation just because it's now in the catch.
+  let vapiCallId: string | null = null;
 
   try {
     const body = await req.json();
     const toolCall = body?.message?.toolCallList?.[0];
-    const vapiCallId = body?.message?.call?.id ?? null;
+    vapiCallId = body?.message?.call?.id ?? null;
 
     if (!toolCall) {
       return respond("unknown", "No tool call found in request.");
@@ -135,29 +167,75 @@ Deno.serve(async (req: Request) => {
 
     toolCallId = toolCall.id ?? "unknown";
     const args = toolCall.arguments ?? {};
+    const distinctId = vapiCallId ?? toolCallId;
 
     // ── 1. Validate inputs ───────────────────────────────────────────────────
 
     const { contactName, contactEmail, contactMobile, businessName } = args;
+    // The lead's business_name/phone/city/state are looked up from
+    // outbound_leads and read back to the prospect on the call for
+    // confirmation (see trigger-outbound-calls' assistantOverrides). These
+    // args carry whatever the prospect confirmed OR corrected — always the
+    // current truth, whether or not it matches what's already in the DB.
+    const city: string | undefined = typeof args.city === "string" ? args.city.trim() || undefined : undefined;
+    const state = normalizeState(args.state);
     let planKey: PlanKey = (args.planKey ?? DEFAULT_PLAN) as PlanKey;
 
     if (!VALID_PLAN_KEYS.includes(planKey)) {
       planKey = DEFAULT_PLAN;
     }
 
+    await captureServerEvent("outbound_trial_requested", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      plan_key: planKey,
+      has_email: Boolean(contactEmail),
+      has_business_name: Boolean(businessName),
+    });
+
     if (!contactMobile) {
+      await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        outcome: "trial_failed",
+        failure_stage: "validate_input",
+        error_code: "MISSING_MOBILE",
+      });
       return respondError(toolCallId, "I need a mobile number to send the link. Can you share yours?");
     }
 
     const phone = normalizePhone(String(contactMobile));
 
     // ── 2. Stripe: create customer + checkout session ─────────────────────────
+    // Idempotency keys are derived from the Vapi tool-call id so a retried
+    // tool call (network hiccup, Vapi re-invoke) reuses the same Stripe
+    // customer/session instead of creating duplicates.
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       console.error("[agent-trial-checkout] STRIPE_SECRET_KEY not set");
+      await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        outcome: "trial_failed",
+        failure_stage: "stripe_config",
+        error_code: "STRIPE_KEY_MISSING",
+      });
       return respondError(toolCallId, "Something went wrong on our end. I'll send you the signup link directly instead.");
     }
+
+    await captureServerEvent("outbound_trial_creation_attempted", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      plan_key: planKey,
+    });
+
+    const _attemptStartedAt = Date.now();
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
@@ -174,12 +252,19 @@ Deno.serve(async (req: Request) => {
         vapi_call_id: vapiCallId ?? "",
         contact_name: contactName ?? "",
         business_name: businessName ?? "",
+        city: city ?? "",
+        state: state ?? "",
       },
     };
     if (contactEmail) customerParams.email = contactEmail;
     if (phone) customerParams.phone = phone;
+    if (city || state) {
+      customerParams.address = { city: city ?? undefined, state: state ?? undefined, country: "US" };
+    }
 
-    const customer = await stripe.customers.create(customerParams);
+    const customer = await stripe.customers.create(customerParams, {
+      idempotencyKey: `agent-trial-checkout-customer-${toolCallId}`,
+    });
 
     // Checkout session — trial, card required, pre-fill email
     const session = await stripe.checkout.sessions.create({
@@ -206,7 +291,11 @@ Deno.serve(async (req: Request) => {
         contact_name: contactName ?? "",
         business_name: businessName ?? "",
         contact_mobile: phone,
+        city: city ?? "",
+        state: state ?? "",
       },
+    }, {
+      idempotencyKey: `agent-trial-checkout-session-${toolCallId}`,
     });
 
     const checkoutUrl = session.url!;
@@ -262,6 +351,7 @@ Deno.serve(async (req: Request) => {
 
     // Upsert lead record (find existing by phone or create new)
     let leadId: string | null = null;
+    let dbLoggingFailed = false;
     try {
       const { data: existingLead } = await supabase
         .from("outbound_leads")
@@ -269,11 +359,23 @@ Deno.serve(async (req: Request) => {
         .eq("phone", phone)
         .maybeSingle();
 
+      // The agent confirms (or corrects) business_name/city/state on every
+      // call, so write back whatever it reported — that's always the
+      // current truth, not just a fallback for missing data.
+      const confirmedFields: Record<string, unknown> = {
+        status: "checkout_sent",
+        updated_at: new Date().toISOString(),
+      };
+      if (businessName) confirmedFields.business_name = businessName;
+      if (city) confirmedFields.city = city;
+      if (state) confirmedFields.state = state;
+      if (contactEmail) confirmedFields.email = contactEmail;
+
       if (existingLead) {
         leadId = existingLead.id;
         await supabase
           .from("outbound_leads")
-          .update({ status: "checkout_sent", updated_at: new Date().toISOString() })
+          .update(confirmedFields)
           .eq("id", leadId);
       } else {
         const { data: newLead } = await supabase
@@ -281,6 +383,9 @@ Deno.serve(async (req: Request) => {
           .insert({
             business_name: businessName ?? contactName ?? "Unknown",
             phone,
+            city: city ?? null,
+            state: state ?? null,
+            email: contactEmail ?? null,
             status: "checkout_sent",
             source: "outbound_agent",
           })
@@ -311,9 +416,51 @@ Deno.serve(async (req: Request) => {
         });
       }
     } catch (dbErr) {
-      // Non-fatal — checkout was created, SMS sent. Log and continue.
+      // Non-fatal for the caller (checkout was created, SMS sent) but this
+      // is the step that actually records the lead→trial conversion, so it
+      // must be visible in monitoring rather than only console.error.
+      dbLoggingFailed = true;
       console.error("[agent-trial-checkout] DB logging failed:", dbErr);
+      await captureServerException(dbErr, distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        failure_stage: "db_logging",
+      });
+      await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        outcome: "trial_failed",
+        failure_stage: "db_logging",
+        error_category: "database",
+        stripe_session_id_present: Boolean(session.id),
+        duration_ms: Date.now() - _attemptStartedAt,
+      });
     }
+
+    // NOT outbound_trial_creation_succeeded: a checkout session being created
+    // and texted doesn't mean the prospect completed it. That event is
+    // reserved for stripe-webhook, fired only after create-trial has
+    // actually created the account — otherwise abandoned checkout links
+    // would count as conversions here, and completed ones would be
+    // double-counted between this event and the webhook's.
+    //
+    // Skipped when DB logging just failed above: firing both the failure
+    // event and this one for the same attempt would double-count it and
+    // corrupt the succeeded/(succeeded+failed) success-rate metric.
+    if (!dbLoggingFailed) {
+    await captureServerEvent("outbound_checkout_link_sent", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      outcome: "checkout_link_sent",
+      plan_key: planKey,
+      sms_sent: smsSent,
+      duration_ms: Date.now() - _attemptStartedAt,
+    });
+    }
+    await flushServerAnalytics();
 
     // ── 5. Return result to Vapi ──────────────────────────────────────────────
 
@@ -338,6 +485,29 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: unknown) {
     console.error("[agent-trial-checkout] Unhandled error:", err);
+    // Matches the distinct id used by every other event in this function —
+    // without this, a Stripe error thrown here would be tagged under a
+    // different distinct id and with no call_id/vapi_call_id, making it
+    // unjoinable to the originating call.
+    const distinctId = vapiCallId ?? toolCallId;
+    await captureServerException(err, distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      failure_stage: "unhandled",
+    });
+    await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      outcome: "trial_failed",
+      failure_stage: "unhandled",
+      error_category: err instanceof Stripe.errors.StripeError ? "stripe" : "unknown",
+      error_code: err instanceof Stripe.errors.StripeError ? err.code ?? err.type : undefined,
+    });
+    await flushServerAnalytics();
     return respondError(
       toolCallId,
       "Something went wrong creating the checkout. Have them go to getringsnap.com/start to sign up directly."

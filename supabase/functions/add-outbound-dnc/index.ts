@@ -1,11 +1,10 @@
 /**
  * add-outbound-dnc
  *
- * Called by the Vapi Sarah outbound agent as a function tool when a prospect
- * asks not to be contacted again. Marks the lead as DNC in outbound_leads so
- * the n8n dialer workflow skips them permanently.
- *
- * Touches ONLY outbound_leads. Never touches product tables.
+ * Called by the Vapi Sarah outbound agent as a function tool when a
+ * prospect asks not to be contacted again. Marks the lead do-not-call
+ * in outbound_leads. Does not touch accounts, profiles, or any product
+ * tables.
  *
  * Vapi tool-call request shape:
  * {
@@ -29,6 +28,10 @@
  */
 
 import { createClient } from "supabase";
+import { logInfo, logError, extractCorrelationId } from "../_shared/logging.ts";
+import { captureServerEvent, flushServerAnalytics } from "../_shared/server-analytics.ts";
+
+const FUNCTION_NAME = "add-outbound-dnc";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -45,24 +48,9 @@ function respond(toolCallId: string, result: string): Response {
   );
 }
 
-function respondError(toolCallId: string, message: string): Response {
-  console.error("[add-outbound-dnc] Error:", message);
+function respondError(toolCallId: string, message: string, correlationId: string): Response {
+  logError("add-outbound-dnc error", { functionName: FUNCTION_NAME, correlationId, context: { message } });
   return respond(toolCallId, message);
-}
-
-// The Supabase anon key is public (shipped in the frontend bundle), so
-// verify_jwt alone does not authenticate Vapi. Vapi sends this header when
-// the tool's server.secret is set; fail closed if the secret isn't configured.
-function requireVapiSecret(req: Request): Response | null {
-  const expected = Deno.env.get("OUTBOUND_TOOL_SECRET");
-  const provided = req.headers.get("x-vapi-secret");
-  if (!expected || !provided || provided !== expected) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  return null;
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -73,20 +61,32 @@ Deno.serve(async (req: Request) => {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, content-type",
+        "Access-Control-Allow-Headers": "authorization, content-type, x-vapi-secret",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
       },
     });
   }
 
-  const unauthorized = requireVapiSecret(req);
-  if (unauthorized) return unauthorized;
+  const correlationId = extractCorrelationId(req);
+
+  // ── Auth: this is a public verify_jwt=false endpoint, so require Vapi's
+  // configured tool secret header — otherwise anyone who finds the URL could
+  // mark arbitrary numbers dnc or spam outbound_leads with junk rows.
+  const vapiToolSecret = Deno.env.get("VAPI_TOOL_SECRET");
+  if (!vapiToolSecret) {
+    logError("VAPI_TOOL_SECRET not configured — refusing to run", { functionName: FUNCTION_NAME, correlationId });
+    return respondError("unknown", "Something went wrong on our end.", correlationId);
+  }
+  if (req.headers.get("x-vapi-secret") !== vapiToolSecret) {
+    return respondError("unknown", "Unauthorized.", correlationId);
+  }
 
   let toolCallId = "unknown";
 
   try {
     const body = await req.json();
     const toolCall = body?.message?.toolCallList?.[0];
+    const vapiCallId = body?.message?.call?.id ?? null;
 
     if (!toolCall) {
       return respond("unknown", "No tool call found in request.");
@@ -94,13 +94,18 @@ Deno.serve(async (req: Request) => {
 
     toolCallId = toolCall.id ?? "unknown";
     const args = toolCall.arguments ?? {};
+
+    // ── 1. Validate inputs ───────────────────────────────────────────────────
+
     const { contactMobile, businessName, reason } = args;
 
     if (!contactMobile) {
-      return respondError(toolCallId, "I need the phone number to add to the do-not-call list.");
+      return respondError(toolCallId, "I don't have a number to flag — can you confirm the mobile number?", correlationId);
     }
 
     const phone = normalizePhone(String(contactMobile));
+
+    // ── 2. Mark do-not-call in Supabase ──────────────────────────────────────
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -114,48 +119,58 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (lookupError) {
-      console.error("[add-outbound-dnc] Lookup failed:", lookupError);
-      return respondError(toolCallId, "I couldn't update the do-not-call list right now. Flag this number for manual removal.");
+      return respondError(toolCallId, "I couldn't update our records just now — please try again.", correlationId);
     }
 
+    let writeError;
     if (existingLead) {
-      const { error: updateError } = await supabase
+      ({ error: writeError } = await supabase
         .from("outbound_leads")
         .update({ status: "dnc", updated_at: new Date().toISOString() })
-        .eq("id", existingLead.id);
-
-      if (updateError) {
-        console.error("[add-outbound-dnc] Update failed:", updateError);
-        return respondError(toolCallId, "I couldn't update the do-not-call list right now. Flag this number for manual removal.");
-      }
+        .eq("id", existingLead.id));
     } else {
-      const { error: insertError } = await supabase
-        .from("outbound_leads")
-        .insert({
-          business_name: businessName ?? "Unknown (DNC request)",
-          phone,
-          status: "dnc",
-          source: "outbound_agent",
-        });
-
-      if (insertError) {
-        console.error("[add-outbound-dnc] Insert failed:", insertError);
-        return respondError(toolCallId, "I couldn't update the do-not-call list right now. Flag this number for manual removal.");
-      }
+      // No prior lead record for this number — create one directly in dnc
+      // status so any future import/sync respects it.
+      ({ error: writeError } = await supabase.from("outbound_leads").insert({
+        business_name: businessName ?? "Unknown",
+        phone,
+        status: "dnc",
+        source: "outbound_agent",
+      }));
     }
 
-    console.log("[add-outbound-dnc] Marked DNC:", { phone, reason: reason ?? null });
+    if (writeError) {
+      logError("Failed to write dnc status", { functionName: FUNCTION_NAME, correlationId, error: writeError });
+      return respondError(toolCallId, "I couldn't update our records just now — please try again.", correlationId);
+    }
 
-    return respond(
-      toolCallId,
-      `Done — ${phone} is on the do-not-call list and won't be contacted again. Apologize for the interruption and end the call politely.`
-    );
+    logInfo("Marked DNC", {
+      functionName: FUNCTION_NAME,
+      correlationId,
+      context: { phone, reason: reason ?? null, vapi_call_id: vapiCallId },
+    });
+
+    await captureServerEvent("outbound_call_completed", vapiCallId ?? existingLead?.id ?? "unknown", {
+      signup_channel: "outbound_agent",
+      lead_id: existingLead?.id ?? null,
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
+      correlation_id: correlationId,
+      function_name: FUNCTION_NAME,
+      outcome: "do_not_call",
+    });
+    await flushServerAnalytics();
+
+    // ── 3. Return result to Vapi ──────────────────────────────────────────────
+
+    return respond(toolCallId, "Got it — that number has been added to our do-not-call list and won't be contacted again.");
 
   } catch (err: unknown) {
-    console.error("[add-outbound-dnc] Unhandled error:", err);
+    logError("Unhandled error", { functionName: FUNCTION_NAME, correlationId, error: err });
     return respondError(
       toolCallId,
-      "Something went wrong updating the do-not-call list. Flag this number for manual removal."
+      "Something went wrong updating our records, but I've noted it — I'll make sure this number isn't called again.",
+      correlationId
     );
   }
 });
