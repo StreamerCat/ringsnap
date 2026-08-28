@@ -11,7 +11,7 @@
  *  - Twilio from-number ownership/SMS capability + recent message statuses/error codes
  *
  * Sync mode (POST {"action":"sync","dryRun":true|false}, requires the
- * x-vapi-secret header matching OUTBOUND_TOOL_SECRET): idempotently wires the
+ * x-vapi-secret header matching VAPI_TOOL_SECRET): idempotently wires the
  * Sarah assistant's Vapi tools —
  *      create_agent_trial -> agent-trial-checkout
  *      send_link          -> send-outbound-link
@@ -77,6 +77,8 @@ function desiredFunctionTools(functionsBase: string, authHeader: string, toolSec
             contactEmail: { type: "string", description: "Prospect's email address, if shared" },
             contactMobile: { type: "string", description: "Prospect's mobile number to text the checkout link to" },
             businessName: { type: "string", description: "Prospect's business name" },
+            city: { type: "string", description: "Prospect's city, as confirmed or corrected on the call" },
+            state: { type: "string", description: "Prospect's US state (2-letter code or full name), as confirmed or corrected on the call" },
             planKey: {
               type: "string",
               enum: ["night_weekend", "lite", "core", "pro"],
@@ -130,10 +132,10 @@ function desiredFunctionTools(functionsBase: string, authHeader: string, toolSec
 async function runSync(req: Request, dryRun: boolean): Promise<Response> {
   // Sync mutates Vapi config — require the private tool secret. The anon key
   // that satisfies verify_jwt is public, so it must not gate this path.
-  const toolSecret = Deno.env.get("OUTBOUND_TOOL_SECRET");
+  const toolSecret = Deno.env.get("VAPI_TOOL_SECRET");
   const provided = req.headers.get("x-vapi-secret");
   if (!toolSecret || !provided || provided !== toolSecret) {
-    return json({ error: "unauthorized: sync requires the x-vapi-secret header matching OUTBOUND_TOOL_SECRET" }, 401);
+    return json({ error: "unauthorized: sync requires the x-vapi-secret header matching VAPI_TOOL_SECRET" }, 401);
   }
 
   const vapiKey = Deno.env.get("VAPI_API_KEY");

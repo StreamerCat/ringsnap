@@ -30,7 +30,7 @@ function json(data: unknown, status = 200) {
 // verify_jwt alone does not authenticate Vapi. Vapi sends this header when
 // the tool's server.secret is set; fail closed if the secret isn't configured.
 function requireVapiSecret(req: Request): Response | null {
-  const expected = Deno.env.get("OUTBOUND_TOOL_SECRET");
+  const expected = Deno.env.get("VAPI_TOOL_SECRET");
   const provided = req.headers.get("x-vapi-secret");
   if (!expected || !provided || provided !== expected) {
     return json({ error: "unauthorized" }, 401);

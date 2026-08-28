@@ -128,7 +128,7 @@ verify_jwt = false
 # "Authorization: Bearer <anon key>" (satisfies the gateway's verify_jwt; the
 # anon key is public so it is NOT authentication) AND set server.secret so
 # Vapi sends x-vapi-secret, which the functions check against the
-# OUTBOUND_TOOL_SECRET Supabase secret (fail closed).
+# VAPI_TOOL_SECRET Supabase secret (fail closed).
 
 [functions.agent-trial-checkout]
 verify_jwt = true

@@ -45,12 +45,12 @@ Live audit + fixes performed against Supabase project rmyvvbqnccpfeyowidrq.
 - [ ] **Set `TWILIO_PHONE_NUMBER` Supabase secret** — it is missing; this is the
       confirmed root cause of the SMS failure. Likely value: +16504126726
       (the outbound number). `supabase secrets set TWILIO_PHONE_NUMBER=+1650...`
-- [ ] **Set `OUTBOUND_TOOL_SECRET` Supabase secret** (Codex review P1 fix) —
+- [ ] **Set `VAPI_TOOL_SECRET` Supabase secret** (Codex review P1 fix) —
       the anon key that passes verify_jwt is public (shipped in the frontend
       bundle), so the outbound functions now fail closed unless the request
       carries an `x-vapi-secret` header matching this secret. Generate one
       yourself (e.g. `openssl rand -hex 32`) and
-      `supabase secrets set OUTBOUND_TOOL_SECRET=<value>` — don't share the
+      `supabase secrets set VAPI_TOOL_SECRET=<value>` — don't share the
       value anywhere else. The sync mode pushes it into each Vapi tool's
       `server.secret`, so Vapi sends the header automatically. NOTE: until the
       updated functions are redeployed (blocked on the function cap) the live
@@ -92,7 +92,7 @@ product create-trial function — the outbound agent must never call it):
 Every function tool needs BOTH of these in its server config:
 - Header `Authorization: Bearer <anon key>` (anon key is publishable, from
   Supabase dashboard → Settings → API) — satisfies the gateway's verify_jwt
-- Server **secret** set to the value of the `OUTBOUND_TOOL_SECRET` Supabase
+- Server **secret** set to the value of the `VAPI_TOOL_SECRET` Supabase
   secret — Vapi sends it as `x-vapi-secret`, which the functions require
   (fail closed) because the anon key alone is public and not authentication
 
