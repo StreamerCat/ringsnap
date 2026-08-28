@@ -72,9 +72,6 @@ verify_jwt = false
 [functions.verify-magic-link]
 verify_jwt = false
 
-[functions.add-outbound-dnc]
-verify_jwt = false
-
 [functions.trigger-outbound-calls]
 verify_jwt = false
 
@@ -125,3 +122,22 @@ verify_jwt = false
 
 [functions.jobber-oauth-callback]
 verify_jwt = false
+
+# ── Cold outbound pipeline (Sarah / Vapi outbound agent) ─────────────────────
+# These are called by Vapi function tools. Each tool's server config must send
+# "Authorization: Bearer <anon key>" (satisfies the gateway's verify_jwt; the
+# anon key is public so it is NOT authentication) AND set server.secret so
+# Vapi sends x-vapi-secret, which the functions check against the
+# VAPI_TOOL_SECRET Supabase secret (fail closed).
+
+[functions.agent-trial-checkout]
+verify_jwt = true
+
+[functions.send-outbound-link]
+verify_jwt = true
+
+[functions.add-outbound-dnc]
+verify_jwt = true
+
+[functions.outbound-audit]
+verify_jwt = true

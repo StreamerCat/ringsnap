@@ -15,8 +15,9 @@
  *       id: "...",
  *       name: "add_to_dnc",
  *       arguments: {
- *         contactMobile: string,
- *         reason: string  (optional)
+ *         contactMobile: string,      // required — number to suppress
+ *         businessName: string,       // optional
+ *         reason: string              // optional, e.g. "asked to be removed"
  *       }
  *     }]
  *   }
@@ -96,7 +97,7 @@ Deno.serve(async (req: Request) => {
 
     // ── 1. Validate inputs ───────────────────────────────────────────────────
 
-    const { contactMobile, reason } = args;
+    const { contactMobile, businessName, reason } = args;
 
     if (!contactMobile) {
       return respondError(toolCallId, "I don't have a number to flag — can you confirm the mobile number?", correlationId);
@@ -131,7 +132,7 @@ Deno.serve(async (req: Request) => {
       // No prior lead record for this number — create one directly in dnc
       // status so any future import/sync respects it.
       ({ error: writeError } = await supabase.from("outbound_leads").insert({
-        business_name: "Unknown",
+        business_name: businessName ?? "Unknown",
         phone,
         status: "dnc",
         source: "outbound_agent",
