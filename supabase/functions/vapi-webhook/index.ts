@@ -658,13 +658,17 @@ async function writeToInbox(
         // Vapi retry storm for the same event doesn't flood the inbox with
         // repeat rows. Rows without a call id or message type (malformed
         // payloads) skip dedup and always insert.
-        if (row.provider_call_id && row.message_type) {
-            await supabase.from('call_webhook_inbox').upsert(row, {
+        const { error: writeError } = row.provider_call_id && row.message_type
+            ? await supabase.from('call_webhook_inbox').upsert(row, {
                 onConflict: 'provider,provider_call_id,message_type,reason',
                 ignoreDuplicates: true,
-            });
-        } else {
-            await supabase.from('call_webhook_inbox').insert(row);
+            })
+            : await supabase.from('call_webhook_inbox').insert(row);
+
+        // supabase-js returns DB errors on the response, it does not throw --
+        // log explicitly so a bad upsert doesn't fail silently.
+        if (writeError) {
+            console.error("Inbox write returned error", writeError);
         }
     } catch (e) {
         console.error("Inbox write failed", e);
