@@ -28,6 +28,7 @@
 
 import { createClient } from "supabase";
 import { logInfo, logError, extractCorrelationId } from "../_shared/logging.ts";
+import { captureServerEvent, flushServerAnalytics } from "../_shared/server-analytics.ts";
 
 const FUNCTION_NAME = "add-outbound-dnc";
 
@@ -147,6 +148,17 @@ Deno.serve(async (req: Request) => {
       correlationId,
       context: { phone, reason: reason ?? null, vapi_call_id: vapiCallId },
     });
+
+    await captureServerEvent("outbound_call_completed", vapiCallId ?? existingLead?.id ?? "unknown", {
+      signup_channel: "outbound_agent",
+      lead_id: existingLead?.id ?? null,
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
+      correlation_id: correlationId,
+      function_name: FUNCTION_NAME,
+      outcome: "do_not_call",
+    });
+    await flushServerAnalytics();
 
     // ── 3. Return result to Vapi ──────────────────────────────────────────────
 

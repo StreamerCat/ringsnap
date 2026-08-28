@@ -78,6 +78,9 @@ verify_jwt = false
 [functions.trigger-outbound-calls]
 verify_jwt = false
 
+[functions.retry-outbound-account-creation]
+verify_jwt = false
+
 [functions.verify-magic-debug]
 verify_jwt = false
 

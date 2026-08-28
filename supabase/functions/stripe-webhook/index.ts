@@ -1455,6 +1455,149 @@ serve(async (req) => {
               source_channel: session.metadata?.signup_source ?? null,
             });
           }
+        } else if (session.metadata?.source === 'outbound_agent') {
+          // Outbound-agent checkouts don't carry an account_id (no account
+          // exists yet at checkout time) and their Stripe customer isn't
+          // linked to an accounts row, so the sync block above never runs
+          // for them. Instead of leaving the checkout dangling (a paid
+          // Stripe subscription with no RingSnap account/phone/assistant
+          // behind it), adopt the completed checkout through create-trial's
+          // own audited account-creation path — same code that handles the
+          // website flow, just given an existing Stripe session instead of
+          // a raw payment method. See agent-trial-checkout for the
+          // originating outbound_trial_creation_attempted event.
+          const outboundDistinctId = customerId as string;
+          const outboundEmail = (session as any).customer_details?.email || (session as any).customer_email || null;
+          const contactMobile = session.metadata?.contact_mobile || null;
+          const contactName = session.metadata?.contact_name || null;
+          const businessName = session.metadata?.business_name || null;
+          const planKeyMeta = session.metadata?.plan_key || 'core';
+          const vapiCallIdMeta = session.metadata?.vapi_call_id || null;
+          const cityMeta = session.metadata?.city || null;
+          // The outbound agent confirms this with the prospect on the call
+          // (see trigger-outbound-calls' assistantOverrides + agent-trial-checkout).
+          // Only forward it if it's already a valid 2-letter USPS code —
+          // create-trial's billingState field requires exactly 2 characters
+          // and falls back to a zip-derived/default state otherwise.
+          const stateMeta = session.metadata?.state && /^[A-Za-z]{2}$/.test(session.metadata.state)
+            ? session.metadata.state.toUpperCase()
+            : null;
+
+          if (!outboundEmail || !contactMobile) {
+            logError('Cannot create account for outbound checkout — missing email or phone', {
+              ...baseLogOptions,
+              context: { stripeSessionId: session.id, hasEmail: !!outboundEmail, hasPhone: !!contactMobile },
+            });
+            await capturePostHog('outbound_trial_creation_failed', outboundDistinctId, {
+              signup_channel: 'outbound_agent',
+              outcome: 'trial_failed',
+              failure_stage: 'account_creation_missing_fields',
+              error_code: !outboundEmail ? 'MISSING_EMAIL' : 'MISSING_PHONE',
+              stripe_session_id: session.id,
+              vapi_call_id: vapiCallIdMeta,
+            });
+          } else {
+            const createTrialStart = Date.now();
+            try {
+              const createTrialUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/create-trial`;
+              const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              const res = await fetch(createTrialUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceRoleKey}`,
+                  'apikey': serviceRoleKey,
+                  // Reuses create-trial's own idempotency_results check so a
+                  // duplicate Stripe webhook delivery for this session never
+                  // creates a second account.
+                  'Idempotency-Key': `outbound-agent-${session.id}`,
+                },
+                body: JSON.stringify({
+                  name: contactName || businessName || 'Business Owner',
+                  email: outboundEmail,
+                  phone: contactMobile,
+                  companyName: businessName || contactName || 'New Business',
+                  // Not yet collected by the outbound call script — see PR follow-up.
+                  trade: 'general',
+                  planType: planKeyMeta,
+                  source: 'outbound_agent',
+                  stripeSessionId: session.id,
+                  vapiCallId: vapiCallIdMeta ?? undefined,
+                  serviceArea: cityMeta ?? undefined,
+                  billingState: stateMeta ?? undefined,
+                }),
+              });
+              const resultBody = await res.json().catch(() => ({}));
+              const durationMs = Date.now() - createTrialStart;
+
+              if (res.ok && resultBody?.success) {
+                logInfo('Outbound checkout adopted into account via create-trial', {
+                  ...baseLogOptions,
+                  accountId: resultBody.accountId,
+                  context: { stripeSessionId: session.id, durationMs },
+                });
+                await capturePostHog('outbound_trial_creation_succeeded', resultBody.accountId || outboundDistinctId, {
+                  signup_channel: 'outbound_agent',
+                  outcome: 'trial_created',
+                  plan_key: planKeyMeta,
+                  vapi_call_id: vapiCallIdMeta,
+                  stripe_session_id: session.id,
+                  account_id: resultBody.accountId,
+                  duration_ms: durationMs,
+                  account_linked: true,
+                });
+                // Marks the row so retry-outbound-account-creation's cron
+                // sweep never picks this session up again.
+                await supabase
+                  .from('outbound_checkout_log')
+                  .update({ status: 'account_created', account_id: resultBody.accountId })
+                  .eq('stripe_session_id', session.id);
+              } else {
+                logError('create-trial rejected outbound checkout adoption', {
+                  ...baseLogOptions,
+                  context: { stripeSessionId: session.id, httpStatus: res.status, resultBody },
+                });
+                await capturePostHog('outbound_trial_creation_failed', outboundDistinctId, {
+                  signup_channel: 'outbound_agent',
+                  outcome: 'trial_failed',
+                  failure_stage: resultBody?.phase || 'create_trial_invoke',
+                  error_code: resultBody?.errorCode || resultBody?.code || 'CREATE_TRIAL_REJECTED',
+                  http_status: res.status,
+                  stripe_session_id: session.id,
+                  vapi_call_id: vapiCallIdMeta,
+                  duration_ms: durationMs,
+                });
+                // record_stripe_event above already marked this Stripe event
+                // id as seen, so a Stripe-side retry will never redeliver
+                // it — this status is what lets retry-outbound-account-
+                // creation's cron sweep pick the session back up instead of
+                // silently leaving a paid subscription with no account.
+                await supabase
+                  .from('outbound_checkout_log')
+                  .update({ status: 'account_creation_failed' })
+                  .eq('stripe_session_id', session.id);
+              }
+            } catch (invokeErr) {
+              logError('Failed to invoke create-trial for outbound checkout', {
+                ...baseLogOptions,
+                error: invokeErr,
+                context: { stripeSessionId: session.id },
+              });
+              await capturePostHog('outbound_trial_creation_failed', outboundDistinctId, {
+                signup_channel: 'outbound_agent',
+                outcome: 'trial_failed',
+                failure_stage: 'create_trial_invoke_unhandled',
+                error_category: 'network',
+                stripe_session_id: session.id,
+                vapi_call_id: vapiCallIdMeta,
+                duration_ms: Date.now() - createTrialStart,
+              });
+              await supabase
+                .from('outbound_checkout_log')
+                .update({ status: 'account_creation_failed' })
+                .eq('stripe_session_id', session.id);
+            }
+          }
         }
 
         break;

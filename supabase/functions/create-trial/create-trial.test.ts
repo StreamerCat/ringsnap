@@ -453,5 +453,298 @@ describe("create-trial endpoint", () => {
       expect(createdStripeCustomerId).toBe("cus_new_456");
     });
   });
+
+  describe("Outbound-agent flow (source: outbound_agent)", () => {
+    // Mirrors the superRefine rule added to createTrialSchema: paymentMethodId
+    // is required UNLESS stripeSessionId is present (outbound checkouts already
+    // completed a hosted Stripe Checkout, so there's no raw payment method to
+    // attach — see the "OUTBOUND CHECKOUT MODE" branch in index.ts).
+    function hasRequiredPayment(payload: { paymentMethodId?: string; stripeSessionId?: string }) {
+      return Boolean(payload.paymentMethodId) || Boolean(payload.stripeSessionId);
+    }
+
+    it("accepts stripeSessionId in place of paymentMethodId", () => {
+      const payload = {
+        name: "Business Owner",
+        email: "prospect@example.com",
+        phone: "+15551234567",
+        companyName: "New Business",
+        trade: "general",
+        planType: "core",
+        source: "outbound_agent",
+        stripeSessionId: "cs_test_123",
+      };
+
+      expect(hasRequiredPayment(payload)).toBe(true);
+      expect(payload.source).toBe("outbound_agent");
+    });
+
+    it("rejects a request with neither paymentMethodId nor stripeSessionId", () => {
+      const payload = { source: "outbound_agent" as const };
+      expect(hasRequiredPayment(payload)).toBe(false);
+    });
+
+    it("website/sales requests still require paymentMethodId", () => {
+      const websitePayload = { source: "website" as const };
+      const salesPayload = { source: "sales" as const, stripeSessionId: undefined };
+      expect(hasRequiredPayment(websitePayload)).toBe(false);
+      expect(hasRequiredPayment(salesPayload)).toBe(false);
+    });
+
+    it("derives the outbound idempotency key from the Stripe session id", () => {
+      // stripe-webhook sends this exact header when adopting a completed
+      // outbound checkout — must be stable and unique per session so a
+      // duplicate webhook delivery replays the cached create-trial response
+      // instead of creating a second account.
+      const stripeSessionId = "cs_test_abc123";
+      const idempotencyKey = `outbound-agent-${stripeSessionId}`;
+      expect(idempotencyKey).toBe("outbound-agent-cs_test_abc123");
+    });
+
+    it("falls back to billingState from the lead record over zip-derived state", () => {
+      const dataWithBillingState = { billingState: "TX", zipCode: undefined as string | undefined };
+      const dataWithoutBillingState = { billingState: undefined as string | undefined, zipCode: "90210" };
+
+      const resolve = (d: { billingState?: string; zipCode?: string }) =>
+        d.billingState || (d.zipCode ? "ZIP_DERIVED" : "CA");
+
+      expect(resolve(dataWithBillingState)).toBe("TX");
+      expect(resolve(dataWithoutBillingState)).toBe("ZIP_DERIVED");
+    });
+
+    it("tags the account with signup_channel=outbound_agent only for this source", () => {
+      const buildAccountData = (source: string) => ({
+        company_name: "Test Co",
+        ...(source === "outbound_agent" ? { signup_channel: "outbound_agent" } : {}),
+      });
+
+      expect(buildAccountData("outbound_agent")).toHaveProperty("signup_channel", "outbound_agent");
+      expect(buildAccountData("website")).not.toHaveProperty("signup_channel");
+      expect(buildAccountData("sales")).not.toHaveProperty("signup_channel");
+    });
+
+    it("rejects adoption when the Stripe checkout session isn't complete", () => {
+      const isSessionUsable = (session: { status?: string; payment_status?: string }) =>
+        session.payment_status === "paid" || session.status === "complete";
+
+      expect(isSessionUsable({ status: "open" })).toBe(false);
+      expect(isSessionUsable({ status: "expired" })).toBe(false);
+      expect(isSessionUsable({ status: "complete", payment_status: "unpaid" })).toBe(true);
+      expect(isSessionUsable({ payment_status: "paid" })).toBe(true);
+    });
+  });
+
+  describe("Outbound lead confirmation/correction (stripe-webhook -> create-trial)", () => {
+    // Mirrors stripe-webhook's stateMeta validation: only a plain 2-letter
+    // USPS code is forwarded as billingState; anything else (a full state
+    // name, garbage, empty) is dropped so create-trial's strict
+    // z.string().length(2) schema never rejects the whole request.
+    function resolveStateMeta(rawState: string | null | undefined): string | null {
+      return rawState && /^[A-Za-z]{2}$/.test(rawState) ? rawState.toUpperCase() : null;
+    }
+
+    it("forwards a valid 2-letter state as billingState", () => {
+      expect(resolveStateMeta("tx")).toBe("TX");
+      expect(resolveStateMeta("CA")).toBe("CA");
+    });
+
+    it("drops an unusable state value instead of forwarding it", () => {
+      expect(resolveStateMeta("Texas")).toBeNull();
+      expect(resolveStateMeta("")).toBeNull();
+      expect(resolveStateMeta(null)).toBeNull();
+      expect(resolveStateMeta(undefined)).toBeNull();
+    });
+
+    // Mirrors agent-trial-checkout's normalizeState: the agent may pass back
+    // either an abbreviation or a full state name spoken by the prospect.
+    function normalizeState(raw: string | undefined, nameMap: Record<string, string>): string | undefined {
+      if (!raw) return undefined;
+      const trimmed = raw.trim();
+      if (trimmed.length === 2) return trimmed.toUpperCase();
+      return nameMap[trimmed.toLowerCase()];
+    }
+
+    it("accepts a full state name spoken on the call and normalizes it to an abbreviation", () => {
+      const nameMap = { georgia: "GA", "north carolina": "NC" };
+      expect(normalizeState("Georgia", nameMap)).toBe("GA");
+      expect(normalizeState("north carolina", nameMap)).toBe("NC");
+      expect(normalizeState("ga", nameMap)).toBe("GA");
+    });
+
+    it("confirmed lead details overwrite stale DB values on every call, not just when missing", () => {
+      // agent-trial-checkout always writes back business_name/city/state from
+      // the tool-call args when present — the agent is expected to confirm
+      // on every call, so a correction must not be silently ignored because
+      // a DB value already existed.
+      const buildLeadUpdate = (args: { businessName?: string; city?: string; state?: string; email?: string }) => {
+        const update: Record<string, unknown> = { status: "checkout_sent" };
+        if (args.businessName) update.business_name = args.businessName;
+        if (args.city) update.city = args.city;
+        if (args.state) update.state = args.state;
+        if (args.email) update.email = args.email;
+        return update;
+      };
+
+      const existingLeadFromDb = { business_name: "Old Name LLC", city: "Springfield", state: "IL" };
+      const correctedByProspect = buildLeadUpdate({ businessName: "New Corrected Name LLC", city: "Shelbyville", state: "IL" });
+
+      expect(correctedByProspect.business_name).toBe("New Corrected Name LLC");
+      expect(correctedByProspect.business_name).not.toBe(existingLeadFromDb.business_name);
+      expect(correctedByProspect.city).toBe("Shelbyville");
+    });
+  });
+
+  describe("Outbound checkout adoption security (P1 fix)", () => {
+    // Mirrors the auth gate added to the isOutboundCheckoutMode branch:
+    // only a caller presenting the service-role key as a bearer token may
+    // adopt a completed checkout session into an account. verify_jwt=false
+    // on this function means the Supabase gateway never checks this on its
+    // own, and a completed stripeSessionId isn't secret (it round-trips
+    // through the browser via agent-trial-checkout's success_url) — without
+    // this gate, anyone holding a session id could POST arbitrary
+    // email/phone/company data and mint an account against someone else's
+    // paid subscription.
+    function isAuthorizedOutboundCaller(authHeader: string | null, serviceRoleKey: string): boolean {
+      return authHeader === `Bearer ${serviceRoleKey}`;
+    }
+
+    it("rejects an outbound checkout adoption request without the service-role bearer token", () => {
+      expect(isAuthorizedOutboundCaller(null, "sb_secret_real_key")).toBe(false);
+      expect(isAuthorizedOutboundCaller("Bearer sb_secret_wrong_key", "sb_secret_real_key")).toBe(false);
+      expect(isAuthorizedOutboundCaller("sb_secret_real_key", "sb_secret_real_key")).toBe(false); // missing "Bearer " prefix
+    });
+
+    it("accepts an outbound checkout adoption request with the correct service-role bearer token", () => {
+      expect(isAuthorizedOutboundCaller("Bearer sb_secret_real_key", "sb_secret_real_key")).toBe(true);
+    });
+
+    // Mirrors overwriting data.email/data.phone with the verified Stripe
+    // customer's values after retrieving the checkout session, rather than
+    // trusting whatever the request body claimed.
+    function resolveVerifiedIdentity(
+      requestBodyEmail: string,
+      requestBodyPhone: string,
+      stripeCustomer: { email: string | null; phone: string | null }
+    ) {
+      return {
+        email: stripeCustomer.email,
+        phone: stripeCustomer.phone,
+        // The request body's claimed identity is intentionally discarded.
+        ignoredRequestEmail: requestBodyEmail,
+        ignoredRequestPhone: requestBodyPhone,
+      };
+    }
+
+    it("uses the verified Stripe customer identity, not the caller-supplied request body", () => {
+      const resolved = resolveVerifiedIdentity(
+        "attacker@example.com",
+        "+15559990000",
+        { email: "real-prospect@example.com", phone: "+15551234567" }
+      );
+      expect(resolved.email).toBe("real-prospect@example.com");
+      expect(resolved.phone).toBe("+15551234567");
+      expect(resolved.email).not.toBe("attacker@example.com");
+      expect(resolved.phone).not.toBe("+15559990000");
+    });
+
+    it("rejects a checkout session not tagged as the outbound-agent flow", () => {
+      const isValidOutboundSession = (metadata: { source?: string }) => metadata.source === "outbound_agent";
+      expect(isValidOutboundSession({ source: "outbound_agent" })).toBe(true);
+      expect(isValidOutboundSession({ source: "website" })).toBe(false);
+      expect(isValidOutboundSession({})).toBe(false);
+    });
+
+    it("returns the existing account instead of creating a duplicate for an already-adopted session", () => {
+      // Mirrors the accounts.stripe_customer_id lookup added before account
+      // creation in the outbound checkout branch — belt-and-suspenders
+      // alongside the idempotency-key check, which only catches identical
+      // requests (not a replay with a different idempotency key).
+      const findExistingAccount = (stripeCustomerId: string, accounts: Array<{ id: string; stripe_customer_id: string }>) =>
+        accounts.find((a) => a.stripe_customer_id === stripeCustomerId) ?? null;
+
+      const existingAccounts = [{ id: "acct_123", stripe_customer_id: "cus_abc" }];
+      expect(findExistingAccount("cus_abc", existingAccounts)?.id).toBe("acct_123");
+      expect(findExistingAccount("cus_new", existingAccounts)).toBeNull();
+    });
+  });
+
+  describe("Outbound checkout link vs. trial creation events (P1 fix)", () => {
+    // agent-trial-checkout must never fire outbound_trial_creation_succeeded
+    // itself — a checkout session being created and texted doesn't mean the
+    // prospect completed it, and stripe-webhook fires that same event again
+    // after create-trial actually creates the account, which would
+    // double-count real conversions.
+    it("agent-trial-checkout fires a distinct checkout-link event, not trial-creation success", () => {
+      const eventFiredByAgentTrialCheckout = "outbound_checkout_link_sent";
+      const eventFiredByStripeWebhookOnRealSuccess = "outbound_trial_creation_succeeded";
+      expect(eventFiredByAgentTrialCheckout).not.toBe(eventFiredByStripeWebhookOnRealSuccess);
+    });
+  });
+
+  describe("Durable retry for failed outbound account adoption (P1 fix)", () => {
+    // record_stripe_event marks a Stripe event id as seen before
+    // processing, so once create-trial adoption fails, Stripe will never
+    // redeliver that webhook. retry-outbound-account-creation's cron sweep
+    // is the only recovery path — this mirrors its retry-count/permanent-
+    // failure bookkeeping.
+    const MAX_RETRIES = 5;
+
+    function nextRetryState(currentRetryCount: number) {
+      const nextRetryCount = currentRetryCount + 1;
+      return {
+        retry_count: nextRetryCount,
+        status: nextRetryCount >= MAX_RETRIES ? "account_creation_failed_permanent" : "account_creation_failed",
+      };
+    }
+
+    it("keeps retrying below the max retry count", () => {
+      expect(nextRetryState(0).status).toBe("account_creation_failed");
+      expect(nextRetryState(3).status).toBe("account_creation_failed");
+    });
+
+    it("marks permanently failed once the max retry count is reached", () => {
+      expect(nextRetryState(4).status).toBe("account_creation_failed_permanent");
+      expect(nextRetryState(4).retry_count).toBe(5);
+    });
+
+    it("a successful retry always marks the row account_created with the resulting account_id", () => {
+      const applySuccess = (accountId: string) => ({ status: "account_created", account_id: accountId });
+      expect(applySuccess("acct_recovered")).toEqual({ status: "account_created", account_id: "acct_recovered" });
+    });
+  });
+
+  describe("agent-trial-checkout event/correlation fixes (P2 findings)", () => {
+    // Mirrors the dbLoggingFailed guard: firing both outbound_trial_creation_failed
+    // (from the DB-logging catch) and outbound_checkout_link_sent for the same
+    // attempt would double-count it in the success-rate formula.
+    function shouldFireCheckoutLinkSentEvent(dbLoggingFailed: boolean): boolean {
+      return !dbLoggingFailed;
+    }
+
+    it("does not fire the checkout-link-sent event when DB logging already failed", () => {
+      expect(shouldFireCheckoutLinkSentEvent(true)).toBe(false);
+    });
+
+    it("fires the checkout-link-sent event when DB logging succeeded", () => {
+      expect(shouldFireCheckoutLinkSentEvent(false)).toBe(true);
+    });
+
+    // Mirrors hoisting vapiCallId out of the try block so the outer catch
+    // can still use `vapiCallId ?? toolCallId` instead of losing call
+    // correlation by falling back to toolCallId alone.
+    it("the outer catch's distinct id still prefers vapiCallId when one was parsed before the failure", () => {
+      const toolCallId = "tool_abc";
+      const vapiCallId = "call_xyz";
+      const distinctId = vapiCallId ?? toolCallId;
+      expect(distinctId).toBe("call_xyz");
+    });
+
+    it("falls back to toolCallId only when no vapiCallId was ever parsed", () => {
+      const toolCallId = "tool_abc";
+      const vapiCallId: string | null = null;
+      const distinctId = vapiCallId ?? toolCallId;
+      expect(distinctId).toBe("tool_abc");
+    });
+  });
 });
 

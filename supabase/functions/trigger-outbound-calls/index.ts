@@ -20,6 +20,7 @@
 
 import { createClient } from "supabase";
 import { logInfo, logError, extractCorrelationId } from "../_shared/logging.ts";
+import { captureServerEvent, captureServerException, flushServerAnalytics } from "../_shared/server-analytics.ts";
 
 const FUNCTION_NAME = "trigger-outbound-calls";
 const VAPI_ASSISTANT_ID = "e2329175-069b-457f-8984-0f2e62742ed8";
@@ -67,7 +68,7 @@ Deno.serve(async (req: Request) => {
   // ── 1. Pull due leads (never touches dnc/called/checkout_sent leads) ────────
   const { data: leads, error: leadsError } = await supabase
     .from("outbound_leads")
-    .select("id, phone, business_name")
+    .select("id, phone, business_name, city, state")
     .eq("status", "new")
     .order("created_at", { ascending: true })
     .limit(batchSize);
@@ -128,6 +129,20 @@ Deno.serve(async (req: Request) => {
           assistantId: VAPI_ASSISTANT_ID,
           phoneNumberId: VAPI_PHONE_NUMBER_ID,
           customer: { number: lead.phone },
+          // Exposes the lead's known details as call variables so the
+          // assistant's prompt can read them back to the prospect for
+          // confirmation (e.g. "I have you down as {{business_name}} in
+          // {{city}}, {{state}} — is that right?") instead of guessing or
+          // silently trusting stale DB data. Corrections come back via the
+          // create_agent_trial tool call's city/state/businessName args.
+          assistantOverrides: {
+            variableValues: {
+              business_name: lead.business_name ?? "",
+              lead_phone: lead.phone ?? "",
+              city: lead.city ?? "",
+              state: lead.state ?? "",
+            },
+          },
         }),
       });
 
@@ -145,6 +160,14 @@ Deno.serve(async (req: Request) => {
         if (insertError) {
           logError("Failed to log call", { functionName: FUNCTION_NAME, correlationId, error: insertError });
         }
+        await captureServerEvent("outbound_call_started", vapiBody?.id ?? lead.id, {
+          signup_channel: "outbound_agent",
+          lead_id: lead.id,
+          call_id: vapiBody?.id ?? null,
+          vapi_call_id: vapiBody?.id ?? null,
+          correlation_id: correlationId,
+          function_name: FUNCTION_NAME,
+        });
         results.push({ leadId: lead.id, phone: lead.phone, status: "initiated" });
       } else {
         logError("Vapi call failed", { functionName: FUNCTION_NAME, correlationId, context: { vapiBody } });
@@ -162,6 +185,16 @@ Deno.serve(async (req: Request) => {
         if (releaseError) {
           logError("Failed to release lead", { functionName: FUNCTION_NAME, correlationId, error: releaseError });
         }
+        await captureServerEvent("outbound_call_started", lead.id, {
+          signup_channel: "outbound_agent",
+          lead_id: lead.id,
+          correlation_id: correlationId,
+          function_name: FUNCTION_NAME,
+          outcome: "technical_failure",
+          failure_stage: "vapi_call_create",
+          error_category: "vapi_api",
+          http_status: vapiRes.status,
+        });
         results.push({ leadId: lead.id, phone: lead.phone, status: "failed" });
       }
     } catch (err) {
@@ -183,11 +216,28 @@ Deno.serve(async (req: Request) => {
       if (releaseError) {
         logError("Failed to release lead", { functionName: FUNCTION_NAME, correlationId, error: releaseError });
       }
+      await captureServerException(err, lead.id, {
+        signup_channel: "outbound_agent",
+        lead_id: lead.id,
+        correlation_id: correlationId,
+        function_name: FUNCTION_NAME,
+        failure_stage: "vapi_call_create",
+      });
+      await captureServerEvent("outbound_call_started", lead.id, {
+        signup_channel: "outbound_agent",
+        lead_id: lead.id,
+        correlation_id: correlationId,
+        function_name: FUNCTION_NAME,
+        outcome: "technical_failure",
+        failure_stage: "vapi_call_create",
+        error_category: "unhandled",
+      });
       results.push({ leadId: lead.id, phone: lead.phone, status: "error" });
     }
   }
 
   logInfo("Run complete", { functionName: FUNCTION_NAME, correlationId, context: { mode: isLive ? "live" : "dry_run", called: results.length } });
+  await flushServerAnalytics();
 
   return jsonResponse({ mode: isLive ? "live" : "dry_run", called: results.length, results });
 });
