@@ -1813,6 +1813,7 @@ Deno.serve(async (req: Request) => {
       billing_call_based: true,
       trial_live_calls_limit: 15,
       selected_post_trial_plan: selectedPostTrialPlan,
+      environment: Deno.env.get("NODE_ENV") === "production" ? "production" : Deno.env.get("NODE_ENV") ?? "development",
       $lib: "edge-function",
       $set: {
         billing_status: "trial",
@@ -2345,6 +2346,7 @@ Deno.serve(async (req: Request) => {
       source_channel: data.source ?? 'website',
       account_id: currentAccountId,
       subscription_id: subscription.id,
+      environment: Deno.env.get('NODE_ENV') === 'production' ? 'production' : Deno.env.get('NODE_ENV') ?? 'development',
       $lib: 'edge-function',
     });
 

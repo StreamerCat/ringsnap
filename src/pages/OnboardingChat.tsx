@@ -1145,6 +1145,7 @@ function OnboardingChatInner() {
         page: '/onboarding-chat',
         section: 'checkout',
         cta_text: experimentAttribution?.ctaText,
+        environment: process.env.NODE_ENV === 'production' ? 'production' : process.env.NODE_ENV ?? 'development',
       });
       capture('onboarding_started', { plan_key: data.planType });
 
