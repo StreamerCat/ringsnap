@@ -1455,6 +1455,21 @@ serve(async (req) => {
               source_channel: session.metadata?.signup_source ?? null,
             });
           }
+        } else if (session.metadata?.source === 'outbound_agent') {
+          // Outbound-agent checkouts don't carry an account_id (no account
+          // exists yet at checkout time) and their Stripe customer isn't
+          // linked to an accounts row, so the sync block above never runs
+          // for them. Emit a distinct signal so this isn't silently
+          // invisible in monitoring — see agent-trial-checkout for the
+          // originating outbound_trial_creation_attempted event.
+          await capturePostHog('outbound_trial_creation_succeeded', customerId as string, {
+            signup_channel: 'outbound_agent',
+            outcome: 'trial_created',
+            plan_key: session.metadata?.plan_key ?? null,
+            vapi_call_id: session.metadata?.vapi_call_id ?? null,
+            stripe_session_id: session.id,
+            account_linked: false,
+          });
         }
 
         break;

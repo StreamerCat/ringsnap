@@ -20,6 +20,7 @@
 
 import { createClient } from "supabase";
 import { logInfo, logError, extractCorrelationId } from "../_shared/logging.ts";
+import { captureServerEvent, captureServerException, flushServerAnalytics } from "../_shared/server-analytics.ts";
 
 const FUNCTION_NAME = "trigger-outbound-calls";
 const VAPI_ASSISTANT_ID = "e2329175-069b-457f-8984-0f2e62742ed8";
@@ -145,6 +146,14 @@ Deno.serve(async (req: Request) => {
         if (insertError) {
           logError("Failed to log call", { functionName: FUNCTION_NAME, correlationId, error: insertError });
         }
+        await captureServerEvent("outbound_call_started", vapiBody?.id ?? lead.id, {
+          signup_channel: "outbound_agent",
+          lead_id: lead.id,
+          call_id: vapiBody?.id ?? null,
+          vapi_call_id: vapiBody?.id ?? null,
+          correlation_id: correlationId,
+          function_name: FUNCTION_NAME,
+        });
         results.push({ leadId: lead.id, phone: lead.phone, status: "initiated" });
       } else {
         logError("Vapi call failed", { functionName: FUNCTION_NAME, correlationId, context: { vapiBody } });
@@ -162,6 +171,16 @@ Deno.serve(async (req: Request) => {
         if (releaseError) {
           logError("Failed to release lead", { functionName: FUNCTION_NAME, correlationId, error: releaseError });
         }
+        await captureServerEvent("outbound_call_started", lead.id, {
+          signup_channel: "outbound_agent",
+          lead_id: lead.id,
+          correlation_id: correlationId,
+          function_name: FUNCTION_NAME,
+          outcome: "technical_failure",
+          failure_stage: "vapi_call_create",
+          error_category: "vapi_api",
+          http_status: vapiRes.status,
+        });
         results.push({ leadId: lead.id, phone: lead.phone, status: "failed" });
       }
     } catch (err) {
@@ -183,11 +202,28 @@ Deno.serve(async (req: Request) => {
       if (releaseError) {
         logError("Failed to release lead", { functionName: FUNCTION_NAME, correlationId, error: releaseError });
       }
+      await captureServerException(err, lead.id, {
+        signup_channel: "outbound_agent",
+        lead_id: lead.id,
+        correlation_id: correlationId,
+        function_name: FUNCTION_NAME,
+        failure_stage: "vapi_call_create",
+      });
+      await captureServerEvent("outbound_call_started", lead.id, {
+        signup_channel: "outbound_agent",
+        lead_id: lead.id,
+        correlation_id: correlationId,
+        function_name: FUNCTION_NAME,
+        outcome: "technical_failure",
+        failure_stage: "vapi_call_create",
+        error_category: "unhandled",
+      });
       results.push({ leadId: lead.id, phone: lead.phone, status: "error" });
     }
   }
 
   logInfo("Run complete", { functionName: FUNCTION_NAME, correlationId, context: { mode: isLive ? "live" : "dry_run", called: results.length } });
+  await flushServerAnalytics();
 
   return jsonResponse({ mode: isLive ? "live" : "dry_run", called: results.length, results });
 });

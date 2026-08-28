@@ -33,6 +33,7 @@
 
 import { createClient } from "supabase";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno&deno-std=0.168.0";
+import { captureServerEvent, captureServerException, flushServerAnalytics } from "../_shared/server-analytics.ts";
 
 // ── Plan config (mirrors plans table) ────────────────────────────────────────
 
@@ -117,6 +118,7 @@ Deno.serve(async (req: Request) => {
 
     toolCallId = toolCall.id ?? "unknown";
     const args = toolCall.arguments ?? {};
+    const distinctId = vapiCallId ?? toolCallId;
 
     // ── 1. Validate inputs ───────────────────────────────────────────────────
 
@@ -127,19 +129,57 @@ Deno.serve(async (req: Request) => {
       planKey = DEFAULT_PLAN;
     }
 
+    await captureServerEvent("outbound_trial_requested", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      vapi_call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      plan_key: planKey,
+      has_email: Boolean(contactEmail),
+      has_business_name: Boolean(businessName),
+    });
+
     if (!contactMobile) {
+      await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        outcome: "trial_failed",
+        failure_stage: "validate_input",
+        error_code: "MISSING_MOBILE",
+      });
       return respondError(toolCallId, "I need a mobile number to send the link. Can you share yours?");
     }
 
     const phone = normalizePhone(String(contactMobile));
 
     // ── 2. Stripe: create customer + checkout session ─────────────────────────
+    // Idempotency keys are derived from the Vapi tool-call id so a retried
+    // tool call (network hiccup, Vapi re-invoke) reuses the same Stripe
+    // customer/session instead of creating duplicates.
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       console.error("[agent-trial-checkout] STRIPE_SECRET_KEY not set");
+      await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        outcome: "trial_failed",
+        failure_stage: "stripe_config",
+        error_code: "STRIPE_KEY_MISSING",
+      });
       return respondError(toolCallId, "Something went wrong on our end. I'll send you the signup link directly instead.");
     }
+
+    await captureServerEvent("outbound_trial_creation_attempted", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      plan_key: planKey,
+    });
+
+    const _attemptStartedAt = Date.now();
 
     const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
@@ -161,7 +201,9 @@ Deno.serve(async (req: Request) => {
     if (contactEmail) customerParams.email = contactEmail;
     if (phone) customerParams.phone = phone;
 
-    const customer = await stripe.customers.create(customerParams);
+    const customer = await stripe.customers.create(customerParams, {
+      idempotencyKey: `agent-trial-checkout-customer-${toolCallId}`,
+    });
 
     // Checkout session — trial, card required, pre-fill email
     const session = await stripe.checkout.sessions.create({
@@ -189,6 +231,8 @@ Deno.serve(async (req: Request) => {
         business_name: businessName ?? "",
         contact_mobile: phone,
       },
+    }, {
+      idempotencyKey: `agent-trial-checkout-session-${toolCallId}`,
     });
 
     const checkoutUrl = session.url!;
@@ -293,9 +337,38 @@ Deno.serve(async (req: Request) => {
         });
       }
     } catch (dbErr) {
-      // Non-fatal — checkout was created, SMS sent. Log and continue.
+      // Non-fatal for the caller (checkout was created, SMS sent) but this
+      // is the step that actually records the lead→trial conversion, so it
+      // must be visible in monitoring rather than only console.error.
       console.error("[agent-trial-checkout] DB logging failed:", dbErr);
+      await captureServerException(dbErr, distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        failure_stage: "db_logging",
+      });
+      await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+        signup_channel: "outbound_agent",
+        call_id: vapiCallId,
+        function_name: "agent-trial-checkout",
+        outcome: "trial_failed",
+        failure_stage: "db_logging",
+        error_category: "database",
+        stripe_session_id_present: Boolean(session.id),
+        duration_ms: Date.now() - _attemptStartedAt,
+      });
     }
+
+    await captureServerEvent("outbound_trial_creation_succeeded", distinctId, {
+      signup_channel: "outbound_agent",
+      call_id: vapiCallId,
+      function_name: "agent-trial-checkout",
+      outcome: "trial_created",
+      plan_key: planKey,
+      sms_sent: smsSent,
+      duration_ms: Date.now() - _attemptStartedAt,
+    });
+    await flushServerAnalytics();
 
     // ── 5. Return result to Vapi ──────────────────────────────────────────────
 
@@ -320,6 +393,21 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: unknown) {
     console.error("[agent-trial-checkout] Unhandled error:", err);
+    const distinctId = toolCallId;
+    await captureServerException(err, distinctId, {
+      signup_channel: "outbound_agent",
+      function_name: "agent-trial-checkout",
+      failure_stage: "unhandled",
+    });
+    await captureServerEvent("outbound_trial_creation_failed", distinctId, {
+      signup_channel: "outbound_agent",
+      function_name: "agent-trial-checkout",
+      outcome: "trial_failed",
+      failure_stage: "unhandled",
+      error_category: err instanceof Stripe.errors.StripeError ? "stripe" : "unknown",
+      error_code: err instanceof Stripe.errors.StripeError ? err.code ?? err.type : undefined,
+    });
+    await flushServerAnalytics();
     return respondError(
       toolCallId,
       "Something went wrong creating the checkout. Have them go to getringsnap.com/start to sign up directly."
