@@ -21,6 +21,10 @@
  *         contactEmail: string,
  *         contactMobile: string,
  *         businessName: string,
+ *         city: string,   (optional — the agent should read back the lead's
+ *                          known city from call variables and confirm/correct
+ *                          it with the prospect; see trigger-outbound-calls)
+ *         state: string,  (optional — same as city; 2-letter or full name, both accepted)
  *         planKey: "night_weekend" | "lite" | "core" | "pro"  (optional, defaults to "core")
  *       }
  *     }]
@@ -79,6 +83,29 @@ function normalizePhone(raw: string): string {
   return "+" + withCountry;
 }
 
+/** Normalize a spoken/typed state to a 2-letter USPS code, or undefined if unusable. */
+function normalizeState(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (trimmed.length === 2) return trimmed.toUpperCase();
+  const byName = US_STATE_NAME_TO_ABBR[trimmed.toLowerCase()];
+  return byName;
+}
+
+const US_STATE_NAME_TO_ABBR: Record<string, string> = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+  colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
+  hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA",
+  kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
+  massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO",
+  montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ",
+  "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", ohio: "OH",
+  oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+  "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+  virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY",
+  "district of columbia": "DC",
+};
+
 function respond(toolCallId: string, result: string): Response {
   return new Response(
     JSON.stringify({ results: [{ toolCallId, result }] }),
@@ -123,6 +150,13 @@ Deno.serve(async (req: Request) => {
     // ── 1. Validate inputs ───────────────────────────────────────────────────
 
     const { contactName, contactEmail, contactMobile, businessName } = args;
+    // The lead's business_name/phone/city/state are looked up from
+    // outbound_leads and read back to the prospect on the call for
+    // confirmation (see trigger-outbound-calls' assistantOverrides). These
+    // args carry whatever the prospect confirmed OR corrected — always the
+    // current truth, whether or not it matches what's already in the DB.
+    const city: string | undefined = typeof args.city === "string" ? args.city.trim() || undefined : undefined;
+    const state = normalizeState(args.state);
     let planKey: PlanKey = (args.planKey ?? DEFAULT_PLAN) as PlanKey;
 
     if (!VALID_PLAN_KEYS.includes(planKey)) {
@@ -196,10 +230,15 @@ Deno.serve(async (req: Request) => {
         vapi_call_id: vapiCallId ?? "",
         contact_name: contactName ?? "",
         business_name: businessName ?? "",
+        city: city ?? "",
+        state: state ?? "",
       },
     };
     if (contactEmail) customerParams.email = contactEmail;
     if (phone) customerParams.phone = phone;
+    if (city || state) {
+      customerParams.address = { city: city ?? undefined, state: state ?? undefined, country: "US" };
+    }
 
     const customer = await stripe.customers.create(customerParams, {
       idempotencyKey: `agent-trial-checkout-customer-${toolCallId}`,
@@ -230,6 +269,8 @@ Deno.serve(async (req: Request) => {
         contact_name: contactName ?? "",
         business_name: businessName ?? "",
         contact_mobile: phone,
+        city: city ?? "",
+        state: state ?? "",
       },
     }, {
       idempotencyKey: `agent-trial-checkout-session-${toolCallId}`,
@@ -295,11 +336,23 @@ Deno.serve(async (req: Request) => {
         .eq("phone", phone)
         .maybeSingle();
 
+      // The agent confirms (or corrects) business_name/city/state on every
+      // call, so write back whatever it reported — that's always the
+      // current truth, not just a fallback for missing data.
+      const confirmedFields: Record<string, unknown> = {
+        status: "checkout_sent",
+        updated_at: new Date().toISOString(),
+      };
+      if (businessName) confirmedFields.business_name = businessName;
+      if (city) confirmedFields.city = city;
+      if (state) confirmedFields.state = state;
+      if (contactEmail) confirmedFields.email = contactEmail;
+
       if (existingLead) {
         leadId = existingLead.id;
         await supabase
           .from("outbound_leads")
-          .update({ status: "checkout_sent", updated_at: new Date().toISOString() })
+          .update(confirmedFields)
           .eq("id", leadId);
       } else {
         const { data: newLead } = await supabase
@@ -307,6 +360,9 @@ Deno.serve(async (req: Request) => {
           .insert({
             business_name: businessName ?? contactName ?? "Unknown",
             phone,
+            city: city ?? null,
+            state: state ?? null,
+            email: contactEmail ?? null,
             status: "checkout_sent",
             source: "outbound_agent",
           })

@@ -1473,6 +1473,15 @@ serve(async (req) => {
           const businessName = session.metadata?.business_name || null;
           const planKeyMeta = session.metadata?.plan_key || 'core';
           const vapiCallIdMeta = session.metadata?.vapi_call_id || null;
+          const cityMeta = session.metadata?.city || null;
+          // The outbound agent confirms this with the prospect on the call
+          // (see trigger-outbound-calls' assistantOverrides + agent-trial-checkout).
+          // Only forward it if it's already a valid 2-letter USPS code —
+          // create-trial's billingState field requires exactly 2 characters
+          // and falls back to a zip-derived/default state otherwise.
+          const stateMeta = session.metadata?.state && /^[A-Za-z]{2}$/.test(session.metadata.state)
+            ? session.metadata.state.toUpperCase()
+            : null;
 
           if (!outboundEmail || !contactMobile) {
             logError('Cannot create account for outbound checkout — missing email or phone', {
@@ -1514,6 +1523,8 @@ serve(async (req) => {
                   source: 'outbound_agent',
                   stripeSessionId: session.id,
                   vapiCallId: vapiCallIdMeta ?? undefined,
+                  serviceArea: cityMeta ?? undefined,
+                  billingState: stateMeta ?? undefined,
                 }),
               });
               const resultBody = await res.json().catch(() => ({}));

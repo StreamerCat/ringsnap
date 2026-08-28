@@ -533,5 +533,65 @@ describe("create-trial endpoint", () => {
       expect(isSessionUsable({ payment_status: "paid" })).toBe(true);
     });
   });
+
+  describe("Outbound lead confirmation/correction (stripe-webhook -> create-trial)", () => {
+    // Mirrors stripe-webhook's stateMeta validation: only a plain 2-letter
+    // USPS code is forwarded as billingState; anything else (a full state
+    // name, garbage, empty) is dropped so create-trial's strict
+    // z.string().length(2) schema never rejects the whole request.
+    function resolveStateMeta(rawState: string | null | undefined): string | null {
+      return rawState && /^[A-Za-z]{2}$/.test(rawState) ? rawState.toUpperCase() : null;
+    }
+
+    it("forwards a valid 2-letter state as billingState", () => {
+      expect(resolveStateMeta("tx")).toBe("TX");
+      expect(resolveStateMeta("CA")).toBe("CA");
+    });
+
+    it("drops an unusable state value instead of forwarding it", () => {
+      expect(resolveStateMeta("Texas")).toBeNull();
+      expect(resolveStateMeta("")).toBeNull();
+      expect(resolveStateMeta(null)).toBeNull();
+      expect(resolveStateMeta(undefined)).toBeNull();
+    });
+
+    // Mirrors agent-trial-checkout's normalizeState: the agent may pass back
+    // either an abbreviation or a full state name spoken by the prospect.
+    function normalizeState(raw: string | undefined, nameMap: Record<string, string>): string | undefined {
+      if (!raw) return undefined;
+      const trimmed = raw.trim();
+      if (trimmed.length === 2) return trimmed.toUpperCase();
+      return nameMap[trimmed.toLowerCase()];
+    }
+
+    it("accepts a full state name spoken on the call and normalizes it to an abbreviation", () => {
+      const nameMap = { georgia: "GA", "north carolina": "NC" };
+      expect(normalizeState("Georgia", nameMap)).toBe("GA");
+      expect(normalizeState("north carolina", nameMap)).toBe("NC");
+      expect(normalizeState("ga", nameMap)).toBe("GA");
+    });
+
+    it("confirmed lead details overwrite stale DB values on every call, not just when missing", () => {
+      // agent-trial-checkout always writes back business_name/city/state from
+      // the tool-call args when present — the agent is expected to confirm
+      // on every call, so a correction must not be silently ignored because
+      // a DB value already existed.
+      const buildLeadUpdate = (args: { businessName?: string; city?: string; state?: string; email?: string }) => {
+        const update: Record<string, unknown> = { status: "checkout_sent" };
+        if (args.businessName) update.business_name = args.businessName;
+        if (args.city) update.city = args.city;
+        if (args.state) update.state = args.state;
+        if (args.email) update.email = args.email;
+        return update;
+      };
+
+      const existingLeadFromDb = { business_name: "Old Name LLC", city: "Springfield", state: "IL" };
+      const correctedByProspect = buildLeadUpdate({ businessName: "New Corrected Name LLC", city: "Shelbyville", state: "IL" });
+
+      expect(correctedByProspect.business_name).toBe("New Corrected Name LLC");
+      expect(correctedByProspect.business_name).not.toBe(existingLeadFromDb.business_name);
+      expect(correctedByProspect.city).toBe("Shelbyville");
+    });
+  });
 });
 

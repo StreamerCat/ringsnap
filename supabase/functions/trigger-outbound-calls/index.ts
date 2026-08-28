@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
   // ── 1. Pull due leads (never touches dnc/called/checkout_sent leads) ────────
   const { data: leads, error: leadsError } = await supabase
     .from("outbound_leads")
-    .select("id, phone, business_name")
+    .select("id, phone, business_name, city, state")
     .eq("status", "new")
     .order("created_at", { ascending: true })
     .limit(batchSize);
@@ -129,6 +129,20 @@ Deno.serve(async (req: Request) => {
           assistantId: VAPI_ASSISTANT_ID,
           phoneNumberId: VAPI_PHONE_NUMBER_ID,
           customer: { number: lead.phone },
+          // Exposes the lead's known details as call variables so the
+          // assistant's prompt can read them back to the prospect for
+          // confirmation (e.g. "I have you down as {{business_name}} in
+          // {{city}}, {{state}} — is that right?") instead of guessing or
+          // silently trusting stale DB data. Corrections come back via the
+          // create_agent_trial tool call's city/state/businessName args.
+          assistantOverrides: {
+            variableValues: {
+              business_name: lead.business_name ?? "",
+              lead_phone: lead.phone ?? "",
+              city: lead.city ?? "",
+              state: lead.state ?? "",
+            },
+          },
         }),
       });
 
