@@ -42,7 +42,13 @@ echo "[session-start] Linting migrations..."
 bash .github/scripts/lint-migrations.sh
 
 # ── 4. Install Playwright browsers (chromium only, for smoke tests) ───────────
-echo "[session-start] Installing Playwright chromium browser..."
-npx playwright install chromium || true
+# Skip if a browser is already provisioned in this environment (e.g. PLAYWRIGHT_BROWSERS_PATH
+# pre-installed) — avoids a slow/flaky download on every session start.
+if [ -n "${PLAYWRIGHT_BROWSERS_PATH:-}" ] && [ -d "${PLAYWRIGHT_BROWSERS_PATH}" ] && find "${PLAYWRIGHT_BROWSERS_PATH}" -maxdepth 1 -iname 'chromium*' -print -quit | grep -q .; then
+  echo "[session-start] Playwright chromium already provisioned at ${PLAYWRIGHT_BROWSERS_PATH}, skipping download."
+else
+  echo "[session-start] Installing Playwright chromium browser..."
+  npx playwright install chromium || true
+fi
 
 echo "[session-start] Setup complete."
