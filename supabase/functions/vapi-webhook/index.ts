@@ -92,6 +92,7 @@ Deno.serve(withSentryEdge(
             // Validation
             if (!providerCallId) {
                 await writeToInbox(supabase, {
+                    message_type: type,
                     provider_call_id: null,
                     provider_phone_number_id: providerPhoneNumberId, // This is the raw ID from payload
                     reason: "missing_call_id",
@@ -111,6 +112,7 @@ Deno.serve(withSentryEdge(
                 if (!incomingSecret || incomingSecret !== expectedSecret) {
                     const errorMsg = incomingSecret ? "Secret mismatch" : "Missing secret header";
                     await writeToInbox(supabase, {
+                        message_type: type,
                         provider_call_id: providerCallId,
                         provider_phone_number_id: providerPhoneNumberId,
                         reason: "unauthorized",
@@ -171,6 +173,7 @@ Deno.serve(withSentryEdge(
                     console.error("Lookup VapiPhoneId Error:", error);
                     if (isDuplicateError(error)) {
                         await writeToInbox(supabase, {
+                            message_type: type,
                             provider_call_id: providerCallId,
                             provider_phone_number_id: vapiPhoneId,
                             reason: "duplicate_phone_mapping",
@@ -198,6 +201,7 @@ Deno.serve(withSentryEdge(
                     console.error("Lookup VapiId (legacy) Error:", error);
                     if (isDuplicateError(error)) {
                         await writeToInbox(supabase, {
+                            message_type: type,
                             provider_call_id: providerCallId,
                             provider_phone_number_id: vapiPhoneId,
                             reason: "duplicate_phone_mapping",
@@ -225,6 +229,7 @@ Deno.serve(withSentryEdge(
                     console.error("Lookup ProviderPhoneNumberId (legacy) Error:", error);
                     if (isDuplicateError(error)) {
                         await writeToInbox(supabase, {
+                            message_type: type,
                             provider_call_id: providerCallId,
                             provider_phone_number_id: vapiPhoneId,
                             reason: "duplicate_phone_mapping",
@@ -252,6 +257,7 @@ Deno.serve(withSentryEdge(
                     console.error("Lookup E164 Error:", error);
                     if (isDuplicateError(error)) {
                         await writeToInbox(supabase, {
+                            message_type: type,
                             provider_call_id: providerCallId,
                             provider_phone_number_id: vapiPhoneId,
                             reason: "duplicate_phone_mapping",
@@ -279,6 +285,7 @@ Deno.serve(withSentryEdge(
                     console.error("Lookup PhoneNumber Error:", error);
                     if (isDuplicateError(error)) {
                         await writeToInbox(supabase, {
+                            message_type: type,
                             provider_call_id: providerCallId,
                             provider_phone_number_id: vapiPhoneId,
                             reason: "duplicate_phone_mapping",
@@ -332,6 +339,7 @@ Deno.serve(withSentryEdge(
                 }
 
                 await writeToInbox(supabase, {
+                    message_type: type,
                     provider_call_id: providerCallId,
                     provider_phone_number_id: vapiPhoneId,
                     reason: "unmapped_account",
@@ -383,6 +391,7 @@ Deno.serve(withSentryEdge(
 
             if (upsertError) {
                 await writeToInbox(supabase, {
+                    message_type: type,
                     provider_call_id: providerCallId,
                     provider_phone_number_id: providerPhoneNumberId,
                     reason: "upsert_failed",
@@ -631,17 +640,32 @@ async function writeToInbox(
         reason: string;
         payload: unknown;
         error: string | null;
+        message_type?: string | null;
     }
 ): Promise<void> {
     try {
-        await supabase.from('call_webhook_inbox').insert({
+        const row = {
             provider: 'vapi',
             provider_call_id: data.provider_call_id,
             provider_phone_number_id: data.provider_phone_number_id,
             reason: data.reason,
             payload: data.payload,
             error: data.error,
-        });
+            message_type: data.message_type ?? null,
+        };
+
+        // Dedup on (provider, provider_call_id, message_type, reason) so a
+        // Vapi retry storm for the same event doesn't flood the inbox with
+        // repeat rows. Rows without a call id or message type (malformed
+        // payloads) skip dedup and always insert.
+        if (row.provider_call_id && row.message_type) {
+            await supabase.from('call_webhook_inbox').upsert(row, {
+                onConflict: 'provider,provider_call_id,message_type,reason',
+                ignoreDuplicates: true,
+            });
+        } else {
+            await supabase.from('call_webhook_inbox').insert(row);
+        }
     } catch (e) {
         console.error("Inbox write failed", e);
     }

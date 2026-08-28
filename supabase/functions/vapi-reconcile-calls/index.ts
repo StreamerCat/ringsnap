@@ -141,6 +141,7 @@ Deno.serve(async (req) => {
         let skipped = 0;
         let upserted = 0;
         let errors = 0;
+        const orphanedNumbers = new Map<string, number>();
 
         for (const call of calls) {
             processed++;
@@ -164,6 +165,13 @@ Deno.serve(async (req) => {
 
             if (!mapping) {
                 skipped++;
+                // A number Vapi is actively routing calls to but that has no
+                // row in phone_numbers is either half-provisioned or should
+                // have been released -- surface it so it can be reconciled
+                // instead of silently retrying forever.
+                if (vapiPhoneId) {
+                    orphanedNumbers.set(vapiPhoneId, (orphanedNumbers.get(vapiPhoneId) ?? 0) + 1);
+                }
                 continue;
             }
 
@@ -217,6 +225,28 @@ Deno.serve(async (req) => {
             }
         }
 
+        // Record orphaned numbers (in Vapi, unmapped in RingSnap) for reconciliation.
+        // Read-only report -- does not mutate Vapi or DB state, since deciding
+        // whether an orphan should be backfilled or released requires human judgment.
+        if (orphanedNumbers.size > 0) {
+            const orphanReport = Array.from(orphanedNumbers.entries()).map(
+                ([vapiPhoneNumberId, callCount]) => ({ vapiPhoneNumberId, callCount })
+            );
+            console.warn(JSON.stringify({
+                event: "reconcile_orphaned_numbers_detected",
+                count: orphanedNumbers.size,
+                orphanReport,
+            }));
+            await supabase.from('call_webhook_inbox').insert({
+                provider: 'vapi',
+                provider_call_id: null,
+                provider_phone_number_id: null,
+                reason: 'orphaned_phone_numbers_report',
+                payload: { orphanReport, lookbackHours: LOOKBACK_HOURS },
+                error: `${orphanedNumbers.size} Vapi number(s) with active calls have no matching phone_numbers row`,
+            });
+        }
+
         const duration = Date.now() - startTime;
 
         console.log(JSON.stringify({
@@ -225,6 +255,7 @@ Deno.serve(async (req) => {
             upserted,
             skipped,
             errors,
+            orphanedNumbers: orphanedNumbers.size,
             durationMs: duration,
         }));
 
@@ -234,6 +265,7 @@ Deno.serve(async (req) => {
             upserted,
             skipped,
             errors,
+            orphanedNumbers: Array.from(orphanedNumbers.keys()),
             durationMs: duration,
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
