@@ -76,6 +76,19 @@ export default function Start() {
   // Loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // PostHog: trial_form_viewed fires once when the form becomes visible —
+  // distinct from form_started below, which only fires on first field
+  // interaction. Additive: does not replace or change form_started.
+  useEffect(() => {
+    capture('trial_form_viewed', {
+      environment: import.meta.env.MODE === 'production' ? 'production' : import.meta.env.MODE,
+      form_id: 'signup_step1',
+      app_surface: 'marketing',
+      page_path: window.location.pathname,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // PostHog: fire form_started only once per session
   const [formStartTracked, setFormStartTracked] = useState(false);
   const handleFormStart = () => {
@@ -233,6 +246,22 @@ export default function Start() {
 
     trackFormEvent('signup_form', 'submit', { has_utm: !!searchParams.get('utm_source') });
     setIsSubmitting(true);
+
+    // PostHog: trial_submitted fires on submit, before the API call —
+    // additive alongside the existing form_submitted (which fires after
+    // the lead is captured, below). No form field values included.
+    capture('trial_submitted', {
+      environment: import.meta.env.MODE === 'production' ? 'production' : import.meta.env.MODE,
+      form_id: 'signup_step1',
+      app_surface: 'marketing',
+      page_path: window.location.pathname,
+    });
+    try {
+      sessionStorage.setItem('trial_submit_at', String(Date.now()));
+    } catch {
+      // Best-effort — storage can throw (blocked/private browsing) and
+      // must never abort a valid submission.
+    }
 
     try {
       if (IS_DEV) console.log('[Start] Capturing lead:', { name: trimmedName, email: trimmedEmail });

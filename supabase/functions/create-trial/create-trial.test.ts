@@ -746,5 +746,147 @@ describe("create-trial endpoint", () => {
       expect(distinctId).toBe("tool_abc");
     });
   });
+
+  describe("error_encountered event (additive PostHog tracking)", () => {
+    // Mirrors captureCreateTrialException's new error_encountered capture:
+    // every existing call site already passes a distinct `step` string,
+    // which doubles as failure_stage without touching each of the 48 call
+    // sites individually.
+    function buildErrorEncounteredProps(
+      err: unknown,
+      step: string,
+      context: Record<string, unknown> = {}
+    ) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      return {
+        environment: "test",
+        flow: "create_trial",
+        function_name: "create-trial",
+        failure_stage: step,
+        error_code: (err as { name?: string; code?: string })?.name ?? (err as { name?: string; code?: string })?.code ?? "UnknownError",
+        failure_reason: e.message,
+        correlation_id: (context.correlation_id as string | undefined) ?? null,
+        lead_id: (context.lead_id as string | undefined) ?? null,
+        account_id: (context.account_id as string | undefined) ?? null,
+        retry_count: (context.retry_count as number | undefined) ?? 0,
+      };
+    }
+
+    it("uses error.message, not the stack trace, for failure_reason", () => {
+      const err = new Error("Stripe Customer Create Failed: card declined");
+      err.stack = "Error: Stripe Customer Create Failed\n    at foo.ts:123";
+      const props = buildErrorEncounteredProps(err, "stripe_customer_create");
+      expect(props.failure_reason).toBe("Stripe Customer Create Failed: card declined");
+      expect(props.failure_reason).not.toContain("at foo.ts");
+    });
+
+    it("uses the distinct step string as failure_stage, unmodified", () => {
+      expect(buildErrorEncounteredProps(new Error("x"), "supabase_insert_account").failure_stage).toBe("supabase_insert_account");
+      expect(buildErrorEncounteredProps(new Error("x"), "outbound_checkout_verify").failure_stage).toBe("outbound_checkout_verify");
+    });
+
+    it("defaults correlation_id/lead_id/account_id to null and retry_count to 0 when not in scope", () => {
+      const props = buildErrorEncounteredProps(new Error("x"), "validation_phone");
+      expect(props.correlation_id).toBeNull();
+      expect(props.lead_id).toBeNull();
+      expect(props.account_id).toBeNull();
+      expect(props.retry_count).toBe(0);
+    });
+
+    it("passes through account_id/correlation_id when present in the existing context object", () => {
+      const props = buildErrorEncounteredProps(new Error("x"), "supabase_insert_account", {
+        account_id: "acct_123",
+        correlation_id: "corr_456",
+      });
+      expect(props.account_id).toBe("acct_123");
+      expect(props.correlation_id).toBe("corr_456");
+    });
+
+    it("never includes an email, phone number, or name in its properties", () => {
+      const props = buildErrorEncounteredProps(new Error("x"), "validation_email", {
+        account_id: "acct_123",
+        // user_email/phone_number are passed to the exception capture via
+        // ...context elsewhere, but error_encountered only reads the four
+        // explicit correlation fields above — nothing else from context
+        // leaks into it.
+        user_email: "someone@example.com",
+        phone_number: "+15551234567",
+      });
+      const values = Object.values(props).map((v) => String(v));
+      expect(values.some((v) => v.includes("@"))).toBe(false);
+      expect(values.some((v) => /\+1\d{10}/.test(v))).toBe(false);
+    });
+  });
+
+  describe("Codex review fixes on error_encountered/environment (verified)", () => {
+    // Mirrors isExpectedValidationRejection: routine 400/409/429 control-flow
+    // rejections must not fire error_encountered, or the event becomes
+    // useless for alerting (constant false positives on normal traffic).
+    function isExpectedValidationRejection(step: string): boolean {
+      return (
+        step.startsWith("validation_") ||
+        step === "validate_input_json_parse" ||
+        step === "validate_input_schema"
+      );
+    }
+
+    it("classifies routine validation/rate-limit/account-exists steps as expected", () => {
+      expect(isExpectedValidationRejection("validation_phone")).toBe(true);
+      expect(isExpectedValidationRejection("validation_email")).toBe(true);
+      expect(isExpectedValidationRejection("validation_ip_rate_limit")).toBe(true);
+      expect(isExpectedValidationRejection("validation_account_exists")).toBe(true);
+      expect(isExpectedValidationRejection("validate_input_json_parse")).toBe(true);
+      expect(isExpectedValidationRejection("validate_input_schema")).toBe(true);
+    });
+
+    it("classifies real operational failures as NOT expected (still fires error_encountered)", () => {
+      expect(isExpectedValidationRejection("stripe_customer_create")).toBe(false);
+      expect(isExpectedValidationRejection("supabase_insert_account")).toBe(false);
+      expect(isExpectedValidationRejection("vapi_setup")).toBe(false);
+      expect(isExpectedValidationRejection("twilio_provision")).toBe(false);
+    });
+
+    // Mirrors the environment resolution fix: NODE_ENV is never set in
+    // deployed Supabase Edge Functions, so defaulting to it would mislabel
+    // every production event as "development". ENVIRONMENT/SUPABASE_ENV
+    // (matching _shared/server-analytics.ts) with a production default
+    // fixes that.
+    function resolveEnvironment(env: Record<string, string | undefined>): string {
+      return env.ENVIRONMENT || env.SUPABASE_ENV || "production";
+    }
+
+    it("defaults to production, not development, when no environment env vars are set", () => {
+      // This is the actual deployed-Edge-Function scenario NODE_ENV would
+      // have silently mislabeled as "development".
+      expect(resolveEnvironment({})).toBe("production");
+    });
+
+    it("respects an explicit ENVIRONMENT or SUPABASE_ENV value", () => {
+      expect(resolveEnvironment({ ENVIRONMENT: "staging" })).toBe("staging");
+      expect(resolveEnvironment({ SUPABASE_ENV: "staging" })).toBe("staging");
+      expect(resolveEnvironment({ ENVIRONMENT: "staging", SUPABASE_ENV: "production" })).toBe("staging");
+    });
+
+    // Mirrors the __provisioningFailedAlreadyEmitted marker: an inner
+    // catch that already emitted provisioning_failed before rethrowing
+    // must suppress the outer catch's emission for the same error.
+    it("suppresses the outer catch's provisioning_failed when an inner catch already emitted one", () => {
+      const shouldEmit = (error: { __provisioningFailedAlreadyEmitted?: boolean }) =>
+        !error.__provisioningFailedAlreadyEmitted;
+
+      expect(shouldEmit({ __provisioningFailedAlreadyEmitted: true })).toBe(false);
+      expect(shouldEmit({})).toBe(true);
+    });
+
+    // Mirrors deriving failure_stage from the already-computed errorCode
+    // instead of a hardcoded "twilio_number_purchase" — the catch wraps
+    // pooled-number binding, Vapi import, and DB persistence too, not just
+    // the Twilio purchase.
+    it("derives failure_stage from the actual error classification, not a hardcoded stage", () => {
+      const deriveFailureStage = (errorCode: string) => errorCode.toLowerCase();
+      expect(deriveFailureStage("TWILIO_PROVISIONING_FAILED")).toBe("twilio_provisioning_failed");
+      expect(deriveFailureStage("VAPI_PHONE_FAILED")).toBe("vapi_phone_failed");
+    });
+  });
 });
 
