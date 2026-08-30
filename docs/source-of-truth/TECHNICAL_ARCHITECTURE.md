@@ -253,10 +253,12 @@ Phone OTP (PARTIAL):
 |---|---|
 | checkout.session.completed | Update plan_key, subscription_status, stripe_customer_id |
 | customer.subscription.updated | Sync subscription status and plan |
-| customer.subscription.deleted | Mark account cancelled ⚠️ NO EMAIL SENT (risk C2) |
-| invoice.payment_failed | Mark account past_due ⚠️ NO EMAIL SENT (risk C1) |
-| invoice.payment_succeeded | ⚠️ UNKNOWN if payment recovery email sent |
-| invoice.upcoming | Charge overage to Stripe ⚠️ DOUBLE-BILLING RISK (risk C3) |
+| customer.subscription.deleted | Mark account cancelled + send cancellation email (✅ C2 resolved in `f85ce31`) |
+| invoice.payment_failed | Mark account past_due + send payment-failed email (✅ C1 resolved in `f85ce31`) |
+| invoice.payment_succeeded | Mark active and send invoice/receipt email via Resend |
+| invoice.upcoming | Report overage to Stripe; resets period counters **before** the Stripe call to prevent double-billing on webhook retry (✅ C3 resolved in `f85ce31`) |
+
+> **Idempotency:** every event is deduplicated via the `record_stripe_event` RPC before the `switch` — a repeated `event.id` short-circuits with `{ received: true, duplicate: true }`. Email sends in the `payment_failed` / `subscription.deleted` handlers are best-effort (wrapped in try/catch, never throw).
 
 ### Billing Portal
 - `create-billing-portal-session` edge function → Stripe hosted portal URL
