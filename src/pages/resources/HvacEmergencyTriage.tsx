@@ -48,7 +48,7 @@ const HvacEmergencyTriage = () => (
                 Every HVAC call falls into one of three categories. Your triage process should classify the call within the first 60 seconds so you can route it correctly:
             </p>
             <div className="grid gap-4 mb-4">
-                <div className="rounded-xl border-2 border-destructive/30 bg-destructive/5 p-5">
+                <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-5">
                     <h3 className="font-bold text-foreground mb-2">🚨 Emergency — Dispatch Immediately</h3>
                     <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
                         <li>Gas smell near HVAC equipment or gas line</li>
@@ -59,7 +59,7 @@ const HvacEmergencyTriage = () => (
                         <li>Sparking, burning smell, or smoke from HVAC equipment</li>
                     </ul>
                 </div>
-                <div className="rounded-xl border-2 border-yellow-500/30 bg-yellow-500/5 p-5">
+                <div className="rounded-2xl border-2 border-yellow-500/30 bg-yellow-500/5 p-5">
                     <h3 className="font-bold text-foreground mb-2">⚡ Urgent — Same-Day Priority</h3>
                     <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
                         <li>System down in moderate weather (uncomfortable but not dangerous)</li>
@@ -68,7 +68,7 @@ const HvacEmergencyTriage = () => (
                         <li>Commercial HVAC down affecting business operations</li>
                     </ul>
                 </div>
-                <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
+                <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-5">
                     <h3 className="font-bold text-foreground mb-2">📅 Routine — Schedule Next Available</h3>
                     <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
                         <li>Tune-up or maintenance request</li>

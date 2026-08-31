@@ -103,15 +103,15 @@ const ServicePricingCalculator = () => {
                     <div className="mt-8 pt-6 border-t border-border">
                         <h3 className="text-lg font-bold text-foreground mb-4">Recommended Pricing</h3>
                         <div className="grid md:grid-cols-3 gap-4 mb-4">
-                            <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-center">
+                            <div className="rounded-2xl bg-primary/10 border border-primary/20 p-4 text-center">
                                 <div className="text-sm text-muted-foreground mb-1">Recommended Price</div>
                                 <div className="text-2xl font-bold text-primary">${recommendedPrice}</div>
                             </div>
-                            <div className="rounded-xl bg-muted/50 border border-border p-4 text-center">
+                            <div className="rounded-2xl bg-muted/50 border border-border p-4 text-center">
                                 <div className="text-sm text-muted-foreground mb-1">Price Range</div>
                                 <div className="text-2xl font-bold text-foreground">${lowEnd}–${highEnd}</div>
                             </div>
-                            <div className="rounded-xl bg-muted/50 border border-border p-4 text-center">
+                            <div className="rounded-2xl bg-muted/50 border border-border p-4 text-center">
                                 <div className="text-sm text-muted-foreground mb-1">Gross Profit</div>
                                 <div className="text-2xl font-bold text-foreground">${grossProfit}</div>
                             </div>
@@ -122,7 +122,7 @@ const ServicePricingCalculator = () => {
 
             <section id="margin-breakdown" className="mb-10">
                 <h2 className="text-2xl font-bold text-foreground mb-4">Margin Breakdown</h2>
-                <div className="rounded-xl border border-border bg-card p-6">
+                <div className="rounded-2xl border border-border bg-card p-6">
                     <div className="space-y-3 text-sm">
                         <div className="flex justify-between"><span className="text-muted-foreground">Labor cost ({avgJobHours}h × ${laborRate}/hr)</span><span className="font-medium">${laborCost}</span></div>
                         <div className="flex justify-between"><span className="text-muted-foreground">Materials</span><span className="font-medium">${materialCost}</span></div>

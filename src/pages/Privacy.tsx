@@ -23,9 +23,9 @@ const sections = [
   { id: 'contact-information', title: '17. Contact Information' },
 ];
 
-const sectionHeadingClass = 'text-2xl sm:text-3xl font-semibold text-gray-900 mb-4 scroll-mt-24';
-const paragraphClass = 'text-gray-700 leading-7 mb-4';
-const listClass = 'list-disc pl-6 space-y-2 text-gray-700 leading-7 mb-4';
+const sectionHeadingClass = 'text-2xl sm:text-3xl font-semibold text-foreground mb-4 scroll-mt-24';
+const paragraphClass = 'text-foreground/80 leading-7 mb-4';
+const listClass = 'list-disc pl-6 space-y-2 text-foreground/80 leading-7 mb-4';
 
 export default function Privacy() {
   return (
@@ -58,11 +58,11 @@ export default function Privacy() {
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <header className="mb-10 sm:mb-12">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#D97757]">Privacy Policy</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-3">
+            <p className="text-sm sm:text-base text-muted-foreground mt-3">
               Effective Date: <span className="font-semibold">February 2025</span> · Last Updated:{' '}
               <span className="font-semibold">March 8, 2026</span>
             </p>
-            <p className="text-gray-700 leading-7 mt-6 max-w-4xl">
+            <p className="text-foreground/80 leading-7 mt-6 max-w-4xl">
               This Privacy Policy explains how RingSnap ("RingSnap," "we," "us," or "our") collects, uses, shares, stores, and protects information when customers use
               our AI-powered phone answering, voice automation, messaging, and scheduling platform, and when callers interact with communications handled through the
               platform. This Policy applies to our website, applications, APIs, and related services (collectively, the "Service").
@@ -70,8 +70,8 @@ export default function Privacy() {
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-8 lg:gap-12 items-start">
-            <aside className="lg:sticky lg:top-24 self-start rounded-xl border border-[#F0E2DE] bg-[#FEF6F3] p-5">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">On this page</h2>
+            <aside className="lg:sticky lg:top-24 self-start rounded-2xl border border-[#F0E2DE] bg-[#FEF6F3] p-5">
+              <h2 className="text-lg font-semibold text-foreground mb-4">On this page</h2>
               <nav aria-label="Privacy Policy sections">
                 <ol className="space-y-2 text-sm">
                   {sections.map((section) => (

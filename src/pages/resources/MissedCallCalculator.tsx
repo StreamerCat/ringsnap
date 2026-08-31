@@ -175,15 +175,15 @@ const MissedCallCalculator = () => {
                     <div className="mt-8 pt-6 border-t border-border">
                         <h3 className="text-lg font-bold text-foreground mb-4">Your Lost Revenue</h3>
                         <div className="grid md:grid-cols-3 gap-4">
-                            <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-center">
+                            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-4 text-center">
                                 <div className="text-sm text-muted-foreground mb-1">Missed calls / month</div>
                                 <div className="text-2xl font-bold text-destructive">{missedCalls}</div>
                             </div>
-                            <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-center">
+                            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-4 text-center">
                                 <div className="text-sm text-muted-foreground mb-1">Lost revenue / month</div>
                                 <div className="text-2xl font-bold text-destructive">${lostRevenueMonthly.toLocaleString()}</div>
                             </div>
-                            <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-center">
+                            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-4 text-center">
                                 <div className="text-sm text-muted-foreground mb-1">Lost revenue / year</div>
                                 <div className="text-2xl font-bold text-destructive">${lostRevenueAnnual.toLocaleString()}</div>
                             </div>
@@ -217,7 +217,7 @@ const MissedCallCalculator = () => {
                 {recommendations.length > 0 ? (
                     <div className="space-y-3">
                         {recommendations.map((rec, i) => (
-                            <div key={i} className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex gap-3">
+                            <div key={i} className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex gap-3">
                                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
                                     {i + 1}
                                 </div>

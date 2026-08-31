@@ -159,7 +159,7 @@ const AfterHoursAnsweringService = () => {
                 <Link
                   key={href}
                   to={href}
-                  className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                  className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -213,7 +213,7 @@ const AfterHoursAnsweringService = () => {
           <div className="site-container max-w-3xl">
             <h2 id="plan-heading" className="text-2xl font-bold mb-6">After-hours coverage plans</h2>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="p-6 rounded-xl border-2 border-primary/30 bg-primary/5">
+              <div className="p-6 rounded-2xl border-2 border-primary/30 bg-primary/5">
                 <div className="text-sm font-medium text-primary mb-1">Night &amp; Weekend</div>
                 <div className="text-3xl font-bold text-charcoal mb-1">$59<span className="text-base font-normal text-muted-foreground">/month</span></div>
                 <p className="text-sm text-muted-foreground mb-4">Evenings and weekends only. Perfect for contractors who handle their own business-hours calls.</p>
@@ -226,7 +226,7 @@ const AfterHoursAnsweringService = () => {
                   ))}
                 </ul>
               </div>
-              <div className="p-6 rounded-xl border border-border bg-card">
+              <div className="p-6 rounded-2xl border border-border bg-card">
                 <div className="text-sm font-medium text-muted-foreground mb-1">24/7 Coverage</div>
                 <div className="text-3xl font-bold text-charcoal mb-1">From $129<span className="text-base font-normal text-muted-foreground">/month</span></div>
                 <p className="text-sm text-muted-foreground mb-4">Full 24/7 coverage including business hours. Never miss a call, even when you're already on a job.</p>
@@ -255,7 +255,7 @@ const AfterHoursAnsweringService = () => {
             <h2 id="faq-heading" className="text-2xl font-bold mb-8 text-center">After-hours answering service FAQ</h2>
             <div className="space-y-4">
               {faqSchema.mainEntity.map((item) => (
-                <div key={item.name} className="border border-border rounded-xl p-5 bg-card">
+                <div key={item.name} className="border border-border rounded-2xl p-5 bg-card">
                   <h3 className="font-semibold text-foreground mb-2">{item.name}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{item.acceptedAnswer.text}</p>
                 </div>

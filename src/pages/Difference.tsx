@@ -169,15 +169,15 @@ const Difference = () => {
 
                     {/* NEPQ Micro Questions */}
                     <div className="max-w-2xl mx-auto space-y-3">
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-white border">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                             <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-foreground">How many calls hit voicemail in a normal week?</p>
                         </div>
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-white border">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                             <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-foreground">What would it do to revenue if you answered first every time?</p>
                         </div>
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-white border">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                             <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-foreground">What happens when your best receptionist is busy, out, or it's after hours?</p>
                         </div>
@@ -216,7 +216,7 @@ const Difference = () => {
                         </p>
                     </div>
 
-                    <div className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative border-primary/20">
+                    <div className="rounded-2xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative border-primary/20">
                         <VoiceDemoWidget />
                     </div>
                 </div>
@@ -287,19 +287,19 @@ const Difference = () => {
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Set your rules: hours, service area, pricing boundaries, emergency handling</p>
                         </div>
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Define when to book and when to transfer</p>
                         </div>
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Get clean summaries and logs for every call</p>
                         </div>
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
+                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Keep a consistent talk track across your team</p>
                         </div>
@@ -323,21 +323,21 @@ const Difference = () => {
                     </div>
 
                     <div className="grid sm:grid-cols-3 gap-6 mb-8">
-                        <div className="p-6 rounded-xl bg-white border text-center">
+                        <div className="p-6 rounded-2xl bg-white border text-center">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
                                 <Phone className="w-5 h-5 text-primary" />
                             </div>
                             <h3 className="font-semibold mb-2">Lead capture</h3>
                             <p className="text-sm text-muted-foreground">Every call creates a lead record automatically. Caller info, job type, urgency, full transcript.</p>
                         </div>
-                        <div className="p-6 rounded-xl bg-white border text-center">
+                        <div className="p-6 rounded-2xl bg-white border text-center">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
                                 <MessageSquare className="w-5 h-5 text-primary" />
                             </div>
                             <h3 className="font-semibold mb-2">Intent signals</h3>
                             <p className="text-sm text-muted-foreground">Urgency and job-type classification on every call. More advanced AI intent signals evolving.</p>
                         </div>
-                        <div className="p-6 rounded-xl bg-white border text-center">
+                        <div className="p-6 rounded-2xl bg-white border text-center">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
                                 <ArrowRight className="w-5 h-5 text-primary" />
                             </div>

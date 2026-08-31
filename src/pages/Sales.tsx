@@ -103,7 +103,7 @@ export default function Sales() {
               <div className="pt-4">
                 <Button
                   size="lg"
-                  className="bg-primary hover:bg-primary/90 text-white text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+                  className="bg-primary hover:bg-primary/90 text-white text-lg px-8 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
                   onClick={() => setShowDemoModal(true)}
                 >
                   <svg

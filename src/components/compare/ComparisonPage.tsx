@@ -180,7 +180,7 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
               </h2>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="overflow-x-auto rounded-2xl border border-border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50">
@@ -263,7 +263,7 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20">
                 <p className="font-semibold mb-3 text-primary">Choose RingSnap if…</p>
                 <p className="text-sm leading-relaxed">{config.whoShouldChoose.ringsnap}</p>
                 <Button
@@ -274,7 +274,7 @@ export const ComparisonPage = ({ config }: { config: ComparisonConfig }) => {
                 </Button>
               </div>
 
-              <div className="p-6 rounded-xl bg-muted/30 border border-border">
+              <div className="p-6 rounded-2xl bg-muted/30 border border-border">
                 <p className="font-semibold mb-3">Consider {config.competitor.name} if…</p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {config.whoShouldChoose.competitor}

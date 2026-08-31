@@ -142,7 +142,7 @@ const HvacDispatcherScript = () => {
                         { step: "3", title: "Capture Information", desc: "Collect the essentials: name, address, callback number, system type/age if known, primary symptom, and preferred appointment window. Use the intake checklist below — don't rely on memory." },
                         { step: "4", title: "Confirm & Set Expectations", desc: "Repeat the appointment time. Provide a tech ETA or arrival window. Explain what the tech will do on-site. Thank them and give them a direct callback number. Done." },
                     ].map((item) => (
-                        <div key={item.step} className="flex gap-4 p-4 rounded-xl border border-border bg-card">
+                        <div key={item.step} className="flex gap-4 p-4 rounded-2xl border border-border bg-card">
                             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
                                 {item.step}
                             </div>
@@ -312,7 +312,7 @@ Thanks for calling [Company Name]. We appreciate your patience!"`}
                 <p className="text-muted-foreground leading-relaxed mb-4">
                     Let's make the cost of missed calls tangible. Consider a mid-sized HVAC shop:
                 </p>
-                <div className="rounded-xl border border-border bg-card p-6 mb-4">
+                <div className="rounded-2xl border border-border bg-card p-6 mb-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><span className="text-muted-foreground">Monthly inbound calls:</span></div>
                         <div className="font-semibold">300</div>

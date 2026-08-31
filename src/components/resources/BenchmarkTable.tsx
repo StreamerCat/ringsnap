@@ -14,7 +14,7 @@ export const BenchmarkTable = ({ title, rows, source }: BenchmarkTableProps) => 
     return (
         <div className="my-8">
             {title && <h3 className="text-lg font-bold text-foreground mb-4">{title}</h3>}
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="overflow-x-auto rounded-2xl border border-border">
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-muted/50 border-b border-border">

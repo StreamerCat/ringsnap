@@ -103,8 +103,8 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
 
             {/* Right Column - Transcript */}
             <div className="relative hidden lg:block">
-              <div className="relative p-1 rounded-3xl bg-gradient-to-br from-primary/20 to-cream/20">
-                <div className="relative p-6 sm:p-8 rounded-3xl bg-white/90 backdrop-blur-xl">
+              <div className="relative p-1 rounded-2xl bg-gradient-to-br from-primary/20 to-cream/20">
+                <div className="relative p-6 sm:p-8 rounded-2xl bg-white/90 backdrop-blur-xl">
                   <Badge className="absolute -top-3 -right-3 px-4 py-1.5 text-xs font-bold rounded-full shadow-xl bg-primary text-primary-foreground">
                     {config.hero.pickupStat} pickup
                   </Badge>

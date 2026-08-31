@@ -359,7 +359,7 @@ export const ContractorPricing = ({ showHeading = true, className }: ContractorP
               </Card>
             ))}
           </div>
-          <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5 text-sm sm:text-base text-center">
+          <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 text-sm sm:text-base text-center">
             <p>
               Want the lowest base cost + pay for usage? <strong>Lite</strong> is your fit. Want to close more jobs 24/7 with predictable billing? <strong>Core</strong> is the best fit for most contractors that rely on phone calls for revenue.
             </p>

@@ -35,7 +35,7 @@ export const SolutionDemo = () => {
 
         {/* Pre-Demo Tip */}
         <div className="max-w-3xl mx-auto mb-6">
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 text-sm text-blue-900">
             <span className="font-bold">💡 Pro Tip:</span> Try saying "What's your pricing for an AC tune-up?" or "Can I
             schedule an emergency visit for tomorrow morning?"
           </div>
@@ -45,7 +45,7 @@ export const SolutionDemo = () => {
         <div className="max-w-3xl mx-auto mb-16">
           <div
             id="vapi-chat-container"
-            className="rounded-xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative"
+            className="rounded-2xl overflow-hidden border-2 shadow-xl min-h-[400px] sm:min-h-[500px] bg-[#FAF9F6] flex items-center justify-center relative"
             style={{
               borderColor: "rgba(44, 54, 57, 0.2)",
             }}
@@ -191,7 +191,7 @@ export const SolutionDemo = () => {
         </div>
 
         {/* Quick Benefits Bar */}
-        <div className="max-w-4xl mx-auto mt-12 p-6 rounded-xl bg-muted/50 border">
+        <div className="max-w-4xl mx-auto mt-12 p-6 rounded-2xl bg-muted/50 border">
           <div className="grid md:grid-cols-3 gap-6 text-center">
             <div className="flex flex-col items-center gap-2">
               <Clock className="w-6 h-6 text-primary" />

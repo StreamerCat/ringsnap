@@ -118,7 +118,7 @@ export default function JobberIntegration() {
                 <CardContent>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className={`h-3 w-3 rounded-full ${connection ? "bg-green-500" : "bg-gray-300"}`} />
+                            <div className={`h-3 w-3 rounded-full ${connection ? "bg-green-500" : "bg-muted-foreground/30"}`} />
                             <span className="font-medium">
                                 {connection ? "Connected" : "Not Connected"}
                             </span>

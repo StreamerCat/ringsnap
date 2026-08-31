@@ -311,7 +311,7 @@ const MissedCalls = () => {
                 job is worth hundreds or thousands of dollars.
               </p>
 
-              <div className="inline-flex items-center gap-2 bg-muted/60 rounded-xl px-6 py-4 text-sm font-medium text-foreground border border-border/40 mb-8 flex-wrap justify-center">
+              <div className="inline-flex items-center gap-2 bg-muted/60 rounded-2xl px-6 py-4 text-sm font-medium text-foreground border border-border/40 mb-8 flex-wrap justify-center">
                 <span className="text-muted-foreground">Missed calls</span>
                 <span className="text-muted-foreground">×</span>
                 <span className="text-primary font-semibold">booking rate</span>
@@ -483,7 +483,7 @@ const MissedCalls = () => {
             </div>
 
             <div className="max-w-2xl mx-auto mb-6">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-900 flex items-start gap-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-900 flex items-start gap-3">
                 <span className="text-base shrink-0">💡</span>
                 <span>
                   <span className="font-semibold">Try saying:</span> "I have a burst pipe, can someone come tonight?" or "Do you handle after-hours HVAC calls?"
@@ -510,7 +510,7 @@ const MissedCalls = () => {
                 { stat: "24 / 7", label: "Always available" },
                 { stat: "100%", label: "Calls captured, not voicemailed" },
               ].map(({ stat, label }) => (
-                <div key={label} className="text-center p-4 rounded-xl border border-border bg-muted/30">
+                <div key={label} className="text-center p-4 rounded-2xl border border-border bg-muted/30">
                   <div className="text-xl font-bold text-primary mb-1">{stat}</div>
                   <div className="text-xs text-muted-foreground">{label}</div>
                 </div>
@@ -546,7 +546,7 @@ const MissedCalls = () => {
                       trackClick("download_script_pack_resources", { page: PAGE });
                       setIsDownloadModalOpen(true);
                     }}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap shrink-0"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap shrink-0"
                   >
                     <ArrowRight className="h-4 w-4" />
                     Download Free Script Pack

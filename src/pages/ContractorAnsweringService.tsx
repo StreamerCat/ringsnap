@@ -169,7 +169,7 @@ const ContractorAnsweringService = () => {
                 <Link
                   key={href}
                   to={href}
-                  className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                  className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
                 >
                   <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Icon className="h-5 w-5 text-primary" />
@@ -191,7 +191,7 @@ const ContractorAnsweringService = () => {
             <h2 id="features-heading" className="text-2xl sm:text-3xl font-bold mb-8 text-center">What RingSnap does for contractors</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               {features.map((feature) => (
-                <div key={feature} className="flex items-start gap-3 p-4 rounded-xl bg-card border border-border">
+                <div key={feature} className="flex items-start gap-3 p-4 rounded-2xl bg-card border border-border">
                   <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-foreground">{feature}</span>
                 </div>
@@ -264,7 +264,7 @@ const ContractorAnsweringService = () => {
             <h2 id="faq-heading" className="text-2xl font-bold mb-8 text-center">Contractor answering service FAQ</h2>
             <div className="space-y-4">
               {faqSchema.mainEntity.map((item) => (
-                <div key={item.name} className="border border-border rounded-xl p-5">
+                <div key={item.name} className="border border-border rounded-2xl p-5">
                   <h3 className="font-semibold text-foreground mb-2">{item.name}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{item.acceptedAnswer.text}</p>
                 </div>

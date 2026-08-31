@@ -105,7 +105,7 @@ const AfterHoursCalculator = () => {
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-3">Current After-Hours Revenue</h3>
-                                <div className="rounded-xl bg-muted/50 p-4 space-y-2 text-sm">
+                                <div className="rounded-2xl bg-muted/50 p-4 space-y-2 text-sm">
                                     <div className="flex justify-between"><span className="text-muted-foreground">After-hours calls</span><span className="font-medium">{afterHoursCalls}</span></div>
                                     <div className="flex justify-between"><span className="text-muted-foreground">Answered</span><span className="font-medium">{currentAnswered}</span></div>
                                     <div className="flex justify-between"><span className="text-muted-foreground">Booked</span><span className="font-medium">{currentBooked}</span></div>
@@ -114,7 +114,7 @@ const AfterHoursCalculator = () => {
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-primary mb-3">With 95% Answer Rate</h3>
-                                <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 space-y-2 text-sm">
+                                <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 space-y-2 text-sm">
                                     <div className="flex justify-between"><span className="text-muted-foreground">After-hours calls</span><span className="font-medium">{afterHoursCalls}</span></div>
                                     <div className="flex justify-between"><span className="text-muted-foreground">Answered</span><span className="font-medium text-primary">{potentialAnswered}</span></div>
                                     <div className="flex justify-between"><span className="text-muted-foreground">Booked</span><span className="font-medium text-primary">{potentialBooked}</span></div>
@@ -123,7 +123,7 @@ const AfterHoursCalculator = () => {
                             </div>
                         </div>
 
-                        <div className="mt-6 rounded-xl bg-primary/10 border border-primary/20 p-5 text-center">
+                        <div className="mt-6 rounded-2xl bg-primary/10 border border-primary/20 p-5 text-center">
                             <div className="text-sm text-muted-foreground mb-1">Revenue opportunity you're missing</div>
                             <div className="text-3xl font-bold text-primary mb-1">${revenueGap.toLocaleString()}/month</div>
                             <div className="text-sm text-muted-foreground">${annualGap.toLocaleString()} per year</div>

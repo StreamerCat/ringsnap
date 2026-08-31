@@ -404,13 +404,13 @@ export default function Onboarding() {
                   <span className="text-sm font-medium">Creating your phone number</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${phoneNumber ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${phoneNumber ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'}`}>
                     {phoneNumber ? <Check className="h-5 w-5" /> : <Loader2 className="h-4 w-4 animate-spin" />}
                   </div>
                   <span className="text-sm font-medium">Configuring Agent</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${assistant ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${assistant ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'}`}>
                     {assistant ? <Check className="h-5 w-5" /> : <span className="text-xs">3</span>}
                   </div>
                   <span className="text-sm font-medium">Finalizing account</span>

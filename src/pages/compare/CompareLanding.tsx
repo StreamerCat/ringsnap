@@ -117,7 +117,7 @@ const CompareLanding = () => {
                 <Link
                   key={href}
                   to={href}
-                  className="group flex flex-col sm:flex-row sm:items-start gap-4 p-6 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                  className="group flex flex-col sm:flex-row sm:items-start gap-4 p-6 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
                 >
                   <div className="flex-1">
                     <p className="text-xs font-medium text-muted-foreground mb-1">{subtitle}</p>
@@ -153,7 +153,7 @@ const CompareLanding = () => {
                 "Jobber integration — lead data flows directly into your field service workflow",
                 "Flat monthly pricing starting at $59/month + clear per-call overage — no surprise charges during busy season",
               ].map((item) => (
-                <div key={item} className="flex items-start gap-3 p-4 rounded-xl bg-card border border-border">
+                <div key={item} className="flex items-start gap-3 p-4 rounded-2xl bg-card border border-border">
                   <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                   <p className="text-sm">{item}</p>
                 </div>

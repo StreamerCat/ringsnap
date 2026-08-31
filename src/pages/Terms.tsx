@@ -36,9 +36,9 @@ const sections = [
   { id: 'contact-information', title: '30. Contact Information' },
 ];
 
-const sectionHeadingClass = 'text-2xl sm:text-3xl font-semibold text-gray-900 mb-4 scroll-mt-24';
-const paragraphClass = 'text-gray-700 leading-7 mb-4';
-const listClass = 'list-disc pl-6 space-y-2 text-gray-700 leading-7 mb-4';
+const sectionHeadingClass = 'text-2xl sm:text-3xl font-semibold text-foreground mb-4 scroll-mt-24';
+const paragraphClass = 'text-foreground/80 leading-7 mb-4';
+const listClass = 'list-disc pl-6 space-y-2 text-foreground/80 leading-7 mb-4';
 
 export default function Terms() {
   return (
@@ -71,11 +71,11 @@ export default function Terms() {
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <header className="mb-10 sm:mb-12">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-[#D97757]">Terms of Service</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-3">
+            <p className="text-sm sm:text-base text-muted-foreground mt-3">
               Effective Date: <span className="font-semibold">February 2025</span> · Last Updated:{' '}
               <span className="font-semibold">March 8, 2026</span>
             </p>
-            <p className="text-gray-700 leading-7 mt-6 max-w-4xl">
+            <p className="text-foreground/80 leading-7 mt-6 max-w-4xl">
               These Terms of Service ("Terms") form a binding legal agreement between RingSnap ("RingSnap," "we," "us," or "our") and the business entity or individual
               acting on behalf of a business ("Customer," "you," or "your") that accesses or uses the RingSnap platform, including our websites, AI voice agents,
               call automation tools, messaging features, scheduling features, application interfaces, integrations, and related services (collectively, the "Service").
@@ -83,8 +83,8 @@ export default function Terms() {
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-8 lg:gap-12 items-start">
-            <aside className="lg:sticky lg:top-24 self-start rounded-xl border border-[#F0E2DE] bg-[#FEF6F3] p-5">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">On this page</h2>
+            <aside className="lg:sticky lg:top-24 self-start rounded-2xl border border-[#F0E2DE] bg-[#FEF6F3] p-5">
+              <h2 className="text-lg font-semibold text-foreground mb-4">On this page</h2>
               <nav aria-label="Terms of Service sections">
                 <ol className="space-y-2 text-sm">
                   {sections.map((section) => (
