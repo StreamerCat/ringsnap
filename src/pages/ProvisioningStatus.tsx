@@ -310,11 +310,10 @@ export default function ProvisioningStatus() {
                                 </h2>
                                 <div className="space-y-4 text-slate-600 text-sm">
                                     <p>
-                                        We are configuring your RingSnap Agent with your business details right now.
-                                        This usually takes just a few minutes.
+                                        Your trial is active. We&apos;re finishing your phone setup in the background.
                                     </p>
                                     <p>
-                                        You will receive an email within 10 minutes when your assistant is ready to take calls.
+                                        You can continue into RingSnap now. We&apos;ll email you when your assistant is ready to take calls.
                                     </p>
                                 </div>
                                 <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-xs">
@@ -485,4 +484,3 @@ export default function ProvisioningStatus() {
         </div>
     );
 }
-

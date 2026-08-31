@@ -59,17 +59,19 @@ import { posthog } from "../_shared/posthog.ts";
 async function capturePostHogEvent(
   event: string,
   distinctId: string,
-  props: Record<string, unknown>
+  props: Record<string, unknown>,
+  eventUuid?: string,
 ): Promise<void> {
   const key = Deno.env.get('POSTHOG_API_KEY');
   if (!key) return;
   try {
-    await fetch('https://us.i.posthog.com/capture/', {
+    const response = await fetch('https://us.i.posthog.com/capture/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         api_key: key,
         event,
+        ...(eventUuid ? { uuid: eventUuid } : {}),
         properties: {
           distinct_id: distinctId,
           ...props,
@@ -78,7 +80,15 @@ async function capturePostHogEvent(
         timestamp: new Date().toISOString(),
       }),
     });
-  } catch { /* best-effort */ }
+    if (!response.ok) {
+      console.warn(`[${FUNCTION_NAME}] PostHog capture rejected`, {
+        event,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    console.warn(`[${FUNCTION_NAME}] PostHog capture failed`, { event, error });
+  }
 }
 
 /** PostHog server-side exception capture — best-effort, never throws. */
@@ -1172,6 +1182,29 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Reject an already-completed signup before creating any Stripe resources.
+    // This is also a defensive backstop when a client retries without its
+    // idempotency header.
+    const existingUser = await getExistingUserByEmail(supabase, data.email, correlationId);
+    if (existingUser?.hasAccount && !isOutboundCheckoutMode) {
+      logWarn("User already has an account", {
+        ...baseLogOptions,
+        context: { email: data.email, existingAccountId: existingUser.accountId },
+      });
+      captureCreateTrialException(new Error("Account already exists for email"), "validation_account_exists", data.email, {
+        user_email: data.email,
+      });
+
+      return new Response(
+        JSON.stringify({
+          error: "An account with this email already exists. Please log in instead.",
+          code: "ACCOUNT_EXISTS",
+          redirect: "/login",
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // STRIPE LOGIC
     console.log(`[${FUNCTION_NAME}] Payment Logic Check`, {
       receivedPmId: pmId,
@@ -1308,7 +1341,19 @@ Deno.serve(async (req: Request) => {
       // Real Stripe Flow
       if (!stripe) throw new Error("Stripe not initialized");
 
-      const stripeIdempotencyPrefix = idempotencyKey || `auto-${correlationId}`;
+      // Use stable fallback keys even when an older client omits the request
+      // idempotency header. A retry after a transient response loss reuses the
+      // same Stripe customer and subscription.
+      const stripeIdentityHash = await hashRequest({
+        email: data.email.trim().toLowerCase(),
+        source: data.source,
+      });
+      const stripeCustomerIdempotencyKey = idempotencyKey
+        ? `${idempotencyKey}-customer`
+        : `trial-${stripeIdentityHash}-customer`;
+      const stripeSubscriptionIdempotencyKey = idempotencyKey
+        ? `${idempotencyKey}-subscription`
+        : `trial-${stripeIdentityHash}-${data.planType}-subscription`;
 
       // Customer
       phase = "stripe_customer";
@@ -1322,7 +1367,7 @@ Deno.serve(async (req: Request) => {
             trade: data.trade,
             source: data.source
           }
-        }, { idempotencyKey: `${stripeIdempotencyPrefix}-customer` });
+        }, { idempotencyKey: stripeCustomerIdempotencyKey });
         stripeCustomerId = customer.id;
         logInfo("Stripe customer created", {
           ...baseLogOptions,
@@ -1391,7 +1436,7 @@ Deno.serve(async (req: Request) => {
           trial_period_days: 3,
           payment_behavior: "default_incomplete",
           metadata: { source: data.source, plan_type: data.planType }
-        }, { idempotencyKey: `${stripeIdempotencyPrefix}-subscription` });
+        }, { idempotencyKey: stripeSubscriptionIdempotencyKey });
         stripeSubscriptionId = subscription.id;
         logInfo("Stripe subscription created", {
           ...baseLogOptions,
@@ -1529,8 +1574,6 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════════════════════════════
 
     // 1. Check if user already exists
-    const existingUser = await getExistingUserByEmail(supabase, data.email, correlationId);
-
     if (existingUser) {
       if (existingUser.hasAccount) {
         // User already has an account - they should log in instead
@@ -1984,16 +2027,12 @@ Deno.serve(async (req: Request) => {
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
     // Check for VAPI kill switch
-    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+    // Fail closed: provider provisioning only runs after operations explicitly
+    // opts in with a separate enable switch following provider verification.
+    const disableVapiProvisioning = Deno.env.get("ENABLE_VAPI_PROVISIONING") !== "true";
     let jobError: any = null;
 
-    if (disableVapiProvisioning) {
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
-      logInfo("VAPI provisioning disabled by env var", {
-        ...baseLogOptions,
-        accountId: currentAccountId,
-      });
-    } else if (isTestMode) {
+    if (isTestMode) {
       // ═══════════════════════════════════════════════════════════════
       // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
       // Uses pre-provisioned real resources and mirrors LIVE DB structure
@@ -2194,6 +2233,27 @@ Deno.serve(async (req: Request) => {
           error = fallbackResult.error;
         }
 
+        // A concurrent or replayed request may have already created the active
+        // job. Treat that as an idempotent enqueue success, not a signup error.
+        if (error?.code === "23505") {
+          const { data: existingJob } = await supabase
+            .from("provisioning_jobs")
+            .select("id")
+            .eq("account_id", currentAccountId)
+            .eq("job_type", "provision_phone")
+            .in("status", ["queued", "processing", "failed"])
+            .maybeSingle();
+
+          if (existingJob) {
+            logInfo("Provisioning job already exists; enqueue is idempotent", {
+              ...baseLogOptions,
+              accountId: currentAccountId,
+              context: { jobId: existingJob.id },
+            });
+            error = null;
+          }
+        }
+
         jobError = error;
 
         stepEnd("enqueue_provisioning", baseStepContext(), {
@@ -2226,57 +2286,26 @@ Deno.serve(async (req: Request) => {
             accountId: currentAccountId,
           });
 
-          // FIRE-AND-FORGET: Provision Vapi
-          supabase.functions.invoke("provision-vapi", {
-            body: { triggered_by: "create-trial" }
-          }).catch(err => {
-            stepError("trigger_provision_vapi_background", baseStepContext(), err, {
-              phase: "vapi_provision_start",
+          if (disableVapiProvisioning) {
+            logInfo("Provisioning paused; durable job remains queued", {
+              ...baseLogOptions,
+              accountId: currentAccountId,
             });
-            captureCreateTrialException(err, "vapi_setup_background_invoke", currentUserId ?? data.email ?? "anonymous", {
-              user_email: data.email,
-              account_id: currentAccountId,
+          } else {
+            // FIRE-AND-FORGET: Provision Vapi. The durable queue and cron worker
+            // remain the source of truth if this immediate invocation is lost.
+            supabase.functions.invoke("provision-vapi", {
+              body: { triggered_by: "create-trial" }
+            }).catch(err => {
+              stepError("trigger_provision_vapi_background", baseStepContext(), err, {
+                phase: "vapi_provision_start",
+              });
+              captureCreateTrialException(err, "vapi_setup_background_invoke", currentUserId ?? data.email ?? "anonymous", {
+                user_email: data.email,
+                account_id: currentAccountId,
+              });
             });
-          });
-
-          // FIRE-AND-FORGET: Send Welcome Email
-          supabase.functions.invoke("send-welcome-email", {
-            body: {
-              email: data.email,
-              name: data.name,
-              userId: currentUserId
-            }
-          }).catch(err => {
-            stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
-              phase: "vapi_provision_start",
-              email: maskEmailForLogs(data.email),
-            });
-            captureCreateTrialException(err, "welcome_email_background_invoke", currentUserId ?? data.email ?? "anonymous", {
-              user_email: data.email,
-              account_id: currentAccountId,
-            });
-          });
-
-          // FIRE-AND-FORGET: Admin signup notification (email + Slack)
-          sendSignupNotifications({
-            email: data.email,
-            name: data.name,
-            companyName: data.companyName,
-            phone: data.phone,
-            trade: data.trade,
-            planType: data.planType,
-            source: data.source,
-            accountId: currentAccountId,
-            userId: currentUserId,
-          }).catch(err => {
-            stepError("admin_signup_notifications_background", baseStepContext(), err, {
-              phase: "background_notification",
-            });
-            captureCreateTrialException(err, "signup_notifications_background", currentUserId ?? data.email ?? "anonymous", {
-              user_email: data.email,
-              account_id: currentAccountId,
-            });
-          });
+          }
         }
       } catch (err: any) {
         stepError("vapi_provision_start", baseStepContext(), err, { phase: "vapi_provision_start" });
@@ -2295,6 +2324,45 @@ Deno.serve(async (req: Request) => {
         }, currentAccountId);
       }
     }
+
+    // Signup notifications are tied to core account creation, not downstream
+    // provisioning availability.
+    supabase.functions.invoke("send-welcome-email", {
+      body: {
+        email: data.email,
+        name: data.name,
+        userId: currentUserId,
+      },
+    }).catch(err => {
+      stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
+        phase: "background_notification",
+        email: maskEmailForLogs(data.email),
+      });
+      captureCreateTrialException(err, "welcome_email_background_invoke", currentUserId ?? data.email ?? "anonymous", {
+        user_email: data.email,
+        account_id: currentAccountId,
+      });
+    });
+
+    sendSignupNotifications({
+      email: data.email,
+      name: data.name,
+      companyName: data.companyName,
+      phone: data.phone,
+      trade: data.trade,
+      planType: data.planType,
+      source: data.source,
+      accountId: currentAccountId,
+      userId: currentUserId,
+    }).catch(err => {
+      stepError("admin_signup_notifications_background", baseStepContext(), err, {
+        phase: "background_notification",
+      });
+      captureCreateTrialException(err, "signup_notifications_background", currentUserId ?? data.email ?? "anonymous", {
+        user_email: data.email,
+        account_id: currentAccountId,
+      });
+    });
 
     phase = "done";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
@@ -2374,7 +2442,9 @@ Deno.serve(async (req: Request) => {
 
     console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
 
-    // PostHog server-side conversion event — fire-and-forget
+    const trialActivatedAt = new Date().toISOString();
+
+    // Preserve the legacy event for existing dashboards.
     capturePostHogEvent('trial_created', currentUserId ?? data.email ?? 'anonymous', {
       plan_key: normalizedPlanKey,
       source_channel: data.source ?? 'website',
@@ -2383,6 +2453,20 @@ Deno.serve(async (req: Request) => {
       environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
       $lib: 'edge-function',
     });
+
+    // The notification event is server-side and awaited so a successful core
+    // signup does not depend on the browser remaining open. PostHog failure is
+    // still best-effort and never changes the signup response. The account UUID
+    // is a stable event UUID, allowing PostHog to deduplicate retries.
+    await capturePostHogEvent('trial_activated', currentUserId ?? currentAccountId, {
+      account_id: currentAccountId,
+      plan_key: normalizedPlanKey,
+      billing_status: 'trial',
+      provisioning_status: isTestMode ? 'completed' : 'pending',
+      signup_source: data.source ?? 'website',
+      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+      created_at: trialActivatedAt,
+    }, currentAccountId);
 
     return new Response(
       JSON.stringify(successResponse),

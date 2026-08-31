@@ -40,3 +40,24 @@ All 4 phases complete and verified. Scope was narrowed twice from the original a
 
 ## Review notes
 (filled in as we go)
+
+---
+
+# Trial signup and provisioning resilience — 2026-08-31
+
+- [x] Verify live create-trial, database, provisioning worker, UI, and PostHog state read-only
+- [x] Always persist a provisioning job when provider provisioning is paused
+- [x] Make the worker honor the provisioning pause without consuming jobs
+- [x] Emit `trial_activated` once from the backend and remove the frontend duplicate
+- [x] Add an active-job uniqueness guardrail and targeted regression tests
+- [x] Run relevant tests, typecheck, lint, and build
+
+## Review notes
+
+- Production signup is already decoupled from Twilio: two recent `create-trial` calls returned 200 and created complete account/Stripe records.
+- Both recent accounts remained pending without jobs because the create path can skip enqueueing when `DISABLE_VAPI_PROVISIONING=true`.
+- The live UI already presents pending/timeout/failure states without exposing provider errors.
+- PostHog receives backend `trial_created`; `trial_activated` is currently client-only and was not present in the connected project's recent event schema.
+- Live failure evidence points to Twilio authentication/account suspension during Vapi phone import. One older job was stranded in `processing` after four attempts.
+- The worker now pauses without consuming retries, atomically claims jobs, persists `retry_after`, and recovers processing leases older than 15 minutes.
+- Verification: 102 focused tests passed, TypeScript passed, lint passed, and the production frontend build passed. No live providers, cards, production writes, migrations, or deployments were used.

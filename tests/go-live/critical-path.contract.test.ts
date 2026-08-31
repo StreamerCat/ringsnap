@@ -15,6 +15,46 @@ describe('Go-live contract checks (edge functions + schema map)', () => {
     expect(src).toContain('pending');
     expect(src).toContain('posthog.flush()');
     expect(src).not.toContain('posthog.shutdown()');
+    expect(src).toContain('Provisioning paused; durable job remains queued');
+    expect(src).toMatch(/await capturePostHogEvent\('trial_activated'/);
+    expect(src).toContain('billing_status: \'trial\'');
+    expect(src).toContain('stripeCustomerIdempotencyKey');
+    expect(src).toContain('stripeSubscriptionIdempotencyKey');
+  });
+
+  it('the signup UI sends a stable request idempotency key', () => {
+    const frontend = read('src/pages/OnboardingChat.tsx');
+
+    expect(frontend).toContain('leadData.id ?? signupRequestIdRef.current');
+  });
+
+  it('captures trial activation only on the server after core signup', () => {
+    const backend = read('supabase/functions/create-trial/index.ts');
+    const frontend = read('src/pages/OnboardingChat.tsx');
+
+    expect(backend.match(/capturePostHogEvent\('trial_activated'/g)).toHaveLength(1);
+    expect(frontend).not.toMatch(/capture\('trial_activated'/);
+    expect(backend).toContain('}, currentAccountId);');
+  });
+
+  it('pauses queue consumption without burning retries and persists retry timing', () => {
+    const worker = read('supabase/functions/provision-vapi/index.ts');
+
+    expect(worker).toContain('ENABLE_VAPI_PROVISIONING');
+    expect(worker).toContain('!== "true"');
+    expect(worker).toContain('paused: true, processed: 0');
+    expect(worker).toContain('retry_after: retryAfter');
+    expect(worker).toContain('if (job.retry_after)');
+    expect(worker).toContain('Provisioning job already claimed by another worker');
+    expect(worker).toContain('WORKER_LEASE_EXPIRED');
+  });
+
+  it('enforces one active provisioning job per account and type', () => {
+    const migration = read('supabase/migrations/20260831150000_durable_provisioning_job_uniqueness.sql');
+
+    expect(migration).toContain('CREATE UNIQUE INDEX');
+    expect(migration).toContain('(account_id, job_type)');
+    expect(migration).toContain("status IN ('queued', 'processing', 'failed')");
   });
 
   it('stripe-webhook enforces signature verification and idempotency persistence', () => {
