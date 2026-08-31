@@ -218,7 +218,7 @@ const MissedCallRecovery = () => {
                 { title: "Triage and dispatch", desc: "Genuine emergencies are routed to you immediately. Routine calls are booked automatically." },
                 { title: "Full job details captured", desc: "Every caller's name, problem, address, and urgency level — logged automatically to your dashboard." },
               ].map(({ title, desc }) => (
-                <div key={title} className="flex gap-3 p-4 rounded-2xl border border-border bg-card">
+                <div key={title} className="flex gap-3 p-4 rounded-2xl bg-card shadow-sm">
                   <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-semibold text-sm text-foreground mb-1">{title}</h3>

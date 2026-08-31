@@ -461,15 +461,15 @@ export default function Start() {
                 <div className="mt-6 pt-6 border-t">
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <CheckCircle className="h-4 w-4 text-sage" />
                       <span>Won't be charged during trial</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Clock className="h-4 w-4 text-blue-600" />
+                      <Clock className="h-4 w-4 text-primary" />
                       <span>Setup in 2 minutes</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Zap className="h-4 w-4 text-yellow-600" />
+                      <Zap className="h-4 w-4 text-primary" />
                       <span>15 live trial calls included</span>
                     </div>
                   </div>

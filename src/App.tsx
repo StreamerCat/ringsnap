@@ -93,10 +93,13 @@ const CompareLanding = lazy(() => import("./pages/compare/CompareLanding"));
 const queryClient = new QueryClient();
 
 const HashScrollHandler = () => {
-  const { hash } = useLocation();
+  const { pathname, hash } = useLocation();
 
   useEffect(() => {
-    if (!hash) return;
+    if (!hash) {
+      window.scrollTo(0, 0);
+      return;
+    }
 
     const targetId = decodeURIComponent(hash.slice(1));
     const scrollToTarget = () => {
@@ -110,7 +113,7 @@ const HashScrollHandler = () => {
 
     const timeout = window.setTimeout(scrollToTarget, 250);
     return () => window.clearTimeout(timeout);
-  }, [hash]);
+  }, [pathname, hash]);
 
   return null;
 };

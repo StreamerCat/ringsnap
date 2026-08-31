@@ -5,7 +5,6 @@ export interface TradeConfig {
   slug: string;
   name: string;
   accentColor: string; // HSL value
-  icon: string; // Emoji
   hero: {
     headline: string;
     subheadline: string;
@@ -53,7 +52,6 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     slug: "plumbers",
     name: "Plumbing",
     accentColor: "210 100% 50%", // Blue
-    icon: "🔧",
     hero: {
       headline: "AI Receptionist for Plumbers: Stop Losing $6,800/Month to Missed Calls",
       subheadline: "Answers every emergency call in under 2 rings — burst pipes, sewer backups, and after-hours work booked while you're under the sink",
@@ -132,7 +130,6 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     slug: "hvac",
     name: "HVAC",
     accentColor: "0 70% 55%", // Red/Orange
-    icon: "❄️",
     hero: {
       headline: "AI Receptionist for HVAC Contractors: Stop Losing $8,200/Month to Missed Calls",
       subheadline: "Captures emergency breakdowns AND maintenance calls 24/7 — AC failures, furnace emergencies, and tune-up requests booked while you're in the attic",
@@ -211,7 +208,6 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     slug: "electricians",
     name: "Electrical",
     accentColor: "45 100% 51%", // Yellow/Gold
-    icon: "⚡",
     hero: {
       headline: "AI Receptionist for Electricians: Stop Losing $7,400/Month to Missed Calls",
       subheadline: "Books emergency calls and quote requests 24/7 — sparking panels, outages, and upgrades captured even when you're in a panel box",
@@ -290,7 +286,6 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     slug: "roofing",
     name: "Roofing",
     accentColor: "25 85% 45%", // Rust/Brown
-    icon: "🏠",
     hero: {
       headline: "AI Receptionist for Roofers: Stop Missing $12K+ in Storm Damage Calls",
       subheadline: "Captures emergency leak calls AND inspection requests 24/7 — storm damage, insurance claims, and new jobs booked while you're 30 feet up",
@@ -369,7 +364,6 @@ export const tradeConfigs: Record<string, TradeConfig> = {
     slug: "handyman",
     name: "Handyman",
     accentColor: "30 80% 45%",
-    icon: "🔨",
     hero: {
       headline: "AI Receptionist for Handymen: Stop Missing Jobs While You're on the Wrench",
       subheadline: "Answers every call 24/7 — honey-do lists, repair estimates, and urgent fix-it jobs booked while you're finishing the last one",

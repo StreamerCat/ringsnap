@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PhoneCall, CheckCircle, Clock } from "lucide-react";
+import { PhoneCall, CheckCircle, Clock, Wrench, Thermometer, Zap, Home, Hammer, type LucideIcon } from "lucide-react";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { TradeConfig } from "./tradeConfig";
@@ -10,7 +10,16 @@ interface TradeHeroProps {
   config: TradeConfig;
 }
 
+const tradeIconBySlug: Record<string, LucideIcon> = {
+  plumbers: Wrench,
+  hvac: Thermometer,
+  electricians: Zap,
+  roofing: Home,
+  handyman: Hammer,
+};
+
 export const TradeHero = ({ config }: TradeHeroProps) => {
+  const TradeIcon = tradeIconBySlug[config.slug] ?? Wrench;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -46,12 +55,10 @@ export const TradeHero = ({ config }: TradeHeroProps) => {
             {/* Left Column */}
             <div>
               <div className="space-y-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-4xl">{config.icon}</span>
-                  <Badge className="px-3.5 py-1.5 text-xs sm:text-sm font-bold bg-primary text-primary-foreground">
-                    For {config.name} Contractors
-                  </Badge>
-                </div>
+                <Badge className="gap-1.5 mb-3 px-3.5 py-1.5 text-xs sm:text-sm font-bold bg-primary text-primary-foreground">
+                  <TradeIcon className="h-3.5 w-3.5" />
+                  For {config.name} Contractors
+                </Badge>
 
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-tight font-bold text-charcoal">
                   {config.hero.headline}
