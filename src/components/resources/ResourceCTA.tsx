@@ -58,7 +58,7 @@ export const ResourceCTA = ({ variant, trade, service, className = "" }: Resourc
         <>
             <div className={`my-10 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-6 md:p-8 ${className}`}>
                 <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
                         <Icon className="h-6 w-6 text-primary" />
                     </div>
                     <div className="flex-1">
@@ -70,14 +70,14 @@ export const ResourceCTA = ({ variant, trade, service, className = "" }: Resourc
                     {variant === "download" ? (
                         <button
                             onClick={() => setIsDownloadModalOpen(true)}
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap"
                         >
                             {config.buttonText}
                         </button>
                     ) : (
                         <Link
                             to={config.href}
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap"
                         >
                             {config.buttonText}
                         </Link>

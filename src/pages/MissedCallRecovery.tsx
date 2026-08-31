@@ -155,7 +155,7 @@ const MissedCallRecovery = () => {
             <p className="text-muted-foreground text-center mb-8 max-w-xl mx-auto">
               These numbers assume each missed caller finds another contractor — which most do within 10 minutes.
             </p>
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="overflow-x-auto rounded-2xl border border-border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border">
@@ -218,7 +218,7 @@ const MissedCallRecovery = () => {
                 { title: "Triage and dispatch", desc: "Genuine emergencies are routed to you immediately. Routine calls are booked automatically." },
                 { title: "Full job details captured", desc: "Every caller's name, problem, address, and urgency level — logged automatically to your dashboard." },
               ].map(({ title, desc }) => (
-                <div key={title} className="flex gap-3 p-4 rounded-xl border border-border bg-card">
+                <div key={title} className="flex gap-3 p-4 rounded-2xl border border-border bg-card">
                   <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-semibold text-sm text-foreground mb-1">{title}</h3>
@@ -250,7 +250,7 @@ const MissedCallRecovery = () => {
             <h2 id="faq-heading" className="text-2xl font-bold mb-8 text-center">Missed call recovery FAQ</h2>
             <div className="space-y-4">
               {faqSchema.mainEntity.map((item) => (
-                <div key={item.name} className="border border-border rounded-xl p-5">
+                <div key={item.name} className="border border-border rounded-2xl p-5">
                   <h3 className="font-semibold text-foreground mb-2">{item.name}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{item.acceptedAnswer.text}</p>
                 </div>

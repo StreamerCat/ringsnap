@@ -287,7 +287,7 @@ Is there anything else I can help with while you wait? Hang in there — we'll g
             {/* Missed Call Revenue */}
             <section id="missed-call-revenue" className="mb-10">
                 <h2 className="text-2xl font-bold text-foreground mb-4">Missed Call Revenue Example</h2>
-                <div className="rounded-xl border border-border bg-card p-6 mb-4">
+                <div className="rounded-2xl border border-border bg-card p-6 mb-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><span className="text-muted-foreground">Monthly inbound calls:</span></div>
                         <div className="font-semibold">250</div>

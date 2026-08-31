@@ -29,7 +29,7 @@ export const CopyableScriptBlock = ({ title, script, scenario }: CopyableScriptB
     };
 
     return (
-        <div className="my-6 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="my-6 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border">
                 <div>
                     <h4 className="font-semibold text-sm text-foreground">{title}</h4>

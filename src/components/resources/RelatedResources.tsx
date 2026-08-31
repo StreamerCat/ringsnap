@@ -21,7 +21,7 @@ export const RelatedResources = ({ resources }: RelatedResourcesProps) => {
                     <Link
                         key={index}
                         to={resource.href}
-                        className="group rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all"
+                        className="group rounded-2xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all"
                     >
                         {resource.tag && (
                             <span className="inline-block text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-0.5 mb-3">

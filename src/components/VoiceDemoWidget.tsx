@@ -235,7 +235,7 @@ export const VoiceDemoWidget = () => {
 
           {/* Inline status indicators - ONLY show connecting and error states */}
           {demoState === 'connecting' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
               <div className="flex items-center justify-center gap-2 text-sm text-blue-900 mb-2">
                 <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <span className="font-medium">Connecting to demo...</span>
@@ -245,7 +245,7 @@ export const VoiceDemoWidget = () => {
           )}
 
           {demoState === 'error' && errorMessage && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
               <div className="flex items-center gap-2 text-sm text-amber-900">
                 <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -325,7 +325,7 @@ export const VoiceDemoWidget = () => {
             </div>
 
             {/* Social Proof - Compact */}
-            <div className="bg-gradient-to-r from-[#D97757]/10 to-transparent rounded-xl p-3 sm:p-4 border border-[#D97757]/20">
+            <div className="bg-gradient-to-r from-[#D97757]/10 to-transparent rounded-2xl p-3 sm:p-4 border border-[#D97757]/20">
               <div className="flex items-center justify-center gap-2 text-xs sm:text-sm flex-wrap">
                 <div className="flex -space-x-2">
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#D97757] flex items-center justify-center text-white text-[10px] sm:text-xs font-bold border-2 border-white">

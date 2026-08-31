@@ -430,7 +430,7 @@ const LegacyInteractive = () => {
       setScenario(value as Scenario);
       setSelectedStep(1);
     }} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-4">
+      <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50 rounded-2xl mb-4">
         {Object.entries(SCENARIOS).map(([key, { label, icon: Icon }]) => <TabsTrigger key={key} value={key} className="flex items-center justify-center gap-2 py-3 px-2 rounded-lg text-sm font-medium">
           <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span className="truncate">{label}</span>
@@ -454,15 +454,15 @@ const LegacyInteractive = () => {
           <CardContent className="p-4 md:p-5 grid gap-3 md:gap-4 md:grid-cols-3">
             <section className="space-y-2" aria-labelledby="legacy-caller-says-title">
               <Badge variant="outline" id="legacy-caller-says-title" className="text-xs font-bold uppercase tracking-wider border-primary/20 text-primary">Caller says</Badge>
-              <p className="rounded-xl bg-muted/40 border border-muted px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.callerSays}</p>
+              <p className="rounded-2xl bg-muted/40 border border-muted px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.callerSays}</p>
             </section>
             <section className="space-y-2" aria-labelledby="legacy-ringsnap-says-title">
               <Badge variant="default" id="legacy-ringsnap-says-title" className="text-xs font-bold uppercase tracking-wider">RingSnap says</Badge>
-              <p className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.ringSnapSays}</p>
+              <p className="rounded-2xl bg-primary/5 border border-primary/15 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.ringSnapSays}</p>
             </section>
             <section className="space-y-2" aria-labelledby="legacy-logged-outcome-title">
               <Badge variant="secondary" id="legacy-logged-outcome-title" className="text-xs font-bold uppercase tracking-wider bg-primary/15 text-primary">Logged outcome</Badge>
-              <p className="rounded-xl border border-primary/20 bg-cream/40 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.loggedOutcome}</p>
+              <p className="rounded-2xl border border-primary/20 bg-cream/40 px-3 py-2 text-sm text-foreground leading-relaxed">{activeStep.loggedOutcome}</p>
             </section>
           </CardContent>
         </Card>
@@ -495,7 +495,7 @@ export const RingSnapCallToCashInteractive = () => {
       }}
       className="w-full"
     >
-      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto p-1 bg-muted/50 rounded-xl mb-5">
+      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto p-1 bg-muted/50 rounded-2xl mb-5">
         {Object.entries(SCENARIOS).map(([key, { label, icon: Icon }]) => <TabsTrigger key={key} value={key} className={cn("flex items-center justify-center gap-2 py-3 px-2 rounded-lg text-sm font-medium transition-all", "data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-primary", "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2")}>
           <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span className="truncate">{label}</span>
@@ -514,7 +514,7 @@ export const RingSnapCallToCashInteractive = () => {
                   onClick={() => setSelectedPhase(phase.id)}
                   aria-pressed={isActive}
                   className={cn(
-                    "flex items-center text-left p-3.5 rounded-xl border-2 transition-all",
+                    "flex items-center text-left p-3.5 rounded-2xl border-2 transition-all",
                     "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none",
                     isActive ? "border-primary bg-primary/5 shadow-md" : "border-muted bg-white shadow-sm hover:border-primary/30"
                   )}
@@ -538,13 +538,13 @@ export const RingSnapCallToCashInteractive = () => {
                 {activeStory.callerSays.length > 0 ? (
                   <ul className="space-y-2">
                     {activeStory.callerSays.map((item, index) => (
-                      <li key={`caller-${index}`} className="rounded-xl bg-muted/40 border border-muted px-3 py-2 text-sm text-foreground leading-relaxed">
+                      <li key={`caller-${index}`} className="rounded-2xl bg-muted/40 border border-muted px-3 py-2 text-sm text-foreground leading-relaxed">
                         {item}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="rounded-xl bg-muted/20 border border-dashed border-muted px-3 py-2 text-sm text-muted-foreground">
+                  <p className="rounded-2xl bg-muted/20 border border-dashed border-muted px-3 py-2 text-sm text-muted-foreground">
                     Caller is already in motion—RingSnap confirms next steps and keeps the handoff clean.
                   </p>
                 )}
@@ -554,7 +554,7 @@ export const RingSnapCallToCashInteractive = () => {
                 <Badge variant="default" id="ringsnap-says-title" className="text-xs font-bold uppercase tracking-wider">RingSnap says / does</Badge>
                 <ul className="space-y-2">
                   {activeStory.ringSnapSaysDoes.map((item, index) => (
-                    <li key={`ringsnap-${index}`} className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-sm text-foreground leading-relaxed">
+                    <li key={`ringsnap-${index}`} className="rounded-2xl bg-primary/5 border border-primary/15 px-3 py-2 text-sm text-foreground leading-relaxed">
                       {item}
                     </li>
                   ))}

@@ -100,7 +100,7 @@ const ElectricianCallScript = () => {
                 <p className="text-muted-foreground leading-relaxed mb-4">
                     Your dispatcher's first job isn't to book an appointment — it's to ensure the caller is safe. Every electrical call script should start with safety screening before moving to intake and scheduling.
                 </p>
-                <div className="rounded-xl border-2 border-destructive/30 bg-destructive/5 p-6 mb-4">
+                <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-6 mb-4">
                     <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
                         <span className="text-destructive">⚠️</span> Immediate Transfer Triggers
                     </h3>
@@ -292,7 +292,7 @@ It sounds like we should get an electrician out to diagnose this. I have availab
             {/* Missed Call Revenue */}
             <section id="missed-call-revenue" className="mb-10">
                 <h2 className="text-2xl font-bold text-foreground mb-4">Missed Call Revenue Example</h2>
-                <div className="rounded-xl border border-border bg-card p-6 mb-4">
+                <div className="rounded-2xl border border-border bg-card p-6 mb-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><span className="text-muted-foreground">Monthly inbound calls:</span></div>
                         <div className="font-semibold">200</div>

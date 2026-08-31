@@ -292,7 +292,7 @@ const Index = () => {
                         <Link
                           key={href}
                           to={href}
-                          className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                          className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
                         >
                           <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <Icon className="h-5 w-5 text-primary" />
@@ -311,7 +311,7 @@ const Index = () => {
                 {/* CRM Teaser */}
                 <section className="section-spacer-compact bg-white border-t border-border/5">
                   <div className="site-container">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-2xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
                       <div className="max-w-2xl text-center md:text-left">
                         <h2 className="text-2xl font-bold mb-3">Not just a receptionist — a built-in CRM</h2>
                         <p className="text-muted-foreground mb-0">
@@ -351,7 +351,7 @@ const Index = () => {
                         <Link
                           key={href}
                           to={href}
-                          className="group flex flex-col gap-3 p-5 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                          className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
                         >
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">

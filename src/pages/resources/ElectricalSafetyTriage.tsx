@@ -64,7 +64,7 @@ const ElectricalSafetyTriage = () => (
                     { num: "7", q: "Is the power out in your entire home, or just part of it?", action: "Entire home → Check with neighbors (utility outage?) and main breaker. Partial → likely a panel or circuit issue." },
                     { num: "8", q: "Have you recently experienced flickering lights, tripping breakers, or power surges?", action: "If yes → Ask about home age and panel type. Schedule evaluation — these are signs of an overloaded or aging panel." },
                 ].map((item) => (
-                    <div key={item.num} className="rounded-xl border border-border bg-card p-4">
+                    <div key={item.num} className="rounded-2xl border border-border bg-card p-4">
                         <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
                                 {item.num}
@@ -82,7 +82,7 @@ const ElectricalSafetyTriage = () => (
         <section id="decision-matrix" className="mb-10">
             <h2 className="text-2xl font-bold text-foreground mb-4">Decision Matrix: How to Classify the Call</h2>
             <div className="grid md:grid-cols-3 gap-4">
-                <div className="rounded-xl border-2 border-destructive/30 bg-destructive/5 p-5">
+                <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-5">
                     <h3 className="font-bold text-foreground mb-2">🚨 Call 911 + Dispatch</h3>
                     <p className="text-xs text-muted-foreground mb-2">Questions 1 (flames), 3, or 4 are yes</p>
                     <ul className="list-disc pl-4 space-y-1 text-xs text-muted-foreground">
@@ -91,7 +91,7 @@ const ElectricalSafetyTriage = () => (
                         <li>Downed power line</li>
                     </ul>
                 </div>
-                <div className="rounded-xl border-2 border-yellow-500/30 bg-yellow-500/5 p-5">
+                <div className="rounded-2xl border-2 border-yellow-500/30 bg-yellow-500/5 p-5">
                     <h3 className="font-bold text-foreground mb-2">⚡ Emergency — Dispatch Now</h3>
                     <p className="text-xs text-muted-foreground mb-2">Questions 1 (sparks/smoke), 2, 5, or 6 are yes</p>
                     <ul className="list-disc pl-4 space-y-1 text-xs text-muted-foreground">
@@ -101,7 +101,7 @@ const ElectricalSafetyTriage = () => (
                         <li>Buzzing or crackling in walls</li>
                     </ul>
                 </div>
-                <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
+                <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-5">
                     <h3 className="font-bold text-foreground mb-2">📅 Schedule Service</h3>
                     <p className="text-xs text-muted-foreground mb-2">Questions 7 or 8 only, or all questions are no</p>
                     <ul className="list-disc pl-4 space-y-1 text-xs text-muted-foreground">

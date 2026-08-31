@@ -277,7 +277,7 @@ const BestAiReceptionistHomeServices = () => {
                 "Setup takes about 10 minutes — forward your number, test a call, start booking",
                 "95%+ call capture rate — the average contractor misses 6+ calls every busy Saturday",
               ].map((item) => (
-                <div key={item} className="flex items-start gap-3 p-4 rounded-xl bg-white border">
+                <div key={item} className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                   <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <p className="text-sm">{item}</p>
                 </div>
@@ -317,7 +317,7 @@ const BestAiReceptionistHomeServices = () => {
               </p>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="overflow-x-auto rounded-2xl border border-border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50">

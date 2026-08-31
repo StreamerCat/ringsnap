@@ -52,7 +52,7 @@ export const EmergencyCalculator = () => {
       <section id="calculator" className="py-16 sm:py-20 lg:py-24">
         <div className="container mx-auto max-w-4xl px-4 sm:px-6">
           <div className="text-center mb-10 sm:mb-12">
-            <h2 className="text-headline mb-3">
+            <h2 className="text-h2 mb-3">
               How much are missed calls costing&nbsp;you?
             </h2>
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -209,7 +209,7 @@ function MetricCard({ icon: Icon, label, value, sub, muted }: {
   muted?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border/30 bg-muted/30 p-3.5">
+    <div className="rounded-2xl border border-border/30 bg-muted/30 p-3.5">
       <div className="flex items-center gap-1.5 mb-2">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-[11px] font-medium text-muted-foreground">{label}</span>

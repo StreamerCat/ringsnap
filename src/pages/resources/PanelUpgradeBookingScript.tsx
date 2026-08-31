@@ -66,7 +66,7 @@ const PanelUpgradeBookingScript = () => (
                     { trigger: '"Our home inspector flagged the panel"', followUp: "What brand/type? Federal Pacific?  Zinsco? Those have safety recalls." },
                     { trigger: '"We\'re adding solar panels"', followUp: "Your panel needs a solar-ready upgrade with back-feed breaker space." },
                 ].map((item, i) => (
-                    <div key={i} className="rounded-xl border border-border bg-card p-4">
+                    <div key={i} className="rounded-2xl border border-border bg-card p-4">
                         <p className="font-semibold text-foreground text-sm mb-1">{item.trigger}</p>
                         <p className="text-xs text-muted-foreground">→ {item.followUp}</p>
                     </div>

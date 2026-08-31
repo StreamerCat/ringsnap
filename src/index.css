@@ -192,27 +192,6 @@ All colors MUST be HSL.
     @apply text-base sm:text-lg md:text-xl;
   }
 
-  /* Expressive Typography Scale */
-  .text-display {
-    font-size: clamp(2.5rem, 5vw + 1rem, 4.5rem);
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-  }
-
-  .text-headline {
-    font-size: clamp(1.75rem, 3.5vw + 0.5rem, 3rem);
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-  }
-
-  .text-subhead {
-    font-size: clamp(1.25rem, 2vw + 0.5rem, 1.75rem);
-    font-weight: 600;
-    line-height: 1.3;
-  }
-
   /* Metric Typography */
   .text-metric {
     font-family: 'JetBrains Mono', monospace;
@@ -228,42 +207,9 @@ All colors MUST be HSL.
     background: hsl(var(--charcoal));
   }
 
-  .gradient-accent {
-    background: linear-gradient(135deg,
-        hsl(var(--terracotta)) 0%,
-        hsl(var(--cream)) 100%);
-  }
-
   /* Gradient Text - Now Solid Terracotta */
   .text-gradient-core {
     color: hsl(var(--terracotta));
-  }
-
-  /* Aura Effects (blurred gradient backgrounds) */
-  .aura-purple {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .aura-purple::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle,
-        hsl(var(--terracotta) / 0.08) 0%,
-        transparent 70%);
-    filter: blur(60px);
-    z-index: -1;
-    contain: paint;
-  }
-
-  @media (max-width: 768px) {
-    .aura-purple::before {
-      filter: blur(30px);
-    }
   }
 
   /* Soft Hover Glow - Terracotta */
@@ -285,27 +231,6 @@ All colors MUST be HSL.
     min-width: 44px;
   }
 
-  /* Elevation System */
-  .elevation-1 {
-    @apply shadow-sm hover:shadow-md transition-shadow duration-200;
-  }
-
-  .elevation-2 {
-    @apply shadow-[0_4px_16px_-4px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.15)] transition-shadow duration-200;
-  }
-
-  .elevation-3 {
-    @apply shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_40px_-12px_rgba(0,0,0,0.2)] transition-shadow duration-200;
-  }
-
-  .elevation-4 {
-    @apply shadow-[0_20px_50px_-15px_rgba(0,0,0,0.25)] hover:shadow-[0_25px_60px_-18px_rgba(0,0,0,0.3)] transition-shadow duration-200;
-  }
-
-  .card-premium {
-    @apply elevation-3 rounded-2xl;
-  }
-
   .section-divider {
     @apply h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent;
   }
@@ -313,34 +238,6 @@ All colors MUST be HSL.
   /* Terracotta button hover state */
   .hover\:bg-terracotta-dark:hover {
     background: hsl(var(--terracotta-dark));
-  }
-
-  /* Pulse Wave Button Animation */
-  .btn-pulse {
-    @apply relative overflow-hidden;
-  }
-
-  .btn-pulse::before {
-    content: '';
-    @apply absolute inset-0 bg-white opacity-0;
-    animation: pulseWave 2s ease-out infinite;
-  }
-
-  @keyframes pulseWave {
-    0% {
-      transform: scale(0.8);
-      opacity: 0.5;
-    }
-
-    50% {
-      transform: scale(1.2);
-      opacity: 0;
-    }
-
-    100% {
-      transform: scale(1.2);
-      opacity: 0;
-    }
   }
 
   /* Revenue Counter Animation */
@@ -364,34 +261,34 @@ All colors MUST be HSL.
 
   /* TIER 1: PREMIUM CARDS (Testimonials, "Most Popular" Pricing) */
   .card-tier-1 {
-    @apply border-2 border-primary rounded-3xl p-8;
+    @apply border-2 border-primary rounded-2xl p-8;
     background: linear-gradient(to bottom right, white, hsl(var(--cream) / 0.2));
-    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.15);
+    box-shadow: 0 8px 24px hsl(var(--terracotta) / 0.15);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .card-tier-1:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(217, 119, 87, 0.25);
+    box-shadow: 0 12px 32px hsl(var(--terracotta) / 0.25);
   }
 
   /* TIER 2: STANDARD CARDS (Other pricing tiers, calculator results, features) */
   .card-tier-2 {
     @apply bg-white border rounded-2xl p-6;
-    border-color: rgba(44, 54, 57, 0.2);
-    box-shadow: 0 4px 12px rgba(44, 54, 57, 0.08);
+    border-color: hsl(var(--charcoal) / 0.2);
+    box-shadow: 0 4px 12px hsl(var(--charcoal) / 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .card-tier-2:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(44, 54, 57, 0.12);
+    box-shadow: 0 6px 16px hsl(var(--charcoal) / 0.12);
   }
 
   /* TIER 3: LIGHT CARDS (FAQ, objection handling, footer sections) */
   .card-tier-3 {
     @apply rounded-2xl p-5;
-    background: rgba(244, 232, 216, 0.3);
+    background: hsl(var(--cream) / 0.3);
     border: none;
     box-shadow: none;
   }
@@ -403,29 +300,13 @@ All colors MUST be HSL.
     @apply active:scale-95 transition-all duration-200 ease-in-out;
   }
 
-  @keyframes pulse-subtle {
-
-    0%,
-    100% {
-      opacity: 1;
-    }
-
-    50% {
-      opacity: 0.92;
-    }
-  }
-
-  .btn-pulse-cta {
-    animation: pulse-subtle 2s ease-in-out infinite;
-  }
-
   /* Card Interactions */
   .card-interactive {
     @apply transition-all duration-300 ease-out cursor-pointer;
   }
 
   .card-glow-terracotta:hover {
-    box-shadow: 0 12px 40px rgba(217, 119, 87, 0.2);
+    box-shadow: 0 12px 40px hsl(var(--terracotta) / 0.2);
   }
 
   /* Input Interactions */
@@ -458,7 +339,7 @@ All colors MUST be HSL.
 
   .calculator-result-card:hover {
     @apply shadow-lg;
-    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.12);
+    box-shadow: 0 8px 24px hsl(var(--terracotta) / 0.12);
   }
 
   .calculator-metric-label {
@@ -469,47 +350,6 @@ All colors MUST be HSL.
   .calculator-metric-number {
     @apply text-2xl sm:text-3xl font-bold;
     color: hsl(var(--charcoal));
-  }
-
-  /* === PRICING SECTION ENHANCEMENTS === */
-
-  /* Pricing card - Most Popular tier */
-  .card-pricing-popular {
-    @apply card-tier-1;
-    transform: scale(1.05);
-    border: 3px solid hsl(var(--primary));
-    animation: pricing-glow 2s ease-in-out infinite;
-    box-shadow: 0 20px 60px rgba(217, 119, 87, 0.3);
-    background: linear-gradient(to bottom, white 0%, hsl(var(--cream) / 0.3) 100%);
-  }
-
-  @keyframes pricing-glow {
-
-    0%,
-    100% {
-      box-shadow: 0 20px 60px rgba(217, 119, 87, 0.3);
-    }
-
-    50% {
-      box-shadow: 0 20px 70px rgba(217, 119, 87, 0.45);
-    }
-  }
-
-  /* Subtle pulse for badge */
-  .animate-pulse-subtle {
-    animation: pulse-badge 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse-badge {
-
-    0%,
-    100% {
-      opacity: 1;
-    }
-
-    50% {
-      opacity: 0.85;
-    }
   }
 
   /* === TYPOGRAPHY SYSTEM === */
@@ -579,7 +419,7 @@ All colors MUST be HSL.
   .image-enhanced {
     @apply rounded-2xl shadow-md;
     filter: sepia(0.08);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 12px hsl(var(--charcoal) / 0.08);
   }
 
   /* Link styling */

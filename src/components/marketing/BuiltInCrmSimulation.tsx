@@ -300,7 +300,7 @@ export function BuiltInCrmSimulation() {
                   <p className="text-sm font-semibold text-foreground">Incoming call</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{LEAD.phone}</p>
                 </div>
-                <div className="w-full bg-white border border-border/40 rounded-xl p-3 text-left">
+                <div className="w-full bg-white border border-border/40 rounded-2xl p-3 text-left">
                   <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">
                     Caller ID
                   </p>
@@ -330,7 +330,7 @@ export function BuiltInCrmSimulation() {
                     >
                       <div
                         className={cn(
-                          "rounded-xl px-2.5 py-1.5 text-xs leading-relaxed",
+                          "rounded-2xl px-2.5 py-1.5 text-xs leading-relaxed",
                           line.speaker === "AI"
                             ? "bg-primary/10 border border-primary/15 text-foreground"
                             : "bg-muted/50 border border-border/30 text-muted-foreground ml-3"
@@ -424,7 +424,7 @@ export function BuiltInCrmSimulation() {
             {/* Lead score + tags */}
             <div
               className={cn(
-                "flex items-center gap-3 p-3 rounded-xl border transition-all duration-500 mb-3",
+                "flex items-center gap-3 p-3 rounded-2xl border transition-all duration-500 mb-3",
                 step >= 2
                   ? "opacity-100 bg-muted/20 border-border/30"
                   : "opacity-0 pointer-events-none border-transparent"
@@ -467,7 +467,7 @@ export function BuiltInCrmSimulation() {
             {/* Next action */}
             <div
               className={cn(
-                "flex items-start gap-2 p-3 rounded-xl border transition-all duration-500 mb-3",
+                "flex items-start gap-2 p-3 rounded-2xl border transition-all duration-500 mb-3",
                 step >= 3
                   ? "opacity-100 bg-primary/5 border-primary/20"
                   : "opacity-0 pointer-events-none border-transparent"
@@ -575,7 +575,7 @@ export function BuiltInCrmSimulation() {
                 step >= 2 ? "max-h-40 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
               )}
             >
-              <div className="p-3 rounded-xl bg-white border border-border/40 space-y-2">
+              <div className="p-3 rounded-2xl bg-white border border-border/40 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Lead Score
@@ -613,7 +613,7 @@ export function BuiltInCrmSimulation() {
                 step >= 3 ? "max-h-32 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
               )}
             >
-              <div className="p-3 rounded-xl bg-white border border-border/40">
+              <div className="p-3 rounded-2xl bg-white border border-border/40">
                 <div className="flex items-center gap-2 mb-1.5">
                   <Calendar className="w-3.5 h-3.5 text-primary" />
                   <span className="text-xs font-semibold text-foreground">
@@ -641,7 +641,7 @@ export function BuiltInCrmSimulation() {
                 step >= 4 ? "max-h-64 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
               )}
             >
-              <div className="p-3 rounded-xl bg-white border border-border/40">
+              <div className="p-3 rounded-2xl bg-white border border-border/40">
                 <div className="flex items-center gap-2 mb-1.5">
                   <Send className="w-3.5 h-3.5 text-primary" />
                   <span className="text-xs font-semibold text-foreground">SMS Sent</span>

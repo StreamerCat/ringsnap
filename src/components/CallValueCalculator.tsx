@@ -194,24 +194,24 @@ export const CallValueCalculator = ({
     </CardHeader>
     <CardContent className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Recovered revenue</div>
           <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.recoveredRevenue)}</div>
           <div className="mt-1 text-[11px] text-white/60">Captured by RingSnap AI follow-up</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Net profit lift</div>
           <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.netGain)}</div>
           <div className="mt-1 text-[11px] text-white/60">ROI: {metrics.roi}% vs. subscription</div>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Break-even pace</div>
           <div className="mt-1 text-xl font-semibold text-white">{metrics.paybackDays} days</div>
           <div className="mt-1 text-[11px] text-white/60">≈ {breakEvenJobs} booked jobs</div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-white/60">Monthly plan</div>
           <div className="mt-1 text-xl font-semibold text-white">${numberFormatter.format(metrics.aiCost)}/mo</div>
           <div className="mt-1 text-[11px] text-white/60">24/7 coverage included</div>
@@ -256,7 +256,7 @@ export const CallValueCalculator = ({
           We just sent the launch kit—check your inbox for scripts, cadences, and ROI math.
         </div> : <p className="text-xs text-white/60">No spam—just the proof you need to sell AI coverage to owners and ops leads.</p>}
       </form>
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
         <p className="text-sm font-semibold text-white">“RingSnap plugged the $38k/mo hole in our call queue and let us scale without hiring.”</p>
         <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-white/60">Bryan — Owner, Precision Plumbing</p>
       </div>

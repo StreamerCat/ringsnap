@@ -105,18 +105,18 @@ const AverageTicketPlanner = () => {
 
                     <div className="mt-8 pt-6 border-t border-border">
                         <div className="grid md:grid-cols-2 gap-4 mb-4">
-                            <div className="rounded-xl bg-muted/50 p-4 text-center">
+                            <div className="rounded-2xl bg-muted/50 p-4 text-center">
                                 <div className="text-xs text-muted-foreground mb-1">Current Monthly Revenue</div>
                                 <div className="text-xl font-bold">${currentMonthly.toLocaleString()}</div>
                                 <div className="text-xs text-muted-foreground">${currentTicket} × {monthlyJobs} jobs</div>
                             </div>
-                            <div className="rounded-xl bg-primary/10 border border-primary/20 p-4 text-center">
+                            <div className="rounded-2xl bg-primary/10 border border-primary/20 p-4 text-center">
                                 <div className="text-xs text-muted-foreground mb-1">Target Monthly Revenue</div>
                                 <div className="text-xl font-bold text-primary">${targetMonthly.toLocaleString()}</div>
                                 <div className="text-xs text-muted-foreground">${targetTicket} × {monthlyJobs} jobs</div>
                             </div>
                         </div>
-                        <div className="rounded-xl bg-primary/10 border border-primary/20 p-5 text-center">
+                        <div className="rounded-2xl bg-primary/10 border border-primary/20 p-5 text-center">
                             <div className="text-sm text-muted-foreground mb-1">Additional revenue from ticket increase</div>
                             <div className="text-3xl font-bold text-primary mb-1">+${monthlyGain.toLocaleString()}/month</div>
                             <div className="text-sm text-muted-foreground">+${annualGain.toLocaleString()} per year</div>
@@ -146,7 +146,7 @@ const AverageTicketPlanner = () => {
 
                 <div className="space-y-3">
                     {upsellMenus[activeTrade].map((item, i) => (
-                        <div key={i} className="rounded-xl border border-border bg-card p-4">
+                        <div key={i} className="rounded-2xl border border-border bg-card p-4">
                             <div className="flex items-start justify-between mb-2">
                                 <h4 className="font-semibold text-foreground text-sm">{item.item}</h4>
                                 <span className="text-xs font-bold text-primary bg-primary/10 rounded-full px-2.5 py-0.5">{item.addedValue}</span>

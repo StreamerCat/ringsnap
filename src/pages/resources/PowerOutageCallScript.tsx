@@ -45,7 +45,7 @@ const PowerOutageCallScript = () => (
                 The goal is to identify whether the outage is on the utility side (neighborhood-wide) or on the home's side (panel, breaker, or wiring). This distinction saves you from wasted truck rolls and ensures you're dispatching on real, billable work.
             </p>
             <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div className="rounded-xl border border-border bg-card p-5">
+                <div className="rounded-2xl border border-border bg-card p-5">
                     <h3 className="font-bold text-foreground mb-3">🏘️ Utility Outage (Not Your Dispatch)</h3>
                     <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
                         <li>Neighbors are also without power</li>
@@ -55,7 +55,7 @@ const PowerOutageCallScript = () => (
                     </ul>
                     <p className="text-xs text-muted-foreground mt-3 italic">→ Direct caller to utility company</p>
                 </div>
-                <div className="rounded-xl border border-primary/30 bg-primary/5 p-5">
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
                     <h3 className="font-bold text-foreground mb-3">🏠 Home Issue (Your Dispatch)</h3>
                     <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
                         <li>Neighbors have power</li>

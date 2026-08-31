@@ -105,7 +105,7 @@ Thank you for calling [Company Name] — we'll talk to you tomorrow!'"`}
                 Not every after-hours HVAC call needs an emergency dispatch. Here's a quick guide for your dispatcher (or AI receptionist) to determine whether to wake up the on-call tech:
             </p>
             <div className="grid md:grid-cols-2 gap-4">
-                <div className="rounded-xl border-2 border-destructive/30 bg-destructive/5 p-5">
+                <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-5">
                     <h3 className="font-bold text-foreground mb-3">🚨 Dispatch Now</h3>
                     <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
                         <li>No heat when outdoor temp is below 35°F</li>
@@ -116,7 +116,7 @@ Thank you for calling [Company Name] — we'll talk to you tomorrow!'"`}
                         <li>Active water leak from HVAC system</li>
                     </ul>
                 </div>
-                <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5">
+                <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-5">
                     <h3 className="font-bold text-foreground mb-3">🕐 Schedule for Morning</h3>
                     <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
                         <li>Unusual noise but system is running</li>

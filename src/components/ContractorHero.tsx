@@ -87,11 +87,10 @@ export const ContractorHero = () => {
   };
 
   return <section className="relative min-h-screen-safe flex items-center overflow-hidden section-spacer">
-    {/* Gradient Aura Background */}
+    {/* Background */}
     <div className="absolute inset-0 -z-10">
       <div className="absolute inset-0 bg-gradient-to-br from-off-white to-cream/30" />
-      <div className="absolute top-20 -right-40 w-96 h-96 gradient-core opacity-10 blur-3xl rounded-full" />
-      <div className="absolute bottom-20 -left-40 w-96 h-96 gradient-secondary opacity-10 blur-3xl rounded-full" />
+      <div className="absolute top-20 -right-40 w-96 h-96 gradient-core opacity-[0.07] blur-3xl rounded-full" />
     </div>
 
     <div className="site-container py-16 sm:py-20 lg:py-28">
@@ -112,13 +111,13 @@ export const ContractorHero = () => {
               </h2>
             </div>
 
-            {/* Gradient CTAs */}
+            {/* Primary + secondary CTAs */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:opacity-90 transition-all" onClick={handleHeroCtaClick}>
+              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-primary text-white hover:bg-terracotta-dark active:scale-[0.98] transition-colors duration-200" onClick={handleHeroCtaClick}>
                 <PhoneCall className="mr-2" />
                 {experiment.payload.cta}
               </Button>
-              <Button size="lg" className="text-lg h-14 px-8 font-semibold rounded-full bg-white border-2 border-charcoal/30 text-charcoal transition-all hover:shadow-md" onClick={scrollToVapiDemo}>
+              <Button size="lg" variant="ghost" className="text-lg h-14 px-8 font-semibold rounded-full text-charcoal hover:bg-charcoal/5 active:scale-[0.98] transition-colors duration-200" onClick={scrollToVapiDemo}>
                 Hear it Live
               </Button>
             </div>
@@ -143,8 +142,8 @@ export const ContractorHero = () => {
 
         {/* Right Column - Transcript */}
         <div className="relative">
-          <div className="relative p-1 rounded-3xl bg-gradient-to-br from-terracotta/20 to-cream/20">
-            <div className="relative p-6 sm:p-8 rounded-3xl bg-white/90 backdrop-blur-xl">
+          <div className="relative p-1 rounded-2xl bg-gradient-to-br from-terracotta/20 to-cream/20">
+            <div className="relative p-6 sm:p-8 rounded-2xl bg-white/90 backdrop-blur-xl">
               <Badge variant="gradient" className="absolute -top-3 -right-3 px-4 py-1.5 text-xs font-bold rounded-full shadow-xl">
                 &lt;1s pickup
               </Badge>

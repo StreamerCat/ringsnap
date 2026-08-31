@@ -68,7 +68,7 @@ export function GoogleButton({ onError }: GoogleButtonProps) {
     <Button
       type="button"
       onClick={handleClick}
-      className="w-full rounded-xl bg-[#D67256] text-white hover:bg-[#c46045]"
+      className="w-full rounded-2xl bg-[#D67256] text-white hover:bg-[#c46045]"
       disabled={isLoading}
       aria-label="Continue with Google"
     >

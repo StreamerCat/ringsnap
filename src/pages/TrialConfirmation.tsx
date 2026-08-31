@@ -34,10 +34,10 @@ export default function TrialConfirmation() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
             <CheckCircle2 className="h-12 w-12 text-green-600" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900">
+          <h1 className="text-4xl font-bold text-foreground">
             Welcome to RingSnap! 🎉
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-xl text-muted-foreground">
             Your RingSnap Agent is being set up right now
           </p>
         </div>
@@ -52,7 +52,7 @@ export default function TrialConfirmation() {
               </div>
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold">Setup in Progress</h2>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   We're personalizing your Agent based on your business details.
                   This usually takes about 5-10 minutes.
                 </p>
@@ -61,17 +61,17 @@ export default function TrialConfirmation() {
 
             {/* What's Happening */}
             <div className="border-t pt-6">
-              <h3 className="font-semibold mb-4 text-gray-900">What's happening now:</h3>
+              <h3 className="font-semibold mb-4 text-foreground">What's happening now:</h3>
               <ul className="space-y-3">
-                <li className="flex items-center gap-3 text-gray-600">
+                <li className="flex items-center gap-3 text-muted-foreground">
                   <div className="h-2 w-2 rounded-full bg-blue-600"></div>
                   Assigning your dedicated phone number
                 </li>
-                <li className="flex items-center gap-3 text-gray-600">
+                <li className="flex items-center gap-3 text-muted-foreground">
                   <div className="h-2 w-2 rounded-full bg-blue-600"></div>
                   Training your Agent on your business information
                 </li>
-                <li className="flex items-center gap-3 text-gray-600">
+                <li className="flex items-center gap-3 text-muted-foreground">
                   <div className="h-2 w-2 rounded-full bg-blue-600"></div>
                   Setting up call forwarding instructions
                 </li>
@@ -85,8 +85,8 @@ export default function TrialConfirmation() {
                   <Mail className="h-6 w-6 text-blue-600" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-gray-900">Check your email</h3>
-                  <p className="text-gray-600">
+                  <h3 className="font-semibold text-foreground">Check your email</h3>
+                  <p className="text-muted-foreground">
                     We'll send setup instructions to <span className="font-medium">{email}</span> within the next 15 minutes.
                     The email will include your RingSnap number and forwarding instructions.
                   </p>
@@ -101,10 +101,10 @@ export default function TrialConfirmation() {
                   <Clock className="h-6 w-6 text-blue-600" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-foreground">
                     Ready in ~15 minutes
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-muted-foreground">
                     Your assistant will be live and ready to answer calls
                   </p>
                 </div>
@@ -114,18 +114,18 @@ export default function TrialConfirmation() {
             {/* Login Credentials (if available) */}
             {password && (
               <div className="border-t pt-6 bg-green-50 rounded-lg p-4">
-                <h3 className="font-semibold mb-3 text-gray-900">Your Login Credentials</h3>
+                <h3 className="font-semibold mb-3 text-foreground">Your Login Credentials</h3>
                 <div className="space-y-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Email:</span>
-                    <p className="font-mono font-medium text-gray-900 bg-white px-3 py-2 rounded mt-1">
+                    <span className="text-muted-foreground">Email:</span>
+                    <p className="font-mono font-medium text-foreground bg-white px-3 py-2 rounded mt-1">
                       {email}
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Temporary Password:</span>
+                    <span className="text-muted-foreground">Temporary Password:</span>
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="font-mono font-medium text-gray-900 bg-white px-3 py-2 rounded flex-1">
+                      <p className="font-mono font-medium text-foreground bg-white px-3 py-2 rounded flex-1">
                         {showPassword ? password : '••••••••••••••••'}
                       </p>
                       <Button
@@ -137,7 +137,7 @@ export default function TrialConfirmation() {
                       </Button>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-600 pt-2 border-t">
+                  <p className="text-xs text-muted-foreground pt-2 border-t">
                     💡 Save these credentials! You'll need them to log in. We recommend changing your password after logging in.
                   </p>
                 </div>
@@ -146,8 +146,8 @@ export default function TrialConfirmation() {
 
             {/* Trial Info */}
             <div className="border-t pt-6 bg-blue-50 rounded-lg p-4">
-              <h3 className="font-semibold mb-3 text-gray-900">Your 3-Day Free Trial</h3>
-              <ul className="space-y-2 text-sm text-gray-600">
+              <h3 className="font-semibold mb-3 text-foreground">Your 3-Day Free Trial</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   Full access to all features
@@ -178,7 +178,7 @@ export default function TrialConfirmation() {
           >
             Go to Dashboard
           </Button>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Questions? Email us at support@getringsnap.com
           </p>
         </div>

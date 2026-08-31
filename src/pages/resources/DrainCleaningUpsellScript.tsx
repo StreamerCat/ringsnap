@@ -43,15 +43,15 @@ const DrainCleaningUpsellScript = () => (
                 Most plumbing shops treat drain cleaning as a simple, low-margin service. Clear the clog, collect $200, move on. But here's what the data shows:
             </p>
             <div className="grid md:grid-cols-3 gap-4 mb-6">
-                <div className="rounded-xl border border-border bg-card p-4 text-center">
+                <div className="rounded-2xl border border-border bg-card p-4 text-center">
                     <div className="text-2xl font-bold text-primary mb-1">$200</div>
                     <div className="text-xs text-muted-foreground">Basic drain clearing</div>
                 </div>
-                <div className="rounded-xl border border-border bg-card p-4 text-center">
+                <div className="rounded-2xl border border-border bg-card p-4 text-center">
                     <div className="text-2xl font-bold text-primary mb-1">$450</div>
                     <div className="text-xs text-muted-foreground">+ Camera inspection</div>
                 </div>
-                <div className="rounded-xl border border-border bg-card p-4 text-center">
+                <div className="rounded-2xl border border-border bg-card p-4 text-center">
                     <div className="text-2xl font-bold text-primary mb-1">$1,200+</div>
                     <div className="text-xs text-muted-foreground">+ Hydro-jet or line repair</div>
                 </div>
