@@ -57,6 +57,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         charcoal: "hsl(var(--charcoal) / <alpha-value>)",
+        sage: "hsl(var(--sage) / <alpha-value>)",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

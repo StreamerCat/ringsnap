@@ -372,7 +372,7 @@ const FeaturedCard = ({ resource }: FeaturedCardProps) => {
     return (
         <Link
             to={resource.href}
-            className="group block rounded-2xl border border-border bg-card p-5 md:p-6 hover:border-primary/40 hover:shadow-md transition-all relative overflow-hidden"
+            className="group block rounded-2xl border border-transparent bg-card shadow-sm hover:shadow-md hover:border-primary/30 p-5 md:p-6 transition-all relative overflow-hidden"
         >
             {/* Content type badge */}
             <div className="flex items-start justify-between gap-2 mb-3">
@@ -415,7 +415,7 @@ const ResourceCard = ({ resource }: ResourceCardProps) => {
     return (
         <Link
             to={resource.href}
-            className="group block rounded-2xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all"
+            className="group block rounded-2xl border border-transparent bg-card shadow-sm hover:shadow-md hover:border-primary/30 p-5 transition-all"
         >
             <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -561,7 +561,7 @@ const ResourceHub = () => {
                     {tradeCards.map((trade) => {
                         const Icon = trade.icon;
                         return (
-                            <div key={trade.value} className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-4">
+                            <div key={trade.value} className="rounded-2xl bg-card shadow-sm p-5 flex flex-col gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                                         <Icon className="h-5 w-5 text-primary" />
@@ -608,7 +608,7 @@ const ResourceHub = () => {
                         <button
                             key={topic.value}
                             onClick={() => handleFilterClick(topic.value)}
-                            className="group text-left rounded-2xl border border-border bg-card p-4 hover:border-primary/40 hover:shadow-sm transition-all"
+                            className="group text-left rounded-2xl border border-transparent bg-card shadow-sm hover:shadow-md hover:border-primary/30 p-4 transition-all"
                         >
                             <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors mb-1">
                                 {topic.label}

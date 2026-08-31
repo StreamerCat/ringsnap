@@ -30,6 +30,11 @@ All colors MUST be HSL.
     --soft-gray: 0 0% 93%;
     /* #EDEDED */
 
+    --card: 0 0% 100%;
+    /* White surface, distinct from off-white page background */
+    --card-foreground: 200 11% 21%;
+    /* Charcoal */
+
     /* Primary = Terracotta */
     --primary: 13 61% 59%;
     --primary-foreground: 0 0% 100%;

@@ -159,7 +159,7 @@ const AfterHoursAnsweringService = () => {
                 <Link
                   key={href}
                   to={href}
-                  className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                  className="group flex flex-col gap-3 p-5 rounded-2xl border border-transparent bg-card shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
