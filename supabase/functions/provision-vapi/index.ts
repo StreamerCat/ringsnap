@@ -1649,13 +1649,18 @@ Deno.serve(async (req: Request) => {
 
     // Recover jobs abandoned by a crashed or timed-out worker. This acts as a
     // bounded processing lease so rows cannot remain stuck forever.
+    // While paused, real jobs must not have their retry attempts burned by
+    // recovery, so only test-mode rows are eligible.
     const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MINUTES * 60 * 1000).toISOString();
-    const { data: staleJobs, error: staleJobsError } = await supabase
+    let staleJobsQuery = supabase
       .from("provisioning_jobs")
       .select("id, account_id, attempts")
       .eq("status", "processing")
-      .lt("updated_at", staleBefore)
-      .limit(JOBS_PER_BATCH);
+      .lt("updated_at", staleBefore);
+    if (provisioningPaused) {
+      staleJobsQuery = staleJobsQuery.eq("test_mode", true);
+    }
+    const { data: staleJobs, error: staleJobsError } = await staleJobsQuery.limit(JOBS_PER_BATCH);
 
     if (staleJobsError) {
       logWarn("Failed to inspect stale processing jobs", {
@@ -1704,11 +1709,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Step 2a: Fetch QUEUED jobs first (High Priority - New Signups)
-    // We want to process these immediately so users don't wait
-    const { data: queuedJobs, error: queuedError } = await supabase
+    // We want to process these immediately so users don't wait.
+    // While paused, only test-mode jobs are eligible, filtered here (not
+    // after the limit) so real queued jobs ahead of them in FIFO order don't
+    // fill the whole batch and starve the test jobs behind them.
+    let queuedJobsQuery = supabase
       .from("provisioning_jobs")
       .select("*")
-      .eq("status", "queued")
+      .eq("status", "queued");
+    if (provisioningPaused) {
+      queuedJobsQuery = queuedJobsQuery.eq("test_mode", true);
+    }
+    const { data: queuedJobs, error: queuedError } = await queuedJobsQuery
       .order("created_at", { ascending: true }) // FIFO
       .limit(JOBS_PER_BATCH);
 
@@ -1723,10 +1735,14 @@ Deno.serve(async (req: Request) => {
     if (jobsToProcess.length < JOBS_PER_BATCH) {
       const remainingSlots = JOBS_PER_BATCH - jobsToProcess.length;
 
-      const { data: failedJobs, error: failedError } = await supabase
+      let failedJobsQuery = supabase
         .from("provisioning_jobs")
         .select("*")
-        .eq("status", "failed")
+        .eq("status", "failed");
+      if (provisioningPaused) {
+        failedJobsQuery = failedJobsQuery.eq("test_mode", true);
+      }
+      const { data: failedJobs, error: failedError } = await failedJobsQuery
         .order("updated_at", { ascending: true }) // Oldest failures first
         .limit(remainingSlots * 2); // Fetch extra to filter in memory
 
@@ -1758,26 +1774,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (!provisioningEnabled) {
-      const pausedCount = jobsToProcess.filter((j: any) => !isProvisionableWhilePaused(j)).length;
-      jobsToProcess = jobsToProcess.filter(isProvisionableWhilePaused);
-
-      if (pausedCount > 0) {
-        logInfo("Provisioning paused by environment switch", {
-          ...baseLogOptions,
-          context: { paused: true, skipped: pausedCount },
-        });
-      }
-
-      if (jobsToProcess.length === 0) {
-        return new Response(
-          JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
+    // The queries above already restrict to test-mode rows while paused, so
+    // real jobs are left untouched in the queue rather than fetched and
+    // dropped here.
+    if (provisioningPaused && jobsToProcess.length === 0) {
+      logInfo("Provisioning paused by environment switch", baseLogOptions);
+      return new Response(
+        JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     if (jobsToProcess.length === 0) {
