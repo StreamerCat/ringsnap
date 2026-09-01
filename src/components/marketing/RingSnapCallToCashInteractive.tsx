@@ -531,7 +531,7 @@ export const RingSnapCallToCashInteractive = () => {
             })}
           </div>
 
-          <Card className="card-tier-2 mb-4 bg-white border-primary/10 shadow-md overflow-hidden">
+          <Card key={selectedPhase} className="card-tier-2 mb-4 bg-white border-primary/10 shadow-md overflow-hidden hero-line">
             <CardContent className="p-4 md:p-6 grid gap-4 md:gap-5 md:grid-cols-3">
               <section className="space-y-3" aria-labelledby="caller-says-title">
                 <Badge variant="outline" id="caller-says-title" className="text-xs font-bold uppercase tracking-wider border-primary/20 text-primary">Caller says</Badge>
