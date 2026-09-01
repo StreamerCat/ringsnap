@@ -400,3 +400,118 @@ export function useAdminStaffUsers() {
     staleTime: 5 * 60_000,
   });
 }
+
+// ─── Outbound leads (cold-outbound pipeline) ────────────────────────────────
+
+export interface OutboundLead {
+  id: string;
+  business_name: string | null;
+  phone: string;
+  city: string | null;
+  state: string | null;
+  email: string | null;
+  status: string;
+  source: string | null;
+  notes: string | null;
+  campaign: string | null;
+  scheduled_after: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useAdminOutboundLeads() {
+  return useQuery<OutboundLead[]>({
+    queryKey: ["admin-outbound-leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("outbound_leads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return (data ?? []) as OutboundLead[];
+    },
+    staleTime: 30_000,
+  });
+}
+
+export interface OutboundCallLogRow {
+  id: string;
+  lead_id: string | null;
+  phone: string;
+  vapi_call_id: string | null;
+  status: string;
+  created_at: string;
+}
+
+export function useAdminOutboundCallLog(leadId: string | null) {
+  return useQuery<OutboundCallLogRow[]>({
+    queryKey: ["admin-outbound-call-log", leadId],
+    enabled: Boolean(leadId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("outbound_call_log")
+        .select("*")
+        .eq("lead_id", leadId as string)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as OutboundCallLogRow[];
+    },
+  });
+}
+
+export interface OutboundCheckoutLogRow {
+  id: string;
+  lead_id: string | null;
+  phone: string;
+  email: string | null;
+  stripe_session_id: string | null;
+  stripe_customer_id: string | null;
+  plan_key: string | null;
+  checkout_url: string | null;
+  status: string;
+  account_id: string | null;
+  created_at: string;
+}
+
+export function useAdminOutboundCheckoutLog(leadId: string | null) {
+  return useQuery<OutboundCheckoutLogRow[]>({
+    queryKey: ["admin-outbound-checkout-log", leadId],
+    enabled: Boolean(leadId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("outbound_checkout_log")
+        .select("*")
+        .eq("lead_id", leadId as string)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as OutboundCheckoutLogRow[];
+    },
+  });
+}
+
+export interface OutboundPipelineHealth {
+  envPresent?: Record<string, boolean>;
+  vapiAssistant?: {
+    name?: string | null;
+    toolIds?: string[];
+    referencedTools?: Array<{ name?: string | null; error?: string }>;
+    error?: string;
+  };
+  vapiPhoneNumber?: { number?: string | null; status?: string | null; error?: string };
+  twilioFromNumber?: { from?: string | null; ownedByAccount?: boolean; smsCapable?: boolean; error?: string };
+  twilioRecentMessages?: Array<{ to: string; status: string; errorCode: number | null; dateCreated: string }>;
+  error?: string;
+}
+
+export function useAdminOutboundPipelineHealth() {
+  return useQuery<OutboundPipelineHealth>({
+    queryKey: ["admin-outbound-pipeline-health"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("outbound-audit", { body: {} });
+      if (error) throw error;
+      return (data ?? {}) as OutboundPipelineHealth;
+    },
+    staleTime: 30_000,
+  });
+}

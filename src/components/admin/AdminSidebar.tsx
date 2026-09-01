@@ -6,6 +6,7 @@ import {
   BarChart3,
   FlaskConical,
   Phone,
+  PhoneOutgoing,
   ShieldAlert,
   Settings,
   UserCog,
@@ -21,6 +22,7 @@ export type AdminTab =
   | "margins"
   | "trials"
   | "calls"
+  | "leads"
   | "alerts"
   | "settings"
   | "staff";
@@ -68,6 +70,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Call Activity",
     icon: Phone,
     description: "Volume, minutes, cost",
+  },
+  {
+    tab: "leads",
+    label: "Outbound Leads",
+    icon: PhoneOutgoing,
+    description: "Cold outbound pipeline",
   },
   {
     tab: "alerts",
