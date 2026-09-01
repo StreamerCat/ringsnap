@@ -61,8 +61,9 @@ describe('useOnboardingGuard', () => {
             return {};
         });
 
-        // Mock incomplete account
-        singleAccountMock.mockResolvedValue({ data: { onboarding_completed_at: null } });
+        // Mock incomplete account with a fully provisioned phone number —
+        // there's a real activation step (test call/forwarding) to do.
+        singleAccountMock.mockResolvedValue({ data: { onboarding_completed_at: null, provisioning_status: 'completed' } });
 
         const { result } = renderHook(() =>
             useOnboardingGuard({ redirectToActivation: true })
@@ -71,6 +72,38 @@ describe('useOnboardingGuard', () => {
         await waitFor(() => {
             expect(navigateMock).toHaveBeenCalledWith('/activation', { replace: true });
         });
+    });
+
+    it('should NOT redirect to /activation while provisioning is still pending/paused', async () => {
+        (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'user123' } } });
+
+        const singleAccountMock = vi.fn();
+        const eqAccountMock = vi.fn().mockReturnValue({ single: singleAccountMock });
+        const selectAccountMock = vi.fn().mockReturnValue({ eq: eqAccountMock });
+
+        const singleProfileMock = vi.fn().mockResolvedValue({ data: { account_id: 'acc123' } });
+        const eqProfileMock = vi.fn().mockReturnValue({ single: singleProfileMock });
+        const selectProfileMock = vi.fn().mockReturnValue({ eq: eqProfileMock });
+
+        (supabase.from as any).mockImplementation((table: string) => {
+            if (table === 'profiles') return { select: selectProfileMock };
+            if (table === 'accounts') return { select: selectAccountMock };
+            return {};
+        });
+
+        // No phone number yet — provisioning still pending (e.g. provider
+        // provisioning is paused). There's nothing for /activation to do,
+        // so the dashboard's own ProvisioningBanner should handle this
+        // instead of a hard redirect trapping the user.
+        singleAccountMock.mockResolvedValue({ data: { onboarding_completed_at: null, provisioning_status: 'pending' } });
+
+        renderHook(() => useOnboardingGuard({ redirectToActivation: true }));
+
+        await waitFor(() => {
+            expect(singleAccountMock).toHaveBeenCalled();
+        });
+
+        expect(navigateMock).not.toHaveBeenCalled();
     });
 
     it('should NOT redirect if guard is disabled', async () => {
