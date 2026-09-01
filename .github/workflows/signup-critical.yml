@@ -79,6 +79,7 @@ jobs:
           echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
           echo "service_key=$SERVICE_KEY" >> "$GITHUB_OUTPUT"
+          printf 'CI_TEST_SECRET=%s\n' "$SERVICE_KEY" >> supabase/.env
 
       - name: Serve Edge Functions with env vars
         run: |

@@ -1054,7 +1054,7 @@ Deno.serve(async (req: Request) => {
       pmId.trim() === "pm_bypass_test" ||
       pmId.trim() === "pm_bypass_check_deploy";
     const ciAuthorization = requestedTestMode
-      ? await verifyCiTestRequest(req, supabaseServiceRoleKey)
+      ? await verifyCiTestRequest(req, Deno.env.get("CI_TEST_SECRET") || supabaseServiceRoleKey)
       : { authorized: false, runId: null, reason: "not_requested" };
 
     if (requestedTestMode && !ciAuthorization.authorized) {
