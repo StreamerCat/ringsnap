@@ -377,7 +377,7 @@ function LeadDetailPanel({ lead, onClose, onUpdated }: { lead: OutboundLead; onC
 // ── Main tab ───────────────────────────────────────────────────────────────────
 
 export function LeadsTab() {
-  const { data: leads = [], isLoading, refetch } = useAdminOutboundLeads();
+  const { data: leads = [], isLoading, error: leadsError, refetch } = useAdminOutboundLeads();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -433,6 +433,14 @@ export function LeadsTab() {
 
       {isLoading ? (
         <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-400" /></div>
+      ) : leadsError ? (
+        <div className="bg-red-950/20 border border-red-800/30 rounded-lg p-4">
+          <p className="text-red-400 text-sm font-medium">Failed to load leads</p>
+          <p className="text-red-400/70 text-xs mt-1 font-mono">{leadsError instanceof Error ? leadsError.message : String(leadsError)}</p>
+          <p className="text-gray-500 text-xs mt-2">
+            If this is a permission error, confirm the staff_read_outbound_leads RLS migration has been applied to this Supabase project.
+          </p>
+        </div>
       ) : (
         <>
           <div className="flex flex-wrap gap-2">
