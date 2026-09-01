@@ -14,56 +14,15 @@ import { createServer } from 'http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { getSortedIndexableRoutes } from './seo-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DIST_DIR = join(__dirname, '..', 'dist');
 
-// Marketing pages that should be prerendered for SEO
-const ROUTES = [
-    '/',
-    '/pricing',
-    '/difference',
-    '/plumbers',
-    '/hvac',
-    '/electricians',
-    '/roofing',
-    '/handyman',
-    '/privacy',
-    '/terms',
-    // Resource Center
-    '/resources',
-    '/resources/hvac-dispatcher-script-template',
-    '/resources/plumbing-dispatcher-script-template',
-    '/resources/electrician-call-answering-script',
-    '/resources/hvac-after-hours-answering-script',
-    '/resources/hvac-price-shopper-phone-script',
-    '/resources/hvac-emergency-call-triage',
-    '/resources/burst-pipe-call-script',
-    '/resources/sewer-backup-call-script',
-    '/resources/drain-cleaning-upsell-script',
-    '/resources/electrical-safety-triage-questions',
-    '/resources/panel-upgrade-booking-script',
-    '/resources/power-outage-call-script',
-    '/resources/missed-call-revenue-calculator',
-    '/resources/after-hours-call-calculator',
-    '/resources/service-pricing-calculator',
-    '/resources/increase-average-ticket',
-    // CRM page
-    '/crm',
-    // SEO landing pages
-    '/home-services-answering-service',
-    '/contractor-answering-service',
-    '/after-hours-answering-service',
-    '/missed-call-recovery',
-    // Comparison pages
-    '/compare',
-    '/compare/ringsnap-vs-ruby',
-    '/compare/ringsnap-vs-smith-ai',
-    '/compare/ringsnap-vs-goodcall',
-    '/compare/ai-receptionist-vs-live-answering',
-    '/compare/best-ai-receptionist-home-services',
-];
+// Single source of truth shared with scripts/generate-sitemap.js, so prerendered
+// pages and sitemap entries can never drift apart.
+const ROUTES = getSortedIndexableRoutes().map((route) => route.path);
 
 const PORT = 8787;
 const BASE_URL = `http://localhost:${PORT}`;

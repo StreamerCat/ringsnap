@@ -7,7 +7,6 @@ import { RingSnapCallToCashInteractive } from "@/components/marketing/RingSnapCa
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Phone, PhoneCall, CheckCircle2, Clock, Settings, Users, Briefcase, MessageSquare, ArrowRight } from "lucide-react";
-import { featureFlags } from "@/lib/featureFlags";
 const ContractorTestimonials = lazy(() => import("@/components/ContractorTestimonials").then(m => ({
     default: m.ContractorTestimonials
 })));
@@ -89,26 +88,22 @@ const Difference = () => {
             <meta property="og:description" content="AI answering service for HVAC, plumbing, electrical, and roofing. Answers every call, books jobs, handles emergencies 24/7." />
             <meta property="og:type" content="website" />
             <meta property="og:url" content="https://getringsnap.com/difference" />
-            <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
-            <meta property="og:image:width" content="512" />
-            <meta property="og:image:height" content="512" />
+            <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+            <meta property="og:image:width" content="1200" />
+            <meta property="og:image:height" content="630" />
             <meta property="og:image:type" content="image/png" />
             <meta property="og:site_name" content="RingSnap" />
             <meta name="twitter:card" content="summary_large_image" />
             <meta name="twitter:title" content="Why RingSnap? | AI Answering Service for Contractors" />
             <meta name="twitter:description" content="AI answering service for HVAC, plumbing, electrical &amp; roofing. Books jobs, handles emergencies 24/7." />
-            <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+            <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
-            {featureFlags.enhancedMarketingSchema && (
-                <>
-                    <script type="application/ld+json">
-                        {JSON.stringify(serviceSchema)}
-                    </script>
-                    <script type="application/ld+json">
-                        {JSON.stringify(differentiationFaqSchema)}
-                    </script>
-                </>
-            )}
+            <script type="application/ld+json">
+                {JSON.stringify(serviceSchema)}
+            </script>
+            <script type="application/ld+json">
+                {JSON.stringify(differentiationFaqSchema)}
+            </script>
         </Helmet>
 
         <SiteHeader />

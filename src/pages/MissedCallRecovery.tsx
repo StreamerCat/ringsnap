@@ -96,13 +96,16 @@ const MissedCallRecovery = () => {
         <meta property="og:description" content="Every missed call is a job your competitor just booked. RingSnap prevents missed calls for HVAC, plumbing, electrical, and roofing contractors — answers in under 2 rings, 24/7." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://getringsnap.com/missed-call-recovery" />
-        <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Missed Call Recovery for Contractors | RingSnap" />
         <meta name="twitter:description" content="Every missed call is a job your competitor just booked. RingSnap answers every call for contractors 24/7 — no more voicemail, no more lost jobs." />
-        <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
         <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>

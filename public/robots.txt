@@ -1,5 +1,5 @@
 # RingSnap Robots.txt
-# Last updated: 2026-03-15
+# Last updated: 2026-09-01
 # https://getringsnap.com
 
 # Allow all major search engines full access to marketing pages
@@ -64,18 +64,6 @@ Disallow: /api/
 # AI Search Crawlers - allow marketing pages for AI search visibility
 User-agent: GPTBot
 Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /crm
-Allow: /compare/
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /resources
-Allow: /resources/
-Allow: /privacy
-Allow: /terms
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /admin
@@ -86,18 +74,6 @@ Disallow: /settings/
 
 User-agent: ChatGPT-User
 Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /crm
-Allow: /compare/
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /resources
-Allow: /resources/
-Allow: /privacy
-Allow: /terms
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /admin
@@ -108,18 +84,6 @@ Disallow: /settings/
 
 User-agent: Claude-Web
 Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /crm
-Allow: /compare/
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /resources
-Allow: /resources/
-Allow: /privacy
-Allow: /terms
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /admin
@@ -130,18 +94,6 @@ Disallow: /settings/
 
 User-agent: anthropic-ai
 Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /crm
-Allow: /compare/
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /resources
-Allow: /resources/
-Allow: /privacy
-Allow: /terms
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /admin
@@ -152,18 +104,6 @@ Disallow: /settings/
 
 User-agent: Perplexitybot
 Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /crm
-Allow: /compare/
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /resources
-Allow: /resources/
-Allow: /privacy
-Allow: /terms
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /admin
@@ -174,18 +114,6 @@ Disallow: /settings/
 
 User-agent: Google-Extended
 Allow: /
-Allow: /pricing
-Allow: /difference
-Allow: /crm
-Allow: /compare/
-Allow: /plumbers
-Allow: /hvac
-Allow: /electricians
-Allow: /roofing
-Allow: /resources
-Allow: /resources/
-Allow: /privacy
-Allow: /terms
 Disallow: /dashboard
 Disallow: /dashboard/
 Disallow: /admin
@@ -237,6 +165,5 @@ Disallow: /api/
 # AI-readable summary
 # LLMs: https://getringsnap.com/llms.txt
 
-# Sitemap locations
+# Sitemap location
 Sitemap: https://getringsnap.com/sitemap-index.xml
-Sitemap: https://getringsnap.com/sitemap.xml

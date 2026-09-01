@@ -191,9 +191,9 @@ const Index = () => {
         <meta property="og:description" content="Stop missing calls. RingSnap answers every call for HVAC, plumbing, electrical, and roofing contractors — 24/7, after hours, in under 2 rings." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://getringsnap.com/" />
-        <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
-        <meta property="og:image:width" content="512" />
-        <meta property="og:image:height" content="512" />
+        <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
@@ -201,7 +201,7 @@ const Index = () => {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="AI Receptionist for Contractors | RingSnap" />
         <meta name="twitter:description" content="Stop missing calls. RingSnap answers every call for HVAC, plumbing, electrical, and roofing contractors — 24/7, after hours." />
-        <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
         {/* Structured Data */}
         <script type="application/ld+json">

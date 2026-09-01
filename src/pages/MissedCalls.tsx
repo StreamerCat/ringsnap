@@ -171,8 +171,11 @@ const MissedCalls = () => {
         />
         <meta
           property="og:image"
-          content="https://getringsnap.com/android-chrome-512x512.png"
+          content="https://getringsnap.com/og-image-1200x630.png"
         />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
         <meta name="twitter:card" content="summary_large_image" />
@@ -186,7 +189,7 @@ const MissedCalls = () => {
         />
         <meta
           name="twitter:image"
-          content="https://getringsnap.com/android-chrome-512x512.png"
+          content="https://getringsnap.com/og-image-1200x630.png"
         />
 
         <script type="application/ld+json">

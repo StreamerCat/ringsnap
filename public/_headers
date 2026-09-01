@@ -1,5 +1,20 @@
 # Ensure search-engine control files are always served with strict MIME types
-/sitemap.xml
+/sitemap-index.xml
+  Content-Type: application/xml; charset=utf-8
+  X-Content-Type-Options: nosniff
+  Cache-Control: public, max-age=3600
+
+/sitemap-core.xml
+  Content-Type: application/xml; charset=utf-8
+  X-Content-Type-Options: nosniff
+  Cache-Control: public, max-age=3600
+
+/sitemap-resources.xml
+  Content-Type: application/xml; charset=utf-8
+  X-Content-Type-Options: nosniff
+  Cache-Control: public, max-age=3600
+
+/sitemap-compare.xml
   Content-Type: application/xml; charset=utf-8
   X-Content-Type-Options: nosniff
   Cache-Control: public, max-age=3600
