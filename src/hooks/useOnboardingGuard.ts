@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { featureFlags } from '@/lib/featureFlags';
+import { isProvisioned } from '@/lib/billing/dashboardPlans';
 
 interface OnboardingGuardState {
     isLoading: boolean;
@@ -72,11 +73,25 @@ export function useOnboardingGuard(options: UseOnboardingGuardOptions = {}): Onb
             // Get account onboarding state
             const { data: account } = await supabase
                 .from('accounts')
-                .select('onboarding_completed_at')
+                .select('onboarding_completed_at, provisioning_status, vapi_phone_number')
                 .eq('id', profile.account_id)
                 .single();
 
             const isComplete = !!account?.onboarding_completed_at;
+
+            // A phone number must actually be provisioned before there's
+            // anything for the user to do in /activation (test call,
+            // forwarding). While provisioning is pending/paused (or failed),
+            // send them into the dashboard instead — it already renders
+            // ProvisioningBanner / AgentActivationPending for those states.
+            // Forcing /activation here would trap the user: it has no real
+            // number to test against, and its own "skip"/"continue" actions
+            // never set onboarding_completed_at, so they'd just bounce back.
+            // Uses the same isProvisioned() check as the dashboard itself so a
+            // legacy-provisioned account (vapi_phone_number set, but
+            // provisioning_status not yet synced to 'completed') isn't
+            // wrongly treated as unprovisioned.
+            const hasProvisionedNumber = account ? isProvisioned(account) : false;
 
             setState({
                 isLoading: false,
@@ -86,7 +101,7 @@ export function useOnboardingGuard(options: UseOnboardingGuardOptions = {}): Onb
             });
 
             // Handle redirects based on options
-            if (redirectToActivation && !isComplete && featureFlags.onboardingGuardEnabled) {
+            if (redirectToActivation && !isComplete && hasProvisionedNumber && featureFlags.onboardingGuardEnabled) {
                 navigate('/activation', { replace: true });
             }
 
