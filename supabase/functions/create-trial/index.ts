@@ -49,6 +49,7 @@ import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
 import { isVapiProvisioningEnabled } from "../_shared/provisioning-switch.ts";
+import { verifyCiTestRequest } from "../_shared/ci-test-auth.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import {
   sendSignupFailureNotifications,
@@ -1042,16 +1043,45 @@ Deno.serve(async (req: Request) => {
 
     // ═══════════════════════════════════════════════════════════════
     // ═══════════════════════════════════════════════════════════════
-    // DETERMINE MODE (Live vs Test)
-    // Test mode triggers: zip code 99999, explicit bypassStripe flag, or magic payment method
+    // DETERMINE MODE (Live vs authenticated CI test)
+    // Public payload fields never authorize bypassing Stripe or rate limits.
     // ═══════════════════════════════════════════════════════════════
     const pmId = data.paymentMethodId || "";
 
-    // Test mode: Zip 99999 triggers full test flow (no real Stripe, Twilio test creds)
-    const isTestMode = data.zipCode === "99999";
+    const requestedTestMode =
+      data.zipCode === "99999" ||
+      data.bypassStripe === true ||
+      pmId.trim() === "pm_bypass_test" ||
+      pmId.trim() === "pm_bypass_check_deploy";
+    const ciAuthorization = requestedTestMode
+      ? await verifyCiTestRequest(req, Deno.env.get("CI_TEST_SECRET") || supabaseServiceRoleKey)
+      : { authorized: false, runId: null, reason: "not_requested" };
 
-    // Bypass mode: Skip Stripe (used by test mode or explicit bypass)
-    const isBypassMode = isTestMode || data.bypassStripe === true || pmId.trim() === "pm_bypass_test" || pmId.trim() === "pm_bypass_check_deploy";
+    if (requestedTestMode && !ciAuthorization.authorized) {
+      logWarn("Rejected unauthorized trial bypass attempt", {
+        ...baseLogOptions,
+        context: {
+          reason: ciAuthorization.reason ?? "not_authorized",
+          hasBypassFlag: data.bypassStripe === true,
+          hasTestZip: data.zipCode === "99999",
+          hasTestPaymentMethod: pmId.startsWith("pm_bypass"),
+        },
+      });
+      captureCreateTrialException(
+        new Error("Unauthorized trial bypass attempt"),
+        "validation_test_mode_auth",
+        data.email ?? "anonymous",
+        { user_email: data.email },
+      );
+      return new Response(
+        JSON.stringify({ error: "Invalid payment method", code: "INVALID_PAYMENT_METHOD" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const isCiTestRequest = requestedTestMode && ciAuthorization.authorized;
+    const isTestMode = isCiTestRequest && data.zipCode === "99999";
+    const isBypassMode = isCiTestRequest;
 
     // Outbound checkout mode: the prospect already completed a hosted Stripe Checkout
     // (card collected there, not on the call — see agent-trial-checkout). Adopt the
@@ -1615,7 +1645,16 @@ Deno.serve(async (req: Request) => {
           company_name: data.companyName,
           trade: data.trade,
           source: data.source,
-        }
+        },
+        ...(isCiTestRequest
+          ? {
+              app_metadata: {
+                is_ci_test: true,
+                ci_run_id: ciAuthorization.runId,
+                ci_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+              },
+            }
+          : {}),
       });
 
       if (userError) {
@@ -1771,6 +1810,10 @@ Deno.serve(async (req: Request) => {
       authUserLookup?.user?.user_metadata && typeof authUserLookup.user.user_metadata === "object"
         ? authUserLookup.user.user_metadata
         : {};
+    const existingAppMetadata =
+      authUserLookup?.user?.app_metadata && typeof authUserLookup.user.app_metadata === "object"
+        ? authUserLookup.user.app_metadata
+        : {};
 
     await supabase.auth.admin.updateUserById(currentUserId, {
       user_metadata: {
@@ -1783,7 +1826,18 @@ Deno.serve(async (req: Request) => {
         source: data.source,
         account_id: currentAccountId,
         account_created_at: new Date().toISOString(),
-      }
+      },
+      ...(isCiTestRequest
+        ? {
+            app_metadata: {
+              ...existingAppMetadata,
+              is_ci_test: true,
+              ci_run_id: ciAuthorization.runId,
+              ci_account_id: currentAccountId,
+              ci_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            },
+          }
+        : {}),
     });
 
     // Unified result object for downstream logging
@@ -2038,60 +2092,24 @@ Deno.serve(async (req: Request) => {
 
     if (isTestMode) {
       // ═══════════════════════════════════════════════════════════════
-      // TEST MODE: Shared Demo Bundle - NO Twilio/Vapi API calls
-      // Uses pre-provisioned real resources and mirrors LIVE DB structure
+      // AUTHENTICATED CI TEST MODE: isolated mock resources only.
+      // Never attach shared or live Twilio/Vapi resources to synthetic accounts.
       // ═══════════════════════════════════════════════════════════════
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=test_mode_demo_bundle`);
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=ci_test_mock_provisioning`);
 
-      // Load demo bundle environment variables
-      const demoTwilioNumber = Deno.env.get("RINGSNAP_DEMO_TWILIO_NUMBER");
-      const demoTwilioPhoneSid = Deno.env.get("RINGSNAP_DEMO_TWILIO_PHONE_SID");
-      const demoVapiPhoneId = Deno.env.get("RINGSNAP_DEMO_VAPI_PHONE_ID");
-      const demoVapiAssistantId = Deno.env.get("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
-      const allowFallback = Deno.env.get("RINGSNAP_ALLOW_DEMO_FALLBACK") === "true";
-
-      // Validate all demo bundle env vars are present
-      const hasMissingVars = !demoTwilioNumber || !demoTwilioPhoneSid || !demoVapiPhoneId || !demoVapiAssistantId;
-
-      if (hasMissingVars) {
-        const missing = [];
-        if (!demoTwilioNumber) missing.push("RINGSNAP_DEMO_TWILIO_NUMBER");
-        if (!demoTwilioPhoneSid) missing.push("RINGSNAP_DEMO_TWILIO_PHONE_SID");
-        if (!demoVapiPhoneId) missing.push("RINGSNAP_DEMO_VAPI_PHONE_ID");
-        if (!demoVapiAssistantId) missing.push("RINGSNAP_DEMO_VAPI_ASSISTANT_ID");
-
-        const errorMsg = `TEST MODE ERROR: Missing demo bundle env vars: ${missing.join(", ")}`;
-        stepError("demo_bundle_env_validation", baseStepContext(), new Error(errorMsg), {
-          phase: "demo_bundle_env_validation",
-        });
-        logError(errorMsg, { ...baseLogOptions, accountId: currentAccountId });
-
-        // Only allow fallback if explicitly enabled via env var (for local dev only)
-        if (!allowFallback) {
-          throw new Error(
-            `Demo bundle not configured. Set the following Supabase secrets: ${missing.join(", ")}. ` +
-            `Or set RINGSNAP_ALLOW_DEMO_FALLBACK=true to use mock values (not recommended for production).`
-          );
-        }
-
-        console.log(`[${FUNCTION_NAME}] RINGSNAP_ALLOW_DEMO_FALLBACK=true - using mock values (LOCAL DEV ONLY)`);
-      }
-
-      // Use demo bundle values (or fallback if explicitly allowed)
-      const phoneNumber = demoTwilioNumber || "+15005550006";
-      const twilioPhoneSid = demoTwilioPhoneSid || `PN_test_${Date.now()}`;
-      const vapiPhoneId = demoVapiPhoneId || `vapi_phone_test_${Date.now()}`;
-      const vapiAssistantId = demoVapiAssistantId || `vapi_assistant_test_${Date.now()}`;
+      const phoneSuffix = crypto.getRandomValues(new Uint32Array(1))[0] % 10_000;
+      const phoneNumber = `+1500555${phoneSuffix.toString().padStart(4, "0")}`;
+      const vapiPhoneId = `vapi_phone_ci_${ciAuthorization.runId}_${crypto.randomUUID()}`;
+      const vapiAssistantId = `vapi_assistant_ci_${ciAuthorization.runId}_${crypto.randomUUID()}`;
       const areaCode = phoneNumber.slice(2, 5); // Extract area code from E.164
 
-      logInfo("TEST MODE: Using shared demo bundle", {
+      logInfo("CI TEST MODE: Using isolated mock resources", {
         ...baseLogOptions,
         accountId: currentAccountId,
         context: {
           zipCode: data.zipCode,
-          demoPhoneNumber: phoneNumber,
-          hasDemoBundle: !hasMissingVars,
-          usingFallback: hasMissingVars && allowFallback,
+          mockPhoneNumber: phoneNumber,
+          ciRunId: ciAuthorization.runId,
         },
       });
 
@@ -2129,8 +2147,8 @@ Deno.serve(async (req: Request) => {
           vapi_assistant_id: vapiAssistantId,
           config: {
             id: vapiAssistantId,
-            name: "Demo Assistant",
-            description: "Shared demo assistant for test accounts",
+            name: "CI Test Assistant",
+            description: "Isolated mock assistant for an authenticated CI test account",
             isTestAssistant: true,
           },
           // is_test_assistant: true, // Add once migration is applied
@@ -2171,7 +2189,7 @@ Deno.serve(async (req: Request) => {
           }).eq("id", currentUserId);
         }
 
-        logInfo("TEST MODE: Demo bundle provisioning completed successfully", {
+        logInfo("CI TEST MODE: Mock provisioning completed successfully", {
           ...baseLogOptions,
           accountId: currentAccountId,
           context: {
@@ -2329,44 +2347,45 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Signup notifications are tied to core account creation, not downstream
-    // provisioning availability.
-    supabase.functions.invoke("send-welcome-email", {
-      body: {
+    // Synthetic CI accounts must never send customer/admin notifications.
+    if (!isCiTestRequest) {
+      supabase.functions.invoke("send-welcome-email", {
+        body: {
+          email: data.email,
+          name: data.name,
+          userId: currentUserId,
+        },
+      }).catch(err => {
+        stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
+          phase: "background_notification",
+          email: maskEmailForLogs(data.email),
+        });
+        captureCreateTrialException(err, "welcome_email_background_invoke", currentUserId ?? data.email ?? "anonymous", {
+          user_email: data.email,
+          account_id: currentAccountId,
+        });
+      });
+
+      sendSignupNotifications({
         email: data.email,
         name: data.name,
+        companyName: data.companyName,
+        phone: data.phone,
+        trade: data.trade,
+        planType: data.planType,
+        source: data.source,
+        accountId: currentAccountId,
         userId: currentUserId,
-      },
-    }).catch(err => {
-      stepError("trigger_send_welcome_email_background", baseStepContext(), err, {
-        phase: "background_notification",
-        email: maskEmailForLogs(data.email),
+      }).catch(err => {
+        stepError("admin_signup_notifications_background", baseStepContext(), err, {
+          phase: "background_notification",
+        });
+        captureCreateTrialException(err, "signup_notifications_background", currentUserId ?? data.email ?? "anonymous", {
+          user_email: data.email,
+          account_id: currentAccountId,
+        });
       });
-      captureCreateTrialException(err, "welcome_email_background_invoke", currentUserId ?? data.email ?? "anonymous", {
-        user_email: data.email,
-        account_id: currentAccountId,
-      });
-    });
-
-    sendSignupNotifications({
-      email: data.email,
-      name: data.name,
-      companyName: data.companyName,
-      phone: data.phone,
-      trade: data.trade,
-      planType: data.planType,
-      source: data.source,
-      accountId: currentAccountId,
-      userId: currentUserId,
-    }).catch(err => {
-      stepError("admin_signup_notifications_background", baseStepContext(), err, {
-        phase: "background_notification",
-      });
-      captureCreateTrialException(err, "signup_notifications_background", currentUserId ?? data.email ?? "anonymous", {
-        user_email: data.email,
-        account_id: currentAccountId,
-      });
-    });
+    }
 
     phase = "done";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
@@ -2406,6 +2425,7 @@ Deno.serve(async (req: Request) => {
       vapi_assistant_id: null,
       phone_number: null,
       message: "Trial started! Your AI receptionist is being set up...",
+      ...(isCiTestRequest ? { ci_test: true, ci_run_id: ciAuthorization.runId } : {}),
     };
 
     // ═══════════════════════════════════════════════════════════════
@@ -2446,31 +2466,33 @@ Deno.serve(async (req: Request) => {
 
     console.log("[create-trial] Completed successfully", { accountId: currentAccountId });
 
-    const trialActivatedAt = new Date().toISOString();
+    if (!isCiTestRequest) {
+      const trialActivatedAt = new Date().toISOString();
 
-    // Preserve the legacy event for existing dashboards.
-    capturePostHogEvent('trial_created', currentUserId ?? data.email ?? 'anonymous', {
-      plan_key: normalizedPlanKey,
-      source_channel: data.source ?? 'website',
-      account_id: currentAccountId,
-      subscription_id: subscription.id,
-      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
-      $lib: 'edge-function',
-    });
+      // Preserve the legacy event for existing dashboards.
+      capturePostHogEvent('trial_created', currentUserId ?? data.email ?? 'anonymous', {
+        plan_key: normalizedPlanKey,
+        source_channel: data.source ?? 'website',
+        account_id: currentAccountId,
+        subscription_id: subscription.id,
+        environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+        $lib: 'edge-function',
+      });
 
-    // The notification event is server-side and awaited so a successful core
-    // signup does not depend on the browser remaining open. PostHog failure is
-    // still best-effort and never changes the signup response. The account UUID
-    // is a stable event UUID, allowing PostHog to deduplicate retries.
-    await capturePostHogEvent('trial_activated', currentUserId ?? currentAccountId, {
-      account_id: currentAccountId,
-      plan_key: normalizedPlanKey,
-      billing_status: 'trial',
-      provisioning_status: isTestMode ? 'completed' : 'pending',
-      signup_source: data.source ?? 'website',
-      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
-      created_at: trialActivatedAt,
-    }, currentAccountId);
+      // The notification event is server-side and awaited so a successful core
+      // signup does not depend on the browser remaining open. PostHog failure is
+      // still best-effort and never changes the signup response. The account UUID
+      // is a stable event UUID, allowing PostHog to deduplicate retries.
+      await capturePostHogEvent('trial_activated', currentUserId ?? currentAccountId, {
+        account_id: currentAccountId,
+        plan_key: normalizedPlanKey,
+        billing_status: 'trial',
+        provisioning_status: 'pending',
+        signup_source: data.source ?? 'website',
+        environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+        created_at: trialActivatedAt,
+      }, currentAccountId);
+    }
 
     return new Response(
       JSON.stringify(successResponse),

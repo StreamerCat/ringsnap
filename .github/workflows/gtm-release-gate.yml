@@ -12,7 +12,48 @@ permissions:
   pull-requests: read
 
 jobs:
+  pr-gate:
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build PR code
+        run: npm run build:no-prerender
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start PR preview
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 > /tmp/ringsnap-preview.log 2>&1 &
+          npx wait-on http://127.0.0.1:4173
+
+      - name: Run non-mutating PR smoke tests
+        run: npm run test:smoke:ci
+
+      - name: Upload PR test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-pr
+          path: playwright-report/
+          retention-days: 7
+
   gtm-gate:
+    if: github.event_name != 'pull_request'
     timeout-minutes: 20
     runs-on: ubuntu-latest
 
@@ -22,6 +63,8 @@ jobs:
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       RESEND_PROD_KEY: ${{ secrets.RESEND_PROD_KEY }}
       PLAYWRIGHT_BASE_URL: https://getringsnap.com
+      CI_TEST_SECRET: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CI_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +104,10 @@ jobs:
       - name: "Tier 3: Playwright Full Suite (Main/Nightly/Staging)"
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gtm-staging-gate' || github.event_name == 'workflow_dispatch'
         run: npx playwright test --project=full
+
+      - name: Clean synthetic signup records
+        if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gtm-staging-gate' || github.event_name == 'workflow_dispatch')
+        run: node scripts/cleanup-ci-test-signups.mjs --run-id=ci-${{ env.CI_TEST_RUN_ID }} --execute
 
       - name: "Tier 4: Lighthouse CI"
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'

@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { createHmac } from 'node:crypto';
 
 /**
  * E2E tests for the signup / create-trial flow.
  *
  * Covers:
  *  1. UI smoke – /start lead-capture page renders correctly
- *  2. API – create-trial edge function accepts a valid payload (bypassStripe)
+ *  2. API – create-trial accepts a valid, signed synthetic CI payload
  *  3. API – duplicate email returns a 409 / ACCOUNT_EXISTS error
  *  4. API – missing required fields are rejected (4xx validation error)
  *
@@ -35,6 +36,23 @@ function getAnonKey(): string {
         process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
         ''
     );
+}
+
+const ciSecret = process.env.CI_TEST_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const ciRunId = `ci-${process.env.CI_TEST_RUN_ID || Date.now()}`;
+
+function getSignedCiHeaders(): Record<string, string> {
+    if (!ciSecret) throw new Error('CI_TEST_SECRET or SUPABASE_SERVICE_ROLE_KEY is required');
+    const timestamp = Date.now().toString();
+    const signature = createHmac('sha256', ciSecret)
+        .update(`${ciRunId}:${timestamp}`)
+        .digest('hex');
+
+    return {
+        'x-ringsnap-ci-run-id': ciRunId,
+        'x-ringsnap-ci-timestamp': timestamp,
+        'x-ringsnap-ci-signature': signature,
+    };
 }
 
 /** Returns true if the error is a TCP-level connection failure. */
@@ -131,19 +149,21 @@ test.describe('Signup – create-trial API', () => {
     const anonKey = getAnonKey();
     const endpoint = `${supabaseUrl}/functions/v1/create-trial`;
 
-    const defaultHeaders = () => ({
+    const defaultHeaders = (signedCiRequest = false) => ({
         'Content-Type': 'application/json',
         ...(anonKey ? { Authorization: `Bearer ${anonKey}` } : {}),
+        ...(signedCiRequest ? getSignedCiHeaders() : {}),
     });
 
     test('create-trial accepts valid payload with bypassStripe', async ({ request }) => {
+        test.skip(!ciSecret, 'Signed CI credentials are not configured');
         const timestamp = Date.now();
         const testEmail = `e2e-trial-${timestamp}@getringsnap.com`;
 
         let response: Awaited<ReturnType<typeof request.post>>;
         try {
             response = await request.post(endpoint, {
-                headers: defaultHeaders(),
+                headers: defaultHeaders(true),
                 data: {
                     name: 'E2E Test User',
                     email: testEmail,
@@ -166,26 +186,18 @@ test.describe('Signup – create-trial API', () => {
             throw err;
         }
 
-        // Should not be a hard 404 (function not deployed)
-        expect(response.status()).not.toBe(404);
-
         const body = await response.json().catch(() => null);
-
-        if (response.ok()) {
-            // Happy-path: account created
-            expect(body).toHaveProperty('success', true);
-            expect(body).toHaveProperty('account_id');
-            expect(typeof body.account_id).toBe('string');
-            expect(body.account_id.length).toBeGreaterThan(0);
-        } else {
-            // Function is deployed but returned a non-2xx status.
-            // Accept any structured error (env-var missing, Stripe not bypassed, etc.)
-            // – just assert it's not a deploy 404.
-            expect([400, 401, 409, 422, 500]).toContain(response.status());
-        }
+        expect(response.status(), JSON.stringify(body)).toBe(200);
+        expect(body).toHaveProperty('success', true);
+        expect(body).toHaveProperty('ci_test', true);
+        expect(body).toHaveProperty('ci_run_id', ciRunId);
+        expect(body).toHaveProperty('account_id');
+        expect(typeof body.account_id).toBe('string');
+        expect(body.account_id.length).toBeGreaterThan(0);
     });
 
     test('create-trial rejects duplicate email with 409', async ({ request }) => {
+        test.skip(!ciSecret, 'Signed CI credentials are not configured');
         const timestamp = Date.now();
         const testEmail = `e2e-dup-${timestamp}@getringsnap.com`;
 
@@ -207,7 +219,7 @@ test.describe('Signup – create-trial API', () => {
         let first: Awaited<ReturnType<typeof request.post>>;
         try {
             first = await request.post(endpoint, {
-                headers: defaultHeaders(),
+                headers: defaultHeaders(true),
                 data: commonPayload,
             });
         } catch (err) {
@@ -218,22 +230,17 @@ test.describe('Signup – create-trial API', () => {
             throw err;
         }
 
-        expect(first.status()).not.toBe(404);
-
-        if (!first.ok()) {
-            // Cannot create the first account (env issue); skip duplicate check
-            return;
-        }
+        const firstBody = await first.json().catch(() => null);
+        expect(first.status(), JSON.stringify(firstBody)).toBe(200);
+        expect(firstBody).toHaveProperty('ci_test', true);
 
         // Second call – same email should be rejected
         const second = await request.post(endpoint, {
-            headers: defaultHeaders(),
+            headers: defaultHeaders(true),
             data: { ...commonPayload, name: 'E2E Dup User 2' },
         });
 
-        // Expect conflict (409) or a similar client error
-        expect(second.status()).toBeGreaterThanOrEqual(400);
-        expect(second.status()).toBeLessThan(500);
+        expect(second.status()).toBe(409);
 
         const body = await second.json().catch(() => null);
         if (body) {
