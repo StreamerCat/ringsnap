@@ -1751,15 +1751,16 @@ Deno.serve(async (req: Request) => {
 
         // Filter for jobs that have passed their backoff period
         const readyRetries = failedJobs.filter((job: any) => {
+          // Test-mode jobs skip backoff delay entirely (checked first so it
+          // isn't shadowed by a populated retry_after).
+          if (job.test_mode) return true;
+
           if (job.retry_after) {
             return new Date(job.retry_after).getTime() <= now;
           }
 
           // If no updated_at, assume ready
           if (!job.updated_at) return true;
-
-          // Test-mode jobs skip backoff delay entirely
-          if (job.test_mode) return true;
 
           const lastUpdate = new Date(job.updated_at).getTime();
           const attempts = job.attempts || 0;
