@@ -50,7 +50,7 @@ describe('Go-live contract checks (edge functions + schema map)', () => {
   });
 
   it('enforces one active provisioning job per account and type', () => {
-    const migration = read('supabase/migrations/20260831150000_durable_provisioning_job_uniqueness.sql');
+    const migration = read('supabase/migrations/20260831143135_durable_provisioning_job_uniqueness.sql');
 
     expect(migration).toContain('CREATE UNIQUE INDEX');
     expect(migration).toContain('(account_id, job_type)');

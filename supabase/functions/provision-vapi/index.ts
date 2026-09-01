@@ -1545,16 +1545,12 @@ Deno.serve(async (req: Request) => {
     // after the switch is removed.
     // Fail closed: a missing or malformed switch must never spend provider
     // resources. Operations explicitly sets this to "true" to resume.
-    if (Deno.env.get("ENABLE_VAPI_PROVISIONING") !== "true") {
-      logInfo("Provisioning paused by environment switch", baseLogOptions);
-      return new Response(
-        JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
+    // Test-mode/mock-provider jobs never call the real provider, so they are
+    // exempt from the switch (this is what lets CI exercise the pipeline
+    // while production provisioning stays paused).
+    const provisioningPaused = Deno.env.get("ENABLE_VAPI_PROVISIONING") !== "true";
+    const provisioningEnabled = !provisioningPaused;
+    const isProvisionableWhilePaused = (j: any) => !!(j?.test_mode || j?.test_config?.mock_provider);
 
     // Check for direct invocation payload (e.g. from create-trial)
     let payload: any = {};
@@ -1621,6 +1617,14 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({ message: "Job already completed", job }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!provisioningEnabled && !isProvisionableWhilePaused(job)) {
+        logInfo("Provisioning paused by environment switch", baseLogOptions);
+        return new Response(
+          JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
@@ -1751,6 +1755,28 @@ Deno.serve(async (req: Request) => {
 
         // Add ready retries to batch until full
         jobsToProcess = [...jobsToProcess, ...readyRetries.slice(0, remainingSlots)];
+      }
+    }
+
+    if (!provisioningEnabled) {
+      const pausedCount = jobsToProcess.filter((j: any) => !isProvisionableWhilePaused(j)).length;
+      jobsToProcess = jobsToProcess.filter(isProvisionableWhilePaused);
+
+      if (pausedCount > 0) {
+        logInfo("Provisioning paused by environment switch", {
+          ...baseLogOptions,
+          context: { paused: true, skipped: pausedCount },
+        });
+      }
+
+      if (jobsToProcess.length === 0) {
+        return new Response(
+          JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
