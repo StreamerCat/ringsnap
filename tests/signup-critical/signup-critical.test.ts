@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { createHmac } from 'node:crypto';
 
 // Configuration
 const SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
@@ -19,11 +20,48 @@ const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 describe('Signup Critical Path Guardrails', () => {
     const timestamp = Date.now();
     const testEmail = `critical-test-${timestamp}@example.com`;
+    const ciRunId = `local-critical-${timestamp}`;
     let accountId: string;
+
+    const ciHeaders = () => {
+        const requestTimestamp = Date.now().toString();
+        const signature = createHmac('sha256', SUPABASE_SERVICE_ROLE_KEY)
+            .update(`${ciRunId}:${requestTimestamp}`)
+            .digest('hex');
+
+        return {
+            'x-ringsnap-ci-run-id': ciRunId,
+            'x-ringsnap-ci-timestamp': requestTimestamp,
+            'x-ringsnap-ci-signature': signature,
+        };
+    };
+
+    it('0. rejects unsigned bypass attempts', async () => {
+        const { error } = await anonClient.functions.invoke('create-trial', {
+            body: {
+                name: 'Unauthorized Test User',
+                email: `unauthorized-${timestamp}@example.com`,
+                phone: '5551234567',
+                companyName: 'Unauthorized Test Co',
+                trade: 'Plumbing',
+                planType: 'professional',
+                paymentMethodId: 'pm_bypass_test',
+                bypassStripe: true,
+                zipCode: '99999',
+                source: 'website',
+            },
+        });
+
+        expect(error).toBeDefined();
+        if (error && 'context' in error && error.context instanceof Response) {
+            expect(error.context.status).toBe(403);
+        }
+    });
 
     it('1. create-trial bypass mode works', async () => {
         // Call the edge function directly
         const { data, error } = await anonClient.functions.invoke('create-trial', {
+            headers: ciHeaders(),
             body: {
                 name: 'Critical Test User',
                 email: testEmail,
@@ -82,6 +120,7 @@ describe('Signup Critical Path Guardrails', () => {
     it('3. create-trial existing user returns 409', async () => {
         // Try to create the same user again
         const { data, error } = await anonClient.functions.invoke('create-trial', {
+            headers: ciHeaders(),
             body: {
                 name: 'Critical Test User Duplicate',
                 email: testEmail,

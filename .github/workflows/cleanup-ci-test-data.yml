@@ -1,0 +1,26 @@
+name: Cleanup Expired CI Test Data
+
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Delete expired authenticated CI accounts
+        run: node scripts/cleanup-ci-test-signups.mjs --expired-hours=24 --execute
