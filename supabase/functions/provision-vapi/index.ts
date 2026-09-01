@@ -40,6 +40,7 @@ import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { trackEvent } from "../_shared/analytics.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import { getLiveCallModel } from "../_shared/live-call-model.ts";
+import { isVapiProvisioningEnabled } from "../_shared/provisioning-switch.ts";
 
 /** Best-effort PostHog server-side event capture. Never throws. */
 async function capturePostHog(event: string, distinctId: string, props: Record<string, unknown>): Promise<void> {
@@ -1542,14 +1543,16 @@ Deno.serve(async (req: Request) => {
 
     // A provider outage must pause consumption, not discard provisioning
     // intent or burn retry attempts. Queued jobs resume on the next cron tick
-    // after the switch is removed.
-    // Fail closed: a missing or malformed switch must never spend provider
-    // resources. Operations explicitly sets this to "true" to resume.
+    // after the switch is removed. See isVapiProvisioningEnabled for the
+    // fail-closed env var + PostHog flag logic.
     // Test-mode/mock-provider jobs never call the real provider, so they are
     // exempt from the switch (this is what lets CI exercise the pipeline
     // while production provisioning stays paused).
-    const provisioningPaused = Deno.env.get("ENABLE_VAPI_PROVISIONING") !== "true";
-    const provisioningEnabled = !provisioningPaused;
+    const provisioningEnabled = await isVapiProvisioningEnabled(
+      "provision-vapi-worker",
+      baseLogOptions,
+    );
+    const provisioningPaused = !provisioningEnabled;
     const isProvisionableWhilePaused = (j: any) => !!(j?.test_mode || j?.test_config?.mock_provider);
 
     // Check for direct invocation payload (e.g. from create-trial)
