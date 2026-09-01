@@ -106,6 +106,38 @@ describe('useOnboardingGuard', () => {
         expect(navigateMock).not.toHaveBeenCalled();
     });
 
+    it('should redirect to /activation for a legacy-provisioned account even if provisioning_status has not synced to completed', async () => {
+        (supabase.auth.getUser as any).mockResolvedValue({ data: { user: { id: 'user123' } } });
+
+        const singleAccountMock = vi.fn();
+        const eqAccountMock = vi.fn().mockReturnValue({ single: singleAccountMock });
+        const selectAccountMock = vi.fn().mockReturnValue({ eq: eqAccountMock });
+
+        const singleProfileMock = vi.fn().mockResolvedValue({ data: { account_id: 'acc123' } });
+        const eqProfileMock = vi.fn().mockReturnValue({ single: singleProfileMock });
+        const selectProfileMock = vi.fn().mockReturnValue({ eq: eqProfileMock });
+
+        (supabase.from as any).mockImplementation((table: string) => {
+            if (table === 'profiles') return { select: selectProfileMock };
+            if (table === 'accounts') return { select: selectAccountMock };
+            return {};
+        });
+
+        // Real number is live on the account (vapi_phone_number set) even
+        // though provisioning_status is still 'pending' — a stale/desynced
+        // status shouldn't hide a genuinely provisioned account from
+        // activation.
+        singleAccountMock.mockResolvedValue({
+            data: { onboarding_completed_at: null, provisioning_status: 'pending', vapi_phone_number: '+15551234567' },
+        });
+
+        renderHook(() => useOnboardingGuard({ redirectToActivation: true }));
+
+        await waitFor(() => {
+            expect(navigateMock).toHaveBeenCalledWith('/activation', { replace: true });
+        });
+    });
+
     it('should NOT redirect if guard is disabled', async () => {
         // Disable guard
         (featureFlags as any).onboardingGuardEnabled = false;
