@@ -13,7 +13,7 @@
  * Sync mode (POST {"action":"sync","dryRun":true|false}, requires the
  * x-vapi-secret header matching VAPI_TOOL_SECRET): idempotently wires the
  * Sarah assistant's Vapi tools —
- *      create_agent_trial -> agent-trial-checkout
+ *      create_agent_trial -> create-agent-trial
  *      send_link          -> send-outbound-link
  *      add_to_dnc         -> add-outbound-dnc
  *      end_call           -> built-in endCall tool
@@ -69,33 +69,28 @@ function desiredFunctionTools(functionsBase: string, authHeader: string, toolSec
       function: {
         name: "create_agent_trial",
         description:
-          "Create a 3-day free-trial Stripe checkout for the prospect and text them the secure signup link. Use once the prospect agrees to try RingSnap and has shared their mobile number.",
+          "Create a real 3-day RingSnap trial for the prospect right now — NO card required. Use once the prospect agrees to try RingSnap live on the call. They'll get a welcome email with dashboard access and a working phone number within minutes; a card can be added later from the dashboard before the trial ends.",
         parameters: {
           type: "object",
           properties: {
             contactName: { type: "string", description: "Prospect's full name" },
-            contactEmail: { type: "string", description: "Prospect's email address, if shared" },
-            contactMobile: { type: "string", description: "Prospect's mobile number to text the checkout link to" },
+            contactEmail: { type: "string", description: "Prospect's email address — required, used to create their account login" },
+            contactMobile: { type: "string", description: "Prospect's mobile number" },
             businessName: { type: "string", description: "Prospect's business name" },
             city: { type: "string", description: "Prospect's city, as confirmed or corrected on the call" },
             state: { type: "string", description: "Prospect's US state (2-letter code or full name), as confirmed or corrected on the call" },
-            planKey: {
-              type: "string",
-              enum: ["night_weekend", "lite", "core", "pro"],
-              description: "Plan for the trial. Defaults to core if omitted.",
-            },
           },
-          required: ["contactMobile"],
+          required: ["contactMobile", "contactEmail", "businessName"],
         },
       },
-      server: server("agent-trial-checkout"),
+      server: server("create-agent-trial"),
     },
     {
       type: "function",
       function: {
         name: "send_link",
         description:
-          "Text the prospect the generic getringsnap.com/start signup link. Use when they want to sign up later on their own rather than through a checkout link.",
+          "Text the prospect the generic getringsnap.com/start signup link. Use ONLY when they do NOT accept a trial live on the call and ask to be sent something to sign up on their own later — not as a follow-up to create_agent_trial.",
         parameters: {
           type: "object",
           properties: {

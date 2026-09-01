@@ -130,7 +130,7 @@ verify_jwt = false
 # Vapi sends x-vapi-secret, which the functions check against the
 # VAPI_TOOL_SECRET Supabase secret (fail closed).
 
-[functions.agent-trial-checkout]
+[functions.create-agent-trial]
 verify_jwt = true
 
 [functions.send-outbound-link]
@@ -141,6 +141,11 @@ verify_jwt = true
 
 [functions.outbound-audit]
 verify_jwt = true
+
+# Cardless-trial expiry sweep — pg_cron calls this without a user session;
+# gated by x-cron-secret like trigger-outbound-calls, not by verify_jwt.
+[functions.pause-expired-cardless-trials]
+verify_jwt = false
 
 # Admin dashboard only (staff-authenticated users, not Vapi) — checks
 # staff_roles itself, see the function for the auth pattern.

@@ -49,6 +49,13 @@ serve(async (req) => {
             },
         });
 
+        // Lets pause-expired-cardless-trials know this account added a card
+        // before its trial expired, without needing to call Stripe per account.
+        await supabaseClient
+            .from('accounts')
+            .update({ trial_payment_method_added: true })
+            .eq('id', account_id);
+
         return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
