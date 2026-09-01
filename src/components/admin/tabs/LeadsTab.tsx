@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAdminOutboundLeads,
+  useAdminOutboundLeadsTrueCount,
   useAdminOutboundCallLog,
   useAdminOutboundCheckoutLog,
   useAdminOutboundPipelineHealth,
@@ -378,6 +379,13 @@ function LeadDetailPanel({ lead, onClose, onUpdated }: { lead: OutboundLead; onC
 
 export function LeadsTab() {
   const { data: leads = [], isLoading, error: leadsError, refetch } = useAdminOutboundLeads();
+  // RLS filters rows silently rather than erroring — a missing/broken
+  // staff-read policy on outbound_leads looks identical to "table is
+  // genuinely empty" from this query alone. Only check once we've actually
+  // loaded zero rows with no query error, to catch that case specifically.
+  const checkTrueCount = !isLoading && !leadsError && leads.length === 0;
+  const { data: trueCount } = useAdminOutboundLeadsTrueCount(checkTrueCount);
+  const rlsMismatch = checkTrueCount && typeof trueCount === "number" && trueCount > 0;
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -427,6 +435,20 @@ export function LeadsTab() {
         <h1 className="text-xl font-semibold text-gray-100">Outbound Leads</h1>
         <p className="text-sm text-gray-500 mt-0.5">{leads.length} total leads</p>
       </div>
+
+      {rlsMismatch && (
+        <div className="bg-amber-950/20 border border-amber-800/30 rounded-lg p-4">
+          <p className="text-amber-400 text-sm font-medium">
+            {trueCount} lead{trueCount === 1 ? "" : "s"} exist in Supabase but none are visible here
+          </p>
+          <p className="text-gray-500 text-xs mt-1">
+            The query succeeded with zero rows — that's what a missing or broken RLS policy looks like (Postgres
+            filters rows silently rather than erroring). Confirm the <code className="text-gray-400">staff_read_outbound_leads</code> policy
+            from <code className="text-gray-400">20260901203226_outbound_leads_staff_access.sql</code> has actually
+            been applied to this Supabase project.
+          </p>
+        </div>
+      )}
 
       <PipelineHealthCard />
       <ImportPanel onImported={() => refetch()} />

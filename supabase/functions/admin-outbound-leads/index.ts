@@ -9,8 +9,12 @@
  * directly through RLS (see 20260901203226_outbound_leads_staff_access.sql)
  * and do not go through this function.
  *
- * Body: { action: "import" | "update" | "bulk_schedule" | "trigger_dial_batch" | "run_tool_sync", ... }
+ * Body: { action: "import" | "update" | "bulk_schedule" | "trigger_dial_batch" | "run_tool_sync" | "diagnostics", ... }
  *
+ * - diagnostics: {} — returns the true lead count via the service-role
+ *     client (bypasses RLS), so the dashboard can detect a missing/broken
+ *     staff-read RLS policy (which manifests as a silent empty result, not
+ *     an error) instead of just "0 leads".
  * - import: { leads: Array<{ business_name?, phone, city?, state?, email?, campaign? }> }
  *     Upserts by phone (lookup-then-insert-or-update, same as add-outbound-dnc).
  * - update: { id, business_name?, city?, state?, email?, notes?, campaign?, status? }
@@ -90,6 +94,19 @@ Deno.serve(async (req: Request) => {
   const action = body.action;
 
   try {
+    if (action === "diagnostics") {
+      // Service-role count bypasses RLS entirely. Used by the dashboard to
+      // tell "table is genuinely empty" apart from "RLS is silently
+      // filtering every row" (a missing/misapplied staff_read_outbound_leads
+      // policy) — Postgres RLS default-denies by omitting rows, not by
+      // erroring, so the client-side query alone can't distinguish the two.
+      const { count, error } = await supabase
+        .from("outbound_leads")
+        .select("id", { count: "exact", head: true });
+      if (error) return json({ error: error.message }, 500);
+      return json({ totalLeads: count ?? 0 });
+    }
+
     if (action === "import") {
       const leads = Array.isArray(body.leads) ? (body.leads as ImportLeadInput[]) : [];
       if (leads.length === 0) return json({ error: "leads array required" }, 400);

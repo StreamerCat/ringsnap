@@ -435,6 +435,27 @@ export function useAdminOutboundLeads() {
   });
 }
 
+// RLS filters rows silently rather than erroring, so a missing/broken
+// staff-read policy looks identical to "table is genuinely empty" from the
+// client query alone. This calls admin-outbound-leads' service-role count
+// (bypasses RLS) so the dashboard can tell the two apart. Only meaningful
+// when the client-side query above returned zero rows — callers should
+// gate on that before enabling this.
+export function useAdminOutboundLeadsTrueCount(enabled: boolean) {
+  return useQuery<number>({
+    queryKey: ["admin-outbound-leads-true-count"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("admin-outbound-leads", {
+        body: { action: "diagnostics" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return (data?.totalLeads ?? 0) as number;
+    },
+  });
+}
+
 export interface OutboundCallLogRow {
   id: string;
   lead_id: string | null;
