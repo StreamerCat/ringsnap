@@ -33,6 +33,22 @@ import {
 type SortKey = "business_name" | "status" | "campaign" | "created_at";
 type SortDir = "asc" | "desc";
 
+// Supabase's PostgrestError (and most thrown query errors here) aren't
+// native Error instances — they're plain objects with message/details/
+// hint/code. `String(err)` on one of those just gives "[object Object]",
+// so pull the readable fields out explicitly instead.
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    const parts = [e.message, e.details, e.hint, e.code]
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (parts.length > 0) return parts.join(" — ");
+    try { return JSON.stringify(err); } catch { /* fall through */ }
+  }
+  return String(err);
+}
+
 async function callAdminOutboundLeads(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke("admin-outbound-leads", { body });
   if (error) throw error;
@@ -75,7 +91,7 @@ function PipelineHealthCard() {
         refetch();
       }
     } catch (err: unknown) {
-      toast({ title: "Sync failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: "Sync failed", description: describeError(err), variant: "destructive" });
     } finally {
       setSyncing(false);
     }
@@ -87,7 +103,7 @@ function PipelineHealthCard() {
       const result = await callAdminOutboundLeads({ action: "trigger_dial_batch" });
       toast({ title: "Dial batch triggered", description: JSON.stringify(result.result ?? result) });
     } catch (err: unknown) {
-      toast({ title: "Trigger failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: "Trigger failed", description: describeError(err), variant: "destructive" });
     } finally {
       setDialing(false);
     }
@@ -211,7 +227,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
       if (fileRef.current) fileRef.current.value = "";
       onImported();
     } catch (err: unknown) {
-      toast({ title: "Import failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: "Import failed", description: describeError(err), variant: "destructive" });
     } finally {
       setImporting(false);
     }
@@ -284,7 +300,7 @@ function LeadDetailPanel({ lead, onClose, onUpdated }: { lead: OutboundLead; onC
       toast({ title: "Notes saved" });
       onUpdated();
     } catch (err: unknown) {
-      toast({ title: "Save failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: "Save failed", description: describeError(err), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -297,7 +313,7 @@ function LeadDetailPanel({ lead, onClose, onUpdated }: { lead: OutboundLead; onC
       toast({ title: "Added to do-not-call" });
       onUpdated();
     } catch (err: unknown) {
-      toast({ title: "Failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: "Failed", description: describeError(err), variant: "destructive" });
     } finally {
       setDncing(false);
     }
@@ -458,7 +474,7 @@ export function LeadsTab() {
       ) : leadsError ? (
         <div className="bg-red-950/20 border border-red-800/30 rounded-lg p-4">
           <p className="text-red-400 text-sm font-medium">Failed to load leads</p>
-          <p className="text-red-400/70 text-xs mt-1 font-mono">{leadsError instanceof Error ? leadsError.message : String(leadsError)}</p>
+          <p className="text-red-400/70 text-xs mt-1 font-mono">{describeError(leadsError)}</p>
           <p className="text-gray-500 text-xs mt-2">
             If this is a permission error, confirm the staff_read_outbound_leads RLS migration has been applied to this Supabase project.
           </p>
