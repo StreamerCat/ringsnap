@@ -112,15 +112,15 @@ const Pricing = () => {
                 <meta property="og:description" content="Stop losing $4,200/month to missed calls. RingSnap starts at $59/mo. CRM included. 3-day free trial." />
                 <meta property="og:type" content="website" />
                 <meta property="og:url" content="https://getringsnap.com/pricing" />
-                <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
-                <meta property="og:image:width" content="512" />
-                <meta property="og:image:height" content="512" />
+                <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+                <meta property="og:image:width" content="1200" />
+                <meta property="og:image:height" content="630" />
                 <meta property="og:image:type" content="image/png" />
                 <meta property="og:site_name" content="RingSnap" />
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content="Pricing | RingSnap AI Receptionist" />
                 <meta name="twitter:description" content="AI receptionist for contractors. Starts at $59/mo. 3-day free trial. No contracts." />
-                <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+                <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
                 {featureFlags.enhancedMarketingSchema && (
                     <>

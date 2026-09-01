@@ -120,9 +120,9 @@ const CRM = () => {
         />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://getringsnap.com/crm" />
-        <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
-        <meta property="og:image:width" content="512" />
-        <meta property="og:image:height" content="512" />
+        <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
@@ -132,7 +132,7 @@ const CRM = () => {
           name="twitter:description"
           content="Every call becomes a lead. Full context. AI routing. Works with Jobber. No extra tools."
         />
-        <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
         <script type="application/ld+json">{JSON.stringify(crmSchema)}</script>
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>

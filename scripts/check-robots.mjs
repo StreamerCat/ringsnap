@@ -5,8 +5,12 @@ const robots = fs.readFileSync(robotsPath, 'utf8');
 
 const errors = [];
 
-if (!robots.includes('Sitemap: https://getringsnap.com/sitemap.xml')) {
-  errors.push('Missing sitemap directive in public/robots.txt');
+if (!robots.includes('Sitemap: https://getringsnap.com/sitemap-index.xml')) {
+  errors.push('Missing sitemap-index directive in public/robots.txt');
+}
+
+if (robots.includes('Sitemap: https://getringsnap.com/sitemap.xml')) {
+  errors.push('robots.txt still references the removed monolithic sitemap.xml');
 }
 
 const invalidLLMs = robots.split('\n').find((line) => /^\s*LLMs\s*:/i.test(line));

@@ -103,7 +103,8 @@ export const ResourceLayout = ({
               "headline": ogTitle || title,
               "description": metaDescription,
               "datePublished": article.datePublished,
-              ...(article.dateModified ? { "dateModified": article.dateModified } : {}),
+              // Every Article carries a freshness date; fall back to the publish date.
+              "dateModified": article.dateModified || article.datePublished,
               "author": {
                   "@type": "Organization",
                   "name": article.author || "RingSnap",
@@ -145,16 +146,16 @@ export const ResourceLayout = ({
                 <meta property="og:description" content={ogDescription || metaDescription} />
                 <meta property="og:type" content="article" />
                 <meta property="og:url" content={fullCanonical} />
-                <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
-                <meta property="og:image:width" content="512" />
-                <meta property="og:image:height" content="512" />
+                <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+                <meta property="og:image:width" content="1200" />
+                <meta property="og:image:height" content="630" />
                 <meta property="og:image:type" content="image/png" />
                 <meta property="og:site_name" content="RingSnap" />
 
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content={ogTitle || title} />
                 <meta name="twitter:description" content={ogDescription || metaDescription} />
-                <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+                <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
                 <script type="application/ld+json">
                     {JSON.stringify(breadcrumbSchema)}

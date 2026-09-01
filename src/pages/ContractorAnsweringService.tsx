@@ -107,13 +107,16 @@ const ContractorAnsweringService = () => {
         <meta property="og:description" content="Stop missing contractor calls. RingSnap answers every call 24/7 for HVAC, plumbing, electrical, and roofing contractors — triages emergencies and books jobs automatically." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://getringsnap.com/contractor-answering-service" />
-        <meta property="og:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta property="og:image" content="https://getringsnap.com/og-image-1200x630.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/png" />
         <meta property="og:site_name" content="RingSnap" />
 
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Contractor Answering Service | AI Phone Answering | RingSnap" />
         <meta name="twitter:description" content="Stop missing contractor calls. RingSnap answers every call 24/7 for HVAC, plumbing, electrical, and roofing contractors." />
-        <meta name="twitter:image" content="https://getringsnap.com/android-chrome-512x512.png" />
+        <meta name="twitter:image" content="https://getringsnap.com/og-image-1200x630.png" />
 
         <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
         <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>

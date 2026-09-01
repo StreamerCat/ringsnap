@@ -173,13 +173,19 @@ test.describe('SEO & Indexing', () => {
         expect(text.toLowerCase()).toContain('user-agent');
     });
 
-    test('sitemap.xml is accessible', async ({ request }) => {
-        const response = await request.get('/sitemap.xml');
-        expect(response.ok()).toBe(true);
+    test('sitemap index and segments are accessible', async ({ request }) => {
+        const indexResponse = await request.get('/sitemap-index.xml');
+        expect(indexResponse.ok()).toBe(true);
 
-        const text = await response.text();
-        expect(text).toContain('<?xml');
-        expect(text.toLowerCase()).toContain('urlset');
+        const indexText = await indexResponse.text();
+        expect(indexText).toContain('<?xml');
+        expect(indexText.toLowerCase()).toContain('sitemapindex');
+
+        for (const segment of ['sitemap-core.xml', 'sitemap-resources.xml', 'sitemap-compare.xml']) {
+            const response = await request.get(`/${segment}`);
+            expect(response.ok()).toBe(true);
+            expect((await response.text()).toLowerCase()).toContain('urlset');
+        }
     });
 
     test('homepage has essential meta content', async ({ page }) => {

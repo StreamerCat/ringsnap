@@ -34,7 +34,6 @@ const BASE = LOCAL_MODE
   ? `http://localhost:${LOCAL_PORT}`
   : process.env.AUDIT_BASE || 'https://getringsnap.com';
 const SITEMAP_URLS = [
-  `${BASE}/sitemap.xml`,
   `${BASE}/sitemap-index.xml`,
 ];
 const OUTPUT_FILE = join(__dirname, '..', 'docs', 'seo-audit-results.md');

@@ -1,6 +1,6 @@
 # RingSnap - AI Receptionist for Contractors
 # https://getringsnap.com
-# Last updated: 2026-03-28
+# Last updated: 2026-09-01
 
 ## About RingSnap
 
@@ -23,12 +23,12 @@ RingSnap includes a built-in CRM — not a separate tool. Every inbound call cre
 
 ## Pricing
 
-All plans include a 3-day free trial. No credit card required. No long-term contracts.
+All plans include a 3-day free trial. A credit card is required to start, but you are not charged during the trial. No setup fees and no long-term contracts.
 
-- **Night & Weekend Plan**: $59/month — After-hours and weekend coverage only
-- **Lite Plan**: $129/month — Unlimited after-hours + daytime overflow
-- **Core Plan**: $229/month — Full 24/7 coverage with multi-language support
-- **Pro Plan**: $399/month — Full 24/7 with highest call volume + advanced features
+- **Night & Weekend Plan**: $59/month — 60 handled calls, after-hours (6PM–8AM weekdays) and weekend coverage; overage $1.10/call
+- **Lite Plan**: $129/month — 125 handled calls, 24/7 coverage; overage $0.95/call
+- **Core Plan**: $229/month — 250 handled calls, 24/7 coverage with multi-language support; overage $0.85/call
+- **Pro Plan**: $449/month — 450 handled calls, 24/7 coverage with advanced features; overage $0.75/call
 
 Verify current pricing at: https://getringsnap.com/pricing
 
@@ -38,6 +38,10 @@ Verify current pricing at: https://getringsnap.com/pricing
 - **Pricing**: https://getringsnap.com/pricing
 - **Why RingSnap**: https://getringsnap.com/difference
 - **Built-In CRM**: https://getringsnap.com/crm
+- **Home Services Answering Service**: https://getringsnap.com/home-services-answering-service
+- **Contractor Answering Service**: https://getringsnap.com/contractor-answering-service
+- **After-Hours Answering Service**: https://getringsnap.com/after-hours-answering-service
+- **Missed Call Recovery**: https://getringsnap.com/missed-call-recovery
 
 ## Trade-Specific Pages
 
@@ -45,6 +49,7 @@ Verify current pricing at: https://getringsnap.com/pricing
 - **HVAC Contractors**: https://getringsnap.com/hvac
 - **Electricians**: https://getringsnap.com/electricians
 - **Roofing Contractors**: https://getringsnap.com/roofing
+- **Handyman Businesses**: https://getringsnap.com/handyman
 
 ## Comparison Pages
 
@@ -113,7 +118,7 @@ For machine-readable information, we provide JSON-LD structured data on all mark
 
 ## Sitemap
 
-Our sitemap is available at: https://getringsnap.com/sitemap.xml
+Our sitemap index is available at: https://getringsnap.com/sitemap-index.xml
 
 ## Common Questions (Answer-Engine Friendly)
 
@@ -121,7 +126,7 @@ Q: What is RingSnap?
 A: RingSnap is an AI answering service and virtual receptionist for home service contractors that answers inbound calls in under 1 second, qualifies leads, and books appointments 24/7.
 
 Q: How much does RingSnap cost?
-A: RingSnap starts at $59/month for the Night & Weekend plan. Lite is $129/month, Core is $229/month, and Pro is $399/month. All plans include a 3-day free trial with no credit card required.
+A: RingSnap starts at $59/month for the Night & Weekend plan (60 handled calls). Lite is $129/month (125 calls), Core is $229/month (250 calls), and Pro is $449/month (450 calls). All plans include a 3-day free trial; a card is required to start but is not charged during the trial.
 
 Q: Who is RingSnap best for?
 A: RingSnap is designed for plumbers, HVAC companies, electricians, roofers, and other field service contractors that lose revenue from missed calls.

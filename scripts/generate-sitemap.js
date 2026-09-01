@@ -84,16 +84,11 @@ const generateSitemaps = () => {
     writeToDir(publicDir, filename, content);
   }
 
-  // Also write a combined sitemap.xml for backwards compatibility
-  const combinedXml = buildUrlset(routes, currentDate);
-  writeToDir(publicDir, 'sitemap.xml', combinedXml);
-
   // Mirror to dist/ if it exists
   writeToDir(distDir, 'sitemap-index.xml', indexXml);
   for (const [filename, content] of Object.entries(sitemapFiles)) {
     writeToDir(distDir, filename, content);
   }
-  writeToDir(distDir, 'sitemap.xml', combinedXml);
 
   console.log(`\n📍 Sitemap index: ${Object.keys(sitemapFiles).length} segments`);
   console.log(`   Core URLs:      ${coreRoutes.length}`);
