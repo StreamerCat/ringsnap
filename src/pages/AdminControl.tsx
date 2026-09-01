@@ -18,6 +18,7 @@ import { BillingTab } from "@/components/admin/tabs/BillingTab";
 import { MarginsTab } from "@/components/admin/tabs/MarginsTab";
 import { TrialsTab } from "@/components/admin/tabs/TrialsTab";
 import { CallsTab } from "@/components/admin/tabs/CallsTab";
+import { LeadsTab } from "@/components/admin/tabs/LeadsTab";
 import { AlertsTab } from "@/components/admin/tabs/AlertsTab";
 import { StaffTab } from "@/components/admin/tabs/StaffTab";
 import { SettingsTab } from "@/components/admin/tabs/SettingsTab";
@@ -30,6 +31,7 @@ const TAB_COMPONENTS: Record<AdminTab, React.ComponentType> = {
   margins: MarginsTab,
   trials: TrialsTab,
   calls: CallsTab,
+  leads: LeadsTab,
   alerts: AlertsTab,
   settings: SettingsTab,
   staff: StaffTab,

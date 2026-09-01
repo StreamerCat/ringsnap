@@ -141,3 +141,8 @@ verify_jwt = true
 
 [functions.outbound-audit]
 verify_jwt = true
+
+# Admin dashboard only (staff-authenticated users, not Vapi) — checks
+# staff_roles itself, see the function for the auth pattern.
+[functions.admin-outbound-leads]
+verify_jwt = true

@@ -66,10 +66,14 @@ Deno.serve(async (req: Request) => {
   );
 
   // ── 1. Pull due leads (never touches dnc/called/checkout_sent leads) ────────
+  // scheduled_after lets the admin dashboard queue a campaign for later
+  // without new cron infrastructure — a lead with a future scheduled_after
+  // is simply skipped until this cron run's clock passes it.
   const { data: leads, error: leadsError } = await supabase
     .from("outbound_leads")
     .select("id, phone, business_name, city, state")
     .eq("status", "new")
+    .or(`scheduled_after.is.null,scheduled_after.lte.${new Date().toISOString()}`)
     .order("created_at", { ascending: true })
     .limit(batchSize);
 
