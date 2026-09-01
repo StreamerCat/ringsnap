@@ -5,6 +5,7 @@ import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { getAreaCodeFromZip, getStateFromZip } from "../_shared/area-code-lookup.ts";
+import { isVapiProvisioningEnabled } from "../_shared/provisioning-switch.ts";
 
 const FUNCTION_NAME = "create-sales-account";
 
@@ -624,14 +625,19 @@ serve(async (req) => {
     phase = "vapi_provision_start";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    // Check for VAPI kill switch
-    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+    // Check for VAPI kill switch. Shares isVapiProvisioningEnabled with
+    // create-trial/provision-vapi/finalize-trial so all signup entry points
+    // agree on provisioning state.
+    const disableVapiProvisioning = !(await isVapiProvisioningEnabled(
+      currentAccountId ?? customerInfo.email ?? "anonymous",
+      baseLogOptions,
+    ));
 
     const provisioningMessage = 'Phone number provisioning is in progress. You will be notified when your RingSnap number is ready.';
 
     if (disableVapiProvisioning) {
-      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (DISABLE_VAPI_PROVISIONING=true)`);
-      logInfo("VAPI provisioning disabled by env var", {
+      console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=vapi_skipped (provisioning paused)`);
+      logInfo("VAPI provisioning paused (env var or PostHog flag off)", {
         ...baseLogOptions,
         accountId: currentAccountId,
       });

@@ -459,6 +459,7 @@ function OnboardingChatInner() {
   const [showCustomTrade, setShowCustomTrade] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const signupRequestIdRef = useRef(crypto.randomUUID());
 
   // Get lead_id from URL, fallback to localStorage
   const LEAD_ID_KEY = 'ringsnap_signup_lead_id';
@@ -1065,6 +1066,9 @@ function OnboardingChatInner() {
       const { data: result, error: createTrialError } = await supabase.functions.invoke(
         "create-trial",
         {
+          headers: {
+            "idempotency-key": `trial-${leadData.id ?? signupRequestIdRef.current}-${data.planType}`,
+          },
           body: {
             // Required user info
             name: leadData.full_name || "Customer",
@@ -1133,9 +1137,9 @@ function OnboardingChatInner() {
       trackFunnelEvent("signup_completed", { account_id: result.accountId, email: result.email });
       trackConversion("signup", { value: 0 }); // Trial has 0 upfront value
 
-      // PostHog: checkout_completed, trial_activated, onboarding_started
+      // PostHog: checkout and onboarding UI events. trial_activated is captured
+      // exactly once by create-trial after core account creation succeeds.
       capture('checkout_completed', { plan_key: data.planType, amount: 0, trial: true });
-      capture('trial_activated', { plan_key: data.planType, signup_source: 'onboarding_chat' });
       const experimentAttribution = getExperimentAttribution(HOMEPAGE_HERO_EXPERIMENT_KEY);
       capture('trial_started', {
         plan_key: data.planType,

@@ -2,6 +2,7 @@ import { Helmet } from "react-helmet-async";
 import { lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Reveal } from "@/components/Reveal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RingSnapCallToCashInteractive } from "@/components/marketing/RingSnapCallToCashInteractive";
 import { Button } from "@/components/ui/button";
@@ -164,18 +165,18 @@ const Difference = () => {
 
                     {/* NEPQ Micro Questions */}
                     <div className="max-w-2xl mx-auto space-y-3">
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
+                        <Reveal className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                             <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-foreground">How many calls hit voicemail in a normal week?</p>
-                        </div>
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
+                        </Reveal>
+                        <Reveal delayMs={80} className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                             <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-foreground">What would it do to revenue if you answered first every time?</p>
-                        </div>
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
+                        </Reveal>
+                        <Reveal delayMs={160} className="flex items-start gap-3 p-4 rounded-2xl bg-white border">
                             <MessageSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm text-foreground">What happens when your best receptionist is busy, out, or it's after hours?</p>
-                        </div>
+                        </Reveal>
                     </div>
                 </div>
             </section>
@@ -190,9 +191,9 @@ const Difference = () => {
                     </div>
 
                     {/* Premium container for the interactive module */}
-                    <div className="card-tier-1 p-6 sm:p-10 mb-6">
+                    <Reveal className="card-tier-1 p-6 sm:p-10 mb-6">
                         <RingSnapCallToCashInteractive />
-                    </div>
+                    </Reveal>
 
                     {/* Micro trust line */}
                     <p className="text-center text-sm text-muted-foreground max-w-2xl mx-auto">
@@ -226,44 +227,50 @@ const Difference = () => {
 
                     {/* Bento Cards */}
                     <div className="grid md:grid-cols-3 gap-6 mb-10">
-                        <Card className="card-tier-2">
-                            <CardContent className="p-6 sm:p-7">
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                                    <Briefcase className="w-6 h-6 text-primary" />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2">Industry intelligence</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Learns common homeowner questions, urgency patterns, and objections using anonymized,
-                                    aggregated insights across each trade.
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <Reveal>
+                            <Card className="card-tier-2 h-full">
+                                <CardContent className="p-6 sm:p-7">
+                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                                        <Briefcase className="w-6 h-6 text-primary" />
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-2">Industry intelligence</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Learns common homeowner questions, urgency patterns, and objections using anonymized,
+                                        aggregated insights across each trade.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </Reveal>
 
-                        <Card className="card-tier-2">
-                            <CardContent className="p-6 sm:p-7">
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                                    <Settings className="w-6 h-6 text-primary" />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2">Your business intelligence</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Adapts to your service area, hours, pricing boundaries, warranties, emergency rules,
-                                    and how you want calls handled and routed.
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <Reveal delayMs={80}>
+                            <Card className="card-tier-2 h-full">
+                                <CardContent className="p-6 sm:p-7">
+                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                                        <Settings className="w-6 h-6 text-primary" />
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-2">Your business intelligence</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Adapts to your service area, hours, pricing boundaries, warranties, emergency rules,
+                                        and how you want calls handled and routed.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </Reveal>
 
-                        <Card className="card-tier-2">
-                            <CardContent className="p-6 sm:p-7">
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                                    <Users className="w-6 h-6 text-primary" />
-                                </div>
-                                <h3 className="font-bold text-lg mb-2">Caller context</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Remembers what was asked and what happened so follow ups and future calls stay
-                                    consistent, accurate, and professional.
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <Reveal delayMs={160}>
+                            <Card className="card-tier-2 h-full">
+                                <CardContent className="p-6 sm:p-7">
+                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                                        <Users className="w-6 h-6 text-primary" />
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-2">Caller context</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Remembers what was asked and what happened so follow ups and future calls stay
+                                        consistent, accurate, and professional.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </Reveal>
                     </div>
 
                     {/* Close line */}
@@ -282,22 +289,22 @@ const Difference = () => {
                     </div>
 
                     <div className="grid sm:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
+                        <Reveal className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Set your rules: hours, service area, pricing boundaries, emergency handling</p>
-                        </div>
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
+                        </Reveal>
+                        <Reveal delayMs={60} className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Define when to book and when to transfer</p>
-                        </div>
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
+                        </Reveal>
+                        <Reveal delayMs={120} className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Get clean summaries and logs for every call</p>
-                        </div>
-                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
+                        </Reveal>
+                        <Reveal delayMs={180} className="flex items-start gap-3 p-4 rounded-2xl bg-muted/50">
                             <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                             <p className="text-sm">Keep a consistent talk track across your team</p>
-                        </div>
+                        </Reveal>
                     </div>
 
                     {/* Privacy note */}

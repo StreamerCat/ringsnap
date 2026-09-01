@@ -40,6 +40,7 @@ import { getPreferredAreaCode } from "../_shared/phone-utils.ts";
 import { trackEvent } from "../_shared/analytics.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import { getLiveCallModel } from "../_shared/live-call-model.ts";
+import { isVapiProvisioningEnabled } from "../_shared/provisioning-switch.ts";
 
 /** Best-effort PostHog server-side event capture. Never throws. */
 async function capturePostHog(event: string, distinctId: string, props: Record<string, unknown>): Promise<void> {
@@ -74,6 +75,7 @@ const VAPI_API_KEY = Deno.env.get("VAPI_API_KEY");
 const VAPI_BASE_URL = "https://api.vapi.ai";
 const MAX_RETRY_ATTEMPTS = 5;
 const JOBS_PER_BATCH = 10;
+const PROCESSING_LEASE_MINUTES = 15;
 const TRIAL_DAYS = parseInt(Deno.env.get("TRIAL_DAYS") || "3", 10);
 const TRIAL_PHONE_RETENTION_DAYS = parseInt(Deno.env.get("TRIAL_PHONE_RETENTION_DAYS") || "10", 10);
 
@@ -757,11 +759,27 @@ async function processJob(job: any, supabase: any): Promise<void> {
   const provisioningStartedAt = Date.now();
 
   try {
-    // Mark job as processing
-    await supabase.from("provisioning_jobs").update({
-      status: "processing",
-      updated_at: new Date().toISOString(),
-    }).eq("id", job.id);
+    // Atomically claim the expected state. The immediate create-trial invoke
+    // and cron poller can overlap, so only one worker may process this row.
+    const { data: claimedJob, error: claimError } = await supabase
+      .from("provisioning_jobs")
+      .update({
+        status: "processing",
+        retry_after: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id)
+      .eq("status", job.status)
+      .select("id")
+      .maybeSingle();
+
+    if (claimError) {
+      throw new Error(`Failed to claim provisioning job: ${claimError.message}`);
+    }
+    if (!claimedJob) {
+      logInfo("Provisioning job already claimed by another worker", baseLogOptions);
+      return;
+    }
 
     // Track Start
     trackEvent(supabase, job.account_id, job.user_id, "provisioning_started", {
@@ -1005,6 +1023,7 @@ async function processJob(job: any, supabase: any): Promise<void> {
         const accountStatus = shouldRetry
           ? "partially_provisioned"
           : "failed_manual_action_required";
+        const retryAfter = shouldRetry ? calculateRetryDelay(newAttempts) : null;
 
         logWarn("Phone provisioning failed, assistant succeeded — partial provisioning", {
           ...baseLogOptions,
@@ -1026,11 +1045,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
           error_details: {
             message: phoneErr.message?.substring(0, 500),
             step: "phone_provisioning",
+            provider: errorCode === "TWILIO_PROVISIONING_FAILED" ? "twilio" : "vapi",
             assistant_succeeded: true,
             vapi_assistant_id: vapiAssistantId,
             timestamp: new Date().toISOString(),
           },
           provisioning_step: "phone_provisioning",
+          retry_after: retryAfter,
           updated_at: new Date().toISOString(),
         }).eq("id", job.id);
 
@@ -1233,8 +1254,12 @@ async function processJob(job: any, supabase: any): Promise<void> {
         error_code: errorCode,
         error_details: {
           message: error.message?.substring(0, 500),
+          step: "provisioning",
+          provider: errorCode.startsWith("TWILIO") ? "twilio" : "vapi",
           timestamp: new Date().toISOString(),
         },
+        provisioning_step: "provisioning",
+        retry_after: retryAfter,
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
 
@@ -1279,9 +1304,13 @@ async function processJob(job: any, supabase: any): Promise<void> {
         error_code: errorCode,
         error_details: {
           message: error.message?.substring(0, 500),
+          step: "provisioning",
+          provider: errorCode.startsWith("TWILIO") ? "twilio" : "vapi",
           timestamp: new Date().toISOString(),
           permanent: true,
         },
+        provisioning_step: "provisioning",
+        retry_after: null,
         updated_at: new Date().toISOString(),
       }).eq("id", job.id);
 
@@ -1512,6 +1541,20 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    // A provider outage must pause consumption, not discard provisioning
+    // intent or burn retry attempts. Queued jobs resume on the next cron tick
+    // after the switch is removed. See isVapiProvisioningEnabled for the
+    // fail-closed env var + PostHog flag logic.
+    // Test-mode/mock-provider jobs never call the real provider, so they are
+    // exempt from the switch (this is what lets CI exercise the pipeline
+    // while production provisioning stays paused).
+    const provisioningEnabled = await isVapiProvisioningEnabled(
+      "provision-vapi-worker",
+      baseLogOptions,
+    );
+    const provisioningPaused = !provisioningEnabled;
+    const isProvisionableWhilePaused = (j: any) => !!(j?.test_mode || j?.test_config?.mock_provider);
+
     // Check for direct invocation payload (e.g. from create-trial)
     let payload: any = {};
     try {
@@ -1580,6 +1623,14 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      if (!provisioningEnabled && !isProvisionableWhilePaused(job)) {
+        logInfo("Provisioning paused by environment switch", baseLogOptions);
+        return new Response(
+          JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       // Process immediately
       try {
         await processJob(job, supabase);
@@ -1599,12 +1650,80 @@ Deno.serve(async (req: Request) => {
     // 2. CRON POLL MODE (Prioritized)
     // --------------------------------------------------------------------------
 
+    // Recover jobs abandoned by a crashed or timed-out worker. This acts as a
+    // bounded processing lease so rows cannot remain stuck forever.
+    // While paused, real jobs must not have their retry attempts burned by
+    // recovery, so only test-mode rows are eligible.
+    const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MINUTES * 60 * 1000).toISOString();
+    let staleJobsQuery = supabase
+      .from("provisioning_jobs")
+      .select("id, account_id, attempts")
+      .eq("status", "processing")
+      .lt("updated_at", staleBefore);
+    if (provisioningPaused) {
+      staleJobsQuery = staleJobsQuery.eq("test_mode", true);
+    }
+    const { data: staleJobs, error: staleJobsError } = await staleJobsQuery.limit(JOBS_PER_BATCH);
+
+    if (staleJobsError) {
+      logWarn("Failed to inspect stale processing jobs", {
+        ...baseLogOptions,
+        error: staleJobsError,
+      });
+    } else {
+      for (const staleJob of staleJobs || []) {
+        const attempts = (staleJob.attempts || 0) + 1;
+        const shouldRetry = attempts < MAX_RETRY_ATTEMPTS;
+        const now = new Date().toISOString();
+
+        const { data: recoveredJob } = await supabase
+          .from("provisioning_jobs")
+          .update({
+            status: shouldRetry ? "failed" : "failed_permanent",
+            attempts,
+            error: "Worker did not complete before the processing lease expired",
+            error_code: "WORKER_LEASE_EXPIRED",
+            error_details: {
+              message: "Worker processing lease expired",
+              step: "worker_recovery",
+              provider: "internal",
+              timestamp: now,
+              permanent: !shouldRetry,
+            },
+            provisioning_step: "worker_recovery",
+            retry_after: shouldRetry ? calculateRetryDelay(attempts) : null,
+            updated_at: now,
+          })
+          .eq("id", staleJob.id)
+          .eq("status", "processing")
+          .select("id")
+          .maybeSingle();
+
+        if (!recoveredJob) continue;
+
+        await supabase.rpc("update_provisioning_lifecycle", {
+          p_account_id: staleJob.account_id,
+          p_status: shouldRetry ? "failed_retryable" : "failed_manual_action_required",
+          p_error: shouldRetry
+            ? `Provisioning worker timed out (attempt ${attempts}/${MAX_RETRY_ATTEMPTS})`
+            : `Provisioning worker timed out after ${MAX_RETRY_ATTEMPTS} attempts`,
+        });
+      }
+    }
+
     // Step 2a: Fetch QUEUED jobs first (High Priority - New Signups)
-    // We want to process these immediately so users don't wait
-    const { data: queuedJobs, error: queuedError } = await supabase
+    // We want to process these immediately so users don't wait.
+    // While paused, only test-mode jobs are eligible, filtered here (not
+    // after the limit) so real queued jobs ahead of them in FIFO order don't
+    // fill the whole batch and starve the test jobs behind them.
+    let queuedJobsQuery = supabase
       .from("provisioning_jobs")
       .select("*")
-      .eq("status", "queued")
+      .eq("status", "queued");
+    if (provisioningPaused) {
+      queuedJobsQuery = queuedJobsQuery.eq("test_mode", true);
+    }
+    const { data: queuedJobs, error: queuedError } = await queuedJobsQuery
       .order("created_at", { ascending: true }) // FIFO
       .limit(JOBS_PER_BATCH);
 
@@ -1619,10 +1738,14 @@ Deno.serve(async (req: Request) => {
     if (jobsToProcess.length < JOBS_PER_BATCH) {
       const remainingSlots = JOBS_PER_BATCH - jobsToProcess.length;
 
-      const { data: failedJobs, error: failedError } = await supabase
+      let failedJobsQuery = supabase
         .from("provisioning_jobs")
         .select("*")
-        .eq("status", "failed")
+        .eq("status", "failed");
+      if (provisioningPaused) {
+        failedJobsQuery = failedJobsQuery.eq("test_mode", true);
+      }
+      const { data: failedJobs, error: failedError } = await failedJobsQuery
         .order("updated_at", { ascending: true }) // Oldest failures first
         .limit(remainingSlots * 2); // Fetch extra to filter in memory
 
@@ -1631,11 +1754,16 @@ Deno.serve(async (req: Request) => {
 
         // Filter for jobs that have passed their backoff period
         const readyRetries = failedJobs.filter((job: any) => {
+          // Test-mode jobs skip backoff delay entirely (checked first so it
+          // isn't shadowed by a populated retry_after).
+          if (job.test_mode) return true;
+
+          if (job.retry_after) {
+            return new Date(job.retry_after).getTime() <= now;
+          }
+
           // If no updated_at, assume ready
           if (!job.updated_at) return true;
-
-          // Test-mode jobs skip backoff delay entirely
-          if (job.test_mode) return true;
 
           const lastUpdate = new Date(job.updated_at).getTime();
           const attempts = job.attempts || 0;
@@ -1648,6 +1776,20 @@ Deno.serve(async (req: Request) => {
         // Add ready retries to batch until full
         jobsToProcess = [...jobsToProcess, ...readyRetries.slice(0, remainingSlots)];
       }
+    }
+
+    // The queries above already restrict to test-mode rows while paused, so
+    // real jobs are left untouched in the queue rather than fetched and
+    // dropped here.
+    if (provisioningPaused && jobsToProcess.length === 0) {
+      logInfo("Provisioning paused by environment switch", baseLogOptions);
+      return new Response(
+        JSON.stringify({ message: "Provisioning paused", paused: true, processed: 0 }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     if (jobsToProcess.length === 0) {
