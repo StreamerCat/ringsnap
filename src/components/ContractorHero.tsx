@@ -153,24 +153,24 @@ export const ContractorHero = () => {
               </div>
 
               <div className="space-y-3 text-sm leading-relaxed">
-                <div>
+                <div className="hero-line" style={{ animationDelay: '150ms' }}>
                   <span className="font-semibold text-gradient-core">RingSnap:</span>
                   <span className="text-foreground/80"> Thanks for calling Summit Plumbing. How can I help?</span>
                 </div>
-                <div>
+                <div className="hero-line" style={{ animationDelay: '550ms' }}>
                   <span className="font-semibold text-foreground">Caller:</span>
                   <span className="text-foreground/80"> I have a burst pipe in the basement, water everywhere!</span>
                 </div>
-                <div>
+                <div className="hero-line" style={{ animationDelay: '950ms' }}>
                   <span className="font-semibold text-gradient-core">RingSnap:</span>
                   <span className="text-foreground/80"> That's an emergency. Turn your main shutoff valve clockwise. I'm routing our on-call tech now. What's your address?</span>
                 </div>
-                <div>
+                <div className="hero-line" style={{ animationDelay: '1400ms' }}>
                   <span className="font-semibold text-gradient-core">RingSnap:</span>
                   <span className="text-foreground/80"> Got it. You're scheduled for arrival in 45 minutes. Text confirmation sent.</span>
                 </div>
 
-                <div className="flex items-center gap-2 pt-4 border-t border-foreground/5">
+                <div className="hero-line flex items-center gap-2 pt-4 border-t border-foreground/5" style={{ animationDelay: '1750ms' }}>
                   <div className="flex items-center gap-1">
                     <div className={`w-1 h-4 gradient-core rounded ${showPulseAnimation ? 'animate-pulse' : ''}`} />
                     <div className={`w-1 h-6 gradient-core rounded ${showPulseAnimation ? 'animate-pulse' : ''}`} style={{

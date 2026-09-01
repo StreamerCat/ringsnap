@@ -2,6 +2,7 @@ import { Helmet } from "react-helmet-async";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ContractorHero } from "@/components/ContractorHero";
+import { Reveal } from "@/components/Reveal";
 import { TestimonialMetricsStrip } from "@/components/TestimonialMetricsStrip";
 import { NextStepsStrip } from "@/components/NextStepsStrip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -258,29 +259,33 @@ const Index = () => {
                 <>
                 <section className="section-spacer-compact bg-charcoal/5 border-y border-charcoal/10">
                   <div className="site-container max-w-3xl text-center">
-                    <p className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
-                      Your competitor just answered the call you missed.
-                    </p>
-                    <p className="text-lg text-muted-foreground">
-                      The average contractor misses 6 calls on a busy Saturday. At $800 per job, that's $4,800 walking out the door — every weekend.
-                    </p>
+                    <Reveal>
+                      <p className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: 'hsl(var(--charcoal))' }}>
+                        Your competitor just answered the call you missed.
+                      </p>
+                      <p className="text-lg text-muted-foreground">
+                        The average contractor misses 6 calls on a busy Saturday. At $800 per job, that's $4,800 walking out the door — every weekend.
+                      </p>
+                    </Reveal>
                   </div>
                 </section>
                 <section aria-labelledby="pricing-teaser-heading" className="section-spacer-compact bg-muted/30">
                   <div className="site-container max-w-4xl text-center">
-                    <PricingTeaserCard headingLevel="h2" />
+                    <Reveal>
+                      <PricingTeaserCard headingLevel="h2" />
+                    </Reveal>
                   </div>
                 </section>
 
                 {/* Trade-specific landing pages */}
                 <section aria-labelledby="trades-heading" className="section-spacer-compact bg-muted/30 border-t border-border/5">
                   <div className="site-container">
-                    <div className="text-center mb-6">
+                    <Reveal className="text-center mb-6">
                       <h2 id="trades-heading" className="text-2xl sm:text-3xl font-bold mb-3">Built for your trade</h2>
                       <p className="text-muted-foreground max-w-xl mx-auto text-sm">
                         RingSnap understands the calls your trade gets — emergencies, price shoppers, after-hours — and handles them the right way.
                       </p>
-                    </div>
+                    </Reveal>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
                       {[
                         { href: "/plumbers", icon: Wrench, title: "AI Receptionist for Plumbers", desc: "Burst pipes, sewer backups, after-hours emergencies — captured and dispatched every time." },
@@ -288,21 +293,22 @@ const Index = () => {
                         { href: "/electricians", icon: Zap, title: "AI Receptionist for Electricians", desc: "Safety triage, panel upgrades, power outages — every call answered and prioritized correctly." },
                         { href: "/roofing", icon: Home, title: "AI Receptionist for Roofers", desc: "Storm damage, leak calls, and new estimates — never miss a job when the weather turns." },
                         { href: "/handyman", icon: Hammer, title: "AI Receptionist for Handymen", desc: "Estimate requests, repair calls, and fix-it jobs booked while you're finishing the last one." },
-                      ].map(({ href, icon: Icon, title, desc }) => (
-                        <Link
-                          key={href}
-                          to={href}
-                          className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
-                        >
-                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Icon className="h-5 w-5 text-primary" />
-                          </div>
-                          <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
-                          <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                            See how it works <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
-                          </span>
-                        </Link>
+                      ].map(({ href, icon: Icon, title, desc }, i) => (
+                        <Reveal key={href} delayMs={i * 60}>
+                          <Link
+                            to={href}
+                            className="group card-lift flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-colors h-full"
+                          >
+                            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Icon className="h-5 w-5 text-primary" />
+                            </div>
+                            <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                              See how it works <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                            </span>
+                          </Link>
+                        </Reveal>
                       ))}
                     </div>
                   </div>
@@ -311,7 +317,7 @@ const Index = () => {
                 {/* CRM Teaser */}
                 <section className="section-spacer-compact bg-white border-t border-border/5">
                   <div className="site-container">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-2xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
+                    <Reveal className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 md:p-12 rounded-2xl bg-gradient-to-br from-primary/5 to-off-white border border-primary/10 shadow-sm">
                       <div className="max-w-2xl text-center md:text-left">
                         <h2 className="text-2xl font-bold mb-3">Not just a receptionist — a built-in CRM</h2>
                         <p className="text-muted-foreground mb-0">
@@ -326,19 +332,19 @@ const Index = () => {
                       >
                         <Link to="/crm">See the Built-In CRM</Link>
                       </Button>
-                    </div>
+                    </Reveal>
                   </div>
                 </section>
 
                 {/* Top Field Guides */}
                 <section aria-labelledby="field-guides-heading" className="section-spacer bg-white border-t border-border/5">
                   <div className="site-container">
-                    <div className="text-center mb-8">
+                    <Reveal className="text-center mb-8">
                       <h2 id="field-guides-heading" className="text-2xl sm:text-3xl font-bold mb-3">Top Field Guides for Home Service Contractors</h2>
                       <p className="text-muted-foreground max-w-2xl mx-auto">
                         Free dispatcher scripts, emergency triage guides, and revenue calculators — built for HVAC, plumbing, and electrical businesses.
                       </p>
-                    </div>
+                    </Reveal>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                       {[
                         { href: "/resources/hvac-dispatcher-script-template", icon: Thermometer, label: "HVAC", title: "HVAC Dispatcher Script Template", desc: "Copy/paste scripts for standard calls, emergencies, price shoppers, and after-hours HVAC." },
@@ -347,24 +353,25 @@ const Index = () => {
                         { href: "/resources/missed-call-revenue-calculator", icon: Calculator, label: "Calculator", title: "Missed Call Revenue Calculator", desc: "See exactly how much revenue your shop loses from unanswered calls each month." },
                         { href: "/resources/hvac-emergency-call-triage", icon: FileText, label: "HVAC", title: "HVAC Emergency Call Triage", desc: "Triage guide for gas leaks, no-heat, and AC failures — what's urgent vs can wait." },
                         { href: "/resources/electrical-safety-triage-questions", icon: FileText, label: "Electrical", title: "Electrical Safety Triage Questions", desc: "The 8 dispatcher questions that assess danger and prioritize every electrical call." },
-                      ].map(({ href, icon: Icon, label, title, desc }) => (
-                        <Link
-                          key={href}
-                          to={href}
-                          className="group flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <Icon className="h-4 w-4 text-primary" />
+                      ].map(({ href, icon: Icon, label, title, desc }, i) => (
+                        <Reveal key={href} delayMs={(i % 3) * 60}>
+                          <Link
+                            to={href}
+                            className="group card-lift flex flex-col gap-3 p-5 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-colors h-full"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <Icon className="h-4 w-4 text-primary" />
+                              </div>
+                              <span className="text-xs font-medium text-muted-foreground">{label}</span>
                             </div>
-                            <span className="text-xs font-medium text-muted-foreground">{label}</span>
-                          </div>
-                          <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
-                          <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                            Read guide <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
-                          </span>
-                        </Link>
+                            <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors leading-snug">{title}</h3>
+                            <p className="text-xs text-muted-foreground leading-relaxed flex-1">{desc}</p>
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                              Read guide <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+                            </span>
+                          </Link>
+                        </Reveal>
                       ))}
                     </div>
                     <div className="text-center">
