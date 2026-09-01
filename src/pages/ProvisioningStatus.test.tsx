@@ -146,6 +146,29 @@ describe('ProvisioningStatus redirect logic', () => {
         expect(mockNavigate).not.toHaveBeenCalled();
     });
 
+    it('confirms the trial is active while phone provisioning is pending', async () => {
+        mockAccount({
+            provisioning_status: 'pending',
+            vapi_phone_number: null,
+            vapi_assistant_id: null,
+        });
+
+        const { default: ProvisioningStatus } = await import('@/pages/ProvisioningStatus');
+        const { getByText } = render(
+            <HelmetProvider>
+                <BrowserRouter>
+                    <ProvisioningStatus />
+                </BrowserRouter>
+            </HelmetProvider>
+        );
+
+        await vi.advanceTimersByTimeAsync(100);
+
+        expect(getByText(/Your trial is active/i)).toBeInTheDocument();
+        expect(getByText(/phone setup in the background/i)).toBeInTheDocument();
+        expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
     it('redirects via legacy fallback when phone_numbers has active primary with activated_at', async () => {
         mockAccount({
             provisioning_status: 'pending',

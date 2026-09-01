@@ -15,6 +15,68 @@ describe('Go-live contract checks (edge functions + schema map)', () => {
     expect(src).toContain('pending');
     expect(src).toContain('posthog.flush()');
     expect(src).not.toContain('posthog.shutdown()');
+    expect(src).toContain('Provisioning paused; durable job remains queued');
+    expect(src).toMatch(/await capturePostHogEvent\('trial_activated'/);
+    expect(src).toContain('billing_status: \'trial\'');
+    expect(src).toContain('stripeCustomerIdempotencyKey');
+    expect(src).toContain('stripeSubscriptionIdempotencyKey');
+  });
+
+  it('the signup UI sends a stable request idempotency key', () => {
+    const frontend = read('src/pages/OnboardingChat.tsx');
+
+    expect(frontend).toContain('leadData.id ?? signupRequestIdRef.current');
+  });
+
+  it('captures trial activation only on the server after core signup', () => {
+    const backend = read('supabase/functions/create-trial/index.ts');
+    const frontend = read('src/pages/OnboardingChat.tsx');
+
+    expect(backend.match(/capturePostHogEvent\('trial_activated'/g)).toHaveLength(1);
+    expect(frontend).not.toMatch(/capture\('trial_activated'/);
+    expect(backend).toContain('}, currentAccountId);');
+  });
+
+  it('pauses queue consumption without burning retries and persists retry timing', () => {
+    const worker = read('supabase/functions/provision-vapi/index.ts');
+
+    expect(worker).toContain('isVapiProvisioningEnabled');
+    expect(worker).toContain('paused: true, processed: 0');
+    expect(worker).toContain('retry_after: retryAfter');
+    expect(worker).toContain('if (job.retry_after)');
+    expect(worker).toContain('Provisioning job already claimed by another worker');
+    expect(worker).toContain('WORKER_LEASE_EXPIRED');
+  });
+
+  it('the provisioning switch fails closed on env var and PostHog flag', () => {
+    const switchSrc = read('supabase/functions/_shared/provisioning-switch.ts');
+
+    expect(switchSrc).toContain('ENABLE_VAPI_PROVISIONING');
+    expect(switchSrc).toContain('!== "true"');
+    expect(switchSrc).toContain('vapi-provisioning-enabled');
+    expect(switchSrc).toContain('isFeatureEnabled');
+    // Every early-exit path before a successful PostHog check must return false.
+    expect(switchSrc.match(/return false;/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('every signup entry point that can enqueue provisioning shares the same switch', () => {
+    const createTrial = read('supabase/functions/create-trial/index.ts');
+    const provisionVapi = read('supabase/functions/provision-vapi/index.ts');
+    const createSalesAccount = read('supabase/functions/create-sales-account/index.ts');
+    const finalizeTrial = read('supabase/functions/finalize-trial/index.ts');
+
+    for (const src of [createTrial, provisionVapi, createSalesAccount, finalizeTrial]) {
+      expect(src).toContain('isVapiProvisioningEnabled');
+      expect(src).not.toContain('DISABLE_VAPI_PROVISIONING');
+    }
+  });
+
+  it('enforces one active provisioning job per account and type', () => {
+    const migration = read('supabase/migrations/20260831143135_durable_provisioning_job_uniqueness.sql');
+
+    expect(migration).toContain('CREATE UNIQUE INDEX');
+    expect(migration).toContain('(account_id, job_type)');
+    expect(migration).toContain("status IN ('queued', 'processing', 'failed')");
   });
 
   it('stripe-webhook enforces signature verification and idempotency persistence', () => {

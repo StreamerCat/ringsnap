@@ -52,6 +52,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { extractCorrelationId, logError, logInfo, logWarn } from "../_shared/logging.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
+import { isVapiProvisioningEnabled } from "../_shared/provisioning-switch.ts";
 
 const FUNCTION_NAME = "finalize-trial";
 
@@ -656,7 +657,13 @@ serve(async (req) => {
 
     phase = "enqueue_provisioning";
 
-    const disableVapiProvisioning = Deno.env.get("DISABLE_VAPI_PROVISIONING") === "true";
+    // Shares isVapiProvisioningEnabled with create-trial/provision-vapi/
+    // create-sales-account so all signup entry points agree on provisioning
+    // state.
+    const disableVapiProvisioning = !(await isVapiProvisioningEnabled(
+      currentAccountId ?? email ?? "anonymous",
+      baseLogOptions,
+    ));
 
     if (!disableVapiProvisioning) {
       const jobMetadata = {
