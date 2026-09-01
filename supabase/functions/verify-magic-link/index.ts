@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
-import { hashToken, isUserNotFoundError } from "../_shared/auth-utils.ts";
+import { hashToken } from "../_shared/auth-utils.ts";
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -55,18 +55,50 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Token missing email" }), { status: 500, headers: jsonHeaders });
     }
 
-    // Find existing auth user or create
-    const { data: userLookup, error: userLookupError } = await supabase.auth.admin.getUserByEmail(email);
-    if (userLookupError && !isUserNotFoundError(userLookupError)) {
-      console.error("[verify-magic-link] getUserByEmail error:", userLookupError);
-      return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
+    // Prefer the user id captured when the link was issued. For legacy
+    // tokens without a user id, fall back to the supported paginated
+    // listUsers API because Supabase Admin has no getUserByEmail method.
+    let userId: string | null = consumedRow.user_id ?? null;
+
+    if (userId) {
+      const { data: userLookup, error: userLookupError } =
+        await supabase.auth.admin.getUserById(userId);
+      if (userLookupError || !userLookup?.user) {
+        console.error("[verify-magic-link] getUserById error:", userLookupError);
+        return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
+      }
+    } else {
+      const perPage = 1000;
+      let page = 1;
+
+      while (!userId) {
+        const { data: usersPage, error: listUsersError } =
+          await supabase.auth.admin.listUsers({ page, perPage });
+
+        if (listUsersError) {
+          console.error("[verify-magic-link] listUsers error:", listUsersError);
+          return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
+        }
+
+        const existingUser = usersPage.users.find(
+          (user) => user.email?.toLowerCase() === email.toLowerCase()
+        );
+        if (existingUser) {
+          userId = existingUser.id;
+          break;
+        }
+
+        if (usersPage.users.length < perPage) break;
+        page += 1;
+      }
     }
 
-    let userId: string;
-    if (userLookup?.user) {
-      userId = userLookup.user.id;
-    } else {
-      const createResp = await supabase.auth.admin.createUser({ email, email_confirm: true, user_metadata: { email_verified: true } });
+    if (!userId) {
+      const createResp = await supabase.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: { email_verified: true }
+      });
       if (createResp.error || !createResp.data?.user) {
         console.error("[verify-magic-link] createUser error:", createResp.error);
         return new Response(JSON.stringify({ error: "Failed to create user" }), { status: 500, headers: jsonHeaders });

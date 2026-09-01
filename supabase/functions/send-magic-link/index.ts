@@ -8,8 +8,7 @@ import {
   getUserAgent,
   isValidEmail,
   createAdminClient,
-  buildAuthUrl,
-  isUserNotFoundError
+  buildAuthUrl
 } from '../_shared/auth-utils.ts';
 import { sendEmail } from '../_shared/resend-client.ts';
 import { buildMagicLinkEmail } from '../_shared/auth-email-templates.ts';
@@ -146,42 +145,25 @@ serve(async (req) => {
       }
     }
 
-    // Check if user exists via auth admin API
-    const { data: userLookup, error: getUserError } = await supabase.auth.admin.getUserByEmail(
-      normalizedEmail
-    );
+    // Resolve known users through profiles. Supabase Admin exposes getUserById
+    // and listUsers, but does not provide getUserByEmail.
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, email_verified')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
 
-    if (getUserError && !isUserNotFoundError(getUserError)) {
-      console.error('[send-magic-link] Failed to lookup user:', getUserError);
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('[send-magic-link] Failed to load user profile:', profileError);
       return new Response(
-        JSON.stringify({ error: 'Failed to lookup user' }),
+        JSON.stringify({ error: 'Failed to load user profile' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = userLookup?.user?.id ?? null;
-
-    let userName: string | undefined;
-    let emailVerified: boolean | undefined;
-
-    if (userId) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, name, email_verified')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('[send-magic-link] Failed to load user profile:', profileError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to load user profile' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      userName = profile?.name ?? undefined;
-      emailVerified = profile?.email_verified ?? undefined;
-    }
+    const userId = profile?.id ?? null;
+    const userName = profile?.name ?? undefined;
+    const emailVerified = profile?.email_verified ?? undefined;
 
     // Create magic link token
     const { token, expiresAt } = await createMagicLinkToken(
