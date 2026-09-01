@@ -40,8 +40,7 @@ describe('Go-live contract checks (edge functions + schema map)', () => {
   it('pauses queue consumption without burning retries and persists retry timing', () => {
     const worker = read('supabase/functions/provision-vapi/index.ts');
 
-    expect(worker).toContain('ENABLE_VAPI_PROVISIONING');
-    expect(worker).toContain('!== "true"');
+    expect(worker).toContain('isVapiProvisioningEnabled');
     expect(worker).toContain('paused: true, processed: 0');
     expect(worker).toContain('retry_after: retryAfter');
     expect(worker).toContain('if (job.retry_after)');
@@ -49,8 +48,31 @@ describe('Go-live contract checks (edge functions + schema map)', () => {
     expect(worker).toContain('WORKER_LEASE_EXPIRED');
   });
 
+  it('the provisioning switch fails closed on env var and PostHog flag', () => {
+    const switchSrc = read('supabase/functions/_shared/provisioning-switch.ts');
+
+    expect(switchSrc).toContain('ENABLE_VAPI_PROVISIONING');
+    expect(switchSrc).toContain('!== "true"');
+    expect(switchSrc).toContain('vapi-provisioning-enabled');
+    expect(switchSrc).toContain('isFeatureEnabled');
+    // Every early-exit path before a successful PostHog check must return false.
+    expect(switchSrc.match(/return false;/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('every signup entry point that can enqueue provisioning shares the same switch', () => {
+    const createTrial = read('supabase/functions/create-trial/index.ts');
+    const provisionVapi = read('supabase/functions/provision-vapi/index.ts');
+    const createSalesAccount = read('supabase/functions/create-sales-account/index.ts');
+    const finalizeTrial = read('supabase/functions/finalize-trial/index.ts');
+
+    for (const src of [createTrial, provisionVapi, createSalesAccount, finalizeTrial]) {
+      expect(src).toContain('isVapiProvisioningEnabled');
+      expect(src).not.toContain('DISABLE_VAPI_PROVISIONING');
+    }
+  });
+
   it('enforces one active provisioning job per account and type', () => {
-    const migration = read('supabase/migrations/20260831150000_durable_provisioning_job_uniqueness.sql');
+    const migration = read('supabase/migrations/20260831143135_durable_provisioning_job_uniqueness.sql');
 
     expect(migration).toContain('CREATE UNIQUE INDEX');
     expect(migration).toContain('(account_id, job_type)');

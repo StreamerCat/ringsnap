@@ -48,6 +48,7 @@ import {
 import { isDisposableEmail } from "../_shared/disposable-domains.ts";
 import { isValidPhoneNumber } from "../_shared/validators.ts";
 import { getRequiredEnv, assertEnv } from "../_shared/env-validation.ts";
+import { isVapiProvisioningEnabled } from "../_shared/provisioning-switch.ts";
 import { initSentry, captureError, setContext } from "../_shared/sentry.ts";
 import {
   sendSignupFailureNotifications,
@@ -2026,10 +2027,13 @@ Deno.serve(async (req: Request) => {
     phase = "vapi_provision_start";
     console.log(`[${FUNCTION_NAME}] request_id=${request_id} phase=${phase}`);
 
-    // Check for VAPI kill switch
-    // Fail closed: provider provisioning only runs after operations explicitly
-    // opts in with a separate enable switch following provider verification.
-    const disableVapiProvisioning = Deno.env.get("ENABLE_VAPI_PROVISIONING") !== "true";
+    // Check for VAPI kill switch. Fail closed: provider provisioning only
+    // runs after operations explicitly opts in via env var AND the
+    // "vapi-provisioning-enabled" PostHog flag agrees.
+    const disableVapiProvisioning = !(await isVapiProvisioningEnabled(
+      currentAccountId ?? currentUserId ?? data.email ?? "anonymous",
+      baseLogOptions,
+    ));
     let jobError: any = null;
 
     if (isTestMode) {
