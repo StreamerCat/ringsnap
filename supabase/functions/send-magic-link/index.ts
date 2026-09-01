@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
-  createMagicLinkToken,
   checkRateLimit,
   logAuthEvent,
   getIpAddress,
@@ -145,13 +144,44 @@ serve(async (req) => {
       }
     }
 
-    // Resolve known users through profiles. Supabase Admin exposes getUserById
-    // and listUsers, but does not provide getUserByEmail.
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, name, email_verified')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
+    // Generate a native Supabase magic-link token. The callback exchanges this
+    // token with verifyOtp, so signing in never changes the user's password.
+    const callbackUrl = buildAuthUrl(
+      SITE_URL,
+      '/auth/magic-callback',
+      redirectTo ? { redirect: redirectTo } : undefined
+    );
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: 'magiclink',
+      email: normalizedEmail,
+      options: { redirectTo: callbackUrl }
+    });
+
+    if (linkError) {
+      console.error('[send-magic-link] Failed to generate native magic link:', linkError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to generate magic link' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const nativeTokenHash = linkData.properties?.hashed_token;
+    if (!nativeTokenHash) {
+      console.error('[send-magic-link] Native magic link response missing hashed token');
+      return new Response(
+        JSON.stringify({ error: 'Failed to generate magic link' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = linkData.user?.id ?? null;
+    const { data: profile, error: profileError } = userId
+      ? await supabase
+          .from('profiles')
+          .select('name, email_verified')
+          .eq('id', userId)
+          .maybeSingle()
+      : { data: null, error: null };
 
     if (profileError && profileError.code !== 'PGRST116') {
       console.error('[send-magic-link] Failed to load user profile:', profileError);
@@ -161,25 +191,16 @@ serve(async (req) => {
       );
     }
 
-    const userId = profile?.id ?? null;
     const userName = profile?.name ?? undefined;
     const emailVerified = profile?.email_verified ?? undefined;
-
-    // Create magic link token
-    const { token, expiresAt } = await createMagicLinkToken(
-      supabase,
-      normalizedEmail,
-      userId,
-      MAGIC_LINK_TTL_MINUTES
-      // deviceNonce - explicitly omitted to allow cross-device login (email to mobile/desktop)
-    );
+    const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MINUTES * 60 * 1000);
 
     // Build magic link URL
     const magicLink = buildAuthUrl(
       SITE_URL,
       '/auth/magic-callback',
       {
-        token,
+        token: nativeTokenHash,
         ...(redirectTo && { redirect: redirectTo })
       }
     );

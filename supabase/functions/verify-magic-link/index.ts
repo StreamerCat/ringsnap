@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
-import { hashToken } from "../_shared/auth-utils.ts";
 
 serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -15,132 +14,34 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { token, deviceNonce } = body || {};
+    const { token } = body || {};
 
     if (!token) {
       return new Response(JSON.stringify({ error: "Missing token" }), { status: 400, headers: jsonHeaders });
     }
 
-    // Use SHA256 to match send-magic-link hashing (fixes token mismatch bug)
-    const tokenHash = await hashToken(token);
-    const nowIso = new Date().toISOString();
+    const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: "email",
+    });
 
-    // Device clause: if deviceNonce provided, allow stored device_nonce NULL or equal to provided
-    const deviceOrClause = deviceNonce ? `device_nonce.is.null,device_nonce.eq.${deviceNonce}` : `device_nonce.is.null`;
-
-    // Atomically mark token used and return the consumed row
-    const { data: consumedRow, error: updateError } = await supabase
-      .from("auth_tokens")
-      .update({ used_at: nowIso })
-      .match({ token_hash: tokenHash, token_type: "magic_link" })
-      .is("used_at", null)
-      .gt("expires_at", nowIso)
-      .or(deviceOrClause)
-      .select("*")
-      .limit(1)
-      .maybeSingle();
-
-    if (updateError) {
-      console.error("[verify-magic-link] DB update error:", updateError);
-      return new Response(JSON.stringify({ error: "Failed to validate token" }), { status: 500, headers: jsonHeaders });
+    if (verifyError || !verifyData.session || !verifyData.user) {
+      console.error("[verify-magic-link] verifyOtp error:", verifyError);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired magic link" }),
+        { status: 401, headers: jsonHeaders }
+      );
     }
-
-    if (!consumedRow) {
-      // token invalid/expired/consumed or device mismatch
-      return new Response(JSON.stringify({ error: "Invalid or expired magic link" }), { status: 401, headers: jsonHeaders });
-    }
-
-    const email = consumedRow.email;
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Token missing email" }), { status: 500, headers: jsonHeaders });
-    }
-
-    // Prefer the user id captured when the link was issued. For legacy
-    // tokens without a user id, fall back to the supported paginated
-    // listUsers API because Supabase Admin has no getUserByEmail method.
-    let userId: string | null = consumedRow.user_id ?? null;
-
-    if (userId) {
-      const { data: userLookup, error: userLookupError } =
-        await supabase.auth.admin.getUserById(userId);
-      if (userLookupError || !userLookup?.user) {
-        console.error("[verify-magic-link] getUserById error:", userLookupError);
-        return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
-      }
-    } else {
-      const perPage = 1000;
-      let page = 1;
-
-      while (!userId) {
-        const { data: usersPage, error: listUsersError } =
-          await supabase.auth.admin.listUsers({ page, perPage });
-
-        if (listUsersError) {
-          console.error("[verify-magic-link] listUsers error:", listUsersError);
-          return new Response(JSON.stringify({ error: "Failed to verify user" }), { status: 500, headers: jsonHeaders });
-        }
-
-        const existingUser = usersPage.users.find(
-          (user) => user.email?.toLowerCase() === email.toLowerCase()
-        );
-        if (existingUser) {
-          userId = existingUser.id;
-          break;
-        }
-
-        if (usersPage.users.length < perPage) break;
-        page += 1;
-      }
-    }
-
-    if (!userId) {
-      const createResp = await supabase.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: { email_verified: true }
-      });
-      if (createResp.error || !createResp.data?.user) {
-        console.error("[verify-magic-link] createUser error:", createResp.error);
-        return new Response(JSON.stringify({ error: "Failed to create user" }), { status: 500, headers: jsonHeaders });
-      }
-      userId = createResp.data.user.id;
-      // small delay for triggers if needed
-      await new Promise((res) => setTimeout(res, 300));
-    }
-
-    // Create a temporary password, set it, sign in to obtain session tokens
-    const tempPassword = randomHex(32);
-    const updatePw = await supabase.auth.admin.updateUserById(userId, { password: tempPassword });
-    if (updatePw.error) {
-      console.error("[verify-magic-link] updateUserById error:", updatePw.error);
-      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: jsonHeaders });
-    }
-
-    const signInResp = await supabase.auth.signInWithPassword({ email, password: tempPassword });
-    if (signInResp.error || !signInResp.data?.session) {
-      console.error("[verify-magic-link] signInWithPassword error:", signInResp.error);
-      return new Response(JSON.stringify({ error: "Failed to create session" }), { status: 500, headers: jsonHeaders });
-    }
-
-    // Rotate password after short delay to minimize window (best-effort)
-    setTimeout(async () => {
-      try {
-        const newPw = randomHex(32);
-        await supabase.auth.admin.updateUserById(userId, { password: newPw });
-      } catch (e) {
-        console.warn("[verify-magic-link] failed to rotate password:", e);
-      }
-    }, 100);
 
     // Return session + user to the client; the client will call supabase.auth.setSession(...)
     return new Response(
       JSON.stringify({
         success: true,
         session: {
-          access_token: signInResp.data.session.access_token,
-          refresh_token: signInResp.data.session.refresh_token,
+          access_token: verifyData.session.access_token,
+          refresh_token: verifyData.session.refresh_token,
         },
-        user: { id: userId, email },
+        user: { id: verifyData.user.id, email: verifyData.user.email },
       }),
       { status: 200, headers: jsonHeaders }
     );
@@ -149,9 +50,3 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: err?.message || "Unexpected error" }), { status: 500, headers: jsonHeaders });
   }
 });
-
-// helper: random hex string
-function randomHex(bytes = 32) {
-  const arr = crypto.getRandomValues(new Uint8Array(bytes));
-  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
