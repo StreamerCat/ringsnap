@@ -1083,6 +1083,18 @@ Deno.serve(async (req: Request) => {
     const isTestMode = isCiTestRequest && data.zipCode === "99999";
     const isBypassMode = isCiTestRequest;
 
+    // Excludes synthetic CI test requests, matching the trial_created/trial_activated
+    // success events below — otherwise CI traffic would count toward attempts but
+    // never toward successes, skewing the reported conversion rate.
+    if (!isCiTestRequest) {
+      await capturePostHogEvent('create_trial_attempted', data.leadId ?? data.email ?? 'anonymous', {
+        environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+        plan_type: data.planType,
+        source: data.source,
+        lead_id: data.leadId ?? null,
+      });
+    }
+
     // Outbound checkout mode: the prospect already completed a hosted Stripe Checkout
     // (card collected there, not on the call — see agent-trial-checkout). Adopt the
     // existing customer/subscription instead of creating new Stripe objects.
