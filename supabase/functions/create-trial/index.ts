@@ -1948,33 +1948,40 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // PostHog: trial_started + trial_plan_preselected (best-effort, fire-and-forget)
-    capturePostHogEvent("trial_started", currentUserId ?? data.email ?? "anonymous", {
-      plan_key: normalizedPlanKey,
-      source_channel: data.source ?? "website",
-      account_id: currentAccountId,
-      subscription_id: stripeSubscriptionId,
-      billing_call_based: true,
-      trial_live_calls_limit: 15,
-      selected_post_trial_plan: selectedPostTrialPlan,
-      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
-      $lib: "edge-function",
-      $set: {
-        billing_status: "trial",
+    // PostHog: trial_started + trial_plan_preselected (best-effort, fire-and-forget).
+    // Gated on !isCiTestRequest for the same reason as create_trial_attempted,
+    // trial_created and trial_activated below: synthetic CI signups must not
+    // enter the production funnel. Leaving trial_started ungated made the
+    // funnel disagree with itself — more trials started than created — and
+    // made CI volume look like real demand.
+    if (!isCiTestRequest) {
+      capturePostHogEvent("trial_started", currentUserId ?? data.email ?? "anonymous", {
         plan_key: normalizedPlanKey,
+        source_channel: data.source ?? "website",
         account_id: currentAccountId,
-      },
-    });
-    capturePostHogEvent("trial_plan_preselected", currentUserId ?? data.email ?? "anonymous", {
-      plan_key: selectedPostTrialPlan,
-      preselect_reason: preselectReason,
-      account_id: currentAccountId,
-      trade: data.trade,
-      team_size: data.teamSize ?? null,
-      coverage_preference: data.coveragePreference ?? null,
-      explicit_selection: !!data.selectedPostTrialPlan,
-      $lib: "edge-function",
-    });
+        subscription_id: stripeSubscriptionId,
+        billing_call_based: true,
+        trial_live_calls_limit: 15,
+        selected_post_trial_plan: selectedPostTrialPlan,
+        environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+        $lib: "edge-function",
+        $set: {
+          billing_status: "trial",
+          plan_key: normalizedPlanKey,
+          account_id: currentAccountId,
+        },
+      });
+      capturePostHogEvent("trial_plan_preselected", currentUserId ?? data.email ?? "anonymous", {
+        plan_key: selectedPostTrialPlan,
+        preselect_reason: preselectReason,
+        account_id: currentAccountId,
+        trade: data.trade,
+        team_size: data.teamSize ?? null,
+        coverage_preference: data.coveragePreference ?? null,
+        explicit_selection: !!data.selectedPostTrialPlan,
+        $lib: "edge-function",
+      });
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // LINK LEAD (if provided)

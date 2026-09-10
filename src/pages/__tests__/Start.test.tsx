@@ -47,6 +47,18 @@ vi.mock("@/lib/api/leads", () => ({
   captureSignupLead: vi.fn(),
 }));
 
+const analytics = vi.hoisted(() => ({ capture: vi.fn(), identify: vi.fn() }));
+vi.mock("@/lib/analytics", () => ({
+  capture: analytics.capture,
+  identify: analytics.identify,
+  IS_DEV: false,
+}));
+
+/** Names of the PostHog events captured so far, in order. */
+function capturedEvents(): string[] {
+  return analytics.capture.mock.calls.map(([event]) => event as string);
+}
+
 // Mock navigate
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -327,6 +339,38 @@ describe("Start Page", () => {
       await waitFor(() => {
         expect(screen.getByText(/setting up/i)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("Funnel instrumentation", () => {
+    // The name input is autoFocused, so React focuses it during mount. That
+    // focus is the browser's, not the visitor's — counting it as engagement
+    // made every bounce on /start look like an abandoned form fill.
+    it("does not fire form_started when autofocus lands on the name field", () => {
+      render(<TestWrapper />);
+
+      expect(capturedEvents()).toContain("trial_form_viewed");
+      expect(capturedEvents()).not.toContain("form_started");
+      expect(capturedEvents()).not.toContain("form_field_focused");
+    });
+
+    it("fires form_started once the visitor types into a field", async () => {
+      const user = userEvent.setup();
+      render(<TestWrapper />);
+
+      await user.type(screen.getByLabelText(/your name/i), "Jo");
+      await user.type(screen.getByLabelText(/work email/i), "jo@acmeplumbing.com");
+
+      expect(capturedEvents().filter((event) => event === "form_started")).toHaveLength(1);
+    });
+
+    it("does not report abandonment for a field the visitor never engaged with", () => {
+      render(<TestWrapper />);
+
+      // Autofocus, then the visitor clicks away without touching the form.
+      fireEvent.blur(screen.getByLabelText(/your name/i));
+
+      expect(capturedEvents()).not.toContain("form_field_abandoned");
     });
   });
 
