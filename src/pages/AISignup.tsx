@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { captureSignupLead } from "@/lib/api/leads";
-import { IS_DEV } from "@/lib/analytics";
+import { IS_DEV, identify } from "@/lib/analytics";
 import { ChatMessage, TypingIndicator, MessageRole } from "@/components/onboarding-chat/ChatMessage";
 import { ChatButtons } from "@/components/onboarding-chat/ChatButtons";
 import { ChatInput } from "@/components/onboarding-chat/ChatInput";
@@ -332,6 +332,18 @@ export default function AISignup() {
 
       if (!data || !data.success) {
         throw new Error(data?.message || "Signup failed");
+      }
+
+      if (data.user_id) {
+        identify(data.user_id, {
+          email: signupData.email,
+          name: signupData.name,
+          phone: signupData.phone,
+          account_id: data.account_id,
+          plan_key: data.plan_type,
+          billing_status: 'trialing',
+          last_active_at: new Date().toISOString(),
+        });
       }
 
       // Success!
