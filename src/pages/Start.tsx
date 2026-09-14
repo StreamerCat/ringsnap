@@ -13,7 +13,7 @@
  * - Reduce friction and risk
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2, Phone, ArrowRight, CheckCircle, Shield, Clock, Zap } from 'lucide-react';
@@ -89,20 +89,47 @@ export default function Start() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The name field below carries autoFocus, so React fires its onFocus during
+  // mount — milliseconds after the pageview, before the visitor has touched
+  // anything. Treating that as engagement made every bounce on /start look
+  // like an abandoned form fill in the signup funnel. Only focus that follows
+  // a real gesture (or an actual value change, which covers browser autofill)
+  // counts as the visitor starting the form.
+  const hasUserGestured = useRef(false);
+  useEffect(() => {
+    const markGesture = () => { hasUserGestured.current = true; };
+    const gestures = ['pointerdown', 'keydown', 'touchstart'] as const;
+    gestures.forEach((name) => window.addEventListener(name, markGesture, { capture: true }));
+    return () => {
+      gestures.forEach((name) => window.removeEventListener(name, markGesture, { capture: true }));
+    };
+  }, []);
+
   // PostHog: fire form_started only once per session
-  const [formStartTracked, setFormStartTracked] = useState(false);
+  const formStartTracked = useRef(false);
   const handleFormStart = () => {
-    if (formStartTracked) return;
-    setFormStartTracked(true);
+    if (formStartTracked.current) return;
+    formStartTracked.current = true;
     capture('form_started', { form_id: 'signup_step1', funnel_step: 'step1_lead_capture' });
   };
 
   const handleFieldFocus = (fieldName: string) => {
+    if (!hasUserGestured.current) return;
     handleFormStart();
     capture('form_field_focused', { field_name: fieldName, form: 'trial_signup' });
   };
 
+  const handleFieldChange = (value: string, setValue: (next: string) => void) => {
+    setValue(value);
+    // Autofill changes a field without any pointer or key event of its own.
+    hasUserGestured.current = true;
+    handleFormStart();
+  };
+
   const handleFieldAbandon = (fieldName: string, value: string) => {
+    // Blurring a field the visitor never engaged with (autofocus, then a click
+    // elsewhere on the page) is not abandonment.
+    if (!formStartTracked.current) return;
     if (value.length === 0) {
       capture('form_field_abandoned', { field_name: fieldName, field_value_length: 0, form: 'trial_signup' });
     }
@@ -408,7 +435,7 @@ export default function Start() {
                       type="text"
                       placeholder="John Smith"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => handleFieldChange(e.target.value, setName)}
                       onFocus={() => handleFieldFocus('name')}
                       onBlur={(e) => handleFieldAbandon('name', e.target.value)}
                       disabled={isSubmitting}
@@ -425,7 +452,7 @@ export default function Start() {
                       type="email"
                       placeholder="john@acmeplumbing.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => handleFieldChange(e.target.value, setEmail)}
                       onFocus={() => handleFieldFocus('email')}
                       onBlur={(e) => handleFieldAbandon('email', e.target.value)}
                       disabled={isSubmitting}

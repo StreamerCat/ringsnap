@@ -25,6 +25,27 @@ Existing website events (unchanged, already in production — see `src/lib/analy
 
 Standardized properties used throughout: `signup_channel`, `lead_id`, `account_id`, `call_id`, `vapi_call_id`, `correlation_id`, `environment`, `outcome`, `failure_stage`, `error_code`, `error_category`, `http_status`, `function_name`, `duration_ms`.
 
+## Reading the funnel: two known discontinuities
+
+Both of these make current counts look lower than the historical series. Neither
+is a regression in the signup path.
+
+- **Synthetic CI signups left the funnel.** Until 2026-09-01, CI and e2e runs
+  posted `bypassStripe` / zip `99999` payloads to the deployed `create-trial`,
+  and those synthetic accounts emitted the same funnel events as real ones —
+  they were the bulk of daily `trial_created` / `trial_started`, and nothing on
+  the event distinguished them. Signed CI requests are now excluded from every
+  funnel event `create-trial` emits, so the daily counts are real signups only.
+  When comparing to anything before 2026-09-01, expect a step change.
+- **`form_started` means interaction, not arrival.** The `/start` name field is
+  autofocused, so `form_started` and `form_field_focused` used to fire from the
+  browser's own focus a few milliseconds after the pageview — every bounce
+  looked like an abandoned form fill, and the `form_started → trial_created`
+  abandonment cohort was mostly people who never typed anything. Both events
+  now require a real gesture (or a value change, which covers autofill). Use
+  `trial_form_viewed` for "reached the form" and `form_started` for "engaged
+  with it".
+
 ## Dashboard insights to build
 
 1. **Website signup funnel** — Funnel insight: `$pageview` (path=`/start`) → `form_started` → `lead_captured` → `trial_created` (server). Breakdown by `utm_source`.
