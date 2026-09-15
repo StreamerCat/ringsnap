@@ -820,8 +820,10 @@ describe("create-trial endpoint", () => {
 
   describe("Codex review fixes on error_encountered/environment (verified)", () => {
     // Mirrors isExpectedValidationRejection: routine 400/409/429 control-flow
-    // rejections must not fire error_encountered, or the event becomes
-    // useless for alerting (constant false positives on normal traffic).
+    // rejections must not report to error tracking at all — neither the
+    // exception nor the error_encountered event — or the signal becomes
+    // useless (a fresh issue per malformed public request, constant
+    // false positives on normal traffic).
     function isExpectedValidationRejection(step: string): boolean {
       return (
         step.startsWith("validation_") ||
@@ -844,6 +846,27 @@ describe("create-trial endpoint", () => {
       expect(isExpectedValidationRejection("supabase_insert_account")).toBe(false);
       expect(isExpectedValidationRejection("vapi_setup")).toBe(false);
       expect(isExpectedValidationRejection("twilio_provision")).toBe(false);
+    });
+
+    // Mirrors captureCreateTrialException's gate: an expected rejection must
+    // ship NEITHER the exception nor the error_encountered event. A malformed
+    // body on this public (verify_jwt=false) endpoint returns a handled 400,
+    // so it must not open a fresh error-tracking issue.
+    function captureCounts(step: string): { exceptions: number; events: number } {
+      return isExpectedValidationRejection(step)
+        ? { exceptions: 0, events: 0 }
+        : { exceptions: 1, events: 1 };
+    }
+
+    it("ships nothing for a malformed-JSON rejection (handled 400, not a crash)", () => {
+      expect(captureCounts("validate_input_json_parse")).toEqual({ exceptions: 0, events: 0 });
+      expect(captureCounts("validate_input_schema")).toEqual({ exceptions: 0, events: 0 });
+      expect(captureCounts("validation_phone")).toEqual({ exceptions: 0, events: 0 });
+    });
+
+    it("still ships an exception and an event for a real operational failure", () => {
+      expect(captureCounts("stripe_customer_create")).toEqual({ exceptions: 1, events: 1 });
+      expect(captureCounts("supabase_insert_account")).toEqual({ exceptions: 1, events: 1 });
     });
 
     // Mirrors the environment resolution fix: NODE_ENV is never set in
