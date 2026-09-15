@@ -43,6 +43,83 @@ const POSTHOG_HOST = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) |
  */
 const REPLAY_SAMPLE_RATE = 1.0;
 
+export type AcquisitionChannel =
+  | 'direct'
+  | 'organic_search'
+  | 'ai_assistant'
+  | 'paid_search'
+  | 'email'
+  | 'partner'
+  | 'referral'
+  | 'other_campaign';
+
+const AI_REFERRER_DOMAINS = [
+  'chatgpt.com',
+  'chat.openai.com',
+  'perplexity.ai',
+  'claude.ai',
+  'gemini.google.com',
+  'copilot.microsoft.com',
+];
+
+const SEARCH_REFERRER_DOMAINS = [
+  'google.',
+  'bing.com',
+  'duckduckgo.com',
+  'yahoo.com',
+  'brave.com',
+  'ecosia.org',
+];
+
+/**
+ * Normalizes acquisition into a small, reportable taxonomy. UTM tags win
+ * because browser referrers are often stripped by search engines and apps.
+ */
+export function classifyAcquisition(
+  utmSource: string | null,
+  utmMedium: string | null,
+  referrer: string,
+): AcquisitionChannel {
+  const source = utmSource?.trim().toLowerCase() ?? '';
+  const medium = utmMedium?.trim().toLowerCase() ?? '';
+
+  if (['chatgpt', 'openai', 'perplexity', 'claude', 'anthropic', 'gemini', 'copilot'].includes(source)) {
+    return 'ai_assistant';
+  }
+  if (medium.includes('cpc') || medium.includes('ppc') || medium === 'paid' || medium === 'paidsearch') {
+    return 'paid_search';
+  }
+  if (medium === 'organic' || source === 'google' || source === 'bing') {
+    return 'organic_search';
+  }
+  if (medium === 'email' || source === 'email' || source === 'newsletter') return 'email';
+  if (medium === 'partner' || medium === 'affiliate') return 'partner';
+  if (source) return 'other_campaign';
+
+  if (!referrer) return 'direct';
+  try {
+    const hostname = new URL(referrer).hostname.toLowerCase();
+    if (AI_REFERRER_DOMAINS.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) {
+      return 'ai_assistant';
+    }
+    if (SEARCH_REFERRER_DOMAINS.some((domain) => hostname.includes(domain))) {
+      return 'organic_search';
+    }
+    return 'referral';
+  } catch {
+    return 'direct';
+  }
+}
+
+function getReferrerDomain(referrer: string): string | undefined {
+  if (!referrer) return undefined;
+  try {
+    return new URL(referrer).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
 
 function safePostHogCall(action: string, fn: () => void): void {
   try {
@@ -138,14 +215,18 @@ export function initAnalytics(): void {
  */
 function getStandardProps(): Record<string, string | undefined> {
   const params = new URLSearchParams(window.location.search);
-  // Note: PostHog auto-captures $referrer — do not add a custom `referrer` prop here (would duplicate it)
+  const utmSource = params.get('utm_source');
+  const utmMedium = params.get('utm_medium');
+  const referrer = document.referrer;
   return {
     page_path: window.location.pathname,
-    utm_source: params.get('utm_source') ?? undefined,
-    utm_medium: params.get('utm_medium') ?? undefined,
+    utm_source: utmSource ?? undefined,
+    utm_medium: utmMedium ?? undefined,
     utm_campaign: params.get('utm_campaign') ?? undefined,
     // source_channel: canonical attribution field — derived from utm_source when present
-    source_channel: params.get('utm_source') ?? undefined,
+    source_channel: utmSource ?? undefined,
+    acquisition_channel: classifyAcquisition(utmSource, utmMedium, referrer),
+    referrer_domain: getReferrerDomain(referrer),
     environment: IS_DEV ? 'development' : 'production',
     app_surface: window.location.pathname.startsWith('/dashboard') ? 'app' : 'marketing',
   };
