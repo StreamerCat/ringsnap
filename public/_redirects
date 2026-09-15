@@ -25,5 +25,46 @@
 /sitemap-resources.xml   /sitemap-resources.xml   200
 /sitemap-compare.xml     /sitemap-compare.xml     200
 
+# Prerendered public pages. Netlify evaluates redirects before the SPA fallback,
+# so these explicit rewrites ensure crawlers receive each route's rendered HTML,
+# including its canonical URL, metadata, and JSON-LD.
+/pricing /pricing/index.html 200
+/difference /difference/index.html 200
+/plumbers /plumbers/index.html 200
+/hvac /hvac/index.html 200
+/electricians /electricians/index.html 200
+/roofing /roofing/index.html 200
+/handyman /handyman/index.html 200
+/privacy /privacy/index.html 200
+/terms /terms/index.html 200
+/crm /crm/index.html 200
+/home-services-answering-service /home-services-answering-service/index.html 200
+/contractor-answering-service /contractor-answering-service/index.html 200
+/after-hours-answering-service /after-hours-answering-service/index.html 200
+/missed-call-recovery /missed-call-recovery/index.html 200
+/compare /compare/index.html 200
+/compare/ringsnap-vs-ruby /compare/ringsnap-vs-ruby/index.html 200
+/compare/ringsnap-vs-smith-ai /compare/ringsnap-vs-smith-ai/index.html 200
+/compare/ringsnap-vs-goodcall /compare/ringsnap-vs-goodcall/index.html 200
+/compare/ai-receptionist-vs-live-answering /compare/ai-receptionist-vs-live-answering/index.html 200
+/compare/best-ai-receptionist-home-services /compare/best-ai-receptionist-home-services/index.html 200
+/resources /resources/index.html 200
+/resources/hvac-dispatcher-script-template /resources/hvac-dispatcher-script-template/index.html 200
+/resources/plumbing-dispatcher-script-template /resources/plumbing-dispatcher-script-template/index.html 200
+/resources/electrician-call-answering-script /resources/electrician-call-answering-script/index.html 200
+/resources/hvac-after-hours-answering-script /resources/hvac-after-hours-answering-script/index.html 200
+/resources/hvac-price-shopper-phone-script /resources/hvac-price-shopper-phone-script/index.html 200
+/resources/hvac-emergency-call-triage /resources/hvac-emergency-call-triage/index.html 200
+/resources/burst-pipe-call-script /resources/burst-pipe-call-script/index.html 200
+/resources/sewer-backup-call-script /resources/sewer-backup-call-script/index.html 200
+/resources/drain-cleaning-upsell-script /resources/drain-cleaning-upsell-script/index.html 200
+/resources/electrical-safety-triage-questions /resources/electrical-safety-triage-questions/index.html 200
+/resources/panel-upgrade-booking-script /resources/panel-upgrade-booking-script/index.html 200
+/resources/power-outage-call-script /resources/power-outage-call-script/index.html 200
+/resources/missed-call-revenue-calculator /resources/missed-call-revenue-calculator/index.html 200
+/resources/after-hours-call-calculator /resources/after-hours-call-calculator/index.html 200
+/resources/service-pricing-calculator /resources/service-pricing-calculator/index.html 200
+/resources/increase-average-ticket /resources/increase-average-ticket/index.html 200
+
 # SPA fallback - must be last
 /*    /index.html   200
