@@ -123,6 +123,18 @@ function captureCreateTrialException(
   distinctId: string,
   context: Record<string, unknown> = {}
 ): void {
+  // Skip routine, expected control-flow rejections (invalid JSON, schema
+  // failure, invalid phone, disposable email, rate limiting,
+  // account-already-exists) — these are handled 400/409/429 responses, not
+  // operational failures. Because create-trial runs with verify_jwt=false,
+  // any malformed public request would otherwise ship an exception and open
+  // a fresh error-tracking issue, burying the real Stripe/Supabase/Vapi
+  // failures worth paging on. Gating the whole function closes the class in
+  // one place instead of one catch block per report.
+  if (isExpectedValidationRejection(step)) {
+    return;
+  }
+
   capturePostHogException(err, {
     error_source: "create_trial",
     step,
@@ -130,33 +142,24 @@ function captureCreateTrialException(
     ...context,
   }, distinctId);
 
-  // Additive: a distinct error_encountered event per failure point. `step`
-  // is already a distinct string per call site (e.g.
-  // "stripe_customer_create", "validation_phone",
+  // A distinct error_encountered event per failure point. `step` is already
+  // a distinct string per call site (e.g. "stripe_customer_create",
   // "supabase_insert_account"), so it doubles as failure_stage without
   // needing to touch every catch block individually — every call site that
-  // already reports here gets this for free.
-  //
-  // Excludes routine, expected control-flow rejections (invalid phone,
-  // disposable email, rate limiting, account-already-exists) — these are
-  // handled 400/409/429 responses, not operational failures, and firing
-  // error_encountered for every one of them would make the event useless
-  // for alerting ("3+ failures in 15 minutes" would trip on normal traffic).
-  if (!isExpectedValidationRejection(step)) {
-    const e = err instanceof Error ? err : new Error(String(err));
-    capturePostHogEvent("error_encountered", distinctId, {
-      environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
-      flow: "create_trial",
-      function_name: FUNCTION_NAME,
-      failure_stage: step,
-      error_code: (err as { name?: string; code?: string })?.name ?? (err as { name?: string; code?: string })?.code ?? "UnknownError",
-      failure_reason: e.message,
-      correlation_id: (context.correlation_id as string | undefined) ?? null,
-      lead_id: (context.lead_id as string | undefined) ?? null,
-      account_id: (context.account_id as string | undefined) ?? null,
-      retry_count: (context.retry_count as number | undefined) ?? 0,
-    });
-  }
+  // reports here gets this for free.
+  const e = err instanceof Error ? err : new Error(String(err));
+  capturePostHogEvent("error_encountered", distinctId, {
+    environment: (Deno.env.get("ENVIRONMENT") || Deno.env.get("SUPABASE_ENV") || "production"),
+    flow: "create_trial",
+    function_name: FUNCTION_NAME,
+    failure_stage: step,
+    error_code: (err as { name?: string; code?: string })?.name ?? (err as { name?: string; code?: string })?.code ?? "UnknownError",
+    failure_reason: e.message,
+    correlation_id: (context.correlation_id as string | undefined) ?? null,
+    lead_id: (context.lead_id as string | undefined) ?? null,
+    account_id: (context.account_id as string | undefined) ?? null,
+    retry_count: (context.retry_count as number | undefined) ?? 0,
+  });
 }
 
 /** Steps representing expected/handled request rejections, not operational failures. */
