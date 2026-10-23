@@ -1,3 +1,4 @@
+import { authorizePlatformStaff } from '../_shared/staff-authorization.ts';
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
@@ -15,6 +16,9 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         const supabase = createClient(supabaseUrl, supabaseKey);
 
+        const denial = await authorizePlatformStaff(req, supabase);
+        if (denial) return denial;
+
         const url = new URL(req.url);
         let accountId = url.searchParams.get("account_id");
         const email = url.searchParams.get("email");
@@ -25,6 +29,11 @@ serve(async (req) => {
         }
 
         const action = url.searchParams.get("action");
+        if (['reset', 'fix_phone'].includes(action ?? '') && req.method !== 'POST') {
+            return new Response(JSON.stringify({ error: 'Use POST for mutations' }), {
+                status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json', Allow: 'POST' },
+            });
+        }
         if (action === "reset" && accountId) {
             await supabase.from("accounts").update({ provisioning_status: "pending", phone_number_status: "pending" }).eq("id", accountId);
             await supabase.from("provisioning_jobs").update({ status: "queued", attempts: 0, error: null }).eq("account_id", accountId);

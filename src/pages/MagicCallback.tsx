@@ -1,3 +1,4 @@
+import { safeInternalRedirect } from "@/lib/auth/safe-redirect";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import * as Sentry from "@sentry/react";
@@ -18,7 +19,7 @@ export default function MagicCallback() {
   useEffect(() => {
     const verifyMagicLink = async () => {
       const token = searchParams.get("token");
-      const customRedirect = searchParams.get("redirect");
+      const customRedirect = safeInternalRedirect(searchParams.get("redirect"));
 
       if (IS_DEV) console.log('[MagicCallback] Starting verification', { token: token?.substring(0, 10), customRedirect });
 

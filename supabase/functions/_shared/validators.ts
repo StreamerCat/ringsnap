@@ -131,15 +131,20 @@ export function tryFormatPhoneE164(
   return result;
 }
 
-/**
- * Generate secure random referral code
- * 8 characters, uppercase alphanumeric
- */
+/** Uniform random integer from the operating system's cryptographic RNG. */
+function secureRandomInt(max: number): number {
+  const limit = 0x100000000 - (0x100000000 % max);
+  const bytes = new Uint32Array(1);
+  do { crypto.getRandomValues(bytes); } while (bytes[0] >= limit);
+  return bytes[0] % max;
+}
+
+/** Generate an eight-character uppercase referral code. */
 export function generateReferralCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid ambiguous chars (0, O, I, 1)
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(secureRandomInt(chars.length));
   }
   return code;
 }
@@ -148,7 +153,7 @@ export function generateReferralCode(): string {
  * Generate 6-digit verification code
  */
 export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return (100000 + secureRandomInt(900000)).toString();
 }
 
 /**

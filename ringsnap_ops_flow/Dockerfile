@@ -2,15 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install poetry
-RUN pip install poetry==1.8.3
-
-# Copy dependency files first for layer caching
-COPY pyproject.toml ./
-
-# Install dependencies (no dev)
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+# Use the same frozen dependency set tested in CI, including patched CA stores.
+RUN pip install --no-cache-dir uv==0.13.5
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
 
 # Copy source
 COPY src/ ./src/

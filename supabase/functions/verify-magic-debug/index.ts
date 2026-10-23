@@ -1,3 +1,4 @@
+import { authorizePlatformStaff } from '../_shared/staff-authorization.ts';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -14,21 +15,22 @@ serve(async (req) => {
   const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
+    const denial = await authorizePlatformStaff(req, supabase);
+    if (denial) return denial;
+
     const body = await req.json().catch(() => ({}));
     const { token, deviceNonce } = body || {};
 
     console.log("[verify-magic-debug] Request received", {
       hasToken: !!token,
-      tokenPrefix: token?.substring(0, 10),
       hasDeviceNonce: !!deviceNonce,
-      deviceNoncePrefix: deviceNonce?.substring(0, 10),
     });
 
     if (!token) {
       return new Response(
         JSON.stringify({
           error: "Missing token",
-          debug: { requestBody: body }
+          debug: { hasToken: false }
         }),
         { status: 400, headers: jsonHeaders }
       );

@@ -1,3 +1,6 @@
+import { corsHeaders } from '../_shared/cors.ts';
+import { createClient } from 'supabase';
+import { authorizePlatformStaff } from '../_shared/staff-authorization.ts';
 /**
  * Sentry Test Function
  *
@@ -28,6 +31,14 @@ serve(
     logInfo("Sentry test function started", baseLog);
 
     try {
+      if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+      const authClient = createClient(
+        Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        { auth: { persistSession: false, autoRefreshToken: false } },
+      );
+      const denial = await authorizePlatformStaff(req, authClient);
+      if (denial) return denial;
+
       const body = await req.json();
       const testType = body.testType || "error";
 
@@ -53,7 +64,7 @@ serve(
               // These should all be redacted
               customer_email: "sensitive@example.com",
               phone_number: "+1234567890",
-              stripe_secret_key: Deno.env.get("STRIPE_SECRET_KEY") || "[missing STRIPE_SECRET_KEY]",
+              stripe_secret_key: "sk_test_redaction_fixture",
               authorization_header: "Bearer token123",
               credit_card: "4242-4242-4242-4242",
 

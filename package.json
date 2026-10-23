@@ -39,7 +39,8 @@
     "test:go-live:integration": "vitest run tests/go-live",
     "test:go-live:e2e": "playwright test --project=smoke tests/e2e/go-live/smoke.spec.ts",
     "test:go-live": "node scripts/run-go-live-tests.mjs",
-    "check:sitemap-serving": "node scripts/check-sitemap-serving.mjs"
+    "check:sitemap-serving": "node scripts/check-sitemap-serving.mjs",
+    "test:security": "node --experimental-strip-types --test tests/security/*.node.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -83,7 +84,7 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
-    "jspdf": "^3.0.3",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "posthog-js": "^1.390.2",
@@ -93,7 +94,7 @@
     "react-helmet-async": "^2.0.5",
     "react-hook-form": "^7.61.1",
     "react-resizable-panels": "^2.1.9",
-    "react-router-dom": "^6.30.1",
+    "react-router-dom": "^7.18.0",
     "recharts": "^2.15.4",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
@@ -112,9 +113,9 @@
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitejs/plugin-react-swc": "^4.3.3",
     "autoprefixer": "^10.4.21",
-    "axios": "^1.13.2",
+    "axios": "^1.20.0",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -127,8 +128,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.21",
-    "vitest": "^4.0.15",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12",
     "wait-on": "^8.0.5"
   }
 }

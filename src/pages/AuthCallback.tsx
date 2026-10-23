@@ -1,3 +1,4 @@
+import { safeInternalRedirect } from "@/lib/auth/safe-redirect";
 /**
  * Handles Supabase OAuth callback by exchanging the authorization code for a session.
  */
@@ -87,7 +88,7 @@ export default function AuthCallback() {
         });
 
         // Use custom redirect if provided, otherwise use role-based redirect
-        const normalizedNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+        const normalizedNext = safeInternalRedirect(next);
         const redirectUrl = normalizedNext ?? await redirectToRoleDashboard(user.id);
 
         if (IS_DEV) console.log('[AuthCallback] Redirecting user to:', redirectUrl);
