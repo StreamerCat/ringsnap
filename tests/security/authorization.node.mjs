@@ -50,6 +50,24 @@ test('rejects unsafe authentication redirects, preserving valid deep links', () 
   for (const path of [null, '', 'https://evil.test', '//evil.test', '/\\evil.test', '/%5cevil.test', '/%2fevil.test', '/%252fevil.test', '/%0a/evil.test', 'javascript:alert(1)', '/bad%']) assert.equal(safeInternalRedirect(path), null);
 });
 
+
+test('preserves encoded query and fragment data after authentication', () => {
+  for (const path of [
+    '/dashboard?search=after%20hours',
+    '/dashboard?discount=100%25',
+    '/dashboard#after%20hours',
+    '/dashboard?next=https%3A%2F%2Fexample.test%2F',
+    '/dashboard?search=C%3A%5Ctemp',
+  ]) assert.equal(safeInternalRedirect(path), path);
+});
+
+test('rejects raw control characters even in query and fragment values', () => {
+  for (const path of [
+    '/dashboard?q=one' + String.fromCharCode(10) + 'two',
+    '/dashboard#one' + String.fromCharCode(9) + 'two',
+  ]) assert.equal(safeInternalRedirect(path), null);
+});
+
 test('verification and referral codes use crypto randomness and retain their formats', () => {
   const original = Math.random;
   Math.random = () => { throw new Error('Insecure random source used'); };
