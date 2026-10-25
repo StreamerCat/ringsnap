@@ -1,3 +1,5 @@
+import { createClient } from 'supabase';
+import { authorizePlatformStaff } from '../_shared/staff-authorization.ts';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { extractCorrelationId, logError, logInfo } from "../_shared/logging.ts";
 
@@ -14,6 +16,13 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const authClient = createClient(
+    Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const denial = await authorizePlatformStaff(req, authClient);
+  if (denial) return denial;
 
   const VAPI_API_KEY = Deno.env.get('VAPI_API_KEY');
   

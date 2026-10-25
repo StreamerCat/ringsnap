@@ -1,20 +1,24 @@
+import { corsHeaders } from '../_shared/cors.ts';
+import { createClient } from 'supabase';
+import { authorizePlatformStaff } from '../_shared/staff-authorization.ts';
 import { withSentryEdge } from "../_shared/sentry.ts";
 
 // This function is for staging validation only. 
 // It forces an error to verify Sentry capture and context.
 Deno.serve(withSentryEdge({ functionName: "sentry-debug" }, async (req, ctx) => {
+    if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+    const authClient = createClient(
+      Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    const denial = await authorizePlatformStaff(req, authClient);
+    if (denial) return denial;
+
     const url = new URL(req.url);
     const force = url.searchParams.get("force");
 
     if (force === "true") {
-        // Add extra context to verify sanitization
-        const sensitiveData = {
-            email: "test-user@example.com",
-            token: "secret-token-123",
-            payload: "safe-payload"
-        };
-
-        throw new Error(`FORCED_STAGING_ERROR: ${JSON.stringify(sensitiveData)}`);
+        throw new Error('FORCED_STAGING_ERROR');
     }
 
     return new Response(JSON.stringify({

@@ -1,3 +1,4 @@
+import { safeInternalRedirect } from "@/lib/auth/safe-redirect";
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -34,7 +35,7 @@ export default function AuthLogin() {
         // CustomerDashboard) override a staff route and trap them in a loop.
         const roleDest = await redirectToRoleDashboard(user.id);
         const isStaffRoute = roleDest === '/admin' || roleDest === '/salesdash';
-        const customRedirect = searchParams.get("redirect");
+        const customRedirect = safeInternalRedirect(searchParams.get("redirect"));
         // Staff: always use role destination.
         // Customers: honour ?redirect unless it points at a staff-only page.
         const finalRedirect = isStaffRoute
@@ -88,7 +89,7 @@ export default function AuthLogin() {
 
       const roleDest = await redirectToRoleDashboard(data.user.id);
       const isStaffRoute = roleDest === '/admin' || roleDest === '/salesdash';
-      const customRedirect = searchParams.get("redirect");
+      const customRedirect = safeInternalRedirect(searchParams.get("redirect"));
       const finalRedirect = isStaffRoute
         ? roleDest
         : (customRedirect &&

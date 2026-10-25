@@ -1,3 +1,4 @@
+import { authorizePlatformStaff } from '../_shared/staff-authorization.ts';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "supabase";
 
@@ -14,6 +15,9 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_URL')!,
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         );
+
+        const denial = await authorizePlatformStaff(req, supabase);
+        if (denial) return denial;
 
         // Config: Default to DRY RUN for safety
         const { dryRun = true, allowlist = [] } = await req.json().catch(() => ({}));

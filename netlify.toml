@@ -1,8 +1,9 @@
 [build]
-  command = "bun run build"
+  command = "npm run build"
   publish = "dist"
 
 [build.environment]
+  NODE_VERSION = "24.22.1"
   # Stripe publishable key is meant to be public; tell Netlify not to treat it as a secret
   SECRETS_SCAN_OMIT_KEYS = "VITE_STRIPE_PUBLISHABLE_KEY"
   # Sentry release tagging using Netlify's commit reference

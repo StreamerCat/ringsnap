@@ -17,13 +17,16 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Supabase's supported mirror avoids ECR throttling on shared CI runners.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '24.22.1'
 
       - name: Install Supabase CLI
         run: npm install -g supabase@2.107.0
@@ -45,7 +48,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          supabase start -x realtime,storage,imgproxy,studio,pgadmin,logflare,vector 2>&1 | tee supabase_start.log
+          supabase start -x realtime,storage-api,imgproxy,studio,logflare,vector 2>&1 | tee supabase_start.log
           exit_code=${PIPESTATUS[0]}
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           exit 0
@@ -54,7 +57,7 @@ jobs:
         if: steps.supabase_start.outputs.exit_code != '0'
         shell: bash
         run: |
-          FAILING_MIGRATION="$(grep -E "Applying migration " supabase_start.log | tail -n 1 | sed -E 's/^.*Applying migration ([^ ]+)\.\.\..*$/\1/')"
+          FAILING_MIGRATION="$({ grep -E "Applying migration " supabase_start.log || true; } | tail -n 1 | sed -E 's/^.*Applying migration ([^ ]+)\.\.\..*$/\1/')"
           ERROR_LINE="$(grep -E "ERROR:" supabase_start.log | tail -n 1 || true)"
           LOG_TAIL="$(tail -n 120 supabase_start.log)"
 
